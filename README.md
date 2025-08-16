@@ -1,0 +1,1 @@
+Set up this repo for dev by cloning, entering the root, and running `uv sync --all-groups`.
