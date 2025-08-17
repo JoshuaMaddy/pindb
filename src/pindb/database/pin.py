@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
@@ -44,9 +45,12 @@ class Pin(MappedAsDataclass, Base):
     funding_type: Mapped[FundingType] = mapped_column(default=FundingType.self)
     ## Physical
     posts: Mapped[int] = mapped_column(default=1)
+    # In mm
     width: Mapped[float | None] = mapped_column(default=None)
     height: Mapped[float | None] = mapped_column(default=None)
-    depth: Mapped[float | None] = mapped_column(default=None)
+    ## Media
+    front_image_guid: Mapped[UUID | None] = mapped_column(default=None)
+    back_image_guid: Mapped[UUID | None] = mapped_column(default=None)
 
     # Optional Relationships
     artists: Mapped[set[Artist]] = relationship(

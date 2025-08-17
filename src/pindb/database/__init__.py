@@ -1,3 +1,6 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker as SessionMaker
+
 from pindb.database.artist import Artist
 from pindb.database.base import Base
 from pindb.database.material import Material
@@ -13,3 +16,8 @@ __all__ = [
     "PinSet",
     "Shop",
 ]
+
+engine = create_engine("sqlite:///test.sqlite")
+Base.metadata.create_all(engine)
+
+session_maker = SessionMaker(bind=engine)
