@@ -8,13 +8,22 @@ from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationshi
 
 from pindb.database.artist import Artist
 from pindb.database.base import Base
-from pindb.database.joins import pins_artists, pins_materials, pins_sets, pins_shops
+from pindb.database.joins import (
+    pins_artists,
+    pins_links,
+    pins_materials,
+    pins_sets,
+    pins_shops,
+    pins_tags,
+)
+from pindb.database.link import Link
 from pindb.models import AcquisitionType, FundingType
 
 if TYPE_CHECKING:
     from pindb.database.material import Material
     from pindb.database.pin_set import PinSet
     from pindb.database.shop import Shop
+    from pindb.database.tag import Tag
 
 
 class Pin(MappedAsDataclass, Base):
@@ -51,6 +60,8 @@ class Pin(MappedAsDataclass, Base):
     ## Media
     front_image_guid: Mapped[UUID | None] = mapped_column(default=None)
     back_image_guid: Mapped[UUID | None] = mapped_column(default=None)
+    ## Info
+    description: Mapped[str | None] = mapped_column(default=None)
 
     # Optional Relationships
     artists: Mapped[set[Artist]] = relationship(
@@ -61,6 +72,15 @@ class Pin(MappedAsDataclass, Base):
     sets: Mapped[set[PinSet]] = relationship(
         secondary=pins_sets,
         back_populates="pins",
+        default_factory=set,
+    )
+    tags: Mapped[set[Tag]] = relationship(
+        secondary=pins_tags,
+        back_populates="pins",
+        default_factory=set,
+    )
+    links: Mapped[set[Link]] = relationship(
+        secondary=pins_links,
         default_factory=set,
     )
 

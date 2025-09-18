@@ -1,3 +1,10 @@
 {
-  "cSpell.words": ["htpy", "pindb", "sessionmaker"]
+  "cSpell.words": [
+    "htpy",
+    "pindb",
+    "pinset",
+    "pinsets",
+    "sessionmaker"
+  ],
+  "python.analysis.typeCheckingMode": "strict"
 }

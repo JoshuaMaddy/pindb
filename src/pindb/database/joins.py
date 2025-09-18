@@ -29,3 +29,38 @@ pins_sets = Table(
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("sets_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
 )
+
+pins_tags = Table(
+    "pins_tags",
+    Base.metadata,
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
+shops_links = Table(
+    "shops_links",
+    Base.metadata,
+    Column("shop_id", Integer, ForeignKey("shops.id"), primary_key=True),
+    Column("link_id", Integer, ForeignKey("links.id"), primary_key=True),
+)
+
+artists_links = Table(
+    "artists_links",
+    Base.metadata,
+    Column("artist_id", Integer, ForeignKey("artists.id"), primary_key=True),
+    Column("link_id", Integer, ForeignKey("links.id"), primary_key=True),
+)
+
+pin_sets_links = Table(
+    "pin_sets_links",
+    Base.metadata,
+    Column("pin_set_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
+    Column("link_id", Integer, ForeignKey("links.id"), primary_key=True),
+)
+
+pins_links = Table(
+    "pins_links",
+    Base.metadata,
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Column("link_id", Integer, ForeignKey("links.id"), primary_key=True),
+)
