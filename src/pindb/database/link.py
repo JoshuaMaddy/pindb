@@ -15,3 +15,6 @@ class Link(MappedAsDataclass, Base):
 
     # Required Attributes
     path: Mapped[str]
+
+    def __hash__(self) -> int:
+        return hash(self.path + str(self.id))

@@ -9,6 +9,6 @@ from pindb.templates.create.material import material_form
 router = APIRouter(prefix="/list")
 
 
-@router.get("/material")
+@router.get("/materials")
 def get_materials(request: Request) -> :
     return HTMLResponse(material_form)

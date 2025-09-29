@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+button,
+input[type="submit"] {
+  @apply border border-gray-500 bg-gray-100 px-2 py-1 rounded-lg;
+}
+
+input, textarea {
+  @apply border border-gray-500 px-2 py-1 rounded-lg;
+}
+
+a{
+    @apply underline text-blue-400
+}

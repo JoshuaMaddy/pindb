@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -34,6 +34,7 @@ class Pin(MappedAsDataclass, Base):
     # Required Attributes
     name: Mapped[str]
     acquisition_type: Mapped[AcquisitionType]
+    front_image_guid: Mapped[UUID]
 
     # Required Relationships
     materials: Mapped[set[Material]] = relationship(
@@ -47,18 +48,17 @@ class Pin(MappedAsDataclass, Base):
 
     # Optional Attributes
     ## Production
-    limited_edition: Mapped[bool] = mapped_column(default=False)
+    limited_edition: Mapped[bool | None] = mapped_column(default=None)
     number_produced: Mapped[int | None] = mapped_column(default=None)
-    release_date: Mapped[datetime | None] = mapped_column(default=None)
-    end_date: Mapped[datetime | None] = mapped_column(default=None)
-    funding_type: Mapped[FundingType] = mapped_column(default=FundingType.self)
+    release_date: Mapped[date | None] = mapped_column(default=None)
+    end_date: Mapped[date | None] = mapped_column(default=None)
+    funding_type: Mapped[FundingType | None] = mapped_column(default=None)
     ## Physical
     posts: Mapped[int] = mapped_column(default=1)
     # In mm
     width: Mapped[float | None] = mapped_column(default=None)
     height: Mapped[float | None] = mapped_column(default=None)
     ## Media
-    front_image_guid: Mapped[UUID | None] = mapped_column(default=None)
     back_image_guid: Mapped[UUID | None] = mapped_column(default=None)
     ## Info
     description: Mapped[str | None] = mapped_column(default=None)

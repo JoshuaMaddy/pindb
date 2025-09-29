@@ -9,3 +9,8 @@ wheels/
 # Virtual environments
 .venv
 /dev
+*.sqlite
+
+# Node
+node_modules
+main.css

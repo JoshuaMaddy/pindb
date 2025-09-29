@@ -1,25 +1,42 @@
+from pathlib import Path
 from typing import Sequence
 
 from fastapi.datastructures import URL
-from htpy import div, form, fragment, h1, h2, input, label, option, select
+from htpy import br, button, div, form, fragment, h1, h2, input, label, option, select
 
-from pindb.database import Material, Shop
+from pindb.database import Material, Shop, Tag
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 
 DIMENSION_PATTERN = r".*?(\d*\.?\d*)\s*(([Ii]nch(?:es)?)|(in)|(IN)|([Cc]entimeters?)|(cm)|(CM)|([Mm]illimeters?)|(mm)|(MM))"
+
+with open(
+    Path(__file__).parent.parent / "js/pin_creation.js", "r", encoding="utf-8"
+) as js_file:
+    SCRIPT_CONTENT = js_file.read()
 
 
 def pin_form(
     post_url: URL | str,
     materials: Sequence[Material],
     shops: Sequence[Shop],
+    tags: Sequence[Tag],
 ):
     return html_base(
-        fragment[
+        body_content=fragment[
             h1["Create a Pin"],
-            form(hx_post=str(post_url))[
+            form(hx_post=str(post_url), enctype="multipart/form-data")[
                 h2["Required Fields"],
+                div[
+                    label(for_="front_image")["Front Image"],
+                    input(
+                        type="file",
+                        id="image",
+                        name="front_image",
+                        accept="image/png, image/jpeg, image/jpg, image/webp",
+                        required=True,
+                    ),
+                ],
                 div[
                     label(for_="name")["Name"],
                     input(
@@ -66,7 +83,25 @@ def pin_form(
                         required=True,
                     )[[option(value=shop.id)[shop.name] for shop in shops]],
                 ],
+                div[
+                    label(for_="tag_ids")["Tags"],
+                    select(
+                        name="tag_ids",
+                        id="tag_ids",
+                        required=True,
+                    )[[option(value=tag.id)[tag.name] for tag in tags]],
+                ],
                 h2["Optional Fields"],
+                # Images
+                div[
+                    label(for_="back_image")["Back Image"],
+                    input(
+                        type="file",
+                        id="image",
+                        name="back_image",
+                        accept="image/png, image/jpeg, image/jpg, image/webp",
+                    ),
+                ],
                 # Production
                 div[
                     label(for_="limited_edition")["Limited Edition"],
@@ -144,7 +179,20 @@ def pin_form(
                         pattern=DIMENSION_PATTERN,
                     ),
                 ],
+                div[
+                    label(for_="links")["Links"],
+                    div(id="links")[
+                        input(
+                            name="links",
+                            id="link_0",
+                            type="text",
+                        ),
+                    ],
+                    br,
+                    button(id="add-link-button")["Add Link"],
+                ],
                 input(type="submit", value="Submit"),
             ],
-        ]
+        ],
+        script_content=SCRIPT_CONTENT,
     )
