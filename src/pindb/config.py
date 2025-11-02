@@ -12,6 +12,7 @@ class Configuration(BaseSettings):
     )
 
     image_directory: Path
+    database_connection: str
 
 
 CONFIGURATION = Configuration()  # type: ignore

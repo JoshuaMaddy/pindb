@@ -1,14 +1,75 @@
 @import "tailwindcss";
 
-button,
-input[type="submit"] {
-  @apply border border-gray-500 bg-gray-100 px-2 py-1 rounded-lg;
+@layer base {
+  button,
+  input[type="submit"] {
+    @apply border border-gray-500 bg-gray-100 px-2 py-1 rounded-lg;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply border border-gray-500 px-2 py-1 rounded-lg;
+  }
+
+  a {
+    @apply underline text-blue-400;
+  }
+
+  h1 {
+    @apply text-4xl font-bold;
+  }
+
+  h2 {
+    @apply text-3xl font-bold;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold;
+  }
+
+  h4 {
+    @apply text-xl font-semibold;
+  }
+
+  hr {
+    @apply my-3;
+  }
 }
 
-input, textarea {
+/** Tom Select **/
+/* Multi-Select Chips */
+.ts-wrapper.multi .ts-control [data-value] {
+  background-image: none;
+  background-color: inherit;
+  background-repeat: inherit;
+  box-shadow: none;
+  text-shadow: none;
+  @apply rounded text-black border-gray-500 bg-gray-100;
+}
+
+/* Single Select */
+.ts-wrapper.single,
+.ts-wrapper.single .ts-control {
+  background-image: none;
+  background-color: inherit;
+  background-repeat: inherit;
+  box-shadow: none;
+  text-shadow: none;
+  @apply rounded-lg text-black border-gray-500 items-center m-0;
+}
+
+.ts-wrapper.single .ts-control {
+  @apply py-2;
+}
+
+/* Select Agnostic */
+.focus .ts-control,
+.ts-control {
+  box-shadow: none;
   @apply border border-gray-500 px-2 py-1 rounded-lg;
 }
 
-a{
-    @apply underline text-blue-400
+.ts-dropdown {
+  @apply border border-gray-500 rounded-lg shadow-lg overflow-clip;
 }

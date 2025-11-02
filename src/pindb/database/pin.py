@@ -35,6 +35,7 @@ class Pin(MappedAsDataclass, Base):
     name: Mapped[str]
     acquisition_type: Mapped[AcquisitionType]
     front_image_guid: Mapped[UUID]
+    original_price: Mapped[float]
 
     # Required Relationships
     materials: Mapped[set[Material]] = relationship(

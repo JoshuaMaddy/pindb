@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker as SessionMaker
 
+from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist
 from pindb.database.base import Base
 from pindb.database.link import Link
@@ -21,7 +22,7 @@ __all__ = [
     "Tag",
 ]
 
-engine = create_engine("sqlite:///test.sqlite")
+engine = create_engine(CONFIGURATION.database_connection)
 Base.metadata.create_all(engine)
 
 session_maker = SessionMaker(bind=engine)

@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from htpy import div
 
-from pindb.routes import create, get, images
+from pindb.routes import create, edit, get, list, search
 
 app = FastAPI()
 
@@ -23,4 +23,6 @@ def root():
 
 app.include_router(create.router)
 app.include_router(get.router)
-app.include_router(images.router)
+app.include_router(edit.router)
+app.include_router(list.router)
+app.include_router(search.router)

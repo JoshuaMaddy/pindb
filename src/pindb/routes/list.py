@@ -1,14 +1,53 @@
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from sqlalchemy import select
 
-from pindb.templates.create.pin import pin_form
-from pindb.templates.create.material import material_form
-
+from pindb.database import Shop, session_maker
+from pindb.database.material import Material
+from pindb.database.pin_set import PinSet
+from pindb.database.tag import Tag
+from pindb.templates.list.index import list_index
+from pindb.templates.list.materials import materials_list
+from pindb.templates.list.pin_sets import pin_sets_list
+from pindb.templates.list.shops import shops_list
+from pindb.templates.list.tags import tags_list
 
 router = APIRouter(prefix="/list")
 
 
+@router.get("/")
+def get_list_index(request: Request) -> HTMLResponse:
+    return HTMLResponse(list_index(request=request))
+
+
+@router.get("/shops")
+def get_list_shops(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        shops = session.scalars(select(Shop)).all()
+
+        return HTMLResponse(shops_list(request=request, shops=shops))
+
+
+@router.get("/pin_sets")
+def get_list_pin_sets(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        pin_sets = session.scalars(select(PinSet)).all()
+
+        return HTMLResponse(pin_sets_list(request=request, pin_sets=pin_sets))
+
+
 @router.get("/materials")
-def get_materials(request: Request) -> :
-    return HTMLResponse(material_form)
+def get_list_materials(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        materials = session.scalars(select(Material)).all()
+
+        return HTMLResponse(materials_list(request=request, materials=materials))
+
+
+@router.get("/tags")
+def get_list_tags(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        tags = session.scalars(select(Tag)).all()
+
+        return HTMLResponse(tags_list(request=request, tags=tags))

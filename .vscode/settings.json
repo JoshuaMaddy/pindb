@@ -1,6 +1,8 @@
 {
   "cSpell.words": [
+    "enctype",
     "htpy",
+    "lucide",
     "pindb",
     "pinset",
     "pinsets",
@@ -8,7 +10,8 @@
   ],
   "python.analysis.typeCheckingMode": "strict",
   "tailwindCSS.experimental.classRegex": [
-    "class_=\"([^\"]*)\""
+    "class_=\"([^\"]*)\"",
+    "\"class\": \"([^\"]*)\""
   ],
   "tailwindCSS.includeLanguages": {
     "python": "html"
