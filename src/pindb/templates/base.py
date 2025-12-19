@@ -43,7 +43,7 @@ def html_base(
         script["lucide.createIcons();"],
         script[
             Markup(
-                """
+                object="""
 var element = document.getElementById('back-link');
 if (element != null){
     element.setAttribute('href', document.referrer);
@@ -55,5 +55,5 @@ if (element != null){
 """
             )
         ],
-        script_content and script[Markup(script_content)],
+        script_content and script[Markup(object=script_content)],
     ]

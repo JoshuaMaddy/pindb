@@ -9,9 +9,11 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 
 with open(
-    Path(__file__).parent.parent / "js/pin_creation.js", "r", encoding="utf-8"
+    file=Path(__file__).parent.parent / "js/pin_creation.js",
+    mode="r",
+    encoding="utf-8",
 ) as js_file:
-    SCRIPT_CONTENT = js_file.read()
+    SCRIPT_CONTENT: str = js_file.read()
 
 
 def shop_form(

@@ -29,7 +29,7 @@ def search_pin_page(post_url: URL | str):
     return html_base(
         title="Search",
         body_content=centered_div(
-            [
+            content=[
                 h1["Search"],
                 hr,
                 search_pin_input(post_url=post_url),

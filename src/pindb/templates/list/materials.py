@@ -16,7 +16,7 @@ def materials_list(request: Request, materials: Sequence[Material]) -> Element:
             for material in materials
         ],
         bread_crumb=bread_crumb(
-            [
+            entries=[
                 (request.url_for("get_list_index"), "List"),
                 "Materials",
             ]

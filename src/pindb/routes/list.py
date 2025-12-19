@@ -1,3 +1,4 @@
+from typing import Sequence
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
@@ -16,40 +17,48 @@ from pindb.templates.list.tags import tags_list
 router = APIRouter(prefix="/list")
 
 
-@router.get("/")
+@router.get(path="/")
 def get_list_index(request: Request) -> HTMLResponse:
-    return HTMLResponse(list_index_page(request=request))
+    return HTMLResponse(content=list_index_page(request=request))
 
 
-@router.get("/shops")
+@router.get(path="/shops")
 def get_list_shops(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
-        shops = session.scalars(select(Shop).order_by(Shop.name.asc())).all()
-
-        return HTMLResponse(shops_list(request=request, shops=shops))
-
-
-@router.get("/pin_sets")
-def get_list_pin_sets(request: Request) -> HTMLResponse:
-    with session_maker.begin() as session:
-        pin_sets = session.scalars(select(PinSet).order_by(PinSet.name.asc())).all()
-
-        return HTMLResponse(pin_sets_list(request=request, pin_sets=pin_sets))
-
-
-@router.get("/materials")
-def get_list_materials(request: Request) -> HTMLResponse:
-    with session_maker.begin() as session:
-        materials = session.scalars(
-            select(Material).order_by(Material.name.asc())
+        shops: Sequence[Shop] = session.scalars(
+            statement=select(Shop).order_by(Shop.name.asc())
         ).all()
 
-        return HTMLResponse(materials_list(request=request, materials=materials))
+        return HTMLResponse(content=shops_list(request=request, shops=shops))
 
 
-@router.get("/tags")
+@router.get(path="/pin_sets")
+def get_list_pin_sets(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        pin_sets: Sequence[PinSet] = session.scalars(
+            statement=select(PinSet).order_by(PinSet.name.asc())
+        ).all()
+
+        return HTMLResponse(content=pin_sets_list(request=request, pin_sets=pin_sets))
+
+
+@router.get(path="/materials")
+def get_list_materials(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material).order_by(Material.name.asc())
+        ).all()
+
+        return HTMLResponse(
+            content=materials_list(request=request, materials=materials)
+        )
+
+
+@router.get(path="/tags")
 def get_list_tags(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
-        tags = session.scalars(select(Tag).order_by(Tag.name.asc())).all()
+        tags: Sequence[Tag] = session.scalars(
+            statement=select(Tag).order_by(Tag.name.asc())
+        ).all()
 
-        return HTMLResponse(tags_list(request=request, tags=tags))
+        return HTMLResponse(content=tags_list(request=request, tags=tags))

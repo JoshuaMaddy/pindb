@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Sequence
 from uuid import UUID
 
 from fastapi import Form, Request, UploadFile
@@ -27,25 +27,29 @@ from pindb.templates.create_and_edit.tag import tag_form
 
 router = APIRouter(prefix="/create")
 
-LOGGER = logging.getLogger("pindb.search.update")
+LOGGER = logging.getLogger(name="pindb.search.update")
 
 
-@router.get("/")
+@router.get(path="/")
 def get_create_index(request: Request) -> HTMLResponse:
-    return HTMLResponse(create_index(request=request))
+    return HTMLResponse(content=create_index(request=request))
 
 
-@router.get("/pin")
+@router.get(path="/pin")
 def get_create_pin(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
-        materials = session.scalars(select(Material)).all()
-        shops = session.scalars(select(Shop)).all()
-        tags = session.scalars(select(Tag)).all()
-        pin_sets = session.scalars(select(PinSet)).all()
-        currencies = session.scalars(select(Currency)).all()
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material)
+        ).all()
+        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
+        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
+        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
+        currencies: Sequence[Currency] = session.scalars(
+            statement=select(Currency)
+        ).all()
 
         return HTMLResponse(
-            pin_form(
+            content=pin_form(
                 post_url=request.url_for("post_create_pin"),
                 materials=materials,
                 shops=shops,
@@ -56,7 +60,7 @@ def get_create_pin(request: Request) -> HTMLResponse:
         )
 
 
-@router.post("/pin")
+@router.post(path="/pin")
 async def post_create_pin(
     request: Request,
     front_image: UploadFile = Form(),
@@ -71,59 +75,71 @@ async def post_create_pin(
     number_produced: Annotated[
         int | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     limited_edition: bool | None = Form(default=None),
     release_date: Annotated[
         date | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     end_date: Annotated[
         date | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     funding_type: FundingType | None = Form(default=None),
     posts: int = Form(default=1),
     width: Annotated[
         str | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     height: Annotated[
         str | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     links: Annotated[
         list[str] | None,
         Form(),
-        BeforeValidator(empty_str_list_to_none),
+        BeforeValidator(func=empty_str_list_to_none),
     ] = None,
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
-    LOGGER.info(f"Creating Pin with form: {await request.form()}")
+    LOGGER.info(msg=f"Creating Pin with form: {await request.form()}")
 
     back_image_guid: UUID | None = None
-    front_image_guid: UUID = await save_file(front_image)
+    front_image_guid: UUID = await save_file(file=front_image)
 
     if back_image:
-        back_image_guid = await save_file(back_image)
+        back_image_guid: UUID = await save_file(file=back_image)
 
     with session_maker.begin() as session:
-        pin_materials = set(
-            session.scalars(select(Material).where(Material.id.in_(material_ids))).all()
+        pin_materials: set[Material] = set(
+            session.scalars(
+                statement=select(Material).where(Material.id.in_(other=material_ids))
+            ).all()
         )
-        pin_shops = set(
-            session.scalars(select(Shop).where(Shop.id.in_(shop_ids))).all()
+        pin_shops: set[Shop] = set(
+            session.scalars(
+                statement=select(Shop).where(Shop.id.in_(other=shop_ids))
+            ).all()
         )
-        pin_tags = set(session.scalars(select(Tag).where(Tag.id.in_(tag_ids))).all())
-        pin_sets = set(
-            session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids))).all()
+        pin_tags: set[Tag] = set(
+            session.scalars(
+                statement=select(Tag).where(Tag.id.in_(other=tag_ids))
+            ).all()
         )
-        currency = session.get_one(Currency, currency_id)
-        new_links = {Link(path=link) for link in links} if links else set[Link]()
+        pin_sets: set[PinSet] = set(
+            session.scalars(
+                statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
+            ).all()
+        )
+        currency: Currency = session.get_one(entity=Currency, ident=currency_id)
+        new_links: set[Link] = (
+            {Link(path=link) for link in links} if links else set[Link]()
+        )
 
         print(width)
 
@@ -141,8 +157,8 @@ async def post_create_pin(
             end_date=end_date,
             funding_type=funding_type,
             posts=posts,
-            width=magnitude_to_mm(width) if width else width,  # type: ignore
-            height=magnitude_to_mm(height) if height else height,  # type: ignore
+            width=magnitude_to_mm(magnitude=width) if width else width,  # type: ignore
+            height=magnitude_to_mm(magnitude=height) if height else height,  # type: ignore
             back_image_guid=back_image_guid,
             description=None,
             artists=set(),
@@ -151,9 +167,9 @@ async def post_create_pin(
             links=new_links,
         )
 
-        session.add(new_pin)
+        session.add(instance=new_pin)
         session.flush()
-        pin_id = new_pin.id
+        pin_id: int = new_pin.id
 
     return HTMLResponse(
         headers={
@@ -167,22 +183,24 @@ async def post_create_pin(
     )
 
 
-@router.get("/material")
+@router.get(path="/material")
 def get_create_material(request: Request) -> HTMLResponse:
-    return HTMLResponse(material_form(post_url=request.url_for("post_create_material")))
+    return HTMLResponse(
+        content=material_form(post_url=request.url_for("post_create_material"))
+    )
 
 
-@router.post("/material")
+@router.post(path="/material")
 async def post_create_material(
     request: Request,
     name: str = Form(),
 ) -> HTMLResponse:
-    LOGGER.info(f"Creating Material with {await request.form()}")
+    LOGGER.info(msg=f"Creating Material with {await request.form()}")
 
     with session_maker.begin() as session:
         material = Material(name=name)
 
-        session.add(material)
+        session.add(instance=material)
         session.flush()
         material_id = material.id
 
@@ -191,28 +209,30 @@ async def post_create_material(
     )
 
 
-@router.get("/shop")
+@router.get(path="/shop")
 def get_create_shop(request: Request) -> HTMLResponse:
-    return HTMLResponse(shop_form(post_url=request.url_for("post_create_shop")))
+    return HTMLResponse(content=shop_form(post_url=request.url_for("post_create_shop")))
 
 
-@router.post("/shop")
+@router.post(path="/shop")
 def post_create_shop(
     request: Request,
     name: str = Form(),
     description: Annotated[
         str | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     links: Annotated[
         list[str] | None,
         Form(),
-        BeforeValidator(empty_str_list_to_none),
+        BeforeValidator(func=empty_str_list_to_none),
     ] = None,
 ) -> HTMLResponse:
     with session_maker.begin() as session:
-        new_links = {Link(path=link) for link in links} if links else set[Link]()
+        new_links: set[Link] = (
+            {Link(path=link) for link in links} if links else set[Link]()
+        )
 
         shop = Shop(
             name=name,
@@ -220,7 +240,7 @@ def post_create_shop(
             links=new_links,
         )
 
-        session.add(shop)
+        session.add(instance=shop)
         session.flush()
         shop_id = shop.id
 
@@ -229,12 +249,12 @@ def post_create_shop(
     )
 
 
-@router.get("/tag")
+@router.get(path="/tag")
 def get_create_tag(request: Request) -> HTMLResponse:
-    return HTMLResponse(tag_form(post_url=request.url_for("post_create_tag")))
+    return HTMLResponse(content=tag_form(post_url=request.url_for("post_create_tag")))
 
 
-@router.post("/tag")
+@router.post(path="/tag")
 def post_create_tag(
     request: Request,
     name: str = Form(),
@@ -242,7 +262,7 @@ def post_create_tag(
     with session_maker.begin() as session:
         tag = Tag(name=name)
 
-        session.add(tag)
+        session.add(instance=tag)
         session.flush()
         tag_id = tag.id
 
@@ -251,12 +271,14 @@ def post_create_tag(
     )
 
 
-@router.get("/pin_set")
+@router.get(path="/pin_set")
 def get_create_pin_set(request: Request) -> HTMLResponse:
-    return HTMLResponse(pin_set_form(post_url=request.url_for("post_create_pin_set")))
+    return HTMLResponse(
+        content=pin_set_form(post_url=request.url_for("post_create_pin_set"))
+    )
 
 
-@router.post("/pin_set")
+@router.post(path="/pin_set")
 def post_create_pin_set(
     request: Request,
     name: str = Form(),
@@ -264,7 +286,7 @@ def post_create_pin_set(
     with session_maker.begin() as session:
         pin_set = PinSet(name=name)
 
-        session.add(pin_set)
+        session.add(instance=pin_set)
         session.flush()
         pin_set_id = pin_set.id
 

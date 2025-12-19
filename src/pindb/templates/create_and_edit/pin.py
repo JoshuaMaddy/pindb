@@ -34,7 +34,9 @@ from pindb.templates.components.centered import centered_div
 DIMENSION_PATTERN = r".*?(\d*\.?\d*)\s*(([Ii]nch(?:es)?)|(in)|(IN)|([Cc]entimeters?)|(cm)|(CM)|([Mm]illimeters?)|(mm)|(MM))"
 
 with open(
-    Path(__file__).parent.parent / "js/pin_creation.js", "r", encoding="utf-8"
+    file=Path(__file__).parent.parent / "js/pin_creation.js",
+    mode="r",
+    encoding="utf-8",
 ) as js_file:
     SCRIPT_CONTENT = js_file.read()
 

@@ -16,7 +16,7 @@ def shops_list(request: Request, shops: Sequence[Shop]) -> Element:
             for shop in shops
         ],
         bread_crumb=bread_crumb(
-            [
+            entries=[
                 (request.url_for("get_list_index"), "List"),
                 "Shops",
             ]

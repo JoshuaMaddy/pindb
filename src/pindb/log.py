@@ -11,10 +11,10 @@ def setup_rich_logger():
     to populate the `LoggerConfig` class with Rich
     logger parameters.
     """
-    output_file_handler = logging.FileHandler(CONFIGURATION.log_file)
+    output_file_handler = logging.FileHandler(filename=CONFIGURATION.log_file)
 
     handler_format = logging.Formatter(
-        CONFIGURATION.logging_format,
+        fmt=CONFIGURATION.logging_format,
         datefmt=CONFIGURATION.logging_date_format,
     )
 
@@ -23,7 +23,7 @@ def setup_rich_logger():
     # Remove all handlers from root logger
     # and propagate to root logger.
     for name in logging.root.manager.loggerDict.keys():
-        logging.getLogger(name).handlers = []
+        logging.getLogger(name).handlers: list[logging.Handler] = []
         logging.getLogger(name).propagate = True
 
     logging.basicConfig(

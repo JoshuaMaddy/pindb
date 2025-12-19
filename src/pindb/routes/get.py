@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import Request
@@ -17,90 +18,92 @@ from pindb.templates.get.tag import tag_page
 router = APIRouter(prefix="/get")
 
 
-@router.get("/image/{guid}", response_model=None)
+@router.get(path="/image/{guid}", response_model=None)
 async def get_image(
     guid: UUID,
     thumbnail: bool = False,
 ) -> FileResponse | None:
-    image_path = (CONFIGURATION.image_directory / str(guid)).resolve()
+    image_path: Path = (CONFIGURATION.image_directory / str(guid)).resolve()
 
     if not image_path.exists() or not image_path.is_file():
         return None
 
     if thumbnail:
-        image_path = (CONFIGURATION.image_directory / f"{guid}.thumbnail").resolve()
+        image_path: Path = (
+            CONFIGURATION.image_directory / f"{guid}.thumbnail"
+        ).resolve()
 
         if not image_path.exists():
-            await create_thumbnail(str(guid))
+            await create_thumbnail(file_uuid=str(guid))
 
     return FileResponse(path=image_path, media_type="image")
 
 
-@router.get("/pin/{id}")
+@router.get(path="/pin/{id}", response_model=None)
 def get_pin(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as session:
-        pin_obj = session.get(Pin, id)
+        pin_obj: Pin | None = session.get(entity=Pin, ident=id)
 
         if not pin_obj:
-            return RedirectResponse("/")
+            return RedirectResponse(url="/")
 
-        return HTMLResponse(pin_page(request=request, pin=pin_obj))
+        return HTMLResponse(content=pin_page(request=request, pin=pin_obj))
 
 
-@router.get("/shop/{id}")
+@router.get(path="/shop/{id}", response_model=None)
 def get_shop(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as session:
-        shop_obj = session.get(Shop, id)
+        shop_obj: Shop | None = session.get(entity=Shop, ident=id)
 
         if not shop_obj:
-            return RedirectResponse("/")
+            return RedirectResponse(url="/")
 
-        return HTMLResponse(shop_page(request=request, shop=shop_obj))
+        return HTMLResponse(content=shop_page(request=request, shop=shop_obj))
 
 
-@router.get("/material/{id}")
+@router.get(path="/material/{id}", response_model=None)
 def get_material(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as session:
-        material_obj = session.get(Material, id)
+        material_obj: Material | None = session.get(entity=Material, ident=id)
 
         if not material_obj:
-            return RedirectResponse("/")
+            return RedirectResponse(url="/")
 
         return HTMLResponse(material_page(request=request, material=material_obj))
 
 
-@router.get("/tag/{id}", response_model=None)
+@router.get(path="/tag/{id}", response_model=None)
 def get_tag(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as session:
-        tag_obj = session.get(Tag, id)
+        tag_obj: Tag | None = session.get(entity=Tag, ident=id)
 
         if not tag_obj:
-            return RedirectResponse("/")
+            return RedirectResponse(url="/")
 
-        return HTMLResponse(tag_page(request=request, tag=tag_obj))
+        return HTMLResponse(content=tag_page(request=request, tag=tag_obj))
 
 
-@router.get("/pin_set/{id}", response_model=None)
+@router.get(path="/pin_set/{id}", response_model=None)
 def get_pin_set(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as session:
-        pin_set_obj = session.get(PinSet, id)
+        pin_set_obj: PinSet | None = session.get(entity=PinSet, ident=id)
 
         if not pin_set_obj:
-            return RedirectResponse("/")
+            return RedirectResponse(url="/")
 
-        return HTMLResponse(pin_set_page(request=request, pin_set=pin_set_obj))
+        return HTMLResponse(content=pin_set_page(request=request, pin_set=pin_set_obj))

@@ -17,7 +17,7 @@ def material_page(
             centered_div(
                 content=[
                     bread_crumb(
-                        [
+                        entries=[
                             (request.url_for("get_list_index"), "List"),
                             (request.url_for("get_list_materials"), "Materials"),
                             material.name,

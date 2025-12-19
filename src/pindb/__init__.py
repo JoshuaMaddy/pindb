@@ -4,20 +4,19 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from pindb.lifespan import lifespan
 from pindb.routes import create, delete, edit, get, list, search
 from pindb.templates.homepage import homepage
 
 app = FastAPI()
 
 app.mount(
-    "/static",
-    StaticFiles(directory=Path(__file__).parent / "static"),
+    path="/static",
+    app=StaticFiles(directory=Path(__file__).parent / "static"),
     name="static",
 )
 
 
-@app.get("/")
+@app.get(path="/")
 def root(request: Request):
     return HTMLResponse(content=str(homepage(request=request)))
 

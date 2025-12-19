@@ -15,9 +15,9 @@ def tag_page(
     return html_base(
         title=tag.name,
         body_content=centered_div(
-            fragment[
+            content=fragment[
                 bread_crumb(
-                    [
+                    entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_tags"), "Tags"),
                         tag.name,

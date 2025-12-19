@@ -105,7 +105,7 @@ def __links(pin: Pin) -> Element | None:
             i(data_lucide="link", class_="inline-block pr-2"),
             "Links",
         ],
-        *[a(href=link.path)[domain_from_url(link.path)] for link in pin.links],
+        *[a(href=link.path)[domain_from_url(url=link.path)] for link in pin.links],
     ]
 
 
@@ -121,7 +121,7 @@ def __original_price(pin: Pin) -> Element:
     return icon_list_item(
         icon="banknote",
         name="Original Price",
-        value=format_currency_code(pin.original_price, pin.currency.code),
+        value=format_currency_code(amount=pin.original_price, code=pin.currency.code),
     )
 
 

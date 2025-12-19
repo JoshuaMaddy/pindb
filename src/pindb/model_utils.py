@@ -22,13 +22,13 @@ def empty_str_list_to_none(v: list[Any] | None) -> list[Any] | None:
 
 
 def magnitude_to_mm(magnitude: str) -> float:
-    match = re.match(MAGNITUDE_PATTERN, magnitude)
+    match: re.Match[str] | None = re.match(pattern=MAGNITUDE_PATTERN, string=magnitude)
 
     if not match:
         return 0
 
     magnitude_float = float(match.group(1))
-    unit = match.group(2).lower()
+    unit: str | Any = match.group(2).lower()
 
     if "inches".startswith(unit):
         return magnitude_float * 25.4

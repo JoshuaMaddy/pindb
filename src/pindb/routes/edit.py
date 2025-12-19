@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Sequence
 from uuid import UUID
 
 from fastapi import Form, Request, UploadFile
@@ -22,24 +22,28 @@ from pindb.templates.create_and_edit.pin import pin_form
 router = APIRouter(prefix="/edit")
 
 
-@router.get("/pin/{id}")
+@router.get(path="/pin/{id}", response_model=None)
 def get_edit_pin(
     request: Request,
     id: int,
-) -> HTMLResponse:
+) -> HTMLResponse | None:
     with session_maker.begin() as session:
-        materials = session.scalars(select(Material)).all()
-        shops = session.scalars(select(Shop)).all()
-        tags = session.scalars(select(Tag)).all()
-        pin_sets = session.scalars(select(PinSet)).all()
-        pin = session.get(Pin, id)
-        currencies = session.scalars(select(Currency)).all()
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material)
+        ).all()
+        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
+        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
+        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
+        pin: Pin | None = session.get(entity=Pin, ident=id)
+        currencies: Sequence[Currency] = session.scalars(
+            statement=select(Currency)
+        ).all()
 
         if pin is None:
             return None
 
         return HTMLResponse(
-            pin_form(
+            content=pin_form(
                 post_url=request.url_for("post_edit_pin", id=id),
                 materials=materials,
                 shops=shops,
@@ -51,7 +55,7 @@ def get_edit_pin(
         )
 
 
-@router.post("/pin/{id}")
+@router.post(path="/pin/{id}", response_model=None)
 async def post_edit_pin(
     request: Request,
     id: int,
@@ -67,96 +71,110 @@ async def post_edit_pin(
     number_produced: Annotated[
         int | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     limited_edition: bool | None = Form(default=None),
     release_date: Annotated[
         date | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     end_date: Annotated[
         date | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     funding_type: FundingType | None = Form(default=None),
     posts: int = Form(default=1),
     width: Annotated[
         str | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     height: Annotated[
         str | None,
         Form(),
-        BeforeValidator(empty_str_to_none),
+        BeforeValidator(func=empty_str_to_none),
     ] = None,
     links: Annotated[
         list[str] | None,
         Form(),
-        BeforeValidator(empty_str_list_to_none),
+        BeforeValidator(func=empty_str_list_to_none),
     ] = None,
     back_image: UploadFile | None = Form(default=None),
-) -> HTMLResponse:
+) -> HTMLResponse | None:
     back_image_guid: UUID | None = None
     front_image_guid: UUID | None = None
 
     if front_image:
-        front_image_guid = await save_file(front_image)
+        front_image_guid: UUID = await save_file(file=front_image)
     if back_image:
-        back_image_guid = await save_file(back_image)
+        back_image_guid: UUID = await save_file(file=back_image)
 
     with session_maker.begin() as session:
-        pin = session.get(Pin, id)
+        pin: Pin | None = session.get(entity=Pin, ident=id)
         if not pin:
             return None
 
-        pin_materials = set(
-            session.scalars(select(Material).where(Material.id.in_(material_ids))).all()
+        pin_materials: set[Material] = set(
+            session.scalars(
+                statement=select(Material).where(Material.id.in_(other=material_ids))
+            ).all()
         )
-        pin_shops = set(
-            session.scalars(select(Shop).where(Shop.id.in_(shop_ids))).all()
+        pin_shops: set[Shop] = set(
+            session.scalars(
+                statement=select(Shop).where(Shop.id.in_(other=shop_ids))
+            ).all()
         )
-        pin_tags = set(session.scalars(select(Tag).where(Tag.id.in_(tag_ids))).all())
-        pin_sets = set(
-            session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids))).all()
+        pin_tags: set[Tag] = set(
+            session.scalars(
+                statement=select(Tag).where(Tag.id.in_(other=tag_ids))
+            ).all()
         )
-        currency = session.get_one(Currency, currency_id)
+        pin_sets: set[PinSet] = set(
+            session.scalars(
+                statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
+            ).all()
+        )
+        currency: Currency = session.get_one(entity=Currency, ident=currency_id)
 
-        pin_str_links = [link.path for link in pin.links]
+        pin_str_links: list[str] = [link.path for link in pin.links]
         new_links: set[Link] = set()
         for link in links if links else []:
             if link not in pin_str_links:
                 new_links.add(Link(path=link))
         new_links.update(pin.links.copy())
 
-        pin.name = name
-        pin.acquisition_type = acquisition_type
-        pin.original_price = original_price
-        pin.currency = currency
-        pin.front_image_guid = (
+        pin.name: str = name
+        pin.acquisition_type: AcquisitionType = acquisition_type
+        pin.original_price: int | float = original_price
+        pin.currency: Currency = currency
+        pin.front_image_guid: UUID = (
             front_image_guid if front_image_guid else pin.front_image_guid
         )
-        pin.materials = pin_materials
-        pin.shops = pin_shops
-        pin.sets = pin_sets
-        pin.tags = pin_tags
-        pin.limited_edition = limited_edition
-        pin.number_produced = number_produced
-        pin.release_date = release_date
-        pin.end_date = end_date
-        pin.funding_type = funding_type
-        pin.posts = posts
-        pin.width = magnitude_to_mm(width) if width else width  # type: ignore
-        pin.height = magnitude_to_mm(height) if height else height  # type: ignore
-        pin.back_image_guid = (
+        pin.materials: set[Material] = pin_materials
+        pin.shops: set[Shop] = pin_shops
+        pin.sets: set[PinSet] = pin_sets
+        pin.tags: set[Tag] = pin_tags
+        pin.limited_edition: bool | None = limited_edition
+        pin.number_produced: int | None = number_produced
+        pin.release_date: date | None = release_date
+        pin.end_date: date | None = end_date
+        pin.funding_type: FundingType | None = funding_type
+        pin.posts: int = posts
+        pin.width: int | float | None = (
+            magnitude_to_mm(magnitude=width) if width else width
+        )  # type: ignore
+        pin.height: int | float | None = (
+            magnitude_to_mm(magnitude=height) if height else height
+        )  # type: ignore
+        pin.back_image_guid: UUID | None = (
             back_image_guid if back_image_guid else pin.back_image_guid
         )
-        pin.links = new_links
+        pin.links: set[Link] = new_links
 
         session.flush()
-        pin_id = pin.id
+        pin_id: int = pin.id
 
     return HTMLResponse(
         headers={

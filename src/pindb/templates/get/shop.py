@@ -17,7 +17,7 @@ def shop_page(
         body_content=centered_div(
             content=fragment[
                 bread_crumb(
-                    [
+                    entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_shops"), "Shops"),
                         shop.name,

@@ -12,7 +12,11 @@ async def lifespan(app: FastAPI):
     setup_rich_logger()
     update_all()
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_all, "interval", minutes=5)  # Run every 5 minutes
+    scheduler.add_job(
+        func=update_all,
+        trigger="interval",
+        minutes=5,
+    )  # Run every 5 minutes
     scheduler.start()
 
     yield

@@ -16,7 +16,7 @@ def pin_sets_list(request: Request, pin_sets: Sequence[PinSet]) -> Element:
             for pin_set in pin_sets
         ],
         bread_crumb=bread_crumb(
-            [
+            entries=[
                 (request.url_for("get_list_index"), "List"),
                 "Pin Sets",
             ]

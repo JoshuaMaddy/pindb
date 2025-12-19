@@ -1,14 +1,14 @@
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 from babel.numbers import format_currency
 
 
 def domain_from_url(url: str) -> str:
-    parse = urlparse(url)
+    parse: ParseResult = urlparse(url)
     return parse.netloc
 
 
-CURRENCY_DEFAULT_LOCALE = {
+CURRENCY_DEFAULT_LOCALE: dict[str, str] = {
     # Americas
     "USD": "en_US",
     "CAD": "en_CA",
@@ -64,12 +64,16 @@ def format_currency_code(amount: float, code: str, locale: str | None = None) ->
     - `code`:      ISO currency code like "USD", "EUR", "JPY".
     - `locale`:    Override locale (optional). If None, a default is chosen automatically.
     """
-    code = code.upper().strip()
+    code: str = code.upper().strip()
 
     if locale is None:
-        locale = CURRENCY_DEFAULT_LOCALE.get(code, "en_US")
+        locale: str = CURRENCY_DEFAULT_LOCALE.get(code, "en_US")
 
     try:
-        return format_currency(amount, code, locale=locale)
+        return format_currency(
+            number=amount,
+            currency=code,
+            locale=locale,
+        )
     except Exception:
         return f"{code} {amount:,.2f}"

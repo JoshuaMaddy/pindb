@@ -17,7 +17,7 @@ def pin_set_page(
         body_content=centered_div(
             content=[
                 bread_crumb(
-                    [
+                    entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_pin_sets"), "Pin Sets"),
                         pin_set.name,

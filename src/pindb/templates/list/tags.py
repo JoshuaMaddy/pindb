@@ -15,7 +15,7 @@ def tags_list(request: Request, tags: Sequence[Tag]) -> Element:
             a(href=str(request.url_for("get_tag", id=tag.id)))[tag.name] for tag in tags
         ],
         bread_crumb=bread_crumb(
-            [
+            entries=[
                 (request.url_for("get_list_index"), "List"),
                 "Tags",
             ]

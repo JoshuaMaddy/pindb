@@ -13,19 +13,19 @@ router = APIRouter(prefix="/delete")
 LOGGER = logging.getLogger("pindb.routes.delete")
 
 
-@router.get("/pin/{id}")
+@router.get(path="/pin/{id}")
 def post_delete_pin(id: int) -> HTMLResponse:
     with session_maker.begin() as session:
-        pin = session.scalar(select(Pin).where(Pin.id == id))
-        session.delete(pin)
+        pin: Pin | None = session.scalar(statement=select(Pin).where(Pin.id == id))
+        session.delete(instance=pin)
 
     return HTMLResponse(content="Success")
 
 
-@router.get("/material/{id}")
+@router.get(path="/material/{id}")
 def post_delete_material(id: int) -> HTMLResponse:
     with session_maker.begin() as session:
-        material = session.scalar(select(Material).where(Material.id == id))
-        session.delete(material)
+        material: Material | None = session.scalar(statement=select(Material).where(Material.id == id))
+        session.delete(instance=material)
 
     return HTMLResponse(content="Success")
