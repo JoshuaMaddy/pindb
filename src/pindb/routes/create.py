@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -9,6 +10,7 @@ from pydantic import BeforeValidator
 from sqlalchemy import select
 
 from pindb.database import Material, Shop, Tag, session_maker
+from pindb.database.currency import Currency
 from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -25,6 +27,8 @@ from pindb.templates.create_and_edit.tag import tag_form
 
 router = APIRouter(prefix="/create")
 
+LOGGER = logging.getLogger("pindb.search.update")
+
 
 @router.get("/")
 def get_create_index(request: Request) -> HTMLResponse:
@@ -38,6 +42,7 @@ def get_create_pin(request: Request) -> HTMLResponse:
         shops = session.scalars(select(Shop)).all()
         tags = session.scalars(select(Tag)).all()
         pin_sets = session.scalars(select(PinSet)).all()
+        currencies = session.scalars(select(Currency)).all()
 
         return HTMLResponse(
             pin_form(
@@ -46,6 +51,7 @@ def get_create_pin(request: Request) -> HTMLResponse:
                 shops=shops,
                 pin_sets=pin_sets,
                 tags=tags,
+                currencies=currencies,
             )
         )
 
@@ -57,6 +63,7 @@ async def post_create_pin(
     name: str = Form(),
     acquisition_type: AcquisitionType = Form(),
     original_price: float = Form(default=0),
+    currency_id: int = Form(default=840),
     material_ids: list[int] = Form(default_factory=list),
     shop_ids: list[int] = Form(default_factory=list),
     tag_ids: list[int] = Form(default_factory=list),
@@ -96,6 +103,8 @@ async def post_create_pin(
     ] = None,
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
+    LOGGER.info(f"Creating Pin with form: {await request.form()}")
+
     back_image_guid: UUID | None = None
     front_image_guid: UUID = await save_file(front_image)
 
@@ -113,6 +122,7 @@ async def post_create_pin(
         pin_sets = set(
             session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids))).all()
         )
+        currency = session.get_one(Currency, currency_id)
         new_links = {Link(path=link) for link in links} if links else set[Link]()
 
         print(width)
@@ -122,6 +132,7 @@ async def post_create_pin(
             acquisition_type=acquisition_type,
             front_image_guid=front_image_guid,
             original_price=original_price,
+            currency=currency,
             materials=pin_materials,
             shops=pin_shops,
             limited_edition=limited_edition,
@@ -162,10 +173,12 @@ def get_create_material(request: Request) -> HTMLResponse:
 
 
 @router.post("/material")
-def post_create_material(
+async def post_create_material(
     request: Request,
     name: str = Form(),
 ) -> HTMLResponse:
+    LOGGER.info(f"Creating Material with {await request.form()}")
+
     with session_maker.begin() as session:
         material = Material(name=name)
 

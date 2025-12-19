@@ -1,15 +1,19 @@
 from fastapi.datastructures import URL
-from htpy import form, h1, hr, input, label
+from htpy import Element, form, h1, hr, input, label
 
 from pindb.database.tag import Tag
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 
 
-def tag_form(post_url: URL | str, tag: Tag | None = None):
+def tag_form(
+    post_url: URL | str,
+    tag: Tag | None = None,
+) -> Element:
     return html_base(
+        title="Create Tag" if not tag else "Edit Tag",
         body_content=centered_div(
-            [
+            content=[
                 h1["Create a Tag" if not tag else "Edit a Tag"],
                 hr,
                 form(
@@ -31,5 +35,5 @@ def tag_form(post_url: URL | str, tag: Tag | None = None):
                     ),
                 ],
             ]
-        )
+        ),
     )

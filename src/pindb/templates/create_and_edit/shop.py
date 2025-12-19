@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi.datastructures import URL
-from htpy import button, div, form, fragment, h1, hr, input, label, textarea
+from htpy import Element, button, div, form, fragment, h1, hr, input, label, textarea
 
 from pindb.database.link import Link
 from pindb.database.shop import Shop
@@ -17,14 +17,15 @@ with open(
 def shop_form(
     post_url: URL | str,
     shop: Shop | None = None,
-):
+) -> Element:
     shop_links: None | list[Link] = None
     if shop:
         shop_links = list(shop.links)
 
     return html_base(
+        title="Create Shop" if not shop else "Edit Shop",
         body_content=centered_div(
-            [
+            content=[
                 h1["Create a Shop" if not shop else "Edit a Shop"],
                 hr,
                 form(

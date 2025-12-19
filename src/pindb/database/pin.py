@@ -4,6 +4,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
 from pindb.database.artist import Artist
@@ -20,6 +21,7 @@ from pindb.database.link import Link
 from pindb.models import AcquisitionType, FundingType
 
 if TYPE_CHECKING:
+    from pindb.database.currency import Currency
     from pindb.database.material import Material
     from pindb.database.pin_set import PinSet
     from pindb.database.shop import Shop
@@ -36,6 +38,8 @@ class Pin(MappedAsDataclass, Base):
     acquisition_type: Mapped[AcquisitionType]
     front_image_guid: Mapped[UUID]
     original_price: Mapped[float]
+    currency_id: Mapped[int] = mapped_column(ForeignKey("currencies.id"), init=False)
+    currency: Mapped[Currency] = relationship()
 
     # Required Relationships
     materials: Mapped[set[Material]] = relationship(
@@ -63,6 +67,8 @@ class Pin(MappedAsDataclass, Base):
     back_image_guid: Mapped[UUID | None] = mapped_column(default=None)
     ## Info
     description: Mapped[str | None] = mapped_column(default=None)
+    # TODO ADD THESE TO FORM
+    sku: Mapped[str | None] = mapped_column(default=None)
 
     # Optional Relationships
     artists: Mapped[set[Artist]] = relationship(
@@ -93,3 +99,33 @@ class Pin(MappedAsDataclass, Base):
             return False
 
         return value.id == self.id
+
+    def document(self) -> dict[str, int | str | list[str]]:
+        document: dict[str, int | str | list[str]] = dict()
+        document.update(
+            {
+                "id": self.id,
+                "name": self.name,
+                "shops": [shop.name for shop in self.shops],
+                "materials": [material.name for material in self.materials],
+            }
+        )
+        document.update(
+            {
+                "tags": [tag.name for tag in self.tags],
+            }
+        ) if self.tags else None
+
+        document.update(
+            {
+                "artists": [artist.name for artist in self.artists],
+            }
+        ) if self.artists else None
+
+        document.update(
+            {
+                "description": self.description,
+            }
+        ) if self.description else None
+
+        return document

@@ -9,7 +9,7 @@ def card_link(
 ) -> Element:
     return a(
         href=str(href),
-        class_="p-2 no-underline text-black bg-blue-200 hover:bg-blue-300 rounded-xl border border-blue-400",
+        class_="p-2 no-underline text-pin-base-text bg-pin-main hover:border-accent hover:bg-pin-main-hover rounded-xl border border-pin-base-350",
     )[
         icon
         and i(

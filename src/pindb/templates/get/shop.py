@@ -1,18 +1,28 @@
 from fastapi import Request
-from htpy import a, br, div, fragment, h1, h2, i, p
+from htpy import Element, a, br, div, fragment, h1, h2, i, p
 
 from pindb.database import Shop
 from pindb.templates.base import html_base
+from pindb.templates.components.bread_crumb import bread_crumb
+from pindb.templates.components.centered import centered_div
 from pindb.templates.components.pin_grid import pin_grid
 
 
 def shop_page(
     request: Request,
     shop: Shop,
-):
+) -> Element:
     return html_base(
-        body_content=fragment[
-            div(class_="mx-auto bg-blue-200 p-10 flex flex-col gap-2 max-w-[120ch]")[
+        title=shop.name,
+        body_content=centered_div(
+            content=fragment[
+                bread_crumb(
+                    [
+                        (request.url_for("get_list_index"), "List"),
+                        (request.url_for("get_list_shops"), "Shops"),
+                        shop.name,
+                    ]
+                ),
                 div(class_="flex w-full gap-2 items-baseline")[
                     i(data_lucide="store"),
                     h1[shop.name],
@@ -35,6 +45,8 @@ def shop_page(
                         pins=shop.pins,
                     ),
                 ],
-            ]
-        ],
+            ],
+            flex=True,
+            col=True,
+        ),
     )

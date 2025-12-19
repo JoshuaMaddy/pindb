@@ -7,7 +7,7 @@ from pindb.database.pin import Pin
 from pindb.templates.components.pin_preview_card import pin_preview_card
 
 
-def pin_grid(request: Request, pins: Iterable[Pin]) -> Element:
+def pin_grid(request: Request, pins: Iterable[Pin] | None) -> Element:
     return div(
         class_="grid grid-cols-[repeat(auto-fill,_minmax(128px,_1fr))] auto auto-rows-[1fr_max-content] gap-3"
-    )[*[pin_preview_card(request=request, pin=pin) for pin in pins]]
+    )[bool(pins) and [pin_preview_card(request=request, pin=pin) for pin in pins]]

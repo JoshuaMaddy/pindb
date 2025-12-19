@@ -3,6 +3,8 @@
     "enctype",
     "htpy",
     "lucide",
+    "meili",
+    "meilisearch",
     "pindb",
     "pinset",
     "pinsets",
@@ -11,7 +13,7 @@
   "python.analysis.typeCheckingMode": "strict",
   "tailwindCSS.experimental.classRegex": [
     "class_=\"([^\"]*)\"",
-    "\"class\": \"([^\"]*)\""
+    "\"class\": \"([^\"]*)\"",
   ],
   "tailwindCSS.includeLanguages": {
     "python": "html"

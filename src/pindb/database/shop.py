@@ -25,6 +25,7 @@ class Shop(MappedAsDataclass, Base):
 
     # Optional Attributes
     description: Mapped[str | None] = mapped_column(default=None)
+    active: Mapped[bool] = mapped_column(default=True)
 
     # Required Relationships
     pins: Mapped[set[Pin]] = relationship(

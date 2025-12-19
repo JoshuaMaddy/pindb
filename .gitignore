@@ -17,3 +17,6 @@ main.css
 
 # Dev
 .env
+
+# Logs
+*.log

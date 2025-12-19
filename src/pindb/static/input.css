@@ -1,19 +1,83 @@
 @import "tailwindcss";
 
+@custom-variant mocha (&:where(.mocha, .mocha *));
+@custom-variant latte (&:where(.latte, .latte *));
+
+@theme {
+  --color-cat-rosewater: hsl(10deg, 56%, 91%);
+  --color-cat-sky: hsl(189deg, 71%, 73%);
+  --color-pin-base-text: hsl(226deg, 64%, 88%);
+  --color-pin-base-100: hsl(227deg, 35%, 80%);
+  --color-pin-base-150: hsl(228deg, 24%, 72%);
+  --color-pin-base-200: hsl(228deg, 17%, 64%);
+  --color-pin-base-250: hsl(230deg, 13%, 55%);
+  --color-pin-base-300: hsl(231deg, 11%, 47%);
+  --color-pin-base-350: hsl(233deg, 12%, 39%);
+  --color-pin-base-400: hsl(234deg, 13%, 31%);
+  --color-pin-base-450: hsl(237deg, 16%, 23%);
+  --color-pin-base-500: hsl(240deg, 21%, 15%);
+  --color-pin-base-550: hsl(240deg, 23%, 9%);
+  --color-pin-main: var(--color-pin-base-500);
+  --color-pin-main-hover: var(--color-pin-base-450);
+  --color-pin-border: var(--color-pin-base-400);
+  --color-pin-border-hover: var(--color-pin-base-350);
+  --color-accent: var(--color-cat-sky);
+}
+
+@layer theme {
+  :root,
+  :host {
+    @variant latte {
+      --color-cat-rosewater: hsl(11deg, 59%, 67%);
+      --color-cat-sky: hsl(197deg, 97%, 46%);
+      --color-pin-base-text: hsl(234deg, 16%, 35%);
+      --color-pin-base-100: hsl(233deg, 13%, 41%);
+      --color-pin-base-150: hsl(233deg, 10%, 47%);
+      --color-pin-base-200: hsl(232deg, 10%, 53%);
+      --color-pin-base-250: hsl(231deg, 10%, 59%);
+      --color-pin-base-300: hsl(228deg, 11%, 65%);
+      --color-pin-base-350: hsl(227deg, 12%, 71%);
+      --color-pin-base-400: hsl(225deg, 14%, 77%);
+      --color-pin-base-450: hsl(223deg, 16%, 83%);
+      --color-pin-base-500: hsl(220deg, 23%, 95%);
+      --color-pin-base-550: hsl(220deg, 22%, 92%);
+    }
+  }
+}
+
 @layer base {
+  * {
+    @apply text-pin-base-text;
+  }
+
   button,
   input[type="submit"] {
-    @apply border border-gray-500 bg-gray-100 px-2 py-1 rounded-lg;
+    @apply border 
+    border-pin-border 
+    hover:border-pin-border-hover 
+    bg-pin-main 
+    hover:bg-pin-main-hover 
+    px-2 
+    py-1 
+    rounded-lg 
+    cursor-pointer
+    transition-all
+    duration-75;
   }
 
   input,
   select,
   textarea {
-    @apply border border-gray-500 px-2 py-1 rounded-lg;
+    @apply border 
+    border-pin-border 
+    bg-pin-base-450 
+    px-2 
+    py-1 
+    rounded-lg;
   }
 
   a {
-    @apply underline text-blue-400;
+    @apply underline text-accent;
   }
 
   h1 {
@@ -45,7 +109,10 @@
   background-repeat: inherit;
   box-shadow: none;
   text-shadow: none;
-  @apply rounded text-black border-gray-500 bg-gray-100;
+  @apply rounded-lg 
+  text-pin-base-text 
+  border-pin-border 
+  bg-pin-base-450;
 }
 
 /* Single Select */
@@ -56,7 +123,12 @@
   background-repeat: inherit;
   box-shadow: none;
   text-shadow: none;
-  @apply rounded-lg text-black border-gray-500 items-center m-0;
+  @apply rounded-lg 
+  text-black 
+  border-pin-border 
+  bg-pin-base-450
+  items-center 
+  m-0;
 }
 
 .ts-wrapper.single .ts-control {
@@ -67,9 +139,41 @@
 .focus .ts-control,
 .ts-control {
   box-shadow: none;
-  @apply border border-gray-500 px-2 py-1 rounded-lg;
+  @apply border 
+  border-pin-border 
+  bg-pin-base-450 
+  px-2 
+  py-1 
+  rounded-lg;
 }
 
 .ts-dropdown {
-  @apply border border-gray-500 rounded-lg shadow-lg overflow-clip;
+  @apply border 
+  border-pin-border
+  bg-pin-base-450 
+  rounded-lg 
+  shadow-lg 
+  overflow-clip;
+}
+
+.ts-dropdown.single,
+.ts-wrapper.single .ts-control,
+.ts-control,
+.ts-wrapper.single.input-active .ts-control {
+  @apply border-pin-border bg-pin-base-450;
+}
+
+.ts-dropdown .active {
+  @apply bg-pin-base-400 text-pin-base-text;
+}
+
+.ts-wrapper.plugin-remove_button:not(.rtl) .item .remove,
+.ts-wrapper.plugin-remove_button .item .remove {
+  @apply border-l-pin-border;
+}
+
+.ts-control,
+.ts-control input,
+.ts-dropdown {
+  @apply text-pin-base-text;
 }

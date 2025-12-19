@@ -1,15 +1,19 @@
 from fastapi.datastructures import URL
-from htpy import form, h1, hr, input, label
+from htpy import Element, form, h1, hr, input, label
 
 from pindb.database.material import Material
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 
 
-def material_form(post_url: URL | str, material: Material | None = None):
+def material_form(
+    post_url: URL | str,
+    material: Material | None = None,
+) -> Element:
     return html_base(
+        title="Create Material" if not material else "Edit Material",
         body_content=centered_div(
-            [
+            content=[
                 h1["Create a Material" if not material else "Edit a Material"],
                 hr,
                 form(
@@ -31,5 +35,5 @@ def material_form(post_url: URL | str, material: Material | None = None):
                     ),
                 ],
             ]
-        )
+        ),
     )

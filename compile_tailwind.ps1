@@ -1,0 +1,1 @@
+npx @tailwindcss/cli -i .\src\pindb\static\input.css -o .\src\pindb\static\main.css --watch

@@ -9,6 +9,7 @@ from pydantic import BeforeValidator
 from sqlalchemy import select
 
 from pindb.database import Material, Shop, Tag, session_maker
+from pindb.database.currency import Currency
 from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -32,6 +33,7 @@ def get_edit_pin(
         tags = session.scalars(select(Tag)).all()
         pin_sets = session.scalars(select(PinSet)).all()
         pin = session.get(Pin, id)
+        currencies = session.scalars(select(Currency)).all()
 
         if pin is None:
             return None
@@ -44,6 +46,7 @@ def get_edit_pin(
                 tags=tags,
                 pin_sets=pin_sets,
                 pin=pin,
+                currencies=currencies,
             )
         )
 
@@ -56,6 +59,7 @@ async def post_edit_pin(
     name: str = Form(),
     acquisition_type: AcquisitionType = Form(),
     original_price: float = Form(default=0),
+    currency_id: int = Form(default=840),
     material_ids: list[int] = Form(default_factory=list),
     shop_ids: list[int] = Form(default_factory=list),
     tag_ids: list[int] = Form(default_factory=list),
@@ -118,6 +122,7 @@ async def post_edit_pin(
         pin_sets = set(
             session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids))).all()
         )
+        currency = session.get_one(Currency, currency_id)
 
         pin_str_links = [link.path for link in pin.links]
         new_links: set[Link] = set()
@@ -129,6 +134,7 @@ async def post_edit_pin(
         pin.name = name
         pin.acquisition_type = acquisition_type
         pin.original_price = original_price
+        pin.currency = currency
         pin.front_image_guid = (
             front_image_guid if front_image_guid else pin.front_image_guid
         )
@@ -156,7 +162,7 @@ async def post_edit_pin(
         headers={
             "HX-Redirect": str(
                 request.url_for(
-                    "get_edit_pin",
+                    "get_pin",
                     id=pin_id,
                 )
             )

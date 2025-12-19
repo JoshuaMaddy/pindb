@@ -1,0 +1,13 @@
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=usdfghkdsjvhnuoseyhfsjhnfdhdzsfkjsdhcnsdvjn
+    volumes:
+      - meili_data:/meili_data
+volumes:
+  meili_data:
+    driver: local
