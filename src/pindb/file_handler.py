@@ -2,19 +2,22 @@ import uuid
 from math import floor
 from pathlib import Path
 
-from fastapi import UploadFile
 from PIL import Image
 from PIL.ImageFile import ImageFile
+from starlette.datastructures import UploadFile
 
 from pindb.config import CONFIGURATION
 
 
-async def save_file(file: UploadFile) -> uuid.UUID:
+async def save_file(file: UploadFile | Path) -> uuid.UUID:
     file_uuid: uuid.UUID = uuid.uuid4()
 
     file_path: Path = (CONFIGURATION.image_directory / str(file_uuid)).resolve()
 
-    file_path.write_bytes(data=await file.read())
+    if isinstance(file, UploadFile):
+        file_path.write_bytes(data=await file.read())
+    else:
+        file_path.write_bytes(data=file.read_bytes())
 
     return file_uuid
 

@@ -33,6 +33,11 @@ def html_base(
                 href="/static/main.css",
             ),
             title_el[title + " | PinDB"],
+            # Alpine
+            script(
+                src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js",
+                defer=True,
+            ),
         ],
         body()[
             navbar(),

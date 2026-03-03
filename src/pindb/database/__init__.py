@@ -10,6 +10,7 @@ from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist
 from pindb.database.base import Base
 from pindb.database.currency import Currency
+from pindb.database.grade import Grade
 from pindb.database.link import Link
 from pindb.database.material import Material
 from pindb.database.pin import Pin
@@ -21,6 +22,7 @@ __all__: list[str] = [
     "Artist",
     "Base",
     "Currency",
+    "Grade",
     "Link",
     "Material",
     "Pin",

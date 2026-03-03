@@ -11,6 +11,7 @@
     "sessionmaker"
   ],
   "python.analysis.typeCheckingMode": "strict",
+  "python.languageServer": "Pylance",
   "tailwindCSS.experimental.classRegex": [
     "class_=\"([^\"]*)\"",
     "\"class\": \"([^\"]*)\"",

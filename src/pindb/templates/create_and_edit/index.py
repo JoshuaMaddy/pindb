@@ -40,6 +40,19 @@ def create_index(request: Request) -> Element:
                     text="Pin Set",
                     icon="layout-grid",
                 ),
+                card_link(
+                    href=request.url_for("get_create_artist"),
+                    text="Artist",
+                    icon="palette",
+                ),
+                div(class_="col-span-2")[hr],
+                div(class_="col-span-2 grid")[
+                    card_link(
+                        href=request.url_for("get_bulk_pin"),
+                        text="Bulk Import Pins",
+                        icon="table-2",
+                    ),
+                ],
             ],
             class_="grid grid-cols-2",
         )

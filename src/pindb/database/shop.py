@@ -21,7 +21,7 @@ class Shop(MappedAsDataclass, Base):
     )
 
     # Required Attributes
-    name: Mapped[str]
+    name: Mapped[str] = mapped_column(unique=True)
 
     # Optional Attributes
     description: Mapped[str | None] = mapped_column(default=None)

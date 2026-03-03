@@ -18,7 +18,7 @@ class Tag(MappedAsDataclass, Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
 
     # Required Attributes
-    name: Mapped[str]
+    name: Mapped[str] = mapped_column(unique=True)
 
     # Foreign key for self-referential parent
     parent_id: Mapped[int | None] = mapped_column(

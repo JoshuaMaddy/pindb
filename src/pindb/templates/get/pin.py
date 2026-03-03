@@ -1,5 +1,5 @@
 from fastapi import Request
-from htpy import Element, a, div, fragment, h1, h2, i, img, p
+from htpy import Element, a, div, fragment, h1, h2, i, img, p, table, tbody, td, th, thead, tr
 
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
@@ -59,9 +59,10 @@ def __pin_details(request: Request, pin: Pin) -> Element:
     return div(class_="min-md:ml-2")[
         h2["Details"],
         __shops(pin=pin, request=request),
+        __artists(pin=pin, request=request),
         __links(pin=pin),
         __acquisition(pin=pin),
-        __original_price(pin=pin),
+        __grades(pin=pin),
         __pin_sets(pin=pin, request=request),
         __tags(pin=pin, request=request),
         __materials(pin=pin, request=request),
@@ -97,6 +98,28 @@ def __shops(pin: Pin, request: Request) -> Element:
     ]
 
 
+def __artists(pin: Pin, request: Request) -> Element | None:
+    if not pin.artists:
+        return None
+    return div(class_="flex flex-wrap gap-2 items-baseline")[
+        p(class_="text-lg font-semibold")[
+            i(data_lucide="palette", class_="inline-block pr-2"),
+            "Artists",
+        ],
+        *[
+            a(
+                href=str(
+                    request.url_for(
+                        "get_artist",
+                        id=artist.id,
+                    )
+                )
+            )[artist.name]
+            for artist in pin.artists
+        ],
+    ]
+
+
 def __links(pin: Pin) -> Element | None:
     if not pin.links:
         return None
@@ -117,12 +140,32 @@ def __acquisition(pin: Pin) -> Element:
     )
 
 
-def __original_price(pin: Pin) -> Element:
-    return icon_list_item(
-        icon="banknote",
-        name="Original Price",
-        value=format_currency_code(amount=pin.original_price, code=pin.currency.code),
-    )
+def __grades(pin: Pin) -> Element | None:
+    if not pin.grades:
+        return None
+    return div[
+        p(class_="text-lg font-semibold")[
+            i(data_lucide="banknote", class_="inline-block pr-2"),
+            "Grades",
+        ],
+        table(class_="border-collapse")[
+            thead[
+                tr[
+                    th(class_="text-left pr-4")["Grade"],
+                    th(class_="text-left")["Price"],
+                ]
+            ],
+            tbody[
+                [
+                    tr[
+                        td(class_="pr-4")[grade.name],
+                        td[format_currency_code(amount=grade.price, code=pin.currency.code)],
+                    ]
+                    for grade in sorted(pin.grades, key=lambda g: g.name)
+                ]
+            ],
+        ],
+    ]
 
 
 def __pin_sets(pin: Pin, request: Request) -> Element | None:

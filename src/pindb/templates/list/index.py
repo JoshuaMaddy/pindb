@@ -28,6 +28,11 @@ def list_index(request: Request, header: bool = True) -> Fragment:
             text="Pin Sets",
             icon="layout-grid",
         ),
+        card_link(
+            href=request.url_for("get_list_artists"),
+            text="Artists",
+            icon="palette",
+        ),
     ]
 
 

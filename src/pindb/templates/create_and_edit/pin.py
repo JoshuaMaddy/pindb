@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Sequence
 
@@ -21,10 +22,10 @@ from htpy import (
     select,
     textarea,
 )
+from markupsafe import Markup
 
-from pindb.database import Material, Shop, Tag
+from pindb.database import Artist, Material, Shop, Tag
 from pindb.database.currency import Currency
-from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.models import AcquisitionType, FundingType
@@ -48,6 +49,7 @@ def pin_form(
     shops: Sequence[Shop],
     tags: Sequence[Tag],
     pin_sets: Sequence[PinSet],
+    artists: Sequence[Artist],
     pin: Pin | None = None,
 ) -> Element:
     return html_base(
@@ -71,6 +73,7 @@ def pin_form(
                             materials=materials,
                             shops=shops,
                             tags=tags,
+                            artists=artists,
                             pin=pin,
                             currencies=currencies,
                         ),
@@ -90,6 +93,7 @@ def __required_fields(
     materials: Sequence[Material],
     shops: Sequence[Shop],
     tags: Sequence[Tag],
+    artists: Sequence[Artist],
     currencies: Sequence[Currency],
     pin: Pin | None = None,
 ) -> Fragment:
@@ -98,9 +102,10 @@ def __required_fields(
         __name_input(pin=pin),
         __shops_input(pin=pin, shops=shops),
         __acquisition_input(pin=pin),
-        __original_price_input(currencies=currencies, pin=pin),
+        __grades_input(currencies=currencies, pin=pin),
         __material_ids_input(pin=pin, materials=materials),
         __tag_ids_input(pin=pin, tags=tags),
+        __artist_ids_input(pin=pin, artists=artists),
     ]
 
 
@@ -233,39 +238,54 @@ def __acquisition_input(pin: Pin | None) -> list[Element | VoidElement]:
     ]
 
 
-def __original_price_input(
+def __grades_input(
     currencies: Sequence[Currency],
     pin: Pin | None,
-) -> list[Element | VoidElement]:
+) -> list[Element | VoidElement | Markup]:
+    # Prepare initial grades data
+    grades_data: list[dict[str, str]] = []
+    if pin and pin.grades:
+        grades_data = [
+            {"name": str(grade.name), "price": str(grade.price)}
+            for grade in pin.grades
+        ]
+
+    # Ensure at least one empty grade
+    if not grades_data:
+        grades_data = [{"name": "", "price": ""}]
+
+    # Default currency
+    default_currency_id = pin.currency_id if pin else 840
+
+    grades_json = json.dumps(grades_data)
+
     return [
-        label(for_="original_price")["Original Price"],
-        div(class_="flex w-full gap-1")[
-            input(
-                type="number",
-                name="original_price",
-                id="original_price",
-                required=True,
-                autocomplete="off",
-                step="0.01",
-                min="0",
-                value=str(pin.original_price) if pin else False,
-                class_="grow",
-            ),
-            select(
-                name="currency_id",
-                id="currency_id",
-            )[
-                [
-                    option(
-                        value=currency.id,
-                        selected=currency.id == pin.currency_id
-                        if pin
-                        else currency.id == 840,
-                    )[currency.code]
-                    for currency in currencies
-                ]
-            ],
+        label(for_="grade")["Grade"],
+        Markup(f"""<div class="flex w-full gap-2">
+            <div class="flex flex-col gap-2 grow" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
+                <template x-for="(grade, index) in grades" :key="index">
+                    <div class="gap-2 flex">
+                        <input class="grow" type="text" name="grade_names" x-model="grades[index].name" required autocomplete="off" placeholder="Grade">
+                        <input class="w-25" type="number" name="grade_prices" x-model="grades[index].price" required autocomplete="off" step="0.01" min="0" placeholder="Price">
+                        <button type="button" @click="grades.splice(index, 1)" x-show="grades.length > 1" class="remove-grade-button">Remove</button>
+                    </div>
+                </template>
+                <button type="button" @click="grades.push({{name: '', price: ''}})" class="w-full">Add Grade</button>
+            </div>
+        """),
+        select(
+            name="currency_id",
+            id="currency_id",
+        )[
+            [
+                option(
+                    value=currency.id,
+                    selected=currency.id == default_currency_id,
+                )[currency.code]
+                for currency in currencies
+            ]
         ],
+        Markup("</div>"),
     ]
 
 
@@ -312,6 +332,29 @@ def __tag_ids_input(
                     selected=tag in pin.tags if pin else False,
                 )[tag.name]
                 for tag in tags
+            ]
+        ],
+    ]
+
+
+def __artist_ids_input(
+    pin: Pin | None,
+    artists: Sequence[Artist],
+) -> list[Element | VoidElement]:
+    return [
+        label(for_="artist_ids")["Artists"],
+        select(
+            name="artist_ids",
+            id="artist_ids",
+            multiple=True,
+            class_="multi-select",
+        )[
+            [
+                option(
+                    value=artist.id,
+                    selected=artist in pin.artists if pin else False,
+                )[artist.name]
+                for artist in artists
             ]
         ],
     ]
@@ -464,40 +507,39 @@ def __height_input(pin: Pin | None) -> list[Element | VoidElement]:
     ]
 
 
-def __links_input(pin: Pin | None) -> Element:
-    pin_links: None | list[Link] = None
-    if pin:
-        pin_links = list(pin.links)
+def __links_input(pin: Pin | None) -> Element | Markup:
+    pin_links: list[str] = []
+    if pin and pin.links:
+        pin_links = [link.path for link in pin.links]
+
+    # Ensure at least one empty field
+    if not pin_links:
+        pin_links = [""]
+
+    links_json = json.dumps(pin_links)
 
     return div(class_="col-span-2")[
         label(for_="links")["Links"],
-        div(id="links", class_="grid grid-cols-[1fr_min-content] gap-2 mt-2")[
-            input(
-                name="links",
-                id="link_0",
-                type="text",
-                class_="col-span-2",
-                value=pin_links.pop(0).path if pin_links else None,
-            ),
-            (pin_links is not None and len(pin_links) != 0)
-            and [
-                fragment[
-                    input(
-                        name="links",
-                        id=f"link_{i}",
-                        type="text",
-                        value=link.path,
-                    ),
-                    button(class_="remove-link-button")["Remove"],
-                ]
-                for i, link in enumerate(pin_links)
-            ],
-        ],
-        button(
-            id="add-link-button",
-            class_="w-full mt-2",
-            type="button",
-        )["Add Link"],
+        Markup(f"""<div class="mt-2" x-data="{{ links: {links_json.replace('"', "'")} }}">
+            <template x-for="(link, index) in links" :key="index">
+                <div class="grid grid-cols-[1fr_min-content] gap-2 mb-2">
+                    <input 
+                        type="text"
+                        name="links"
+                        x-model="links[index]"
+                        class="col-span-1">
+                    <button 
+                        type="button" 
+                        @click="links.splice(index, 1)" 
+                        x-show="links.length > 1"
+                        class="remove-link-button">Remove</button>
+                </div>
+            </template>
+            <button 
+                type="button" 
+                @click="links.push('')" 
+                class="w-full mt-2">Add Link</button>
+        </div>"""),
     ]
 
 

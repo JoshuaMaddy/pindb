@@ -64,3 +64,10 @@ pins_links = Table(
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("link_id", Integer, ForeignKey("links.id"), primary_key=True),
 )
+
+pins_grades = Table(
+    "pins_grades",
+    Base.metadata,
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Column("grade_id", Integer, ForeignKey("grades.id"), primary_key=True),
+)

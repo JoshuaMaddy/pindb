@@ -1,0 +1,213 @@
+from datetime import date
+from uuid import UUID
+
+from fastapi import Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.routing import APIRouter
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from pindb.database import Artist, Material, PinSet, Shop, Tag, session_maker
+from pindb.database.currency import Currency
+from pindb.database.grade import Grade
+from pindb.database.link import Link
+from pindb.database.pin import Pin
+from pindb.file_handler import save_file
+from pindb.model_utils import magnitude_to_mm
+from pindb.models.acquisition_type import AcquisitionType
+from pindb.models.funding_type import FundingType
+from pindb.templates.bulk.pin import bulk_pin_page
+
+router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models for JSON submit
+# ---------------------------------------------------------------------------
+
+
+class GradeInput(BaseModel):
+    name: str
+    price: float
+
+
+class PinRowInput(BaseModel):
+    name: str
+    acquisition_type: AcquisitionType
+    front_image_guid: str
+    back_image_guid: str | None = None
+    currency_id: int = 840
+    shop_names: list[str] = []
+    material_names: list[str] = []
+    tag_names: list[str] = []
+    artist_names: list[str] = []
+    pin_set_names: list[str] = []
+    grades: list[GradeInput] = []
+    links: list[str] = []
+    limited_edition: bool | None = None
+    number_produced: int | None = None
+    release_date: date | None = None
+    end_date: date | None = None
+    funding_type: FundingType | None = None
+    posts: int = 1
+    width: str | None = None
+    height: str | None = None
+    description: str | None = None
+
+
+class BulkPinInput(BaseModel):
+    pins: list[PinRowInput]
+
+
+class PinRowResult(BaseModel):
+    index: int
+    success: bool
+    pin_id: int | None = None
+    pin_name: str | None = None
+    front_image_guid: str | None = None
+    error: str | None = None
+
+
+class BulkPinResult(BaseModel):
+    results: list[PinRowResult]
+    created_count: int
+    failed_count: int
+
+
+# ---------------------------------------------------------------------------
+# Helper: resolve or create an entity by name
+# ---------------------------------------------------------------------------
+
+
+def _get_or_create(session, model, name: str):
+    obj = session.scalar(select(model).where(model.name == name))
+    if not obj:
+        obj = model(name=name)
+        session.add(obj)
+        session.flush()
+    return obj
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
+@router.get(path="/pin")
+def get_bulk_pin(request: Request) -> HTMLResponse:
+    with session_maker.begin() as session:
+        shops = session.scalars(statement=select(Shop)).all()
+        materials = session.scalars(statement=select(Material)).all()
+        tags = session.scalars(statement=select(Tag)).all()
+        pin_sets = session.scalars(statement=select(PinSet)).all()
+        artists = session.scalars(statement=select(Artist)).all()
+        currencies = session.scalars(statement=select(Currency)).all()
+
+        return HTMLResponse(
+            content=bulk_pin_page(
+                upload_image_url=str(request.url_for("post_bulk_image")),
+                submit_url=str(request.url_for("post_bulk_pins")),
+                shops=shops,
+                materials=materials,
+                tags=tags,
+                pin_sets=pin_sets,
+                artists=artists,
+                currencies=currencies,
+            )
+        )
+
+
+@router.post(path="/pin/image")
+async def post_bulk_image(image: UploadFile = Form()) -> JSONResponse:
+    guid: UUID = await save_file(file=image)
+    return JSONResponse(content={"guid": str(guid)})
+
+
+@router.post(path="/pin")
+async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
+    results: list[PinRowResult] = []
+
+    with session_maker.begin() as session:
+        for idx, row in enumerate(body.pins):
+            try:
+                currency = session.get_one(entity=Currency, ident=row.currency_id)
+
+                shops = {_get_or_create(session, Shop, n) for n in row.shop_names if n}
+                materials = {
+                    _get_or_create(session, Material, n)
+                    for n in row.material_names
+                    if n
+                }
+                tags = {_get_or_create(session, Tag, n) for n in row.tag_names if n}
+                artists = {
+                    _get_or_create(session, Artist, n) for n in row.artist_names if n
+                }
+                pin_sets = {
+                    _get_or_create(session, PinSet, n) for n in row.pin_set_names if n
+                }
+
+                grades = {
+                    Grade(name=g.name, price=g.price)
+                    for g in row.grades
+                }
+                links = {Link(path=url) for url in row.links if url}
+
+                new_pin = Pin(
+                    name=row.name,
+                    acquisition_type=row.acquisition_type,
+                    front_image_guid=UUID(row.front_image_guid),
+                    back_image_guid=UUID(row.back_image_guid)
+                    if row.back_image_guid
+                    else None,
+                    currency=currency,
+                    shops=shops,
+                    materials=materials,
+                    tags=tags,
+                    artists=artists,
+                    sets=pin_sets,
+                    grades=grades,
+                    links=links,
+                    limited_edition=row.limited_edition,
+                    number_produced=row.number_produced,
+                    release_date=row.release_date,
+                    end_date=row.end_date,
+                    funding_type=row.funding_type,
+                    posts=row.posts,
+                    width=magnitude_to_mm(magnitude=row.width) if row.width else None,  # type: ignore
+                    height=magnitude_to_mm(magnitude=row.height)
+                    if row.height
+                    else None,  # type: ignore
+                    description=row.description,
+                )
+
+                session.add(new_pin)
+                session.flush()
+
+                results.append(
+                    PinRowResult(
+                        index=idx,
+                        success=True,
+                        pin_id=new_pin.id,
+                        pin_name=new_pin.name,
+                        front_image_guid=str(new_pin.front_image_guid),
+                    )
+                )
+            except Exception as e:
+                results.append(
+                    PinRowResult(
+                        index=idx,
+                        success=False,
+                        error=str(e),
+                    )
+                )
+
+    created = sum(1 for r in results if r.success)
+    failed = sum(1 for r in results if not r.success)
+
+    return JSONResponse(
+        content=BulkPinResult(
+            results=results,
+            created_count=created,
+            failed_count=failed,
+        ).model_dump(mode="json")
+    )

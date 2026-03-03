@@ -7,21 +7,23 @@ from uuid import UUID
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
-from pindb.database.artist import Artist
 from pindb.database.base import Base
 from pindb.database.joins import (
     pins_artists,
+    pins_grades,
     pins_links,
     pins_materials,
     pins_sets,
     pins_shops,
     pins_tags,
 )
-from pindb.database.link import Link
 from pindb.models import AcquisitionType, FundingType
 
 if TYPE_CHECKING:
+    from pindb.database.artist import Artist
     from pindb.database.currency import Currency
+    from pindb.database.grade import Grade
+    from pindb.database.link import Link
     from pindb.database.material import Material
     from pindb.database.pin_set import PinSet
     from pindb.database.shop import Shop
@@ -37,11 +39,13 @@ class Pin(MappedAsDataclass, Base):
     name: Mapped[str]
     acquisition_type: Mapped[AcquisitionType]
     front_image_guid: Mapped[UUID]
-    original_price: Mapped[float]
     currency_id: Mapped[int] = mapped_column(ForeignKey("currencies.id"), init=False)
     currency: Mapped[Currency] = relationship()
 
     # Required Relationships
+    grades: Mapped[set[Grade]] = relationship(
+        secondary=pins_grades,
+    )
     materials: Mapped[set[Material]] = relationship(
         secondary=pins_materials,
         back_populates="pins",

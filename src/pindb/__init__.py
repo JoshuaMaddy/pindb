@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from pindb.routes import create, delete, edit, get, list, search
+from pindb.routes.bulk import router as bulk_router
 from pindb.templates.homepage import homepage
 
 app = FastAPI()
@@ -27,3 +28,4 @@ app.include_router(edit.router)
 app.include_router(list.router)
 app.include_router(search.router)
 app.include_router(delete.router)
+app.include_router(bulk_router)

@@ -39,3 +39,6 @@ class Artist(MappedAsDataclass, Base):
         secondary=artists_links,
         default_factory=set,
     )
+
+    def __hash__(self) -> int:
+        return hash(self.name + str(self.id))

@@ -2,7 +2,7 @@ window.addEventListener("load", function () {
   // -------------------------------
   // Link Add/Remove
   // -------------------------------
-
+  /*
   const addLinkButton = document.getElementById("add-link-button");
   const removeButtons = document.querySelectorAll(".remove-link-button");
   const linksDiv = document.getElementById("links");
@@ -46,7 +46,8 @@ window.addEventListener("load", function () {
     button.previousSibling.remove();
     button.remove();
   }
-
+  */
+ 
   // -------------------------------
   // Tom Select Initialization
   // -------------------------------
