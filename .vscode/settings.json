@@ -1,17 +1,27 @@
 {
   "cSpell.words": [
+    "beforeend",
     "enctype",
+    "favorited",
+    "HTMX",
     "htpy",
     "lucide",
     "meili",
     "meilisearch",
+    "minmax",
+    "outerjoin",
     "pindb",
     "pinset",
     "pinsets",
-    "sessionmaker"
+    "Pydantic",
+    "sessionmaker",
+    "stdlib",
+    "subgrid",
+    "tabindex",
+    "userinfo"
   ],
   "python.analysis.typeCheckingMode": "strict",
-  "python.languageServer": "Pylance",
+  "python.languageServer": "None",
   "tailwindCSS.experimental.classRegex": [
     "class_=\"([^\"]*)\"",
     "\"class\": \"([^\"]*)\"",

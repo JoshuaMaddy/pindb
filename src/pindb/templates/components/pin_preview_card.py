@@ -4,7 +4,10 @@ from htpy import Element, a, div, img
 from pindb.database.pin import Pin
 
 
-def pin_preview_card(request: Request, pin: Pin) -> Element:
+def pin_preview_card(
+    request: Request,
+    pin: Pin,
+) -> Element:
     return div(
         class_="grid grid-rows-subgrid row-span-2 gap-0 rounded-lg overflow-clip bg-pin-base-450 border border-pin-base-400 hover:scale-[102%] hover:border-accent"
     )[

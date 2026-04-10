@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
+from rich.repr import Result
+from sqlalchemy.orm import (
+    Mapped,
+    MappedAsDataclass,
+    mapped_column,
+    object_session,
+    relationship,
+)
 
 from pindb.database.base import Base
 from pindb.database.joins import artists_links, pins_artists
@@ -42,3 +49,13 @@ class Artist(MappedAsDataclass, Base):
 
     def __hash__(self) -> int:
         return hash(self.name + str(self.id))
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "name", self.name
+        yield "active", self.active
+        if object_session(self):
+            yield "number_of_pins", len(self.pins)
+            yield "links", self.links, set()
+        else:
+            yield "session", "expired"

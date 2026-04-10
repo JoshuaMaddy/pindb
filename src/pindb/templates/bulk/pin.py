@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
+from fastapi import Request
 from htpy import (
     Element,
     button,
@@ -12,7 +13,6 @@ from htpy import (
     span,
     table,
     tbody,
-    td,
     th,
     thead,
     tr,
@@ -41,8 +41,11 @@ def bulk_pin_page(
     pin_sets: Sequence[PinSet],
     artists: Sequence[Artist],
     currencies: Sequence[Currency],
+    request: Request | None = None,
 ) -> Element:
-    ref_data = {
+    ref_data: dict[
+        str, str | list[dict[str, str]] | list[dict[str, int | str]] | int
+    ] = {
         "uploadImageUrl": upload_image_url,
         "submitUrl": submit_url,
         "shops": [{"value": s.name, "text": s.name} for s in shops],
@@ -60,7 +63,7 @@ def bulk_pin_page(
         "defaultCurrencyId": 840,
     }
 
-    optional_cols = [
+    optional_cols: list[tuple[str, str]] = [
         ("artists", "Artists"),
         ("pin_sets", "Pin Sets"),
         ("limited_edition", "Ltd. Ed."),
@@ -77,6 +80,7 @@ def bulk_pin_page(
 
     return html_base(
         title="Bulk Import Pins",
+        request=request,
         body_content=[
             # Inject reference data
             script[Markup(f"window.BULK_REF = {json.dumps(ref_data)};")],
@@ -92,11 +96,13 @@ def bulk_pin_page(
                         </button>
                         <div x-show="open" @click.outside="open = false"
                              class="absolute right-0 top-full mt-1 z-50 bg-pin-main border border-pin-border rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
-                            {"".join(
-                                f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
-                                f'<input type="checkbox" checked data-col="{key}" class="col-toggle-check"> {label}</label>'
-                                for key, label in optional_cols
-                            )}
+                            {
+                        "".join(
+                            f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
+                            f'<input type="checkbox" checked data-col="{key}" class="col-toggle-check"> {label}</label>'
+                            for key, label in optional_cols
+                        )
+                    }
                         </div>
                     </div>"""),
                     button(
@@ -108,39 +114,110 @@ def bulk_pin_page(
                         id="submit-btn",
                         type="button",
                         class_="flex items-center gap-1 border-accent text-accent",
-                    )[Markup('<i data-lucide="upload"></i>'), span(id="submit-label")["Submit (0)"]],
+                    )[
+                        Markup('<i data-lucide="upload"></i>'),
+                        span(id="submit-label")["Submit (0)"],
+                    ],
                 ],
                 hr,
                 # Scrollable table container
-                div(class_="overflow-x-auto overflow-y-clip rounded-lg border border-pin-border")[
+                div(
+                    class_="overflow-x-auto overflow-y-clip rounded-lg border border-pin-border"
+                )[
                     table(class_="bulk-table w-full border-collapse text-sm")[
                         thead[
                             tr(class_="border-b border-pin-border")[
                                 th(class_="bulk-th w-8")[
-                                    Markup('<input type="checkbox" id="select-all-rows">')
+                                    Markup(
+                                        '<input type="checkbox" id="select-all-rows">'
+                                    )
                                 ],
                                 th(class_="bulk-th w-20")["Front *"],
                                 th(class_="bulk-th w-20")["Back"],
-                                th(class_="bulk-th min-w-[160px]", data_col_type="name")["Name *"],
-                                th(class_="bulk-th min-w-[180px]", data_col_type="shops")["Shops *"],
-                                th(class_="bulk-th min-w-[140px]", data_col_type="acquisition_type")["Acquisition *"],
-                                th(class_="bulk-th min-w-[100px]", data_col_type="grades")["Grades *"],
-                                th(class_="bulk-th min-w-[120px]", data_col_type="currency_id")["Currency *"],
-                                th(class_="bulk-th min-w-[160px]", data_col_type="materials")["Materials *"],
-                                th(class_="bulk-th min-w-[160px]", data_col_type="tags")["Tags *"],
+                                th(
+                                    class_="bulk-th min-w-[160px]", data_col_type="name"
+                                )["Name *"],
+                                th(
+                                    class_="bulk-th min-w-[180px]",
+                                    data_col_type="shops",
+                                )["Shops *"],
+                                th(
+                                    class_="bulk-th min-w-[140px]",
+                                    data_col_type="acquisition_type",
+                                )["Acquisition *"],
+                                th(
+                                    class_="bulk-th min-w-[100px]",
+                                    data_col_type="grades",
+                                )["Grades *"],
+                                th(
+                                    class_="bulk-th min-w-[120px]",
+                                    data_col_type="currency_id",
+                                )["Currency *"],
+                                th(
+                                    class_="bulk-th min-w-[160px]",
+                                    data_col_type="materials",
+                                )["Materials *"],
+                                th(
+                                    class_="bulk-th min-w-[160px]", data_col_type="tags"
+                                )["Tags *"],
                                 # Optional columns
-                                th(class_="bulk-th min-w-[160px]", data_col="artists", data_col_type="artists")["Artists"],
-                                th(class_="bulk-th min-w-[160px]", data_col="pin_sets", data_col_type="pin_sets")["Pin Sets"],
-                                th(class_="bulk-th min-w-[80px]", data_col="limited_edition")["Ltd. Ed."],
-                                th(class_="bulk-th min-w-[100px]", data_col="number_produced", data_col_type="number_produced")["# Produced"],
-                                th(class_="bulk-th min-w-[130px]", data_col="release_date", data_col_type="release_date")["Release Date"],
-                                th(class_="bulk-th min-w-[130px]", data_col="end_date", data_col_type="end_date")["End Date"],
-                                th(class_="bulk-th min-w-[130px]", data_col="funding_type", data_col_type="funding_type")["Funding"],
-                                th(class_="bulk-th min-w-[70px]", data_col="posts", data_col_type="posts")["Posts"],
-                                th(class_="bulk-th min-w-[90px]", data_col="width", data_col_type="width")["Width"],
-                                th(class_="bulk-th min-w-[90px]", data_col="height", data_col_type="height")["Height"],
-                                th(class_="bulk-th min-w-[100px]", data_col="links")["Links"],
-                                th(class_="bulk-th min-w-[180px]", data_col="description", data_col_type="description")["Description"],
+                                th(
+                                    class_="bulk-th min-w-[160px]",
+                                    data_col="artists",
+                                    data_col_type="artists",
+                                )["Artists"],
+                                th(
+                                    class_="bulk-th min-w-[160px]",
+                                    data_col="pin_sets",
+                                    data_col_type="pin_sets",
+                                )["Pin Sets"],
+                                th(
+                                    class_="bulk-th min-w-[80px]",
+                                    data_col="limited_edition",
+                                )["Ltd. Ed."],
+                                th(
+                                    class_="bulk-th min-w-[100px]",
+                                    data_col="number_produced",
+                                    data_col_type="number_produced",
+                                )["# Produced"],
+                                th(
+                                    class_="bulk-th min-w-[130px]",
+                                    data_col="release_date",
+                                    data_col_type="release_date",
+                                )["Release Date"],
+                                th(
+                                    class_="bulk-th min-w-[130px]",
+                                    data_col="end_date",
+                                    data_col_type="end_date",
+                                )["End Date"],
+                                th(
+                                    class_="bulk-th min-w-[130px]",
+                                    data_col="funding_type",
+                                    data_col_type="funding_type",
+                                )["Funding"],
+                                th(
+                                    class_="bulk-th min-w-[70px]",
+                                    data_col="posts",
+                                    data_col_type="posts",
+                                )["Posts"],
+                                th(
+                                    class_="bulk-th min-w-[90px]",
+                                    data_col="width",
+                                    data_col_type="width",
+                                )["Width"],
+                                th(
+                                    class_="bulk-th min-w-[90px]",
+                                    data_col="height",
+                                    data_col_type="height",
+                                )["Height"],
+                                th(class_="bulk-th min-w-[100px]", data_col="links")[
+                                    "Links"
+                                ],
+                                th(
+                                    class_="bulk-th min-w-[180px]",
+                                    data_col="description",
+                                    data_col_type="description",
+                                )["Description"],
                                 th(class_="bulk-th w-20")["Actions"],
                             ]
                         ],
@@ -155,9 +232,13 @@ def bulk_pin_page(
                 id="success-modal",
                 class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60",
             )[
-                div(class_="bg-pin-main border border-pin-border rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4")[
+                div(
+                    class_="bg-pin-main border border-pin-border rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
+                )[
                     div(class_="flex items-center justify-between")[
-                        h1(id="modal-title", class_="text-xl font-bold")["Import Complete"],
+                        h1(id="modal-title", class_="text-xl font-bold")[
+                            "Import Complete"
+                        ],
                         button(
                             id="modal-close-btn",
                             type="button",

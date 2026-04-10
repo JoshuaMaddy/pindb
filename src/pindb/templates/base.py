@@ -1,16 +1,19 @@
-from htpy import BaseElement, Fragment, body, head, html, link, meta, script
+from fastapi import Request
+from htpy import BaseElement, body, head, html, link, meta, script
 from htpy import title as title_el
 from markupsafe import Markup
 
 from pindb.templates.components.bread_crumb import BreadCrumbLink, bread_crumb
 from pindb.templates.components.navbar import navbar
+from pindb.templates.types import Content
 
 
 def html_base(
-    body_content: BaseElement | Fragment | list[BaseElement | Fragment],
+    body_content: Content,
     script_content: BaseElement | str | None = None,
     bread_crumb_links: list[BreadCrumbLink | str] | None = None,
     title: str = "Document",
+    request: Request | None = None,
 ):
     return html(lang="en", class_="mocha bg-pin-base-550")[
         head[
@@ -40,7 +43,7 @@ def html_base(
             ),
         ],
         body()[
-            navbar(),
+            navbar(request=request),
             bread_crumb(entries=bread_crumb_links),
             body_content,
         ],
@@ -57,6 +60,9 @@ if (element != null){
     return false;
     }
 }
+document.body.addEventListener('htmx:afterSwap', function() {
+    lucide.createIcons();
+});
 """
             )
         ],

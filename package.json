@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
+    "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify"
+  },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.13",
     "tailwindcss": "^4.1.13"

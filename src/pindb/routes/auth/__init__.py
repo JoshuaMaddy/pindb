@@ -1,0 +1,3 @@
+from pindb.routes.auth.router import router
+
+__all__: list[str] = ["router"]

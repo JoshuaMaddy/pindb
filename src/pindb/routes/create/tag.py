@@ -10,7 +10,12 @@ router = APIRouter()
 
 @router.get(path="/tag")
 def get_create_tag(request: Request) -> HTMLResponse:
-    return HTMLResponse(content=tag_form(post_url=request.url_for("post_create_tag")))
+    return HTMLResponse(
+        content=tag_form(
+            post_url=request.url_for("post_create_tag"),
+            request=request,
+        )
+    )
 
 
 @router.post(path="/tag")
@@ -23,7 +28,7 @@ def post_create_tag(
 
         session.add(instance=tag)
         session.flush()
-        tag_id = tag.id
+        tag_id: int = tag.id
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_tag", id=tag_id))}

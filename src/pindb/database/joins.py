@@ -23,11 +23,12 @@ pins_artists = Table(
     Column("artists_id", Integer, ForeignKey("artists.id"), primary_key=True),
 )
 
-pins_sets = Table(
-    "pins_sets",
+pin_set_memberships = Table(
+    "pin_set_memberships",
     Base.metadata,
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
-    Column("sets_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
+    Column("set_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
+    Column("position", Integer, nullable=False, server_default="0"),
 )
 
 pins_tags = Table(
@@ -70,4 +71,18 @@ pins_grades = Table(
     Base.metadata,
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("grade_id", Integer, ForeignKey("grades.id"), primary_key=True),
+)
+
+user_favorite_pins = Table(
+    "user_favorite_pins",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+)
+
+user_favorite_pin_sets = Table(
+    "user_favorite_pin_sets",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("pin_set_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
 )

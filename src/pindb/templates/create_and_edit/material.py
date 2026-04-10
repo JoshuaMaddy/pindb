@@ -1,3 +1,4 @@
+from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, form, h1, hr, input, label
 
@@ -8,6 +9,7 @@ from pindb.templates.components.centered import centered_div
 
 def material_form(
     post_url: URL | str,
+    request: Request,
     material: Material | None = None,
 ) -> Element:
     return html_base(
@@ -36,4 +38,5 @@ def material_form(
                 ],
             ]
         ),
+        request=request,
     )

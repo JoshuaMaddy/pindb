@@ -1,3 +1,4 @@
+from fastapi import Request
 from pathlib import Path
 
 from fastapi.datastructures import URL
@@ -18,11 +19,12 @@ with open(
 
 def shop_form(
     post_url: URL | str,
+    request: Request,
     shop: Shop | None = None,
 ) -> Element:
     shop_links: None | list[Link] = None
     if shop:
-        shop_links = list(shop.links)
+        shop_links: list[Link] = list(shop.links)
 
     return html_base(
         title="Create Shop" if not shop else "Edit Shop",
@@ -91,4 +93,5 @@ def shop_form(
             ]
         ),
         script_content=SCRIPT_CONTENT,
+        request=request
     )

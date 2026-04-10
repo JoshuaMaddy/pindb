@@ -28,6 +28,7 @@ def get_edit_artist(
             content=artist_form(
                 post_url=request.url_for("post_edit_artist", id=id),
                 artist=artist,
+                request=request,
             )
         )
 
@@ -63,7 +64,7 @@ def post_edit_artist(
         new_links: set[Link] = set()
         for new_link in links or []:
             new_links.add(Link(new_link))
-        artist.links = new_links
+        artist.links: set[Link] = new_links
 
         session.flush()
         artist_id: int = artist.id

@@ -1,3 +1,4 @@
+from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, div, form, h1, hr, input
 
@@ -5,7 +6,10 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 
 
-def search_pin_input(post_url: URL | str, hx_target: str = "#results") -> Element:
+def search_pin_input(
+    post_url: URL | str,
+    hx_target: str = "#results",
+) -> Element:
     return form(
         hx_post=str(post_url),
         hx_target=hx_target,
@@ -15,7 +19,9 @@ def search_pin_input(post_url: URL | str, hx_target: str = "#results") -> Elemen
             type="text",
             name="search",
             id="search",
-            required=True,
+            hx_post=str(post_url),
+            hx_target=hx_target,
+            hx_trigger="input changed delay:1s",
         ),
         input(
             type="submit",
@@ -25,9 +31,13 @@ def search_pin_input(post_url: URL | str, hx_target: str = "#results") -> Elemen
     ]
 
 
-def search_pin_page(post_url: URL | str):
+def search_pin_page(
+    post_url: URL | str,
+    request: Request | None = None,
+):
     return html_base(
         title="Search",
+        request=request,
         body_content=centered_div(
             content=[
                 h1["Search"],
@@ -35,6 +45,5 @@ def search_pin_page(post_url: URL | str):
                 search_pin_input(post_url=post_url),
                 div("#results", class_="mt-4"),
             ],
-            wide=True,
         ),
     )

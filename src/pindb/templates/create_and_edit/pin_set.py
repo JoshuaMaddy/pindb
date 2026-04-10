@@ -1,39 +1,398 @@
-from fastapi.datastructures import URL
-from htpy import Element, form, h1, hr, input, label
+from fastapi import Request
+from htpy import (
+    Element,
+    a,
+    button,
+    div,
+    form,
+    h2,
+    hr,
+    i,
+    img,
+    input,
+    p,
+    textarea,
+)
 
+from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
+from pindb.database.user import User
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
+from pindb.templates.components.confirm_modal import confirm_modal
+from pindb.templates.components.empty_state import empty_state
+from pindb.templates.components.form_field import form_field
+from pindb.templates.components.htmx_search_input import htmx_search_input
+from pindb.templates.components.icon_button import icon_button
+from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.toggle_button import toggle_button
+
+# Dynamically loads SortableJS then initializes the draggable pin grid.
+_SORTABLE_INIT = """
+(function () {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
+    s.onload = function () {
+        var grid = document.getElementById('pin-list');
+        if (!grid) return;
+        Sortable.create(grid, {
+            animation: 150,
+            onEnd: function () {
+                var items = grid.querySelectorAll('[data-pin-id]');
+                var fd = new FormData();
+                items.forEach(function (el) {
+                    fd.append('pin_ids', el.getAttribute('data-pin-id'));
+                });
+                fetch(grid.getAttribute('data-reorder-url'), {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'HX-Request': 'true' },
+                });
+            },
+        });
+    };
+    document.head.appendChild(s);
+})();
+"""
 
 
-def pin_set_form(
-    post_url: URL | str,
-    pin_set: PinSet | None = None,
-) -> Element:
+# ---------------------------------------------------------------------------
+# Admin create page
+# ---------------------------------------------------------------------------
+
+
+def pin_set_create_page(request: Request) -> Element:
     return html_base(
-        title="Create Pin Set" if not pin_set else "Edit Pin Set",
+        title="Create Pin Set",
+        request=request,
         body_content=centered_div(
             content=[
-                h1["Create a Pin Set" if not pin_set else "Edit a Pin Set"],
+                page_heading(
+                    icon="folder-plus",
+                    text="Create Pin Set",
+                    gap=3,
+                ),
                 hr,
                 form(
-                    hx_post=str(post_url),
-                    class_="flex flex-col gap-2 [&_label]:font-semibold",
+                    method="post",
+                    action=str(request.url_for("post_create_pin_set")),
+                    class_="flex flex-col gap-3",
                 )[
-                    label(for_="name")["Name"],
-                    input(
-                        type="text",
-                        name="name",
-                        id="name",
-                        required=True,
-                        value=pin_set.name if pin_set else None,
+                    form_field(
+                        label_text="Name",
+                        field_id="name",
+                        child=input(
+                            type_="text",
+                            id="name",
+                            name="name",
+                            required=True,
+                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text",
+                            placeholder="Set Name",
+                        ),
                     ),
-                    input(
-                        type="submit",
-                        value="Submit",
-                        class_="mt-2",
+                    form_field(
+                        label_text="Description",
+                        field_id="description",
+                        child=textarea(
+                            id="description",
+                            name="description",
+                            rows="2",
+                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text resize-none",
+                            placeholder="Optional description",
+                        ),
                     ),
+                    button(
+                        type_="submit",
+                        class_="self-start px-4 py-1 rounded-lg bg-pin-main hover:bg-pin-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+                    )["Create Set"],
                 ],
-            ]
+            ],
+            flex=True,
+            col=True,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Rich edit page (personal and global sets)
+# ---------------------------------------------------------------------------
+
+
+def pin_set_edit_page(
+    request: Request,
+    pin_set: PinSet,
+    pins: list[Pin],
+    current_user: User,
+) -> Element:
+    reorder_url = str(request.url_for("reorder_set_pins", set_id=pin_set.id))
+    is_global: bool = pin_set.owner_id is None
+
+    if is_global:
+        back_href = str(request.url_for("get_list_pin_sets"))
+        back_label = "Pin Sets"
+    else:
+        back_href = str(request.url_for("get_my_sets"))
+        back_label = "My Sets"
+
+    header_extras: list[Element] = [
+        icon_button(
+            icon="eye",
+            title="View",
+            href=str(request.url_for("get_pin_set", id=pin_set.id)),
+        )
+    ]
+
+    if current_user.is_admin and not is_global:
+        promote_url = str(request.url_for("promote_set_to_global", set_id=pin_set.id))
+        header_extras.append(
+            confirm_modal(
+                trigger=icon_button(icon="globe", title="Promote to global"),
+                message=f'Promote "{pin_set.name}" to a global set? It will become admin-only and visible to all users.',
+                form_action=promote_url,
+                confirm_label="Promote",
+            )
+        )
+
+    return html_base(
+        title=f"Edit — {pin_set.name}",
+        request=request,
+        script_content=_SORTABLE_INIT,
+        body_content=centered_div(
+            content=[
+                a(
+                    href=back_href,
+                    class_="text-pin-base-300 no-underline hover:text-accent",
+                )[
+                    i(data_lucide="arrow-left", class_="inline-block mb-1"),
+                    f" {back_label}",
+                ],
+                page_heading(
+                    icon="pencil",
+                    text=f"Edit: {pin_set.name}",
+                    extras=header_extras,
+                    gap=3,
+                ),
+                hr,
+                _metadata_form(request=request, pin_set=pin_set),
+                hr,
+                pin_list_section(
+                    request=request,
+                    pin_set=pin_set,
+                    pins=pins,
+                    reorder_url=reorder_url,
+                ),
+                hr,
+                _add_pin_section(request=request, pin_set=pin_set),
+            ],
+            flex=True,
+            col=True,
+        ),
+    )
+
+
+def _metadata_form(request: Request, pin_set: PinSet) -> Element:
+    return div(class_="flex flex-col gap-2")[
+        h2["Details"],
+        form(
+            method="post",
+            action=str(request.url_for("update_set", set_id=pin_set.id)),
+            class_="flex flex-col gap-3",
+        )[
+            form_field(
+                label_text="Name",
+                field_id="name",
+                child=input(
+                    type_="text",
+                    id="name",
+                    name="name",
+                    value=pin_set.name,
+                    required=True,
+                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text",
+                ),
+            ),
+            form_field(
+                label_text="Description",
+                field_id="description",
+                child=textarea(
+                    id="description",
+                    name="description",
+                    rows="2",
+                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text resize-none",
+                )[pin_set.description or ""],
+            ),
+            button(
+                type_="submit",
+                class_="self-start px-4 py-1 rounded-lg bg-pin-main hover:bg-pin-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+            )["Save"],
+        ],
+    ]
+
+
+def pin_list_section(
+    request: Request,
+    pin_set: PinSet,
+    pins: list[Pin],
+    reorder_url: str,
+) -> Element:
+    return div(id="pin-list-section", class_="flex flex-col gap-2")[
+        h2(id="pin-list-count")[f"Pins ({len(pins)})"],
+        pins and p(class_="text-sm text-pin-base-300")["Drag cards to reorder."],
+        div(
+            id="pin-list",
+            data_reorder_url=reorder_url,
+            class_="flex flex-wrap gap-3",
+        )[
+            *(
+                [_pin_card(request=request, pin=pin, set_id=pin_set.id) for pin in pins]
+                or [
+                    p(id="pin-list-empty", class_="text-pin-base-300")[
+                        "No pins in this set yet."
+                    ]
+                ]
+            )
+        ],
+    ]
+
+
+def pin_count_oob(count: int) -> Element:
+    """OOB fragment that updates the Pins (n) heading."""
+    return h2(id="pin-list-count", hx_swap_oob="true")[f"Pins ({count})"]
+
+
+def pin_card_oob(request: Request, pin: Pin, set_id: int) -> Element:
+    """OOB fragment that appends a new pin card to #pin-list."""
+    return div(hx_swap_oob="beforeend:#pin-list")[
+        _pin_card(request=request, pin=pin, set_id=set_id)
+    ]
+
+
+def pin_empty_oob() -> Element:
+    """OOB fragment that deletes the empty-state placeholder from #pin-list."""
+    return p(id="pin-list-empty", hx_swap_oob="delete")
+
+
+def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
+    remove_url = str(
+        request.url_for("remove_pin_from_personal_set", set_id=set_id, pin_id=pin.id)
+    )
+    image_url = str(
+        request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
+            thumbnail=True
+        )
+    )
+    return div(
+        id=f"pin-row-{pin.id}",
+        data_pin_id=str(pin.id),
+        class_="relative flex flex-col w-[100px] shrink-0 rounded-lg bg-pin-base-450 border border-pin-base-400 overflow-hidden cursor-grab select-none hover:border-accent",
+    )[
+        button(
+            type_="button",
+            hx_delete=remove_url,
+            hx_target=f"#pin-row-{pin.id}",
+            hx_swap="outerHTML",
+            class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-400 hover:text-red-300 hover:border-red-400 p-0",
+        )[i(data_lucide="x", class_="w-3 h-3")],
+        a(
+            href=str(request.url_for("get_pin", id=pin.id)),
+            class_="block",
+            tabindex="-1",
+        )[
+            img(
+                src=image_url,
+                alt=pin.name,
+                class_="w-full aspect-square object-contain bg-pin-base-500",
+            )
+        ],
+        p(
+            class_="px-2 pt-1 pb-0 text-xs text-pin-base-text leading-tight line-clamp-2"
+        )[pin.name],
+        div(class_="flex justify-center pb-1 pt-0.5 text-pin-base-300")[
+            i(data_lucide="grip-horizontal", class_="w-4 h-4"),
+        ],
+    ]
+
+
+def _add_pin_section(request: Request, pin_set: PinSet) -> Element:
+    search_url = str(request.url_for("search_pins_for_set", set_id=pin_set.id))
+    return div(class_="flex flex-col gap-2")[
+        h2["Add Pins"],
+        htmx_search_input(
+            search_url, "#pin-search-results", placeholder="Search pins by name…"
+        ),
+        div(id="pin-search-results"),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# HTMX fragment: search results returned by search_pins_for_set route
+# ---------------------------------------------------------------------------
+
+
+def pin_search_results(
+    request: Request,
+    set_id: int,
+    pins: list[Pin],
+    existing_ids: set[int],
+) -> Element:
+    if not pins:
+        return empty_state("No results.", small=True)
+
+    return div(class_="flex flex-col gap-1")[
+        *[
+            search_result_row(
+                request=request,
+                pin=pin,
+                set_id=set_id,
+                in_set=pin.id in existing_ids,
+            )
+            for pin in pins
+        ]
+    ]
+
+
+def search_result_row(
+    request: Request,
+    pin: Pin,
+    set_id: int,
+    in_set: bool,
+) -> Element:
+    if in_set:
+        action_url = str(
+            request.url_for(
+                "remove_pin_from_personal_set", set_id=set_id, pin_id=pin.id
+            )
+        )
+        icon = "check-square"
+        text_class = "text-pin-base-300"
+    else:
+        action_url = str(
+            request.url_for("add_pin_to_personal_set", set_id=set_id, pin_id=pin.id)
+        )
+        icon = "square"
+        text_class = "text-pin-base-text"
+
+    thumbnail_url = str(
+        request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
+            thumbnail=True
+        )
+    )
+    return div(
+        id=f"search-row-{pin.id}",
+        class_="flex items-center gap-2 p-2 rounded bg-pin-base-450 border border-pin-base-400",
+    )[
+        toggle_button(
+            url=action_url,
+            is_active=in_set,
+            target_id=f"search-row-{pin.id}",
+            children=[
+                i(data_lucide=icon, class_="inline-block shrink-0"),
+                img(
+                    src=thumbnail_url,
+                    alt=pin.name,
+                    class_="w-10 h-10 object-contain rounded bg-pin-base-500 shrink-0",
+                ),
+                pin.name,
+            ],
+            class_=f"flex items-center gap-2 flex-1 bg-transparent border-0 cursor-pointer text-left font-inherit p-0 {text_class}",
+        )
+    ]

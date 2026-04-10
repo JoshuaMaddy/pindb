@@ -1,5 +1,4 @@
 import re
-from typing import Any
 
 MAGNITUDE_PATTERN = r".*?(\d*\.?\d*)\s*(([Ii]nch(?:es)?)|(in)|(IN)|([Cc]entimeters?)|(cm)|(CM)|([Mm]illimeters?)|(mm)|(MM))"
 
@@ -12,7 +11,7 @@ def empty_str_to_none(v: str | None) -> str | None:
     return v
 
 
-def empty_str_list_to_none(v: list[Any] | None) -> list[Any] | None:
+def empty_str_list_to_none(v: list[str] | None) -> list[str] | None:
     if v is None:
         return None
     if len(v) == 1 and v[0] == "":
@@ -28,7 +27,7 @@ def magnitude_to_mm(magnitude: str) -> float:
         return 0
 
     magnitude_float = float(match.group(1))
-    unit: str | Any = match.group(2).lower()
+    unit: str = match.group(2).lower()
 
     if "inches".startswith(unit):
         return magnitude_float * 25.4

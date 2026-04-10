@@ -11,7 +11,10 @@ router = APIRouter()
 @router.get(path="/material")
 def get_create_material(request: Request) -> HTMLResponse:
     return HTMLResponse(
-        content=material_form(post_url=request.url_for("post_create_material"))
+        content=material_form(
+            post_url=request.url_for("post_create_material"),
+            request=request,
+        ),
     )
 
 
@@ -25,7 +28,7 @@ async def post_create_material(
 
         session.add(instance=material)
         session.flush()
-        material_id = material.id
+        material_id: int = material.id
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_material", id=material_id))}

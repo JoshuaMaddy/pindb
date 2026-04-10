@@ -279,6 +279,9 @@
   @apply border-b border-pin-border;
 }
 
+/* Alpine x-cloak: hide elements until Alpine initialises */
+[x-cloak] { display: none !important; }
+
 /* Spinner animation */
 @keyframes spin {
   to { transform: rotate(360deg); }

@@ -2,58 +2,60 @@ from fastapi import Request
 from htpy import Element, div, h1, hr
 
 from pindb.templates.base import html_base
-from pindb.templates.components.card_link import card_link
+from pindb.templates.components.card import card
 from pindb.templates.components.centered import centered_div
 
 
 def create_index(request: Request) -> Element:
     return html_base(
         title="Create",
+        request=request,
         body_content=centered_div(
             content=[
-                div(class_="col-span-2")[
+                div(class_="min-md:col-span-2")[
                     h1["Create"],
                     hr,
                 ],
-                card_link(
+                card(
                     href=request.url_for("get_create_pin"),
-                    text="Pin",
+                    content="Pin",
                     icon="square-star",
                 ),
-                card_link(
+                card(
                     href=request.url_for("get_create_shop"),
-                    text="Shop",
+                    content="Shop",
                     icon="store",
                 ),
-                card_link(
+                card(
                     href=request.url_for("get_create_material"),
-                    text="Material",
+                    content="Material",
                     icon="anvil",
                 ),
-                card_link(
+                card(
                     href=request.url_for("get_create_tag"),
-                    text="Tag",
+                    content="Tag",
                     icon="tag",
                 ),
-                card_link(
+                card(
                     href=request.url_for("get_create_pin_set"),
-                    text="Pin Set",
+                    content="Pin Set",
                     icon="layout-grid",
                 ),
-                card_link(
+                card(
                     href=request.url_for("get_create_artist"),
-                    text="Artist",
+                    content="Artist",
                     icon="palette",
                 ),
-                div(class_="col-span-2")[hr],
-                div(class_="col-span-2 grid")[
-                    card_link(
+                div(class_="min-md:col-span-2")[hr],
+                div(class_="min-md:col-span-2")[
+                    card(
                         href=request.url_for("get_bulk_pin"),
-                        text="Bulk Import Pins",
+                        content="Bulk Import Pins",
                         icon="table-2",
                     ),
                 ],
             ],
-            class_="grid grid-cols-2",
-        )
+            additional_classes="grid min-md:grid-cols-2",
+            content_width="small",
+        ),
     )

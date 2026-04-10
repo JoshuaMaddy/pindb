@@ -4,16 +4,23 @@ from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from rich.repr import Result
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
+from sqlalchemy.orm import (
+    Mapped,
+    MappedAsDataclass,
+    mapped_column,
+    object_session,
+    relationship,
+)
 
 from pindb.database.base import Base
 from pindb.database.joins import (
+    pin_set_memberships,
     pins_artists,
     pins_grades,
     pins_links,
     pins_materials,
-    pins_sets,
     pins_shops,
     pins_tags,
 )
@@ -81,7 +88,7 @@ class Pin(MappedAsDataclass, Base):
         default_factory=set,
     )
     sets: Mapped[set[PinSet]] = relationship(
-        secondary=pins_sets,
+        secondary=pin_set_memberships,
         back_populates="pins",
         default_factory=set,
     )
@@ -133,3 +140,25 @@ class Pin(MappedAsDataclass, Base):
         ) if self.description else None
 
         return document
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "name", self.name
+        yield "acquisition_type", self.acquisition_type
+        yield "posts", self.posts, 1
+        yield "width", self.width, None
+        yield "height", self.height, None
+        yield "sku", self.sku, None
+        yield "release_date", self.release_date, None
+        yield "limited_edition", self.limited_edition, None
+        yield "funding_type", self.funding_type, None
+        if object_session(self):
+            yield "currency", self.currency.code
+            yield "shops", self.shops, set()
+            yield "materials", self.materials, set()
+            yield "grades", self.grades, set()
+            yield "artists", self.artists, set()
+            yield "tags", self.tags, set()
+            yield "number_of_sets", len(self.sets), 0
+        else:
+            yield "session", "expired"

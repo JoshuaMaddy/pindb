@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Sequence
 from uuid import UUID
 
 from fastapi import Form, Request, UploadFile
@@ -29,12 +29,16 @@ LOGGER = logging.getLogger(name="pindb.search.update")
 @router.get(path="/pin")
 def get_create_pin(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
-        materials = session.scalars(statement=select(Material)).all()
-        shops = session.scalars(statement=select(Shop)).all()
-        tags = session.scalars(statement=select(Tag)).all()
-        pin_sets = session.scalars(statement=select(PinSet)).all()
-        currencies = session.scalars(statement=select(Currency)).all()
-        artists = session.scalars(statement=select(Artist)).all()
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material)
+        ).all()
+        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
+        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
+        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
+        currencies: Sequence[Currency] = session.scalars(
+            statement=select(Currency)
+        ).all()
+        artists: Sequence[Artist] = session.scalars(statement=select(Artist)).all()
 
         return HTMLResponse(
             content=pin_form(
@@ -45,6 +49,7 @@ def get_create_pin(request: Request) -> HTMLResponse:
                 tags=tags,
                 currencies=currencies,
                 artists=artists,
+                request=request,
             )
         )
 
@@ -105,7 +110,7 @@ async def post_create_pin(
     front_image_guid: UUID = await save_file(file=front_image)
 
     if back_image:
-        back_image_guid = await save_file(file=back_image)
+        back_image_guid: UUID = await save_file(file=back_image)
 
     with session_maker.begin() as session:
         pin_materials: set[Material] = set(

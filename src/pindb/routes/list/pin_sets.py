@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
+from pindb.database.user import User
 from pindb.templates.list.pin_sets import pin_sets_list
 
 router = APIRouter()
@@ -16,7 +17,10 @@ router = APIRouter()
 def get_list_pin_sets(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
         pin_sets: Sequence[PinSet] = session.scalars(
-            statement=select(PinSet).order_by(PinSet.name.asc())
+            statement=select(PinSet)
+            .outerjoin(User, PinSet.owner_id == User.id)
+            .where(PinSet.owner_id.is_(None))
+            .order_by(PinSet.name.asc())
         ).all()
 
         return HTMLResponse(content=pin_sets_list(request=request, pin_sets=pin_sets))

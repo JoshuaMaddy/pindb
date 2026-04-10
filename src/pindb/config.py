@@ -23,8 +23,9 @@ class Configuration(BaseSettings):
     meilisearch_key: str
     meilisearch_url: str = Field(default="http://127.0.0.1:7700")
     meilisearch_index: str = Field(default="pins")
+    search_sync_interval_minutes: int = Field(default=5)
 
-    __meili_client: meilisearch.Client | None = None  # type: ignore
+    __meili_client: meilisearch.Client | None = None
 
     @property
     def meili_client(self) -> meilisearch.Client:
@@ -35,6 +36,18 @@ class Configuration(BaseSettings):
             )
 
         return self.__meili_client
+
+    # Auth
+    secret_key: str
+    base_url: str = Field(default="http://localhost:8000")
+
+    # Google OAuth (optional)
+    google_client_id: str | None = Field(default=None)
+    google_client_secret: str | None = Field(default=None)
+
+    # Discord OAuth (optional)
+    discord_client_id: str | None = Field(default=None)
+    discord_client_secret: str | None = Field(default=None)
 
     # Logging
     logging_date_format: str = Field(default="%d %b %Y | %H:%M:%S")

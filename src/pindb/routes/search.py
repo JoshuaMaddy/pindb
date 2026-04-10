@@ -18,7 +18,9 @@ def get_search_pin(
     request: Request,
 ) -> HTMLResponse:
     return HTMLResponse(
-        content=search_pin_page(post_url=request.url_for("post_search_pin"))
+        content=search_pin_page(
+            post_url=request.url_for("post_search_pin"), request=request
+        )
     )
 
 

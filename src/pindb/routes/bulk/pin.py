@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Sequence, TypeVar
 from uuid import UUID
 
 from fastapi import Form, Request, UploadFile
@@ -6,8 +7,16 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from pindb.database import Artist, Material, PinSet, Shop, Tag, session_maker
+from pindb.database import (
+    Artist,
+    Material,
+    PinSet,
+    Shop,
+    Tag,
+    session_maker,
+)
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
@@ -17,6 +26,8 @@ from pindb.model_utils import magnitude_to_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.templates.bulk.pin import bulk_pin_page
+
+_NameOnly = TypeVar("_NameOnly", Artist, Tag, Shop, Material, PinSet)
 
 router = APIRouter()
 
@@ -79,7 +90,11 @@ class BulkPinResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _get_or_create(session, model, name: str):
+def _get_or_create(
+    session: Session,
+    model: type[_NameOnly],
+    name: str,
+) -> _NameOnly:
     obj = session.scalar(select(model).where(model.name == name))
     if not obj:
         obj = model(name=name)
@@ -96,12 +111,16 @@ def _get_or_create(session, model, name: str):
 @router.get(path="/pin")
 def get_bulk_pin(request: Request) -> HTMLResponse:
     with session_maker.begin() as session:
-        shops = session.scalars(statement=select(Shop)).all()
-        materials = session.scalars(statement=select(Material)).all()
-        tags = session.scalars(statement=select(Tag)).all()
-        pin_sets = session.scalars(statement=select(PinSet)).all()
-        artists = session.scalars(statement=select(Artist)).all()
-        currencies = session.scalars(statement=select(Currency)).all()
+        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material)
+        ).all()
+        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
+        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
+        artists: Sequence[Artist] = session.scalars(statement=select(Artist)).all()
+        currencies: Sequence[Currency] = session.scalars(
+            statement=select(Currency)
+        ).all()
 
         return HTMLResponse(
             content=bulk_pin_page(
@@ -113,6 +132,7 @@ def get_bulk_pin(request: Request) -> HTMLResponse:
                 pin_sets=pin_sets,
                 artists=artists,
                 currencies=currencies,
+                request=request,
             )
         )
 
@@ -128,29 +148,42 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     results: list[PinRowResult] = []
 
     with session_maker.begin() as session:
-        for idx, row in enumerate(body.pins):
+        for index, row in enumerate(body.pins):
             try:
-                currency = session.get_one(entity=Currency, ident=row.currency_id)
+                currency: Currency = session.get_one(
+                    entity=Currency, ident=row.currency_id
+                )
 
-                shops = {_get_or_create(session, Shop, n) for n in row.shop_names if n}
-                materials = {
-                    _get_or_create(session, Material, n)
-                    for n in row.material_names
-                    if n
+                shops: set[Shop] = {
+                    _get_or_create(session=session, model=Shop, name=name)
+                    for name in row.shop_names
+                    if name
                 }
-                tags = {_get_or_create(session, Tag, n) for n in row.tag_names if n}
-                artists = {
-                    _get_or_create(session, Artist, n) for n in row.artist_names if n
+                materials: set[Material] = {
+                    _get_or_create(session=session, model=Material, name=name)
+                    for name in row.material_names
+                    if name
                 }
-                pin_sets = {
-                    _get_or_create(session, PinSet, n) for n in row.pin_set_names if n
+                tags: set[Tag] = {
+                    _get_or_create(session=session, model=Tag, name=name)
+                    for name in row.tag_names
+                    if name
+                }
+                artists: set[Artist] = {
+                    _get_or_create(session=session, model=Artist, name=name)
+                    for name in row.artist_names
+                    if name
+                }
+                pin_sets: set[PinSet] = {
+                    _get_or_create(session=session, model=PinSet, name=name)
+                    for name in row.pin_set_names
+                    if name
                 }
 
-                grades = {
-                    Grade(name=g.name, price=g.price)
-                    for g in row.grades
+                grades: set[Grade] = {
+                    Grade(name=g.name, price=g.price) for g in row.grades
                 }
-                links = {Link(path=url) for url in row.links if url}
+                links: set[Link] = {Link(path=url) for url in row.links if url}
 
                 new_pin = Pin(
                     name=row.name,
@@ -173,10 +206,10 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
                     end_date=row.end_date,
                     funding_type=row.funding_type,
                     posts=row.posts,
-                    width=magnitude_to_mm(magnitude=row.width) if row.width else None,  # type: ignore
+                    width=magnitude_to_mm(magnitude=row.width) if row.width else None,
                     height=magnitude_to_mm(magnitude=row.height)
                     if row.height
-                    else None,  # type: ignore
+                    else None,
                     description=row.description,
                 )
 
@@ -185,29 +218,29 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
 
                 results.append(
                     PinRowResult(
-                        index=idx,
+                        index=index,
                         success=True,
                         pin_id=new_pin.id,
                         pin_name=new_pin.name,
                         front_image_guid=str(new_pin.front_image_guid),
                     )
                 )
-            except Exception as e:
+            except Exception as error:
                 results.append(
                     PinRowResult(
-                        index=idx,
+                        index=index,
                         success=False,
-                        error=str(e),
+                        error=str(error),
                     )
                 )
 
-    created = sum(1 for r in results if r.success)
-    failed = sum(1 for r in results if not r.success)
+    created = sum(1 for result in results if result.success)
+    failed = sum(1 for result in results if not result.success)
 
     return JSONResponse(
         content=BulkPinResult(
             results=results,
             created_count=created,
             failed_count=failed,
-        ).model_dump(mode="json")
+        ).model_dump_json()
     )

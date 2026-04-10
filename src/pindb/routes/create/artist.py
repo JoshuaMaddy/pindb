@@ -15,7 +15,12 @@ router = APIRouter()
 
 @router.get(path="/artist")
 def get_create_artist(request: Request) -> HTMLResponse:
-    return HTMLResponse(content=artist_form(post_url=request.url_for("post_create_artist")))
+    return HTMLResponse(
+        content=artist_form(
+            post_url=request.url_for("post_create_artist"),
+            request=request,
+        )
+    )
 
 
 @router.post(path="/artist")
@@ -46,8 +51,10 @@ def post_create_artist(
 
         session.add(instance=artist)
         session.flush()
-        artist_id = artist.id
+        artist_id: int = artist.id
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_artist", id=artist_id))}
+        headers={
+            "HX-Redirect": str(request.url_for("get_artist", id=artist_id)),
+        }
     )

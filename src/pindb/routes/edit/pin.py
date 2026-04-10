@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Sequence
 from uuid import UUID
 
 from fastapi import Form, Request, UploadFile
@@ -29,13 +29,17 @@ def get_edit_pin(
     id: int,
 ) -> HTMLResponse | None:
     with session_maker.begin() as session:
-        materials = session.scalars(statement=select(Material)).all()
-        shops = session.scalars(statement=select(Shop)).all()
-        tags = session.scalars(statement=select(Tag)).all()
-        pin_sets = session.scalars(statement=select(PinSet)).all()
+        materials: Sequence[Material] = session.scalars(
+            statement=select(Material)
+        ).all()
+        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
+        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
+        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
         pin: Pin | None = session.get(entity=Pin, ident=id)
-        currencies = session.scalars(statement=select(Currency)).all()
-        artists = session.scalars(statement=select(Artist)).all()
+        currencies: Sequence[Currency] = session.scalars(
+            statement=select(Currency)
+        ).all()
+        artists: Sequence[Artist] = session.scalars(statement=select(Artist)).all()
 
         if pin is None:
             return None
@@ -50,6 +54,7 @@ def get_edit_pin(
                 pin=pin,
                 currencies=currencies,
                 artists=artists,
+                request=request,
             )
         )
 
@@ -108,9 +113,9 @@ async def post_edit_pin(
     front_image_guid: UUID | None = None
 
     if front_image:
-        front_image_guid = await save_file(file=front_image)
+        front_image_guid: UUID = await save_file(file=front_image)
     if back_image:
-        back_image_guid = await save_file(file=back_image)
+        back_image_guid: UUID = await save_file(file=back_image)
 
     with session_maker.begin() as session:
         pin: Pin | None = session.get(entity=Pin, ident=id)
@@ -145,25 +150,25 @@ async def post_edit_pin(
         currency: Currency = session.get_one(entity=Currency, ident=currency_id)
 
         pin.name = name
-        pin.acquisition_type = acquisition_type
-        pin.currency = currency
-        pin.front_image_guid = (
+        pin.acquisition_type: AcquisitionType = acquisition_type
+        pin.currency: Currency = currency
+        pin.front_image_guid: UUID = (
             front_image_guid if front_image_guid else pin.front_image_guid
         )
-        pin.materials = pin_materials
-        pin.shops = pin_shops
-        pin.sets = pin_sets
-        pin.tags = pin_tags
-        pin.artists = pin_artists
-        pin.limited_edition = limited_edition
-        pin.number_produced = number_produced
-        pin.release_date = release_date
-        pin.end_date = end_date
-        pin.funding_type = funding_type
-        pin.posts = posts
+        pin.materials: set[Material] = pin_materials
+        pin.shops: set[Shop] = pin_shops
+        pin.sets: set[PinSet] = pin_sets
+        pin.tags: set[Tag] = pin_tags
+        pin.artists: set[Artist] = pin_artists
+        pin.limited_edition: bool | None = limited_edition
+        pin.number_produced: int | None = number_produced
+        pin.release_date: date | None = release_date
+        pin.end_date: date | None = end_date
+        pin.funding_type: FundingType | None = funding_type
+        pin.posts: int = posts
         pin.width = magnitude_to_mm(magnitude=width) if width else width  # type: ignore
         pin.height = magnitude_to_mm(magnitude=height) if height else height  # type: ignore
-        pin.back_image_guid = (
+        pin.back_image_guid: UUID | None = (
             back_image_guid if back_image_guid else pin.back_image_guid
         )
 
@@ -173,7 +178,7 @@ async def post_edit_pin(
         new_links: set[Link] = set()
         for new_link in links or []:
             new_links.add(Link(new_link))
-        pin.links = new_links
+        pin.links: set[Link] = new_links
 
         for old_grade in pin.grades:
             session.delete(old_grade)
@@ -181,7 +186,7 @@ async def post_edit_pin(
         new_grades: set[Grade] = set()
         for new_grade_name, new_grade_price in zip(grade_names, grade_prices):
             new_grades.add(Grade(name=new_grade_name, price=new_grade_price))
-        pin.grades = new_grades
+        pin.grades: set[Grade] = new_grades
 
         session.flush()
         pin_id: int = pin.id

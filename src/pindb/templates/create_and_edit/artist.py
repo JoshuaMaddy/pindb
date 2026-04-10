@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, button, div, form, fragment, h1, hr, input, label, textarea
 
@@ -18,11 +19,12 @@ with open(
 
 def artist_form(
     post_url: URL | str,
+    request: Request,
     artist: Artist | None = None,
 ) -> Element:
     artist_links: None | list[Link] = None
     if artist:
-        artist_links = list(artist.links)
+        artist_links: list[Link] = list(artist.links)
 
     return html_base(
         title="Create Artist" if not artist else "Edit Artist",
@@ -60,7 +62,9 @@ def artist_form(
                                 id="link_0",
                                 type="text",
                                 class_="col-span-2",
-                                value=artist_links.pop(0).path if artist_links else None,
+                                value=artist_links.pop(0).path
+                                if artist_links
+                                else None,
                             ),
                             (artist_links is not None and len(artist_links) != 0)
                             and [
@@ -91,4 +95,5 @@ def artist_form(
             ]
         ),
         script_content=SCRIPT_CONTENT,
+        request=request,
     )

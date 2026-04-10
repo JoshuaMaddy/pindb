@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rich.repr import Result
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 from pindb.database.base import Base
@@ -16,3 +17,8 @@ class Currency(MappedAsDataclass, Base):
 
     def __hash__(self) -> int:
         return hash(self.code)
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "name", self.name
+        yield "code", self.code

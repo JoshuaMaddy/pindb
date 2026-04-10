@@ -15,7 +15,12 @@ router = APIRouter()
 
 @router.get(path="/shop")
 def get_create_shop(request: Request) -> HTMLResponse:
-    return HTMLResponse(content=shop_form(post_url=request.url_for("post_create_shop")))
+    return HTMLResponse(
+        content=shop_form(
+            post_url=request.url_for("post_create_shop"),
+            request=request,
+        )
+    )
 
 
 @router.post(path="/shop")
@@ -46,7 +51,7 @@ def post_create_shop(
 
         session.add(instance=shop)
         session.flush()
-        shop_id = shop.id
+        shop_id: int = shop.id
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_shop", id=shop_id))}

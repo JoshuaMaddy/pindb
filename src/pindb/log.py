@@ -5,7 +5,7 @@ from rich.logging import RichHandler
 from pindb.config import CONFIGURATION
 
 
-def setup_rich_logger():
+def setup_rich_logger() -> None:
     """Cycles through uvicorn root loggers to
     remove handler, then runs `get_logger_config()`
     to populate the `LoggerConfig` class with Rich
@@ -32,7 +32,9 @@ def setup_rich_logger():
         datefmt=CONFIGURATION.logging_date_format,
         handlers=[
             RichHandler(
-                rich_tracebacks=True, tracebacks_show_locals=True, show_time=False
+                rich_tracebacks=True,
+                tracebacks_show_locals=True,
+                show_time=False,
             ),
             output_file_handler,
         ],

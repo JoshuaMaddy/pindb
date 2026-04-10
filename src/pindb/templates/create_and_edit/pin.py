@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
+from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import (
     Element,
@@ -39,7 +40,7 @@ with open(
     mode="r",
     encoding="utf-8",
 ) as js_file:
-    SCRIPT_CONTENT = js_file.read()
+    SCRIPT_CONTENT: str = js_file.read()
 
 
 def pin_form(
@@ -50,6 +51,7 @@ def pin_form(
     tags: Sequence[Tag],
     pin_sets: Sequence[PinSet],
     artists: Sequence[Artist],
+    request: Request,
     pin: Pin | None = None,
 ) -> Element:
     return html_base(
@@ -83,9 +85,9 @@ def pin_form(
                     ],
                 ],
             ],
-            wide=True,
         ),
         script_content=SCRIPT_CONTENT,
+        request=request,
     )
 
 
@@ -246,8 +248,7 @@ def __grades_input(
     grades_data: list[dict[str, str]] = []
     if pin and pin.grades:
         grades_data = [
-            {"name": str(grade.name), "price": str(grade.price)}
-            for grade in pin.grades
+            {"name": str(grade.name), "price": str(grade.price)} for grade in pin.grades
         ]
 
     # Ensure at least one empty grade

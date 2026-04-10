@@ -113,11 +113,10 @@ async def import_csv():
             grades = {
                 Grade(
                     name=grade[0],
-                    amount=float(grade[1]),
                     price=float(grade[2]),
                 )
                 for raw in row["grades"]
-                if (grade := raw.split("|")) and len(grade) == 3
+                if (grade := raw.split("|")) and len(grade) == 2
             }
 
             session.add(

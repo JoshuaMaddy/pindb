@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.repr import Result
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
+from sqlalchemy.orm import (
+    Mapped,
+    MappedAsDataclass,
+    mapped_column,
+    object_session,
+    relationship,
+)
 
 from pindb.database.base import Base
 from pindb.database.joins import pins_tags
@@ -55,3 +62,13 @@ class Tag(MappedAsDataclass, Base):
         if not isinstance(value, Tag):
             return False
         return value.id == self.id
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "name", self.name
+        if object_session(self):
+            yield "number_of_pins", len(self.pins)
+            yield "parent", self.parent, None
+            yield "children", self.children, set()
+        else:
+            yield "session", "expired"
