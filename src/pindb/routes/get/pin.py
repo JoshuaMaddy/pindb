@@ -2,9 +2,10 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from pindb.auth import CurrentUser
-from pindb.database import Pin, PinSet, User, session_maker
+from pindb.database import Pin, PinSet, User, UserOwnedPin, UserWantedPin, session_maker
 from pindb.database.joins import user_favorite_pins
 from pindb.templates.get.pin import pin_page
 
@@ -25,6 +26,8 @@ def get_pin(
 
         is_favorited = False
         user_sets: list[PinSet] = []
+        owned_entries: list[UserOwnedPin] = []
+        wanted_entries: list[UserWantedPin] = []
 
         if current_user is not None:
             user: User | None = session.get(User, current_user.id)
@@ -42,6 +45,26 @@ def get_pin(
                         select(PinSet).where(PinSet.owner_id == current_user.id)
                     ).all()
                 )
+                owned_entries = list(
+                    session.scalars(
+                        select(UserOwnedPin)
+                        .where(
+                            UserOwnedPin.user_id == current_user.id,
+                            UserOwnedPin.pin_id == id,
+                        )
+                        .options(selectinload(UserOwnedPin.grade))
+                    ).all()
+                )
+                wanted_entries = list(
+                    session.scalars(
+                        select(UserWantedPin)
+                        .where(
+                            UserWantedPin.user_id == current_user.id,
+                            UserWantedPin.pin_id == id,
+                        )
+                        .options(selectinload(UserWantedPin.grade))
+                    ).all()
+                )
 
         return HTMLResponse(
             content=pin_page(
@@ -49,5 +72,7 @@ def get_pin(
                 pin=pin_obj,
                 is_favorited=is_favorited,
                 user_sets=user_sets,
+                owned_entries=owned_entries,
+                wanted_entries=wanted_entries,
             )
         )

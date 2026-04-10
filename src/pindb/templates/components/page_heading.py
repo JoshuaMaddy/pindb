@@ -9,11 +9,10 @@ def page_heading(
     extras: Content | None = None,
     level: int = 1,
     full_width: bool = False,
-    gap: int = 2,
 ) -> Element:
     """Icon + heading in a flex-baseline row. Extras are appended after the heading text."""
     heading_el: Element = h1[text] if level == 1 else h2[text]
-    classes = f"flex items-baseline gap-{gap}"
+    classes = "flex items-baseline gap-2"
     if full_width:
         classes += " w-full"
     return div(class_=classes)[

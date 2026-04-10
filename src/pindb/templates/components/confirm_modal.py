@@ -21,7 +21,7 @@ def confirm_modal(
 
     # Build the confirm button inside the modal
     confirm_btn_base_class = (
-        "flex items-center gap-1 px-3 py-1 rounded border border-red-400 "
+        "flex items-center gap-1 px-2 py-1 rounded border border-red-400 "
         "bg-transparent cursor-pointer text-red-400 hover:bg-red-950/30"
     )
 
@@ -47,7 +47,7 @@ def confirm_modal(
         )[confirm_label]
 
     cancel_class = (
-        "flex items-center gap-1 px-3 py-1 rounded border border-pin-base-400 "
+        "flex items-center gap-1 px-2 py-1 rounded border border-pin-base-400 "
         "bg-transparent cursor-pointer text-pin-base-text hover:border-accent"
     )
 

@@ -31,8 +31,11 @@ class UserAuthProvider(MappedAsDataclass, Base):
     user: Mapped[User] = relationship(back_populates="auth_providers", init=False)
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "user_id", self.user_id
-        yield "provider", self.provider
-        yield "provider_user_id", self.provider_user_id
-        yield "provider_email", self.provider_email, None
+        try:
+            yield "id", self.id
+            yield "user_id", self.user_id
+            yield "provider", self.provider
+            yield "provider_user_id", self.provider_user_id
+            yield "provider_email", self.provider_email, None
+        except Exception:
+            yield "detached", True

@@ -505,7 +505,7 @@
 
     subTr.innerHTML = `
       <td colspan="${colCount}" style="padding: 0;">
-        <div class="px-4 py-3" style="position: sticky; left: 0; width: ${visibleWidth}px; box-sizing: border-box;">
+        <div class="px-4 py-2" style="position: sticky; left: 0; width: ${visibleWidth}px; box-sizing: border-box;">
         <div class="flex items-center gap-2 mb-2">
           <i data-lucide="layers" class="w-4 h-4"></i>
           <span class="font-semibold text-sm">Grades for this pin</span>
@@ -591,7 +591,7 @@
 
     subTr.innerHTML = `
       <td colspan="${colCount}" style="padding: 0;">
-        <div class="px-4 py-3" style="position: sticky; left: 0; width: ${visibleWidth}px; box-sizing: border-box;">
+        <div class="px-4 py-2" style="position: sticky; left: 0; width: ${visibleWidth}px; box-sizing: border-box;">
         <div class="flex items-center gap-2 mb-2">
           <i data-lucide="link" class="w-4 h-4"></i>
           <span class="font-semibold text-sm">Links for this pin</span>

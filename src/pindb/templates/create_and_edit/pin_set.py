@@ -11,6 +11,7 @@ from htpy import (
     img,
     input,
     p,
+    span,
     textarea,
 )
 
@@ -70,13 +71,12 @@ def pin_set_create_page(request: Request) -> Element:
                 page_heading(
                     icon="folder-plus",
                     text="Create Pin Set",
-                    gap=3,
                 ),
                 hr,
                 form(
                     method="post",
                     action=str(request.url_for("post_create_pin_set")),
-                    class_="flex flex-col gap-3",
+                    class_="flex flex-col gap-2",
                 )[
                     form_field(
                         label_text="Name",
@@ -86,7 +86,7 @@ def pin_set_create_page(request: Request) -> Element:
                             id="name",
                             name="name",
                             required=True,
-                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text",
+                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
                             placeholder="Set Name",
                         ),
                     ),
@@ -97,7 +97,7 @@ def pin_set_create_page(request: Request) -> Element:
                             id="description",
                             name="description",
                             rows="2",
-                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text resize-none",
+                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text resize-none",
                             placeholder="Optional description",
                         ),
                     ),
@@ -131,8 +131,10 @@ def pin_set_edit_page(
         back_href = str(request.url_for("get_list_pin_sets"))
         back_label = "Pin Sets"
     else:
-        back_href = str(request.url_for("get_my_sets"))
-        back_label = "My Sets"
+        back_href = str(
+            request.url_for("get_user_profile", username=current_user.username)
+        )
+        back_label = "My Profile"
 
     header_extras: list[Element] = [
         icon_button(
@@ -170,7 +172,6 @@ def pin_set_edit_page(
                     icon="pencil",
                     text=f"Edit: {pin_set.name}",
                     extras=header_extras,
-                    gap=3,
                 ),
                 hr,
                 _metadata_form(request=request, pin_set=pin_set),
@@ -196,7 +197,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
         form(
             method="post",
             action=str(request.url_for("update_set", set_id=pin_set.id)),
-            class_="flex flex-col gap-3",
+            class_="flex flex-col gap-2",
         )[
             form_field(
                 label_text="Name",
@@ -207,7 +208,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
                     name="name",
                     value=pin_set.name,
                     required=True,
-                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text",
+                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
                 ),
             ),
             form_field(
@@ -217,7 +218,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
                     id="description",
                     name="description",
                     rows="2",
-                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text resize-none",
+                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text resize-none",
                 )[pin_set.description or ""],
             ),
             button(
@@ -240,7 +241,7 @@ def pin_list_section(
         div(
             id="pin-list",
             data_reorder_url=reorder_url,
-            class_="flex flex-wrap gap-3",
+            class_="flex flex-wrap gap-2",
         )[
             *(
                 [_pin_card(request=request, pin=pin, set_id=pin_set.id) for pin in pins]
@@ -376,6 +377,12 @@ def search_result_row(
             thumbnail=True
         )
     )
+    shops = sorted(pin.shops, key=lambda s: s.name)
+    artists = sorted(pin.artists, key=lambda a: a.name)
+    shop_text = (shops[0].name + (" …" if len(shops) > 1 else "")) if shops else None
+    artist_text = (
+        (artists[0].name + (" …" if len(artists) > 1 else "")) if artists else None
+    )
     return div(
         id=f"search-row-{pin.id}",
         class_="flex items-center gap-2 p-2 rounded bg-pin-base-450 border border-pin-base-400",
@@ -391,7 +398,14 @@ def search_result_row(
                     alt=pin.name,
                     class_="w-10 h-10 object-contain rounded bg-pin-base-500 shrink-0",
                 ),
-                pin.name,
+                div(class_="flex flex-col gap-0.5 flex-1 min-w-0")[
+                    span(class_="truncate")[pin.name],
+                    bool(shop_text or artist_text)
+                    and div(class_="flex gap-3 text-xs text-pin-base-300")[
+                        bool(shop_text) and span[shop_text],
+                        bool(artist_text) and span[artist_text],
+                    ],
+                ],
             ],
             class_=f"flex items-center gap-2 flex-1 bg-transparent border-0 cursor-pointer text-left font-inherit p-0 {text_class}",
         )

@@ -16,7 +16,7 @@ def dropdown_panel(
     return div(class_="relative", x_data="{ open: false }")[
         div(class_="contents", **{"@click": "open = !open"})[trigger],
         div(
-            class_=f"absolute z-10 top-full mt-1 left-0 {panel_class} bg-pin-base-500 border border-pin-base-400 rounded-lg shadow-lg p-2 flex flex-col gap-1",
+            class_=f"absolute z-10 top-full mt-1 left-0 {panel_class} bg-pin-base-500 border border-pin-base-400 rounded-lg shadow-lg p-2 flex flex-col gap-1 text-sm",
             x_show="open",
             **{"@click.outside": "open = false"},
         )[content],

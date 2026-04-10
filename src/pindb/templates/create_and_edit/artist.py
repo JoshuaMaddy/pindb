@@ -2,12 +2,13 @@ from pathlib import Path
 
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, button, div, form, fragment, h1, hr, input, label, textarea
+from htpy import Element, button, div, form, fragment, hr, input, label, textarea
 
 from pindb.database.artist import Artist
 from pindb.database.link import Link
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
+from pindb.templates.components.page_heading import page_heading
 
 with open(
     file=Path(__file__).parent.parent / "js/pin_creation.js",
@@ -30,7 +31,10 @@ def artist_form(
         title="Create Artist" if not artist else "Edit Artist",
         body_content=centered_div(
             content=[
-                h1["Create an Artist" if not artist else "Edit an Artist"],
+                page_heading(
+                    icon="palette" if not artist else "pencil",
+                    text="Create an Artist" if not artist else "Edit an Artist",
+                ),
                 hr,
                 form(
                     hx_post=str(post_url),

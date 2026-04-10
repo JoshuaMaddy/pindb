@@ -10,7 +10,7 @@ def navbar(
     user: User | None = getattr(getattr(request, "state", None), "user", None)
 
     if user:
-        auth_link: Element = div(class_="ml-auto flex items-center gap-3")[
+        auth_link: Element = div(class_="ml-auto flex items-center gap-2")[
             a(
                 class_="no-underline text-pin-base-100 hover:text-accent",
                 href=f"/user/{user.username}",

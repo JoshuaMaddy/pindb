@@ -93,5 +93,5 @@ def shop_form(
             ]
         ),
         script_content=SCRIPT_CONTENT,
-        request=request
+        request=request,
     )

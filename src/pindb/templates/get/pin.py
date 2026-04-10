@@ -4,7 +4,6 @@ from htpy import (
     a,
     div,
     fragment,
-    h1,
     h2,
     i,
     img,
@@ -12,14 +11,14 @@ from htpy import (
     table,
     tbody,
     td,
-    th,
-    thead,
     tr,
 )
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
+from pindb.database.user_owned_pin import UserOwnedPin
+from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
 from pindb.templates.components.back_link import back_link
 from pindb.templates.components.confirm_modal import confirm_modal
@@ -27,6 +26,8 @@ from pindb.templates.components.dropdown_panel import dropdown_panel
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.icon_list_element import icon_list_item
 from pindb.templates.components.linked_items_row import linked_items_row
+from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.pill_link import pill_link
 from pindb.templates.components.toggle_button import toggle_button
 from pindb.utils import domain_from_url, format_currency_code
 
@@ -36,6 +37,8 @@ def pin_page(
     pin: Pin,
     is_favorited: bool = False,
     user_sets: list[PinSet] | None = None,
+    owned_entries: list[UserOwnedPin] | None = None,
+    wanted_entries: list[UserWantedPin] | None = None,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     return html_base(
@@ -47,29 +50,35 @@ def pin_page(
             )[
                 div(class_="min-md:col-span-2")[
                     back_link(),
-                    div(class_="flex items-end gap-3")[
-                        h1[pin.name],
-                        user
-                        and user.is_admin
-                        and fragment[
-                            icon_button(
-                                icon="pen",
-                                title="Edit pin",
-                                href=str(request.url_for("get_edit_pin", id=pin.id)),
-                            ),
-                            confirm_modal(
-                                trigger=icon_button(
-                                    icon="trash-2",
-                                    title="Delete set",
-                                    variant="danger",
+                    page_heading(
+                        icon="circle-star",
+                        text=pin.name,
+                        full_width=True,
+                        extras=fragment[
+                            user
+                            and user.is_admin
+                            and fragment[
+                                icon_button(
+                                    icon="pen",
+                                    title="Edit pin",
+                                    href=str(
+                                        request.url_for("get_edit_pin", id=pin.id)
+                                    ),
                                 ),
-                                message=f'Delete the pin "{pin.name}"? This will delete the pin!',
-                                form_action=str(
-                                    request.url_for("post_delete_pin", id=pin.id)
+                                confirm_modal(
+                                    trigger=icon_button(
+                                        icon="trash-2",
+                                        title="Delete pin",
+                                        variant="danger",
+                                    ),
+                                    message=f'Delete the pin "{pin.name}"? This will delete the pin!',
+                                    form_action=str(
+                                        request.url_for("post_delete_pin", id=pin.id)
+                                    ),
                                 ),
-                            ),
+                            ],
                         ],
-                    ],
+                    ),
                 ],
                 div(class_="w-full")[
                     img(
@@ -90,6 +99,8 @@ def pin_page(
                     user=user,
                     is_favorited=is_favorited,
                     user_sets=user_sets or [],
+                    owned_entries=owned_entries or [],
+                    wanted_entries=wanted_entries or [],
                 ),
             ]
         ],
@@ -102,6 +113,8 @@ def __pin_details(
     user: User | None,
     is_favorited: bool,
     user_sets: list[PinSet],
+    owned_entries: list[UserOwnedPin],
+    wanted_entries: list[UserWantedPin],
 ) -> Element:
     return div(class_="min-md:ml-2")[
         user
@@ -110,25 +123,29 @@ def __pin_details(
             pin=pin,
             is_favorited=is_favorited,
             user_sets=user_sets,
+            owned_entries=owned_entries,
+            wanted_entries=wanted_entries,
         ),
         h2["Details"],
-        __shops(pin=pin, request=request),
-        __artists(pin=pin, request=request),
-        __links(pin=pin),
-        __acquisition(pin=pin),
-        __grades(pin=pin),
-        __pin_sets(pin=pin, request=request, user_sets=user_sets),
-        __tags(pin=pin, request=request),
-        __materials(pin=pin, request=request),
-        __description(pin=pin),
-        __posts(pin=pin),
-        __height(pin=pin),
-        __width(pin=pin),
-        __release_date(pin=pin),
-        __end_date(pin=pin),
-        __limited_edition(pin=pin),
-        __number_produced(pin=pin),
-        __funding(pin=pin),
+        div(class_="flex flex-col gap-2")[
+            __shops(pin=pin, request=request),
+            __artists(pin=pin, request=request),
+            __links(pin=pin),
+            __acquisition(pin=pin),
+            __grades(pin=pin),
+            __pin_sets(pin=pin, request=request, user_sets=user_sets),
+            __tags(pin=pin, request=request),
+            __materials(pin=pin, request=request),
+            __description(pin=pin),
+            __posts(pin=pin),
+            __height(pin=pin),
+            __width(pin=pin),
+            __release_date(pin=pin),
+            __end_date(pin=pin),
+            __limited_edition(pin=pin),
+            __number_produced(pin=pin),
+            __funding(pin=pin),
+        ],
     ]
 
 
@@ -137,10 +154,16 @@ def __user_actions(
     pin: Pin,
     is_favorited: bool,
     user_sets: list[PinSet],
+    owned_entries: list[UserOwnedPin],
+    wanted_entries: list[UserWantedPin],
 ) -> Element:
-    return div(class_="flex flex-wrap gap-3 mb-4")[
+    from pindb.templates.get.pin_collection import owned_panel, wanted_panel
+
+    return div(class_="flex flex-wrap gap-2 mb-4")[
         favorite_button(request=request, pin_id=pin.id, is_favorited=is_favorited),
         __add_to_set_panel(request=request, pin=pin, user_sets=user_sets),
+        owned_panel(request=request, pin=pin, owned_entries=owned_entries),
+        wanted_panel(request=request, pin=pin, wanted_entries=wanted_entries),
     ]
 
 
@@ -167,7 +190,7 @@ def favorite_button(request: Request, pin_id: int, is_favorited: bool) -> Elemen
                 i(data_lucide="heart", class_=f"inline-block {icon_fill}".strip()),
                 label_text,
             ],
-            class_="flex items-center gap-1 px-3 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text",
+            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text",
         )
     ]
 
@@ -211,7 +234,7 @@ def __add_to_set_panel(
     pin_set_ids: set[int] = {ps.id for ps in pin.sets}
     return dropdown_panel(
         trigger=div(
-            class_="flex items-center gap-1 px-3 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text"
+            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text"
         )[
             i(data_lucide="folder-plus", class_="inline-block"),
             "Add to Set",
@@ -229,7 +252,11 @@ def __add_to_set_panel(
             not user_sets
             and p(class_="text-sm text-pin-base-300 px-2 py-1")["No sets yet."],
             a(
-                href=str(request.url_for("get_my_sets")),
+                href=str(
+                    request.url_for("get_create_user_set")
+                    if not user_sets
+                    else request.url_for("get_me")
+                ),
                 class_="text-sm text-pin-base-100 no-underline mt-1 pt-1 border-t border-pin-base-400 hover:text-accent",
             )["+ Create a set" if not user_sets else "+ Manage sets"],
         ],
@@ -244,7 +271,7 @@ def __shops(
         icon="store",
         label="Shops",
         items=[
-            a(href=str(request.url_for("get_shop", id=shop.id)))[shop.name]
+            pill_link(href=str(request.url_for("get_shop", id=shop.id)), text=shop.name)
             for shop in sorted(pin.shops, key=lambda shop: shop.name)
         ],
     )
@@ -260,7 +287,10 @@ def __artists(
         icon="palette",
         label="Artists",
         items=[
-            a(href=str(request.url_for("get_artist", id=artist.id)))[artist.name]
+            pill_link(
+                href=str(request.url_for("get_artist", id=artist.id)),
+                text=artist.name,
+            )
             for artist in sorted(pin.artists, key=lambda artist: artist.name)
         ],
     )
@@ -272,7 +302,10 @@ def __links(pin: Pin) -> Element | None:
     return linked_items_row(
         icon="link",
         label="Links",
-        items=[a(href=link.path)[domain_from_url(url=link.path)] for link in pin.links],
+        items=[
+            pill_link(href=link.path, text=domain_from_url(url=link.path))
+            for link in pin.links
+        ],
     )
 
 
@@ -293,17 +326,11 @@ def __grades(pin: Pin) -> Element | None:
             "Grades",
         ],
         table(class_="border-collapse")[
-            thead[
-                tr[
-                    th(class_="text-left pr-4")["Grade"],
-                    th(class_="text-left")["Price"],
-                ]
-            ],
             tbody[
                 [
                     tr[
-                        td(class_="pr-4")[grade.name],
-                        td[
+                        td(class_="pr-2 border-r border-pin-base-400")[grade.name],
+                        td(class_="pl-2")[
                             format_currency_code(
                                 amount=grade.price, code=pin.currency.code
                             )
@@ -331,7 +358,10 @@ def __pin_sets(
         icon="layout-grid",
         label="Pin Sets",
         items=[
-            a(href=str(request.url_for("get_pin_set", id=ps.id)))[ps.name.title()]
+            pill_link(
+                href=str(request.url_for("get_pin_set", id=ps.id)),
+                text=ps.name.title(),
+            )
             for ps in visible_pin_sets
         ],
     )
@@ -345,7 +375,7 @@ def __tags(
         icon="tag",
         label="Tags",
         items=[
-            a(href=str(request.url_for("get_tag", id=tag.id)))[tag.name]
+            pill_link(href=str(request.url_for("get_tag", id=tag.id)), text=tag.name)
             for tag in sorted(pin.tags, key=lambda tag: tag.name)
         ],
     )
@@ -359,9 +389,10 @@ def __materials(
         icon="anvil",
         label="Materials",
         items=[
-            a(href=str(request.url_for("get_material", id=material.id)))[
-                material.name.title()
-            ]
+            pill_link(
+                href=str(request.url_for("get_material", id=material.id)),
+                text=material.name.title(),
+            )
             for material in sorted(pin.materials, key=lambda material: material.name)
         ],
     )

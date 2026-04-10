@@ -19,6 +19,9 @@ class Grade(MappedAsDataclass, Base):
         return hash(self.name + str(self.id))
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
-        yield "price", self.price
+        try:
+            yield "id", self.id
+            yield "name", self.name
+            yield "price", self.price
+        except Exception:
+            yield "detached", True

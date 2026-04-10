@@ -34,7 +34,7 @@ def search_pin_input(
 def search_pin_page(
     post_url: URL | str,
     request: Request | None = None,
-):
+) -> Element:
     return html_base(
         title="Search",
         request=request,

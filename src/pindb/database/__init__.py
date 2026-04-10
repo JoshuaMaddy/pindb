@@ -20,6 +20,8 @@ from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
+from pindb.database.user_owned_pin import UserOwnedPin
+from pindb.database.user_wanted_pin import UserWantedPin
 
 __all__: list[str] = [
     "seed_currencies",
@@ -35,7 +37,9 @@ __all__: list[str] = [
     "Tag",
     "User",
     "UserAuthProvider",
+    "UserOwnedPin",
     "UserSession",
+    "UserWantedPin",
 ]
 
 # Create engine

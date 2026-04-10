@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from pindb.database.pin_set import PinSet
     from pindb.database.session import UserSession
     from pindb.database.user_auth_provider import UserAuthProvider
+    from pindb.database.user_owned_pin import UserOwnedPin
+    from pindb.database.user_wanted_pin import UserWantedPin
 
 
 class User(MappedAsDataclass, Base):
@@ -59,19 +61,31 @@ class User(MappedAsDataclass, Base):
         default_factory=list,
         foreign_keys="PinSet.owner_id",
     )
+    owned_pins: Mapped[list[UserOwnedPin]] = relationship(
+        back_populates="user",
+        default_factory=list,
+        cascade="all, delete-orphan",
+    )
+    wanted_pins: Mapped[list[UserWantedPin]] = relationship(
+        back_populates="user",
+        default_factory=list,
+        cascade="all, delete-orphan",
+    )
 
     def __hash__(self) -> int:
         return self.id or 0
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "username", self.username
-        yield "email", self.email, None
-        yield "is_admin", self.is_admin, False
-        yield "created_at", self.created_at
+        try:
+            yield "id", self.id
+            yield "username", self.username
+            yield "email", self.email, None
+            yield "is_admin", self.is_admin, False
+            yield "created_at", self.created_at
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "auth_providers", [p.provider for p in self.auth_providers], []
             yield "number_of_favorites", len(self.favorite_pins), 0
             yield "number_of_personal_sets", len(self.personal_sets), 0
-        else:
-            yield "session", "expired"

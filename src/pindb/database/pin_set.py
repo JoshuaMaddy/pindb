@@ -66,12 +66,14 @@ class PinSet(MappedAsDataclass, Base):
         return value.id == self.id
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
-        yield "owner_id", self.owner_id, None
+        try:
+            yield "id", self.id
+            yield "name", self.name
+            yield "owner_id", self.owner_id, None
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "number_of_pins", len(self.pins)
             yield "owner", self.owner.username if self.owner else None, None
             yield "links", self.links, set()
-        else:
-            yield "session", "expired"

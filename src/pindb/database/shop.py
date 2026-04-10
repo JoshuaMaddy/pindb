@@ -57,11 +57,13 @@ class Shop(MappedAsDataclass, Base):
         return value.id == self.id
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
-        yield "active", self.active
+        try:
+            yield "id", self.id
+            yield "name", self.name
+            yield "active", self.active
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "number_of_pins", len(self.pins)
             yield "links", self.links, set()
-        else:
-            yield "session", "expired"

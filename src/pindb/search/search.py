@@ -1,7 +1,7 @@
 from meilisearch.index import Index
 from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from pindb.config import CONFIGURATION
 from pindb.database.pin import Pin
@@ -60,7 +60,9 @@ def search_pin(query: str, session: Session) -> list[Pin] | None:
     pins_by_id: dict[int, Pin] = {
         pin.id: pin
         for pin in session.scalars(
-            statement=select(Pin).where(Pin.id.in_(other=pin_ids))
+            statement=select(Pin)
+            .where(Pin.id.in_(other=pin_ids))
+            .options(selectinload(Pin.shops), selectinload(Pin.artists))
         ).all()
     }
     return [pins_by_id[pid] for pid in pin_ids if pid in pins_by_id]

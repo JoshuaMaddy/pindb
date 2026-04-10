@@ -150,7 +150,7 @@ document.addEventListener('alpine:init', function () {{
         script[Markup(js)],
         div(
             **{"x-data": component_name},
-            class_="flex flex-col gap-3",
+            class_="flex flex-col gap-2",
         )[
             _search_input(),
             div(class_="overflow-x-auto")[
@@ -177,7 +177,7 @@ def _search_input() -> VoidElement:
         type_="search",
         placeholder="Search…",
         **{"x-model": "search", "@input": "page = 1"},
-        class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text max-w-sm",
+        class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text max-w-sm",
     )
 
 
@@ -200,7 +200,7 @@ def _th(col: TableColumn) -> Element:
 
 
 def _pagination_controls(total_row_count: int) -> Element:
-    return div(class_="flex items-center gap-3 text-sm")[
+    return div(class_="flex items-center gap-2 text-sm")[
         button(
             class_="btn btn-sm",
             **{"@click": "setPage(page - 1)", ":disabled": "page <= 1"},

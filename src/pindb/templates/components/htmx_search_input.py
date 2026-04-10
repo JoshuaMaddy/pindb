@@ -17,5 +17,5 @@ def htmx_search_input(
         hx_trigger=trigger,
         hx_target=target,
         hx_swap="innerHTML",
-        class_="bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1 text-pin-base-text",
+        class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
     )

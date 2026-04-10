@@ -19,6 +19,9 @@ class Currency(MappedAsDataclass, Base):
         return hash(self.code)
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
-        yield "code", self.code
+        try:
+            yield "id", self.id
+            yield "name", self.name
+            yield "code", self.code
+        except Exception:
+            yield "detached", True

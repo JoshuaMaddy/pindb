@@ -21,5 +21,8 @@ class Link(MappedAsDataclass, Base):
         return hash(self.path + str(self.id))
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "path", self.path
+        try:
+            yield "id", self.id
+            yield "path", self.path
+        except Exception:
+            yield "detached", True

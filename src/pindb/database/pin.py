@@ -142,16 +142,20 @@ class Pin(MappedAsDataclass, Base):
         return document
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
-        yield "acquisition_type", self.acquisition_type
-        yield "posts", self.posts, 1
-        yield "width", self.width, None
-        yield "height", self.height, None
-        yield "sku", self.sku, None
-        yield "release_date", self.release_date, None
-        yield "limited_edition", self.limited_edition, None
-        yield "funding_type", self.funding_type, None
+        try:
+            yield "id", self.id
+            yield "name", self.name
+            yield "acquisition_type", self.acquisition_type
+            yield "posts", self.posts, 1
+            yield "width", self.width, None
+            yield "height", self.height, None
+            yield "sku", self.sku, None
+            yield "release_date", self.release_date, None
+            yield "limited_edition", self.limited_edition, None
+            yield "funding_type", self.funding_type, None
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "currency", self.currency.code
             yield "shops", self.shops, set()
@@ -160,5 +164,3 @@ class Pin(MappedAsDataclass, Base):
             yield "artists", self.artists, set()
             yield "tags", self.tags, set()
             yield "number_of_sets", len(self.sets), 0
-        else:
-            yield "session", "expired"

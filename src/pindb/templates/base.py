@@ -1,3 +1,5 @@
+import time
+
 from fastapi import Request
 from htpy import BaseElement, body, head, html, link, meta, script
 from htpy import title as title_el
@@ -6,6 +8,8 @@ from markupsafe import Markup
 from pindb.templates.components.bread_crumb import BreadCrumbLink, bread_crumb
 from pindb.templates.components.navbar import navbar
 from pindb.templates.types import Content
+
+_STARTUP_TIME = int(time.time())
 
 
 def html_base(
@@ -33,7 +37,7 @@ def html_base(
             # Custom styles
             link(
                 rel="stylesheet",
-                href="/static/main.css",
+                href=f"/static/main.css?v={_STARTUP_TIME}",
             ),
             title_el[title + " | PinDB"],
             # Alpine

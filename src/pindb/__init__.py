@@ -13,6 +13,7 @@ from pindb.routes import admin, create, delete, edit, get, list, search
 from pindb.routes.auth import router as auth_router
 from pindb.routes.bulk import router as bulk_router
 from pindb.routes.user import router as user_router
+from pindb.routes.user.collection import router as collection_router
 from pindb.templates.homepage import homepage
 
 app = FastAPI(lifespan=lifespan)
@@ -38,6 +39,7 @@ def root(request: Request):
 app.include_router(admin.router)
 app.include_router(auth_router)
 app.include_router(user_router)
+app.include_router(collection_router)
 app.include_router(create.router)
 app.include_router(get.router)
 app.include_router(edit.router)

@@ -15,7 +15,6 @@ def admin_panel_page(request: Request) -> Element:
                 page_heading(
                     icon="shield",
                     text="Admin Panel",
-                    gap=3,
                 ),
                 hr,
                 _users_section(request),
@@ -29,7 +28,7 @@ def admin_panel_page(request: Request) -> Element:
 
 
 def _users_section(request: Request) -> Element:
-    return div(class_="flex flex-col gap-3")[
+    return div(class_="flex flex-col gap-2")[
         page_heading(
             icon="users",
             text="User Management",
@@ -47,7 +46,7 @@ def _users_section(request: Request) -> Element:
 
 
 def _search_section() -> Element:
-    return div(class_="flex flex-col gap-3")[
+    return div(class_="flex flex-col gap-2")[
         page_heading(
             icon="search",
             text="Search Index",

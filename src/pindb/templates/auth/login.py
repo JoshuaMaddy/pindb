@@ -36,7 +36,7 @@ def login_page(request: Request, error: str | None = None) -> Element:
                 form(
                     method="post",
                     action="/auth/login",
-                    class_="flex flex-col gap-3",
+                    class_="flex flex-col gap-2",
                 )[
                     label(for_="username")["Username"],
                     input(

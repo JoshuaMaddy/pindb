@@ -38,7 +38,7 @@ def admin_users_page(
         request=request,
         body_content=centered_div(
             content=[
-                div(class_="flex items-baseline gap-3")[
+                div(class_="flex items-baseline gap-2")[
                     i(data_lucide="users", class_="inline-block"),
                     h1["Manage Users"],
                 ],

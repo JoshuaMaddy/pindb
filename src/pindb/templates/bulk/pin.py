@@ -85,9 +85,9 @@ def bulk_pin_page(
             # Inject reference data
             script[Markup(f"window.BULK_REF = {json.dumps(ref_data)};")],
             # Page wrapper — full width with padding
-            div(class_="px-4 py-4 flex flex-col gap-3 h-full")[
+            div(class_="px-4 py-4 flex flex-col gap-2 h-full")[
                 # Header bar
-                div(class_="flex items-center gap-3 flex-wrap")[
+                div(class_="flex items-center gap-2 flex-wrap")[
                     h1(class_="grow")["Bulk Import Pins"],
                     # Columns toggle (Alpine dropdown)
                     Markup(f"""<div class="relative" x-data="{{open: false}}">
@@ -247,7 +247,7 @@ def bulk_pin_page(
                     ],
                     div(
                         id="modal-grid",
-                        class_="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 overflow-y-auto",
+                        class_="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 overflow-y-auto",
                     ),
                 ]
             ],

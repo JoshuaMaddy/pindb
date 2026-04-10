@@ -64,11 +64,13 @@ class Tag(MappedAsDataclass, Base):
         return value.id == self.id
 
     def __rich_repr__(self) -> Result:
-        yield "id", self.id
-        yield "name", self.name
+        try:
+            yield "id", self.id
+            yield "name", self.name
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "number_of_pins", len(self.pins)
             yield "parent", self.parent, None
             yield "children", self.children, set()
-        else:
-            yield "session", "expired"

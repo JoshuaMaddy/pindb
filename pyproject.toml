@@ -25,14 +25,32 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "Faker>=30.0.0",
+    "factory-boy>=3.3.0",
     "ipykernel>=6.30.1",
     "pindb",
     "pytest>=8.4.1",
+    "pytest-env>=1.1.3",
+    "testcontainers[postgres]>=4.8.0",
 ]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 pythonpath = "src"
+testpaths = ["tests"]
+env = [
+    "DATABASE_CONNECTION=postgresql+psycopg://placeholder:placeholder@localhost/placeholder",
+    "MEILISEARCH_KEY=test-meili-key",
+    "MEILISEARCH_URL=http://localhost:7700",
+    "SECRET_KEY=test-secret-key-for-pytest-only",
+    "IMAGE_DIRECTORY=/tmp/pindb_test_images",
+]
+markers = [
+    "unit: fast tests, no I/O (DB or network)",
+    "integration: tests requiring real PostgreSQL via testcontainers",
+    "meili: tests requiring a real Meilisearch container",
+    "slow: tests that are slow by nature",
+]
 
 [build-system]
 requires = ["hatchling"]

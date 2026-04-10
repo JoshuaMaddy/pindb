@@ -1,5 +1,3 @@
-from typing import Sequence
-
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
@@ -19,7 +17,8 @@ def get_search_pin(
 ) -> HTMLResponse:
     return HTMLResponse(
         content=search_pin_page(
-            post_url=request.url_for("post_search_pin"), request=request
+            post_url=request.url_for("post_search_pin"),
+            request=request,
         )
     )
 
@@ -29,6 +28,6 @@ def post_search_pin(
     request: Request,
     search: str = Form(),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        pins: Sequence[Pin] | None = search_pin(query=search, session=session)
-        return HTMLResponse(content=pin_grid(request=request, pins=pins))
+    with session_maker() as session:
+        pins: list[Pin] | None = search_pin(query=search, session=session)
+    return HTMLResponse(content=str(pin_grid(request=request, pins=pins)))

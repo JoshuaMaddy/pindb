@@ -33,10 +33,12 @@ class UserSession(MappedAsDataclass, Base):
     user: Mapped[User] = relationship(back_populates="sessions", init=False)
 
     def __rich_repr__(self) -> Result:
-        yield "user_id", self.user_id
-        yield "expires_at", self.expires_at
-        yield "created_at", self.created_at
+        try:
+            yield "user_id", self.user_id
+            yield "expires_at", self.expires_at
+            yield "created_at", self.created_at
+        except Exception:
+            yield "detached", True
+            return
         if object_session(self):
             yield "username", self.user.username
-        else:
-            yield "session", "expired"

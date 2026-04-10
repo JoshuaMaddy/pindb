@@ -3,12 +3,14 @@ from typing import Sequence
 from fastapi import Request
 from htpy import Element, a, br, div, fragment, h2
 
-from pindb.database import Artist
+from pindb.database import Artist, User
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.centered import centered_div
+from pindb.templates.components.confirm_modal import confirm_modal
 from pindb.templates.components.description_block import description_block
+from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.paginated_pin_grid import paginated_pin_grid
 
@@ -21,11 +23,12 @@ def artist_page(
     page: int,
     per_page: int,
 ) -> Element:
+    user: User | None = getattr(getattr(request, "state", None), "user", None)
     return html_base(
         title=artist.name,
         request=request,
         body_content=centered_div(
-            content=fragment[
+            content=[
                 bread_crumb(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
@@ -37,6 +40,30 @@ def artist_page(
                     icon="palette",
                     text=artist.name,
                     full_width=True,
+                    extras=fragment[
+                        user
+                        and user.is_admin
+                        and fragment[
+                            icon_button(
+                                icon="pen",
+                                title="Edit artist",
+                                href=str(
+                                    request.url_for("get_edit_artist", id=artist.id)
+                                ),
+                            ),
+                            confirm_modal(
+                                trigger=icon_button(
+                                    icon="trash-2",
+                                    title="Delete artist",
+                                    variant="danger",
+                                ),
+                                message=f'Delete the artist "{artist.name}"?',
+                                form_action=str(
+                                    request.url_for("post_delete_artist", id=artist.id)
+                                ),
+                            ),
+                        ],
+                    ],
                 ),
                 description_block(artist.description),
                 fragment[

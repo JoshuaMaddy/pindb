@@ -3,7 +3,7 @@
 > **Maintainability note:** Keep this file up to date. If you make a change that affects the architecture, tech stack, environment variables, auth system, deployment, or project structure, update the relevant section of CLAUDE.md in the same commit.
 
 ## Project Overview
-PinDB is a FastAPI web app for cataloging collectible pins. It uses server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, and Meilisearch for full-text search. Authentication is session-based with password login and OAuth (Google, Discord).
+PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session-based auth with password login and OAuth (Google, Discord).
 
 ## After Every Change
 Always run both linters before considering a task done:
@@ -129,23 +129,49 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 - **Routes return HTML**, not JSON — HTMX-driven, not a REST API.
 - **Templates use htpy** — Python functions returning `htpy.Element`, not Jinja2.
 - **Database access** uses `with session_maker() as session:` (read) or `with session_maker.begin() as session:` (write — auto-commits on success, auto-rollbacks on exception).
-- New entities follow the pattern: model in `database/`, router in `routes/`, template in `templates/`.
-- Association tables (many-to-many) go in `database/joins.py`.
+- New entities: model in `database/`, router in `routes/`, template in `templates/`.
+- Many-to-many association tables go in `database/joins.py`.
+
+### Database Sessions & Eager Loading
+
+Two patterns for rendering templates:
+
+**1. Render inside session (preferred for read routes)**
+Put `return HTMLResponse(...)` inside the `with session_maker() as db:` block. Session stays open during `str(template(...))`, so lazy relationships work.
+```python
+with session_maker() as db:
+    artist = db.get(Artist, id)
+    return HTMLResponse(content=artist_page(request=request, artist=artist))
+```
+
+**2. Render outside session (required when write precedes read)**
+Write block must close first (e.g. HTMX fragment handlers). Open second read session, use `selectinload` for every relationship the template touches.
+```python
+with session_maker.begin() as db:
+    db.execute(...)   # write
+with session_maker() as db:
+    pin = db.scalar(select(Pin).where(Pin.id == pin_id)
+                    .options(selectinload(Pin.shops), selectinload(Pin.artists)))
+return HTMLResponse(content=str(template(pin=pin)))
+```
+
+**Always `selectinload` on list queries** — even inside open session. Prevents N+1: `artist.pins` in a loop = one query per artist without it.
+
+**Columns survive session close; relationships don't.** `pin.name`/`pin.id` safe after close. `pin.shops`/`pin.artists` → `DetachedInstanceError`.
 
 ### Authentication
-- Auth is session-based: cookie `session=<token>` → `UserSession` row → `User`.
-- Sessions last 30 days. Argon2 for password hashing.
-- FastAPI Depends for auth:
-  - `CurrentUser` → `User | None` (optional)
-  - `AuthenticatedUser` → `User` (raises 401 if not logged in)
-  - `AdminUser` → `User` (raises 403 if not admin)
-- On startup, `lifespan._ensure_admins()` grants admin to hardcoded usernames (default: `["josh"]`).
-- OAuth providers: Google (OIDC) and Discord. Both handled in `routes/auth/router.py`.
+- Cookie `session=<token>` → `UserSession` row → `User`. Sessions last 30 days. Argon2 hashing.
+- FastAPI Depends:
+  - `CurrentUser` → `User | None`
+  - `AuthenticatedUser` → `User` (401 if not logged in)
+  - `AdminUser` → `User` (403 if not admin)
+- Startup: `lifespan._ensure_admins()` grants admin to hardcoded usernames (default: `["josh"]`).
+- OAuth: Google (OIDC) and Discord, both in `routes/auth/router.py`.
 
 ### Global vs Personal PinSets
 - `PinSet.owner_id = NULL` → global/curator set (admin-editable only)
 - `PinSet.owner_id = {user_id}` → personal set (user-editable)
-- Sets can be promoted from personal → global by admin.
+- Sets can be promoted personal → global by admin.
 
 ### HTMX
 - Routes check `request.headers.get("HX-Request")` to return fragments vs full pages.
@@ -154,26 +180,54 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 ### Images
 - Pins store `front_image_guid` (required) and `back_image_guid` (optional) as UUIDs.
-- Files stored at `{image_directory}/{uuid}`, thumbnails at `{uuid}.thumbnail` (256px WebP).
+- Files at `{image_directory}/{uuid}`, thumbnails at `{uuid}.thumbnail` (256px WebP).
 - Route: `GET /get/image/{uuid}?size=thumbnail`
 
 ### Search (Meilisearch)
-- `Pin.document()` returns a dict with `id`, `name`, `shops`, `materials`, `tags`, `artists`, `description`.
+- `Pin.document()` returns dict with `id`, `name`, `shops`, `materials`, `tags`, `artists`, `description`.
 - Searchable attributes configured on startup.
 - Background APScheduler job syncs every N minutes (configurable).
-- Manual sync available via admin panel (`POST /admin/search/sync`).
+- Manual sync via admin panel (`POST /admin/search/sync`).
 
 ### Migrations
-- Alembic is active. Do **not** use `Base.metadata.create_all()` for schema changes — write a migration.
-- Run migrations: `alembic upgrade head`
-- Migrations run automatically in Docker via `docker-entrypoint.sh`.
+- Alembic active. Do **not** use `Base.metadata.create_all()` — write a migration.
+- Run: `alembic upgrade head`
+- Auto-runs in Docker via `docker-entrypoint.sh`.
+
+### User Pin Lists (Collection, Wants, Trades, Favorites)
+Four pin list types: paginated full-list page (`GET /user/{username}/{list}`) + preview strip on profile.
+
+| Section | URL segment | Data source | Description |
+|---|---|---|---|
+| Favorites | `favorites` | `user_favorite_pins` join table | Pins the user has liked/favorited |
+| Collection | `collection` | `UserOwnedPin` | Pins the user owns; per-grade rows with `quantity` and `tradeable_quantity` |
+| Want List | `wants` | `UserWantedPin` | Pins the user wants; per-grade rows |
+| Trades | `trades` | `UserOwnedPin` filtered by `tradeable_quantity > 0` | Subset of collection available for trade |
+
+**Profile preview:** Each section shows up to 10 pins in a horizontal row (`h-44` flex strip) + `>` see-all card. Counts in section heading.
+
+**Full list pages** (`routes/user/router.py`): Paginated (24/page, distinct pins). Grid/table toggle via `?view=grid|table`. Public.
+
+**Table columns:**
+- Favorites: thumbnail, name, shops (links), artists (links)
+- Collection: thumbnail, name, shops, artists, grade, qty, tradeable qty
+- Wants: thumbnail, name, shops, artists, grade
+- Trades: thumbnail, name, shops, artists, grade, tradeable qty
+
+**Key models:**
+- `UserOwnedPin` — `user_id`, `pin_id`, `grade_id` (nullable), `quantity`, `tradeable_quantity`. Unique on `(user_id, pin_id, grade_id)`.
+- `UserWantedPin` — `user_id`, `pin_id`, `grade_id` (nullable). Unique on `(user_id, pin_id, grade_id)`.
+
+Routes for add/remove/update owned and wanted pins: `routes/user/collection.py` (prefix `/user/pins`).
 
 ## Key Entities
 - **Pin** — central model. Has grades, materials, shops, artists, sets, tags, links, images, currency, acquisition/funding type.
-- **PinSet** — ordered collection of pins. Can be global (admin) or personal (user). Has an `owner_id` FK.
-- **User** — username (unique), optional email, optional password (OAuth users may have no password), `is_admin`.
+- **PinSet** — ordered pin collection. Global (admin) or personal (user). `owner_id` FK.
+- **User** — unique username, optional email/password (OAuth users may have no password), `is_admin`.
 - **UserSession** — token (PK), user_id, expires_at.
 - **UserAuthProvider** — links User to Google/Discord accounts.
+- **UserOwnedPin** — owned pins per-grade with quantity and tradeable quantity.
+- **UserWantedPin** — wanted pins per-grade.
 - **Artist, Shop, Material, Tag, Grade, Currency, Link** — supporting entities.
 - **Tag** — hierarchical (self-referential `parent_id`).
 

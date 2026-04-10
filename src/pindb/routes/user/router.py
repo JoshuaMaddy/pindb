@@ -5,15 +5,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import func, select
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import selectinload
 
 from pindb.auth import AdminUser, AuthenticatedUser, CurrentUser
-from pindb.database import Pin, PinSet, User, session_maker
+from pindb.database import Pin, PinSet, User, UserOwnedPin, UserWantedPin, session_maker
 from pindb.database.joins import (
     pin_set_memberships,
     user_favorite_pin_sets,
     user_favorite_pins,
 )
 from pindb.search.search import search_pin
+from pindb.templates.user.pin_list_pages import PAGE_SIZE, ViewMode
 from pindb.templates.user.profile import user_profile_page
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -47,25 +49,14 @@ def get_me(current_user: AuthenticatedUser) -> RedirectResponse:
     return RedirectResponse(url=f"/user/{current_user.username}", status_code=303)
 
 
-@router.get("/me/sets", response_model=None)
-def get_my_sets(
+@router.get("/me/sets/new", response_model=None)
+def get_create_user_set(
     request: Request,
-    current_user: AuthenticatedUser,
+    _current_user: AuthenticatedUser,
 ) -> HTMLResponse:
-    with session_maker() as db:
-        personal_sets: list[PinSet] = list(
-            db.scalars(
-                select(PinSet)
-                .where(PinSet.owner_id == current_user.id)
-                .order_by(PinSet.name)
-            ).all()
-        )
+    from pindb.templates.create_and_edit.user_pin_sets import create_user_set_page
 
-    from pindb.templates.create_and_edit.user_pin_sets import user_pin_sets_page
-
-    return HTMLResponse(
-        content=str(user_pin_sets_page(request=request, sets=personal_sets))
-    )
+    return HTMLResponse(content=str(create_user_set_page(request=request)))
 
 
 # ---------------------------------------------------------------------------
@@ -73,12 +64,17 @@ def get_my_sets(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{username}", response_model=None)
-def get_user_profile(
+@router.get("/{username}/favorites", response_model=None, name="user_favorites_list")
+def user_favorites_list(
     request: Request,
     username: str,
-    current_user: CurrentUser,
+    page: int = 1,
+    view: str = "grid",
 ) -> HTMLResponse:
+    page = max(1, page)
+    resolved_view: ViewMode = "table" if view == "table" else "grid"
+    offset: int = (page - 1) * PAGE_SIZE
+
     with session_maker() as db:
         user: User | None = db.scalars(
             select(User).where(User.username == username)
@@ -86,18 +82,440 @@ def get_user_profile(
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
+        total: int = (
+            db.scalar(
+                select(func.count())
+                .select_from(user_favorite_pins)
+                .where(user_favorite_pins.c.user_id == user.id)
+            )
+            or 0
+        )
+
+        pins: list[Pin] = list(
+            db.scalars(
+                select(Pin)
+                .join(user_favorite_pins, Pin.id == user_favorite_pins.c.pin_id)
+                .where(user_favorite_pins.c.user_id == user.id)
+                .options(
+                    selectinload(Pin.shops),
+                    selectinload(Pin.artists),
+                )
+                .order_by(Pin.name)
+                .limit(PAGE_SIZE)
+                .offset(offset)
+            ).all()
+        )
+
+    from pindb.templates.user.pin_list_pages import favorites_list_page
+
+    return HTMLResponse(
+        content=str(
+            favorites_list_page(
+                request=request,
+                profile_user=user,
+                pins=pins,
+                total=total,
+                page=page,
+                view=resolved_view,
+            )
+        )
+    )
+
+
+@router.get("/{username}/collection", response_model=None, name="user_collection_list")
+def user_collection_list(
+    request: Request,
+    username: str,
+    page: int = 1,
+    view: str = "grid",
+) -> HTMLResponse:
+    page = max(1, page)
+    resolved_view: ViewMode = "table" if view == "table" else "grid"
+    offset: int = (page - 1) * PAGE_SIZE
+
+    with session_maker() as db:
+        user: User | None = db.scalars(
+            select(User).where(User.username == username)
+        ).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        total: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
+                    UserOwnedPin.user_id == user.id
+                )
+            )
+            or 0
+        )
+
+        pin_ids: list[int] = list(
+            db.scalars(
+                select(UserOwnedPin.pin_id)
+                .distinct()
+                .where(UserOwnedPin.user_id == user.id)
+                .order_by(UserOwnedPin.pin_id)
+                .limit(PAGE_SIZE)
+                .offset(offset)
+            )
+        )
+
+        owned_pins: list[UserOwnedPin] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin)
+                    .where(
+                        UserOwnedPin.user_id == user.id,
+                        UserOwnedPin.pin_id.in_(pin_ids),
+                    )
+                    .options(
+                        selectinload(UserOwnedPin.pin).options(
+                            selectinload(Pin.shops),
+                            selectinload(Pin.artists),
+                        ),
+                        selectinload(UserOwnedPin.grade),
+                    )
+                    .order_by(UserOwnedPin.pin_id, UserOwnedPin.grade_id)
+                )
+            )
+            if pin_ids
+            else []
+        )
+
+    from pindb.templates.user.pin_list_pages import collection_list_page
+
+    return HTMLResponse(
+        content=str(
+            collection_list_page(
+                request=request,
+                profile_user=user,
+                owned_pins=owned_pins,
+                total=total,
+                page=page,
+                view=resolved_view,
+            )
+        )
+    )
+
+
+@router.get("/{username}/wants", response_model=None, name="user_wants_list")
+def user_wants_list(
+    request: Request,
+    username: str,
+    page: int = 1,
+    view: str = "grid",
+) -> HTMLResponse:
+    page = max(1, page)
+    resolved_view: ViewMode = "table" if view == "table" else "grid"
+    offset: int = (page - 1) * PAGE_SIZE
+
+    with session_maker() as db:
+        user: User | None = db.scalars(
+            select(User).where(User.username == username)
+        ).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        total: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserWantedPin.pin_id))).where(
+                    UserWantedPin.user_id == user.id
+                )
+            )
+            or 0
+        )
+
+        pin_ids: list[int] = list(
+            db.scalars(
+                select(UserWantedPin.pin_id)
+                .distinct()
+                .where(UserWantedPin.user_id == user.id)
+                .order_by(UserWantedPin.pin_id)
+                .limit(PAGE_SIZE)
+                .offset(offset)
+            )
+        )
+
+        wanted_pins: list[UserWantedPin] = (
+            list(
+                db.scalars(
+                    select(UserWantedPin)
+                    .where(
+                        UserWantedPin.user_id == user.id,
+                        UserWantedPin.pin_id.in_(pin_ids),
+                    )
+                    .options(
+                        selectinload(UserWantedPin.pin).options(
+                            selectinload(Pin.shops),
+                            selectinload(Pin.artists),
+                        ),
+                        selectinload(UserWantedPin.grade),
+                    )
+                    .order_by(UserWantedPin.pin_id, UserWantedPin.grade_id)
+                )
+            )
+            if pin_ids
+            else []
+        )
+
+    from pindb.templates.user.pin_list_pages import wants_list_page
+
+    return HTMLResponse(
+        content=str(
+            wants_list_page(
+                request=request,
+                profile_user=user,
+                wanted_pins=wanted_pins,
+                total=total,
+                page=page,
+                view=resolved_view,
+            )
+        )
+    )
+
+
+@router.get("/{username}/trades", response_model=None, name="user_trades_list")
+def user_trades_list(
+    request: Request,
+    username: str,
+    page: int = 1,
+    view: str = "grid",
+) -> HTMLResponse:
+    page = max(1, page)
+    resolved_view: ViewMode = "table" if view == "table" else "grid"
+    offset: int = (page - 1) * PAGE_SIZE
+
+    with session_maker() as db:
+        user: User | None = db.scalars(
+            select(User).where(User.username == username)
+        ).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        total: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
+                    UserOwnedPin.user_id == user.id,
+                    UserOwnedPin.tradeable_quantity > 0,
+                )
+            )
+            or 0
+        )
+
+        pin_ids: list[int] = list(
+            db.scalars(
+                select(UserOwnedPin.pin_id)
+                .distinct()
+                .where(
+                    UserOwnedPin.user_id == user.id,
+                    UserOwnedPin.tradeable_quantity > 0,
+                )
+                .order_by(UserOwnedPin.pin_id)
+                .limit(PAGE_SIZE)
+                .offset(offset)
+            )
+        )
+
+        tradeable_entries: list[UserOwnedPin] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin)
+                    .where(
+                        UserOwnedPin.user_id == user.id,
+                        UserOwnedPin.pin_id.in_(pin_ids),
+                        UserOwnedPin.tradeable_quantity > 0,
+                    )
+                    .options(
+                        selectinload(UserOwnedPin.pin).options(
+                            selectinload(Pin.shops),
+                            selectinload(Pin.artists),
+                        ),
+                        selectinload(UserOwnedPin.grade),
+                    )
+                    .order_by(UserOwnedPin.pin_id, UserOwnedPin.grade_id)
+                )
+            )
+            if pin_ids
+            else []
+        )
+
+    from pindb.templates.user.pin_list_pages import trades_list_page
+
+    return HTMLResponse(
+        content=str(
+            trades_list_page(
+                request=request,
+                profile_user=user,
+                tradeable_entries=tradeable_entries,
+                total=total,
+                page=page,
+                view=resolved_view,
+            )
+        )
+    )
+
+
+@router.get("/{username}", response_model=None, name="get_user_profile")
+def get_user_profile(
+    request: Request,
+    username: str,
+    current_user: CurrentUser,
+) -> HTMLResponse:
+    _PREVIEW_LIMIT: int = 10
+
+    with session_maker() as db:
+        user: User | None = db.scalars(
+            select(User).where(User.username == username)
+        ).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Favorites — count + preview
+        favorite_count: int = (
+            db.scalar(
+                select(func.count())
+                .select_from(user_favorite_pins)
+                .where(user_favorite_pins.c.user_id == user.id)
+            )
+            or 0
+        )
         favorite_pins: list[Pin] = list(
             db.scalars(
                 select(Pin)
                 .join(user_favorite_pins, Pin.id == user_favorite_pins.c.pin_id)
                 .where(user_favorite_pins.c.user_id == user.id)
                 .order_by(Pin.name)
+                .limit(_PREVIEW_LIMIT)
             ).all()
         )
+
+        # Personal sets (full list, they render as cards not a pin grid)
         personal_sets: list[PinSet] = list(
             db.scalars(
                 select(PinSet).where(PinSet.owner_id == user.id).order_by(PinSet.name)
             ).all()
+        )
+
+        # Collection — count distinct pins + preview entries
+        owned_count: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
+                    UserOwnedPin.user_id == user.id
+                )
+            )
+            or 0
+        )
+        _owned_preview_ids: list[int] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin.pin_id)
+                    .distinct()
+                    .where(UserOwnedPin.user_id == user.id)
+                    .limit(_PREVIEW_LIMIT)
+                )
+            )
+            if owned_count > 0
+            else []
+        )
+        owned_pins: list[UserOwnedPin] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin)
+                    .where(
+                        UserOwnedPin.user_id == user.id,
+                        UserOwnedPin.pin_id.in_(_owned_preview_ids),
+                    )
+                    .options(
+                        selectinload(UserOwnedPin.pin),
+                        selectinload(UserOwnedPin.grade),
+                    )
+                )
+            )
+            if _owned_preview_ids
+            else []
+        )
+
+        # Wants — count distinct pins + preview entries
+        wanted_count: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserWantedPin.pin_id))).where(
+                    UserWantedPin.user_id == user.id
+                )
+            )
+            or 0
+        )
+        _wanted_preview_ids: list[int] = (
+            list(
+                db.scalars(
+                    select(UserWantedPin.pin_id)
+                    .distinct()
+                    .where(UserWantedPin.user_id == user.id)
+                    .limit(_PREVIEW_LIMIT)
+                )
+            )
+            if wanted_count > 0
+            else []
+        )
+        wanted_pins: list[UserWantedPin] = (
+            list(
+                db.scalars(
+                    select(UserWantedPin)
+                    .where(
+                        UserWantedPin.user_id == user.id,
+                        UserWantedPin.pin_id.in_(_wanted_preview_ids),
+                    )
+                    .options(
+                        selectinload(UserWantedPin.pin),
+                        selectinload(UserWantedPin.grade),
+                    )
+                )
+            )
+            if _wanted_preview_ids
+            else []
+        )
+
+        # Trades — count distinct tradeable pins + preview entries
+        tradeable_count: int = (
+            db.scalar(
+                select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
+                    UserOwnedPin.user_id == user.id,
+                    UserOwnedPin.tradeable_quantity > 0,
+                )
+            )
+            or 0
+        )
+        _trade_preview_ids: list[int] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin.pin_id)
+                    .distinct()
+                    .where(
+                        UserOwnedPin.user_id == user.id,
+                        UserOwnedPin.tradeable_quantity > 0,
+                    )
+                    .limit(_PREVIEW_LIMIT)
+                )
+            )
+            if tradeable_count > 0
+            else []
+        )
+        tradeable_entries: list[UserOwnedPin] = (
+            list(
+                db.scalars(
+                    select(UserOwnedPin)
+                    .where(
+                        UserOwnedPin.user_id == user.id,
+                        UserOwnedPin.pin_id.in_(_trade_preview_ids),
+                        UserOwnedPin.tradeable_quantity > 0,
+                    )
+                    .options(
+                        selectinload(UserOwnedPin.pin),
+                        selectinload(UserOwnedPin.grade),
+                    )
+                )
+            )
+            if _trade_preview_ids
+            else []
         )
 
         return HTMLResponse(
@@ -106,7 +524,14 @@ def get_user_profile(
                     request=request,
                     profile_user=user,
                     favorite_pins=favorite_pins,
+                    favorite_count=favorite_count,
                     personal_sets=personal_sets,
+                    owned_pins=owned_pins,
+                    owned_count=owned_count,
+                    wanted_pins=wanted_pins,
+                    wanted_count=wanted_count,
+                    tradeable_entries=tradeable_entries,
+                    tradeable_count=tradeable_count,
                     current_user=current_user,
                 )
             )
@@ -376,7 +801,7 @@ def delete_personal_set(
         db.delete(pin_set)
 
     return RedirectResponse(
-        url=str(request.url_for("get_my_sets")),
+        url=str(request.url_for("get_user_profile", username=current_user.username)),
         status_code=303,
     )
 
@@ -424,7 +849,11 @@ def add_pin_to_personal_set(
         hx_target: str = request.headers.get("HX-Target", "")
         if hx_target.startswith("search-row-"):
             with session_maker() as db:
-                pin = db.get(Pin, pin_id)
+                pin = db.scalar(
+                    select(Pin)
+                    .where(Pin.id == pin_id)
+                    .options(selectinload(Pin.shops), selectinload(Pin.artists))
+                )
                 assert pin is not None
                 count = db.scalar(
                     select(func.count()).where(pin_set_memberships.c.set_id == set_id)
@@ -496,7 +925,11 @@ def remove_pin_from_personal_set(
             return HTMLResponse(content=str(pin_count_oob(count or 0)))
         elif hx_target.startswith("search-row-"):
             with session_maker() as db:
-                pin = db.get(Pin, pin_id)
+                pin = db.scalar(
+                    select(Pin)
+                    .where(Pin.id == pin_id)
+                    .options(selectinload(Pin.shops), selectinload(Pin.artists))
+                )
                 assert pin is not None
             from pindb.templates.create_and_edit.pin_set import search_result_row
 
@@ -533,7 +966,7 @@ def search_pins_for_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
-    query: str = "",
+    q: str = "",
 ) -> HTMLResponse:
     with session_maker() as db:
         pin_set: PinSet | None = db.get(PinSet, set_id)
@@ -542,8 +975,8 @@ def search_pins_for_set(
         _assert_can_edit_set(pin_set, current_user)
 
         results: list[Pin] = []
-        if query.strip():
-            results = search_pin(query=query.strip(), session=db) or []
+        if q.strip():
+            results = search_pin(query=q.strip(), session=db) or []
         existing_ids: set[int] = set(
             db.scalars(
                 select(pin_set_memberships.c.pin_id).where(
