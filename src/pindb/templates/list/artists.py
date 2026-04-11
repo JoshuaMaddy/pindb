@@ -21,7 +21,7 @@ def _grid_items(
             request=request,
             href=str(request.url_for("get_artist", id=artist.id)),
             pins=artist.pins,
-            name=artist.name,
+            name=("(P) " + artist.name) if artist.is_pending else artist.name,
         )
         for artist in artists
     ]
@@ -38,7 +38,7 @@ def _detailed_items(
                 thumbnail_grid(request=request, pins=artist.pins),
                 div[
                     p(class_="text-lg")[
-                        artist.name,
+                        ("(P) " + artist.name) if artist.is_pending else artist.name,
                         span(class_="text-pin-base-300 ml-1")[f"({len(artist.pins)})"],
                     ],
                     p(class_="text-pin-base-300")[artist.description],

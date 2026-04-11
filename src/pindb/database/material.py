@@ -11,14 +11,16 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import pins_materials
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
 
 
-class Material(MappedAsDataclass, Base):
+class Material(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "materials"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -44,6 +46,7 @@ class Material(MappedAsDataclass, Base):
         try:
             yield "id", self.id
             yield "name", self.name
+            yield "is_pending", self.is_pending, False
         except Exception:
             yield "detached", True
             return

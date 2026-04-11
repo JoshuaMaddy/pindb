@@ -14,7 +14,9 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import (
     pin_set_memberships,
     pins_artists,
@@ -37,7 +39,7 @@ if TYPE_CHECKING:
     from pindb.database.tag import Tag
 
 
-class Pin(MappedAsDataclass, Base):
+class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "pins"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -145,6 +147,7 @@ class Pin(MappedAsDataclass, Base):
         try:
             yield "id", self.id
             yield "name", self.name
+            yield "is_pending", self.is_pending, False
             yield "acquisition_type", self.acquisition_type
             yield "posts", self.posts, 1
             yield "width", self.width, None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import Request
-from htpy import Element, a, div, hr, i, p
+from htpy import Element, a, div, hr, i, p, span
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -201,7 +201,12 @@ def __sets_section(
                 content=div(class_="flex gap-2 w-full")[
                     thumbnail_grid(request, pin_set.pins),
                     div[
-                        p[pin_set.name],
+                        p[
+                            pin_set.name,
+                            span(class_="text-pin-base-300 ml-1")[
+                                f"({len(pin_set.pins)})"
+                            ],
+                        ],
                         p(class_="text-pin-base-300")[pin_set.description],
                     ],
                     is_own_profile

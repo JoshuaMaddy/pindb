@@ -8,6 +8,7 @@ from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
 from sqlalchemy import select
 
+from pindb.auth import EditorUser
 from pindb.database import Artist, Material, Shop, Tag, session_maker
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
@@ -18,6 +19,7 @@ from pindb.file_handler import save_file
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
+from pindb.routes._guards import assert_editor_can_edit
 from pindb.templates.create_and_edit.pin import pin_form
 
 router = APIRouter()
@@ -27,6 +29,7 @@ router = APIRouter()
 def get_edit_pin(
     request: Request,
     id: int,
+    current_user: EditorUser,
 ) -> HTMLResponse | None:
     with session_maker.begin() as session:
         materials: Sequence[Material] = session.scalars(
@@ -43,6 +46,8 @@ def get_edit_pin(
 
         if pin is None:
             return None
+
+        assert_editor_can_edit(pin, current_user)
 
         return HTMLResponse(
             content=pin_form(
@@ -63,6 +68,7 @@ def get_edit_pin(
 async def post_edit_pin(
     request: Request,
     id: int,
+    current_user: EditorUser,
     front_image: UploadFile | None = Form(default=None),
     name: str = Form(),
     acquisition_type: AcquisitionType = Form(),
@@ -121,6 +127,8 @@ async def post_edit_pin(
         pin: Pin | None = session.get(entity=Pin, ident=id)
         if not pin:
             return None
+
+        assert_editor_can_edit(pin, current_user)
 
         pin_materials: set[Material] = set(
             session.scalars(

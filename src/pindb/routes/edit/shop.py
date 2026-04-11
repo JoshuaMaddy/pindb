@@ -7,9 +7,11 @@ from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pindb.auth import EditorUser
 from pindb.database import Shop, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
+from pindb.routes._guards import assert_editor_can_edit
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
@@ -19,6 +21,7 @@ router = APIRouter()
 def get_edit_shop(
     request: Request,
     id: int,
+    current_user: EditorUser,
 ) -> HTMLResponse | None:
     with session_maker() as session:
         shop: Shop | None = session.scalar(
@@ -27,6 +30,8 @@ def get_edit_shop(
 
         if shop is None:
             return None
+
+        assert_editor_can_edit(shop, current_user)
 
         return HTMLResponse(
             content=str(
@@ -43,6 +48,7 @@ def get_edit_shop(
 def post_edit_shop(
     request: Request,
     id: int,
+    current_user: EditorUser,
     name: str = Form(),
     description: Annotated[
         str | None,
@@ -60,6 +66,8 @@ def post_edit_shop(
 
         if not shop:
             return None
+
+        assert_editor_can_edit(shop, current_user)
 
         shop.name = name
         shop.description = description

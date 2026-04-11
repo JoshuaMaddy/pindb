@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.sql.selectable import Select
 
+from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.database import UserSession
 from pindb.database import session_maker as db_session_maker
 from pindb.database.user import User
@@ -106,6 +107,15 @@ def require_admin(user: AuthenticatedUser) -> User:
 AdminUser = Annotated[User, Depends(require_admin)]
 
 
+def require_editor(user: AuthenticatedUser) -> User:
+    if not (user.is_editor or user.is_admin):
+        raise HTTPException(status_code=403, detail="Editor access required")
+    return user
+
+
+EditorUser = Annotated[User, Depends(require_editor)]
+
+
 # ---------------------------------------------------------------------------
 # Middleware — attach current user to request.state
 # ---------------------------------------------------------------------------
@@ -133,4 +143,10 @@ async def attach_user_middleware(
                     session.expunge(user)
                     request.state.user = user
 
+    u = request.state.user
+    set_audit_user(u.id if u else None)
+    set_audit_user_flags(
+        is_admin=u.is_admin if u else False,
+        is_editor=(u.is_editor or u.is_admin) if u else False,
+    )
     return await call_next(request)

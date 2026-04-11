@@ -21,7 +21,7 @@ def _grid_items(
             request=request,
             href=str(request.url_for("get_tag", id=tag.id)),
             pins=tag.pins,
-            name=tag.name,
+            name=("(P) " + tag.name) if tag.is_pending else tag.name,
         )
         for tag in tags
     ]
@@ -37,7 +37,7 @@ def _detailed_items(
             content=div(class_="flex gap-2 w-full")[
                 thumbnail_grid(request=request, pins=tag.pins),
                 p(class_="text-lg")[
-                    tag.name,
+                    ("(P) " + tag.name) if tag.is_pending else tag.name,
                     span(class_="text-pin-base-300 ml-1")[f"({len(tag.pins)})"],
                 ],
             ],

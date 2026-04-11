@@ -3,10 +3,11 @@ from __future__ import annotations
 from rich.repr import Result
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 
 
-class Link(MappedAsDataclass, Base):
+class Link(AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "links"
 
     id: Mapped[int] = mapped_column(

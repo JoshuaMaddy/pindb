@@ -33,12 +33,12 @@ def shop_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_shops"), "Shops"),
-                        shop.name,
+                        ("(P) " + shop.name) if shop.is_pending else shop.name,
                     ]
                 ),
                 page_heading(
                     icon="store",
-                    text=shop.name,
+                    text=("(P) " + shop.name) if shop.is_pending else shop.name,
                     full_width=True,
                     extras=fragment[
                         user

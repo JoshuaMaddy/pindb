@@ -31,7 +31,7 @@ def navbar(
     return nav(class_="flex gap-4 px-2 py-1 bg-pin-base-500")[
         a(class_="no-underline text-accent font-bold", href="/")["PinDB"],
         user
-        and user.is_admin
+        and (user.is_admin or user.is_editor)
         and a(class_="no-underline text-pin-base-100", href="/create")["Create"],
         a(class_="no-underline text-pin-base-100", href="/list")["List"],
         a(class_="no-underline text-pin-base-100", href="/search/pin")["Search Pin"],

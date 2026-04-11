@@ -21,7 +21,7 @@ def _grid_items(
             request=request,
             href=str(request.url_for("get_material", id=material.id)),
             pins=material.pins,
-            name=material.name,
+            name=("(P) " + material.name) if material.is_pending else material.name,
         )
         for material in materials
     ]
@@ -37,7 +37,7 @@ def _detailed_items(
             content=[
                 thumbnail_grid(request=request, pins=material.pins),
                 p(class_="text-lg")[
-                    material.name,
+                    ("(P) " + material.name) if material.is_pending else material.name,
                     span(class_="text-pin-base-300 ml-1")[f"({len(material.pins)})"],
                 ],
             ],

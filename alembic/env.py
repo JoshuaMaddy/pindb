@@ -24,6 +24,9 @@ import pindb.database.shop  # noqa: F401
 import pindb.database.tag  # noqa: F401
 import pindb.database.user  # noqa: F401
 import pindb.database.user_auth_provider  # noqa: F401
+import pindb.database.user_owned_pin  # noqa: F401
+import pindb.database.user_wanted_pin  # noqa: F401
+import pindb.database.change_log  # noqa: F401
 
 config = context.config
 

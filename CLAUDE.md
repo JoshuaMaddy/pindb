@@ -5,7 +5,7 @@
 ## Project Overview
 PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session-based auth with password login and OAuth (Google, Discord).
 
-## After Every Change
+## After Every Python Change
 Always run both linters before considering a task done:
 ```bash
 uvx ruff format .
@@ -25,15 +25,19 @@ uvx ty check
 src/pindb/
 ├── __init__.py              # FastAPI app instance
 ├── config.py                # Env config (Pydantic Settings) — see env vars table below
-├── auth.py                  # Auth helpers: hashing, session cookies, FastAPI Depends
+├── auth.py                  # Auth helpers: hashing, session cookies, FastAPI Depends; sets audit ContextVar in middleware
+├── audit_events.py          # SQLAlchemy session events: auto-sets audit fields, records ChangeLog patches, soft-delete filter
 ├── lifespan.py              # App startup/shutdown (logging, Meili setup, scheduler, admin bootstrap)
 ├── log.py                   # Rich logger setup
 ├── file_handler.py          # Image upload/storage + WebP thumbnail generation
 ├── utils.py                 # URL parsing, currency formatting (Babel)
 ├── model_utils.py           # Pydantic validators (magnitude parsing, empty→None)
 ├── database/
-│   ├── __init__.py          # Engine, sessionmaker, model exports, currency seeding
+│   ├── __init__.py          # Engine, sessionmaker, model exports, currency seeding; calls register_audit_events()
 │   ├── base.py              # DeclarativeBase with Alembic naming convention
+│   ├── audit_mixin.py       # AuditMixin: created_at/by, updated_at/by, deleted_at/by (all init=False)
+│   ├── pending_mixin.py     # PendingMixin: approved_at/by, rejected_at/by + PendingAuditEntity Protocol
+│   ├── change_log.py        # ChangeLog model: linear patch history for all AuditMixin entities
 │   ├── pin.py               # Pin model (central entity)
 │   ├── pin_set.py           # PinSet model (global curator sets + personal user sets)
 │   ├── user.py              # User model (auth, favorites, personal sets)
@@ -49,13 +53,15 @@ src/pindb/
 │   └── update.py            # Index setup, single/batch/full sync, delete
 ├── routes/
 │   ├── __init__.py          # Router registration
-│   ├── admin.py             # Admin panel, manual search sync
-│   ├── delete.py            # Cascade delete (POST /delete/{entity}/{id})
+│   ├── admin.py             # Admin panel, user management (admin/editor promote/demote), search sync
+│   ├── approve.py           # Pending approval queue (GET/POST /admin/pending/…) — admin only
+│   ├── _guards.py           # assert_editor_can_edit() — ownership check for edit routes
+│   ├── delete.py            # Soft delete (POST /delete/{entity}/{id}) — sets deleted_at/deleted_by_id
 │   ├── search.py            # Pin search (GET/POST /search/pin)
 │   ├── auth/router.py       # Login, signup, logout, Google/Discord OAuth
 │   ├── user/router.py       # Profiles, favorites, personal sets
-│   ├── create/              # Create entities (admin only)
-│   ├── edit/                # Edit entities (admin only)
+│   ├── create/              # Create entities (editor or admin; new items enter pending state)
+│   ├── edit/                # Edit entities (admin any; editor own-pending only)
 │   ├── get/                 # Detail pages for all entities + image serving
 │   ├── list/                # List pages for all entities
 │   └── bulk/                # Bulk pin create from JSON (admin only)
@@ -67,7 +73,7 @@ src/pindb/
 │   ├── get/                 # Detail templates (pin, artist, shop, material, tag, pin_set)
 │   ├── list/                # List templates (artists, shops, materials, tags, pin_sets)
 │   ├── user/                # user_profile_page()
-│   ├── admin/               # admin_panel_page()
+│   ├── admin/               # admin_panel_page(), admin_users_page(), pending_page()
 │   ├── search/              # search_pin_page()
 │   ├── bulk/                # bulk_pin_page()
 │   └── homepage.py
@@ -75,7 +81,7 @@ src/pindb/
 
 alembic/                     # Database migrations
 ├── env.py                   # Loads pindb.config, imports all models
-└── versions/                # Migration scripts (3 migrations so far)
+└── versions/                # Migration scripts (4 migrations)
 
 scripts/
 ├── README.md                # CSV import format docs (grades encoding, column format)
@@ -91,16 +97,9 @@ docker-entrypoint.sh         # Runs alembic upgrade head, then starts uvicorn
 
 ## Running Locally
 ```bash
-# 1. Install deps
 uv sync --all-groups
-
-# 2. Start PostgreSQL + Meilisearch
 docker compose -f docker-compose.dev.yaml up -d
-
-# 3. Run migrations
 alembic upgrade head
-
-# 4. Start dev server
 fastapi dev ./src/pindb/ --host 0.0.0.0
 ```
 
@@ -122,6 +121,30 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 | `google_client_secret` | No | None | Google OAuth client secret |
 | `discord_client_id` | No | None | Discord OAuth client ID |
 | `discord_client_secret` | No | None | Discord OAuth client secret |
+
+## Audit & History System
+
+All core entities inherit `AuditMixin` (`database/audit_mixin.py`), which adds:
+- `created_at`, `created_by_id` — set automatically on first INSERT
+- `updated_at`, `updated_by_id` — set automatically on every UPDATE
+- `deleted_at`, `deleted_by_id` — set on soft delete instead of `session.delete()`
+
+**How it works:** `audit_events.py` registers three SQLAlchemy session-level events:
+1. `before_flush` — sets audit timestamps/user_ids; captures diff for ChangeLog
+2. `after_flush` — writes ChangeLog entries with JSON patches (`{"field": {"old": v, "new": v}}`)
+3. `do_orm_execute` — auto-filters soft-deleted rows from all SELECT queries via `with_loader_criteria`
+
+**Current user** is threaded from `attach_user_middleware` → `set_audit_user()` + `set_audit_user_flags()` → ContextVars → event handlers. No route changes required. Three ContextVars: `_audit_user_id`, `_audit_user_is_admin`, `_audit_user_is_editor`.
+
+**Soft deletes:** `routes/delete.py` sets `entity.deleted_at`/`entity.deleted_by_id` instead of `session.delete()`. Soft-deleted entities are invisible to all queries by default. Pass `.execution_options(include_deleted=True)` to bypass (e.g. admin views).
+
+**ChangeLog table** (`database/change_log.py`): `entity_type` (table name), `entity_id`, `operation` (create/update/delete), `changed_by_id`, `changed_at`, `patch` (JSONB). Does NOT inherit `AuditMixin` (no audit of the audit log).
+
+**AuditMixin + MappedAsDataclass**: All mixin fields use `init=False` — they're never in `__init__`, avoiding dataclass field-ordering conflicts. Declare models as `class Foo(PendingMixin, AuditMixin, MappedAsDataclass, Base)` for editor-creatable entities, or `class Foo(AuditMixin, MappedAsDataclass, Base)` for others.
+
+**Excluded from audit**: `UserSession` (ephemeral), all join tables in `joins.py`.
+
+**Pending filter**: `_filter_deleted` also applies a `PendingMixin` visibility filter. Regular users/guests see only `approved_at IS NOT NULL`. Editors/admins see pending items too (`rejected_at IS NULL`). Pass `.execution_options(include_pending=True)` to bypass (admin approval views).
 
 ## Architecture Conventions
 
@@ -164,6 +187,7 @@ return HTMLResponse(content=str(template(pin=pin)))
 - FastAPI Depends:
   - `CurrentUser` → `User | None`
   - `AuthenticatedUser` → `User` (401 if not logged in)
+  - `EditorUser` → `User` (403 if not editor or admin)
   - `AdminUser` → `User` (403 if not admin)
 - Startup: `lifespan._ensure_admins()` grants admin to hardcoded usernames (default: `["josh"]`).
 - OAuth: Google (OIDC) and Discord, both in `routes/auth/router.py`.
@@ -220,10 +244,55 @@ Four pin list types: paginated full-list page (`GET /user/{username}/{list}`) + 
 
 Routes for add/remove/update owned and wanted pins: `routes/user/collection.py` (prefix `/user/pins`).
 
+## Editor Role & Pending Approval System
+
+Editors (`User.is_editor = True`) can create all entity types, but their submissions enter a **pending** state requiring admin approval before becoming publicly visible. Admins have implicit editor privileges; their creations auto-approve.
+
+### PendingMixin (`database/pending_mixin.py`)
+Applied to: `Pin`, `Shop`, `Artist`, `Tag`, `Material`, `PinSet`. Adds:
+- `approved_at`, `approved_by_id` — set on approval (NULL = pending)
+- `rejected_at`, `rejected_by_id` — set on rejection
+- Properties: `is_pending`, `is_approved`, `is_rejected`
+
+MRO: `class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base)`
+
+`PendingAuditEntity` Protocol (same file) — use as the type hint wherever a function needs fields from both `PendingMixin` and `AuditMixin`.
+
+### Visibility rules (enforced in `audit_events._filter_deleted`)
+| Viewer | Sees |
+|---|---|
+| Guest / regular user | Approved items only (`approved_at IS NOT NULL`, `rejected_at IS NULL`) |
+| Editor | Approved + pending (`rejected_at IS NULL`) |
+| Admin | Same as editor by default; use `include_pending=True` for approval views |
+
+Pending items appear in create/edit form selection lists with a `(P) ` name prefix.
+
+### Auto-approve on admin create
+`_before_flush` in `audit_events.py` sets `approved_at`/`approved_by_id` immediately when an admin creates a `PendingMixin` entity. No extra route code needed.
+
+### Edit permissions (`routes/_guards.py`)
+`assert_editor_can_edit(entity, current_user)`:
+- Admins: always allowed
+- Editors: only their own `is_pending` entries (403 otherwise)
+
+### Approval queue (`routes/approve.py`, prefix `/admin/pending`)
+| Route | Action |
+|---|---|
+| `GET /admin/pending` | Queue page — lists all pending entities by type |
+| `POST /admin/pending/approve/{type}/{id}` | Approve; cascades to pending deps of a Pin |
+| `POST /admin/pending/reject/{type}/{id}` | Mark `rejected_at` (editor can still see/fix) |
+| `POST /admin/pending/delete/{type}/{id}` | Soft-delete the pending entry |
+
+**Cascade rule**: approving a Pin also approves any pending shops/artists/materials/tags on that pin — but does NOT bulk-approve other pins that reference those entities.
+
+### Admin management
+- `POST /admin/users/{id}/promote-editor` / `demote-editor` — grant/revoke editor role
+- Admin panel shows pending count badge; links to `/admin/pending`
+
 ## Key Entities
 - **Pin** — central model. Has grades, materials, shops, artists, sets, tags, links, images, currency, acquisition/funding type.
 - **PinSet** — ordered pin collection. Global (admin) or personal (user). `owner_id` FK.
-- **User** — unique username, optional email/password (OAuth users may have no password), `is_admin`.
+- **User** — unique username, optional email/password (OAuth users may have no password), `is_admin`, `is_editor`.
 - **UserSession** — token (PK), user_id, expires_at.
 - **UserAuthProvider** — links User to Google/Discord accounts.
 - **UserOwnedPin** — owned pins per-grade with quantity and tradeable quantity.

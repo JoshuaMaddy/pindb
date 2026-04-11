@@ -6,15 +6,18 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from pindb.audit_events import register_audit_events
 from pindb.auth import attach_user_middleware
 from pindb.config import CONFIGURATION
 from pindb.lifespan import lifespan
-from pindb.routes import admin, create, delete, edit, get, list, search
+from pindb.routes import admin, approve, create, delete, edit, get, list, search
 from pindb.routes.auth import router as auth_router
 from pindb.routes.bulk import router as bulk_router
 from pindb.routes.user import router as user_router
 from pindb.routes.user.collection import router as collection_router
 from pindb.templates.homepage import homepage
+
+register_audit_events()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -37,6 +40,7 @@ def root(request: Request):
 
 
 app.include_router(admin.router)
+app.include_router(approve.router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(collection_router)

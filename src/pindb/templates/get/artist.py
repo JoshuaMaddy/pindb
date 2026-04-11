@@ -33,12 +33,12 @@ def artist_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_artists"), "Artists"),
-                        artist.name,
+                        ("(P) " + artist.name) if artist.is_pending else artist.name,
                     ]
                 ),
                 page_heading(
                     icon="palette",
-                    text=artist.name,
+                    text=("(P) " + artist.name) if artist.is_pending else artist.name,
                     full_width=True,
                     extras=fragment[
                         user

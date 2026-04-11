@@ -153,7 +153,10 @@ def _thumbnail(request: Request, pin: Pin) -> VoidElement:
 
 
 def _pin_button(request: Request, pin: Pin) -> Element:
-    return pill_link(href=str(request.url_for("get_pin", id=pin.id)), text=pin.name)
+    return pill_link(
+        href=str(request.url_for("get_pin", id=pin.id)),
+        text=("(P) " + pin.name) if pin.is_pending else pin.name,
+    )
 
 
 def _shop_links(request: Request, shops: set[Shop]) -> Element:
@@ -163,7 +166,7 @@ def _shop_links(request: Request, shops: set[Shop]) -> Element:
         [
             pill_link(
                 href=str(request.url_for("get_shop", id=shop.id)),
-                text=shop.name,
+                text=("(P) " + shop.name) if shop.is_pending else shop.name,
             )
             for shop in sorted(shops, key=lambda shop: shop.name)
         ]
@@ -177,7 +180,7 @@ def _artist_links(request: Request, artists: set[Artist]) -> Element:
         [
             pill_link(
                 href=str(request.url_for("get_artist", id=artist.id)),
-                text=artist.name,
+                text=("(P) " + artist.name) if artist.is_pending else artist.name,
             )
             for artist in sorted(artists, key=lambda artist: artist.name)
         ]

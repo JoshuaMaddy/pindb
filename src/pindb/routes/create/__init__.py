@@ -2,11 +2,11 @@ from fastapi import Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 
-from pindb.auth import require_admin
+from pindb.auth import require_editor
 from pindb.routes.create import artist, material, pin, pin_set, shop, tag
 from pindb.templates.create_and_edit.index import create_index
 
-router = APIRouter(prefix="/create", dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/create", dependencies=[Depends(require_editor)])
 
 
 @router.get(path="/")

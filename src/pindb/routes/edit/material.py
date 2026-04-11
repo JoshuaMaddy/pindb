@@ -2,7 +2,9 @@ from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 
+from pindb.auth import EditorUser
 from pindb.database import Material, session_maker
+from pindb.routes._guards import assert_editor_can_edit
 from pindb.templates.create_and_edit.material import material_form
 
 router = APIRouter()
@@ -12,12 +14,15 @@ router = APIRouter()
 def get_edit_material(
     request: Request,
     id: int,
+    current_user: EditorUser,
 ) -> HTMLResponse | None:
     with session_maker() as session:
         material: Material | None = session.get(entity=Material, ident=id)
 
         if material is None:
             return None
+
+        assert_editor_can_edit(material, current_user)
 
         return HTMLResponse(
             content=str(
@@ -34,6 +39,7 @@ def get_edit_material(
 def post_edit_material(
     request: Request,
     id: int,
+    current_user: EditorUser,
     name: str = Form(),
 ) -> HTMLResponse | None:
     with session_maker.begin() as session:
@@ -41,6 +47,8 @@ def post_edit_material(
 
         if not material:
             return None
+
+        assert_editor_can_edit(material, current_user)
 
         material.name = name
         session.flush()

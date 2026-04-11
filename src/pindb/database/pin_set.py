@@ -12,7 +12,9 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import pin_set_memberships, pin_sets_links
 from pindb.database.link import Link
 
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
     from pindb.database.user import User
 
 
-class PinSet(MappedAsDataclass, Base):
+class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "pin_sets"
 
     id: Mapped[int] = mapped_column(
@@ -69,6 +71,7 @@ class PinSet(MappedAsDataclass, Base):
         try:
             yield "id", self.id
             yield "name", self.name
+            yield "is_pending", self.is_pending, False
             yield "owner_id", self.owner_id, None
         except Exception:
             yield "detached", True

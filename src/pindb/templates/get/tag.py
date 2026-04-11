@@ -33,12 +33,12 @@ def tag_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_tags"), "Tags"),
-                        tag.name,
+                        ("(P) " + tag.name) if tag.is_pending else tag.name,
                     ]
                 ),
                 page_heading(
                     icon="tag",
-                    text=tag.name,
+                    text=("(P) " + tag.name) if tag.is_pending else tag.name,
                     full_width=True,
                     extras=fragment[
                         user

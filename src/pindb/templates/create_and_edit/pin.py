@@ -59,6 +59,7 @@ def pin_form(
         body_content=centered_div(
             content=[
                 h1["Create a Pin" if not pin else "Edit a Pin"],
+                _pending_notice(request=request, pin=pin),
                 hr,
                 form(
                     hx_post=str(post_url),
@@ -89,6 +90,27 @@ def pin_form(
         script_content=SCRIPT_CONTENT,
         request=request,
     )
+
+
+def _pending_notice(request: Request, pin: Pin | None) -> Element | str:
+    user = getattr(getattr(request, "state", None), "user", None)
+    if user is None or user.is_admin:
+        return ""
+    if not (user.is_editor or user.is_admin):
+        return ""
+    if pin and not pin.is_pending:
+        return ""
+    msg = (
+        "This entry is pending admin approval."
+        if pin and pin.is_pending
+        else "Your submission will be reviewed by an admin before becoming visible."
+    )
+    return div(
+        class_="rounded bg-amber-900 border border-amber-600 text-amber-200 px-4 py-2 text-sm my-2"
+    )[
+        i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
+        msg,
+    ]
 
 
 def __required_fields(
@@ -213,7 +235,7 @@ def __shops_input(
                 option(
                     value=shop.id,
                     selected=shop in pin.shops if pin else False,
-                )[shop.name]
+                )["(P) " + shop.name if shop.is_pending else shop.name]
                 for shop in shops
             ]
         ],
@@ -307,7 +329,7 @@ def __material_ids_input(
                 option(
                     value=material.id,
                     selected=material in pin.materials if pin else False,
-                )[material.name]
+                )["(P) " + material.name if material.is_pending else material.name]
                 for material in materials
             ]
         ],
@@ -331,7 +353,7 @@ def __tag_ids_input(
                 option(
                     value=tag.id,
                     selected=tag in pin.tags if pin else False,
-                )[tag.name]
+                )["(P) " + tag.name if tag.is_pending else tag.name]
                 for tag in tags
             ]
         ],
@@ -354,7 +376,7 @@ def __artist_ids_input(
                 option(
                     value=artist.id,
                     selected=artist in pin.artists if pin else False,
-                )[artist.name]
+                )["(P) " + artist.name if artist.is_pending else artist.name]
                 for artist in artists
             ]
         ],
@@ -377,7 +399,7 @@ def __pin_sets_ids_input(
                 option(
                     value=pin_set.id,
                     selected=pin_set in pin.sets if pin else False,
-                )[pin_set.name]
+                )["(P) " + pin_set.name if pin_set.is_pending else pin_set.name]
                 for pin_set in pin_sets
             ]
         ],

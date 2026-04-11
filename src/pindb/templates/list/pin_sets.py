@@ -21,7 +21,7 @@ def _grid_items(
             request=request,
             href=str(request.url_for("get_pin_set", id=pin_set.id)),
             pins=pin_set.pins,
-            name=pin_set.name,
+            name=("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
         )
         for pin_set in pin_sets
     ]
@@ -38,7 +38,7 @@ def _detailed_items(
                 thumbnail_grid(request=request, pins=pin_set),
                 div[
                     p(class_="text-lg")[
-                        pin_set.name,
+                        ("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
                         span(class_="text-pin-base-300 ml-1")[f"({len(pin_set.pins)})"],
                     ],
                     p(class_="text-pin-base-300")[pin_set.description],

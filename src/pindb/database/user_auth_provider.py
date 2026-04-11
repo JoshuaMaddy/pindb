@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey, UniqueConstraint
 from rich.repr import Result
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ class OAuthProvider(StrEnum):
     discord = "discord"
 
 
-class UserAuthProvider(MappedAsDataclass, Base):
+class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "user_auth_providers"
     __table_args__ = (UniqueConstraint("provider", "provider_user_id"),)
 
@@ -28,7 +29,9 @@ class UserAuthProvider(MappedAsDataclass, Base):
     provider_user_id: Mapped[str]
     provider_email: Mapped[str | None] = mapped_column(default=None)
 
-    user: Mapped[User] = relationship(back_populates="auth_providers", init=False)
+    user: Mapped[User] = relationship(
+        back_populates="auth_providers", init=False, foreign_keys=[user_id]
+    )
 
     def __rich_repr__(self) -> Result:
         try:

@@ -5,9 +5,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
 
+from pindb.auth import EditorUser
 from pindb.database import Artist, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
+from pindb.routes._guards import assert_editor_can_edit
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
@@ -17,12 +19,15 @@ router = APIRouter()
 def get_edit_artist(
     request: Request,
     id: int,
+    current_user: EditorUser,
 ) -> HTMLResponse | None:
     with session_maker.begin() as session:
         artist: Artist | None = session.get(entity=Artist, ident=id)
 
         if artist is None:
             return None
+
+        assert_editor_can_edit(artist, current_user)
 
         return HTMLResponse(
             content=artist_form(
@@ -37,6 +42,7 @@ def get_edit_artist(
 def post_edit_artist(
     request: Request,
     id: int,
+    current_user: EditorUser,
     name: str = Form(),
     description: Annotated[
         str | None,
@@ -54,6 +60,8 @@ def post_edit_artist(
 
         if not artist:
             return None
+
+        assert_editor_can_edit(artist, current_user)
 
         artist.name = name
         artist.description = description

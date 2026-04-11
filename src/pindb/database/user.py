@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from rich.repr import Result
@@ -12,6 +11,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import user_favorite_pin_sets, user_favorite_pins
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from pindb.database.user_wanted_pin import UserWantedPin
 
 
-class User(MappedAsDataclass, Base):
+class User(AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -32,10 +32,7 @@ class User(MappedAsDataclass, Base):
     email: Mapped[str | None] = mapped_column(unique=True, default=None)
     hashed_password: Mapped[str | None] = mapped_column(default=None)
     is_admin: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        init=False,
-    )
+    is_editor: Mapped[bool] = mapped_column(default=False)
 
     sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user",
@@ -47,6 +44,7 @@ class User(MappedAsDataclass, Base):
         back_populates="user",
         default_factory=list,
         cascade="all, delete-orphan",
+        foreign_keys="[UserAuthProvider.user_id]",
     )
     favorite_pins: Mapped[set[Pin]] = relationship(
         secondary=user_favorite_pins,
@@ -65,11 +63,13 @@ class User(MappedAsDataclass, Base):
         back_populates="user",
         default_factory=list,
         cascade="all, delete-orphan",
+        foreign_keys="[UserOwnedPin.user_id]",
     )
     wanted_pins: Mapped[list[UserWantedPin]] = relationship(
         back_populates="user",
         default_factory=list,
         cascade="all, delete-orphan",
+        foreign_keys="[UserWantedPin.user_id]",
     )
 
     def __hash__(self) -> int:
@@ -81,6 +81,7 @@ class User(MappedAsDataclass, Base):
             yield "username", self.username
             yield "email", self.email, None
             yield "is_admin", self.is_admin, False
+            yield "is_editor", self.is_editor, False
             yield "created_at", self.created_at
         except Exception:
             yield "detached", True

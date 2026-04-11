@@ -3,10 +3,11 @@ from __future__ import annotations
 from rich.repr import Result
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 
 
-class Grade(MappedAsDataclass, Base):
+class Grade(AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "grades"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)

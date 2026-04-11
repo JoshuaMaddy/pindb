@@ -11,6 +11,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from pindb.database.user import User
 
 
-class UserOwnedPin(MappedAsDataclass, Base):
+class UserOwnedPin(AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "user_owned_pins"
     __table_args__ = (
         UniqueConstraint(
@@ -46,6 +47,7 @@ class UserOwnedPin(MappedAsDataclass, Base):
     user: Mapped[User] = relationship(
         back_populates="owned_pins",
         init=False,
+        foreign_keys=[user_id],
     )
     pin: Mapped[Pin] = relationship(init=False)
     grade: Mapped[Grade | None] = relationship(init=False)

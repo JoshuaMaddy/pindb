@@ -8,7 +8,10 @@ from sqlalchemy.orm.session import Session, sessionmaker
 
 from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist
+from pindb.database.audit_mixin import AuditMixin
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.base import Base
+from pindb.database.change_log import ChangeLog
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
@@ -26,7 +29,10 @@ from pindb.database.user_wanted_pin import UserWantedPin
 __all__: list[str] = [
     "seed_currencies",
     "Artist",
+    "AuditMixin",
+    "PendingMixin",
     "Base",
+    "ChangeLog",
     "Currency",
     "Grade",
     "Link",

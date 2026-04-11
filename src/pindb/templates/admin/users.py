@@ -20,8 +20,13 @@ def admin_users_page(
             "username": user.username,
             "email": user.email or "",
             "is_admin": user.is_admin,
+            "is_editor": user.is_editor,
             "promote_url": str(request.url_for("promote_user", user_id=user.id)),
             "demote_url": str(request.url_for("demote_user", user_id=user.id)),
+            "promote_editor_url": str(
+                request.url_for("promote_editor", user_id=user.id)
+            ),
+            "demote_editor_url": str(request.url_for("demote_editor", user_id=user.id)),
         }
         for user in users
     ]
@@ -63,17 +68,26 @@ def admin_users_page(
 def _user_row_template() -> Element:
     """Alpine-bound <tr> — 'row' is provided by x-for in the data_table component."""
     is_self = "row.is_admin && row.id === currentUserId"
-    action_url = "row.is_admin ? row.demote_url : row.promote_url"
-    btn_class = (
+
+    # Admin promote/demote
+    admin_action_url = "row.is_admin ? row.demote_url : row.promote_url"
+    admin_btn_class = (
         f"{is_self} ? 'btn btn-sm opacity-50 cursor-not-allowed'"
         " : row.is_admin ? 'btn btn-sm btn-error'"
         " : 'btn btn-sm btn-primary'"
     )
-    btn_text = (
+    admin_btn_text = (
         f"{is_self} ? 'Cannot demote self'"
-        " : row.is_admin ? 'Demote'"
+        " : row.is_admin ? 'Demote Admin'"
         " : 'Promote to Admin'"
     )
+
+    # Editor promote/demote (only show when user is not admin, since admins are implicitly editors)
+    editor_action_url = "row.is_editor ? row.demote_editor_url : row.promote_editor_url"
+    editor_btn_class = (
+        "row.is_editor ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-secondary'"
+    )
+    editor_btn_text = "row.is_editor ? 'Revoke Editor' : 'Promote to Editor'"
 
     return tr(class_="border-b border-pin-base-800")[
         td(class_="py-2 pr-6", **{"x-text": "row.username"}),
@@ -82,28 +96,51 @@ def _user_row_template() -> Element:
             **{"x-text": "row.email || '—'"},
         ),
         td(class_="py-2 pr-6")[
-            span(
-                class_="text-xs font-semibold px-2 py-0.5 rounded",
-                **{
-                    ":class": (
-                        "row.is_admin"
-                        " ? 'bg-amber-700 text-amber-100'"
-                        " : 'bg-pin-base-700 text-pin-base-300'"
-                    ),
-                    "x-text": "row.is_admin ? 'Admin' : 'User'",
-                },
-            ),
-        ],
-        td(class_="py-2")[
-            form(method="post", **{":action": action_url})[
-                button(
-                    type_="submit",
+            div(class_="flex gap-1 flex-wrap")[
+                span(
+                    class_="text-xs font-semibold px-2 py-0.5 rounded",
                     **{
-                        ":class": btn_class,
-                        ":disabled": is_self,
-                        "x-text": btn_text,
+                        ":class": (
+                            "row.is_admin"
+                            " ? 'bg-amber-700 text-amber-100'"
+                            " : 'bg-pin-base-700 text-pin-base-300'"
+                        ),
+                        "x-text": "row.is_admin ? 'Admin' : 'User'",
                     },
                 ),
+                span(
+                    class_="text-xs font-semibold px-2 py-0.5 rounded bg-blue-700 text-blue-100",
+                    **{
+                        "x-show": "row.is_editor && !row.is_admin",
+                        "x-cloak": True,
+                    },
+                )["Editor"],
+            ],
+        ],
+        td(class_="py-2")[
+            div(class_="flex gap-2 flex-wrap")[
+                form(method="post", **{":action": admin_action_url})[
+                    button(
+                        type_="submit",
+                        **{
+                            ":class": admin_btn_class,
+                            ":disabled": is_self,
+                            "x-text": admin_btn_text,
+                        },
+                    ),
+                ],
+                form(
+                    method="post",
+                    **{":action": editor_action_url, "x-show": "!row.is_admin"},
+                )[
+                    button(
+                        type_="submit",
+                        **{
+                            ":class": editor_btn_class,
+                            "x-text": editor_btn_text,
+                        },
+                    ),
+                ],
             ]
         ],
     ]

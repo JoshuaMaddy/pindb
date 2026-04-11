@@ -52,7 +52,7 @@ def pin_page(
                     back_link(),
                     page_heading(
                         icon="circle-star",
-                        text=pin.name,
+                        text=("(P) " + pin.name) if pin.is_pending else pin.name,
                         full_width=True,
                         extras=fragment[
                             user
@@ -271,7 +271,10 @@ def __shops(
         icon="store",
         label="Shops",
         items=[
-            pill_link(href=str(request.url_for("get_shop", id=shop.id)), text=shop.name)
+            pill_link(
+                href=str(request.url_for("get_shop", id=shop.id)),
+                text=("(P) " + shop.name) if shop.is_pending else shop.name,
+            )
             for shop in sorted(pin.shops, key=lambda shop: shop.name)
         ],
     )
@@ -289,7 +292,7 @@ def __artists(
         items=[
             pill_link(
                 href=str(request.url_for("get_artist", id=artist.id)),
-                text=artist.name,
+                text=("(P) " + artist.name) if artist.is_pending else artist.name,
             )
             for artist in sorted(pin.artists, key=lambda artist: artist.name)
         ],
@@ -360,7 +363,7 @@ def __pin_sets(
         items=[
             pill_link(
                 href=str(request.url_for("get_pin_set", id=ps.id)),
-                text=ps.name.title(),
+                text=("(P) " + ps.name.title()) if ps.is_pending else ps.name.title(),
             )
             for ps in visible_pin_sets
         ],
@@ -375,7 +378,10 @@ def __tags(
         icon="tag",
         label="Tags",
         items=[
-            pill_link(href=str(request.url_for("get_tag", id=tag.id)), text=tag.name)
+            pill_link(
+                href=str(request.url_for("get_tag", id=tag.id)),
+                text=("(P) " + tag.name) if tag.is_pending else tag.name,
+            )
             for tag in sorted(pin.tags, key=lambda tag: tag.name)
         ],
     )
@@ -391,7 +397,9 @@ def __materials(
         items=[
             pill_link(
                 href=str(request.url_for("get_material", id=material.id)),
-                text=material.name.title(),
+                text=("(P) " + material.name.title())
+                if material.is_pending
+                else material.name.title(),
             )
             for material in sorted(pin.materials, key=lambda material: material.name)
         ],

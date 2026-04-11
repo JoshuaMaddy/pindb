@@ -11,7 +11,9 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import artists_links, pins_artists
 from pindb.database.link import Link
 
@@ -19,7 +21,7 @@ if TYPE_CHECKING:
     from pindb.database.pin import Pin
 
 
-class Artist(MappedAsDataclass, Base):
+class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "artists"
 
     id: Mapped[int] = mapped_column(
@@ -54,6 +56,7 @@ class Artist(MappedAsDataclass, Base):
         try:
             yield "id", self.id
             yield "name", self.name
+            yield "is_pending", self.is_pending, False
             yield "active", self.active
         except Exception:
             yield "detached", True

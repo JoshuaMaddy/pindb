@@ -1,10 +1,10 @@
 from fastapi import Depends
 from fastapi.routing import APIRouter
 
-from pindb.auth import require_admin
+from pindb.auth import require_editor
 from pindb.routes.edit import artist, material, pin, shop, tag
 
-router = APIRouter(prefix="/edit", dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/edit", dependencies=[Depends(require_editor)])
 
 router.include_router(pin.router)
 router.include_router(artist.router)

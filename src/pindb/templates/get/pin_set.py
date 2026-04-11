@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div
+from htpy import Element, fragment
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -26,7 +26,9 @@ def pin_set_page(
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     can_edit: bool = user is not None and (pin_set.owner_id == user.id or user.is_admin)
-    can_delete: bool = user is not None and pin_set.owner_id == user.id
+    can_delete: bool = user is not None and (
+        pin_set.owner_id == user.id or user.is_admin
+    )
 
     return html_base(
         title=pin_set.name,
@@ -37,15 +39,17 @@ def pin_set_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_pin_sets"), "Pin Sets"),
-                        pin_set.name,
+                        ("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
                     ]
                 ),
                 page_heading(
                     icon="layout-grid",
-                    text=pin_set.name.title(),
+                    text=("(P) " + pin_set.name.title())
+                    if pin_set.is_pending
+                    else pin_set.name.title(),
                     extras=[
                         (can_edit or can_delete)
-                        and div(class_="ml-auto flex gap-2")[
+                        and fragment[
                             can_edit
                             and icon_button(
                                 icon="pencil",

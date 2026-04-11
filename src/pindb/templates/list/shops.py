@@ -21,7 +21,7 @@ def _grid_items(
             request=request,
             href=str(request.url_for("get_shop", id=shop.id)),
             pins=shop.pins,
-            name=shop.name,
+            name=("(P) " + shop.name) if shop.is_pending else shop.name,
         )
         for shop in shops
     ]
@@ -38,7 +38,7 @@ def _detailed_items(
                 thumbnail_grid(request=request, pins=shop.pins),
                 div[
                     p(class_="text-lg")[
-                        shop.name,
+                        ("(P) " + shop.name) if shop.is_pending else shop.name,
                         span(class_="text-pin-base-300 ml-1")[f"({len(shop.pins)})"],
                     ],
                     p(class_="text-pin-base-300")[shop.description],

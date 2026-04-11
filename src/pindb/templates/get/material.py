@@ -34,12 +34,16 @@ def material_page(
                         entries=[
                             (request.url_for("get_list_index"), "List"),
                             (request.url_for("get_list_materials"), "Materials"),
-                            material.name,
+                            ("(P) " + material.name)
+                            if material.is_pending
+                            else material.name,
                         ]
                     ),
                     page_heading(
                         icon="anvil",
-                        text=material.name.title(),
+                        text=("(P) " + material.name.title())
+                        if material.is_pending
+                        else material.name.title(),
                         full_width=True,
                         extras=fragment[
                             user
