@@ -10,7 +10,6 @@ from pindb.database.artist import Artist
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
-from pindb.database.material import Material
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
@@ -41,10 +40,6 @@ shops_set: set[str] = set()
 for row in df.select(pl.col("shops")).unique().rows():
     shops_set.update(row[0])
 
-materials_set: set[str] = set()
-for row in df.select(pl.col("materials")).unique().rows():
-    materials_set.update(row[0])
-
 pin_sets_set: set[str] = set()
 for row in df.select(pl.col("pin_sets")).unique().rows():
     pin_sets_set.update(row[0])
@@ -65,10 +60,6 @@ with session_maker.begin() as session:
     for tag_name in tags_set:
         if not session.scalar(select(Tag).where(Tag.name == tag_name)):
             session.merge(Tag(name=tag_name))
-
-    for material_name in materials_set:
-        if not session.scalar(select(Material).where(Material.name == material_name)):
-            session.merge(Material(name=material_name))
 
     for pins_set_name in pin_sets_set:
         if not session.scalar(select(PinSet).where(PinSet.name == pins_set_name)):
@@ -98,10 +89,10 @@ async def import_csv():
                 print(f"No currency found with code: {row['currency']}")
                 continue
 
-            materials = session.scalars(
-                select(Material).where(Material.name.in_(row["materials"]))
+            material_tag_names: list[str] = row.get("materials") or []
+            tags = session.scalars(
+                select(Tag).where(Tag.name.in_(list(row["tags"]) + material_tag_names))
             )
-            tags = session.scalars(select(Tag).where(Tag.name.in_(row["tags"])))
             pin_sets = session.scalars(
                 select(PinSet).where(PinSet.name.in_(row["pin_sets"]))
             )
@@ -113,10 +104,10 @@ async def import_csv():
             grades = {
                 Grade(
                     name=grade[0],
-                    price=float(grade[2]),
+                    price=float(grade[2]) if grade[2].strip() else None,
                 )
                 for raw in row["grades"]
-                if (grade := raw.split("|")) and len(grade) == 2
+                if (grade := raw.split("|")) and len(grade) == 3 and grade[0].strip()
             }
 
             session.add(
@@ -125,7 +116,6 @@ async def import_csv():
                     acquisition_type=row["acquisition"],
                     front_image_guid=await save_file(image_path),
                     currency=currency,
-                    materials=set(materials),
                     shops=set(shops),
                     limited_edition=row["limited_edition"],
                     number_produced=row["number_produced"],

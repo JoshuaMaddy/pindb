@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.repr import Result
+from sqlalchemy import Index
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -23,6 +24,14 @@ if TYPE_CHECKING:
 
 class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     __tablename__ = "shops"
+    __table_args__ = (
+        Index(
+            "uq_shops_name_active",
+            "name",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
@@ -30,7 +39,7 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     )
 
     # Required Attributes
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column()
 
     # Optional Attributes
     description: Mapped[str | None] = mapped_column(default=None)
@@ -57,6 +66,15 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             return False
 
         return value.id == self.id
+
+    def document(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "active": self.active,
+            "is_pending": self.is_pending,
+        }
 
     def __rich_repr__(self) -> Result:
         try:

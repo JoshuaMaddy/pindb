@@ -16,7 +16,6 @@ import pindb.database.currency  # noqa: F401
 import pindb.database.grade  # noqa: F401
 import pindb.database.joins  # noqa: F401
 import pindb.database.link  # noqa: F401
-import pindb.database.material  # noqa: F401
 import pindb.database.pin  # noqa: F401
 import pindb.database.pin_set  # noqa: F401
 import pindb.database.session  # noqa: F401
@@ -27,6 +26,7 @@ import pindb.database.user_auth_provider  # noqa: F401
 import pindb.database.user_owned_pin  # noqa: F401
 import pindb.database.user_wanted_pin  # noqa: F401
 import pindb.database.change_log  # noqa: F401
+import pindb.database.pending_edit  # noqa: F401
 
 config = context.config
 

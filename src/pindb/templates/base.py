@@ -1,9 +1,24 @@
 import time
+from pathlib import Path
 
 from fastapi import Request
 from htpy import BaseElement, body, head, html, link, meta, script
 from htpy import title as title_el
 from markupsafe import Markup
+
+with open(
+    file=Path(__file__).parent / "js/form_persist.js",
+    mode="r",
+    encoding="utf-8",
+) as _fp:
+    _FORM_PERSIST_SCRIPT: str = _fp.read()
+
+with open(
+    file=Path(__file__).parent / "js/markdown_editor.js",
+    mode="r",
+    encoding="utf-8",
+) as _fp:
+    _MARKDOWN_EDITOR_SCRIPT: str = _fp.read()
 
 from pindb.templates.components.bread_crumb import BreadCrumbLink, bread_crumb
 from pindb.templates.components.navbar import navbar
@@ -45,6 +60,12 @@ def html_base(
                 src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js",
                 defer=True,
             ),
+            # Overtype markdown editor
+            script(
+                src="https://cdn.jsdelivr.net/npm/overtype@latest/dist/overtype.min.js"
+            ),
+            # marked (client-side markdown preview)
+            script(src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"),
         ],
         body()[
             navbar(request=request),
@@ -70,5 +91,7 @@ document.body.addEventListener('htmx:afterSwap', function() {
 """
             )
         ],
+        script[Markup(object=_FORM_PERSIST_SCRIPT)],
+        script[Markup(object=_MARKDOWN_EDITOR_SCRIPT)],
         script_content and script[Markup(object=script_content)],
     ]

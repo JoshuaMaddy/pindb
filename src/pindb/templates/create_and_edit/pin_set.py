@@ -12,7 +12,6 @@ from htpy import (
     input,
     p,
     span,
-    textarea,
 )
 
 from pindb.database.pin import Pin
@@ -25,6 +24,7 @@ from pindb.templates.components.empty_state import empty_state
 from pindb.templates.components.form_field import form_field
 from pindb.templates.components.htmx_search_input import htmx_search_input
 from pindb.templates.components.icon_button import icon_button
+from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.toggle_button import toggle_button
 
@@ -69,7 +69,7 @@ def pin_set_create_page(request: Request) -> Element:
         body_content=centered_div(
             content=[
                 page_heading(
-                    icon="folder-plus",
+                    icon="layout-grid",
                     text="Create Pin Set",
                 ),
                 hr,
@@ -81,8 +81,9 @@ def pin_set_create_page(request: Request) -> Element:
                     form_field(
                         label_text="Name",
                         field_id="name",
+                        required=True,
                         child=input(
-                            type_="text",
+                            type="text",
                             id="name",
                             name="name",
                             required=True,
@@ -92,17 +93,14 @@ def pin_set_create_page(request: Request) -> Element:
                     ),
                     form_field(
                         label_text="Description",
-                        field_id="description",
-                        child=textarea(
-                            id="description",
+                        field_id="md-editor-description",
+                        child=markdown_editor(
+                            field_id="description",
                             name="description",
-                            rows="2",
-                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text resize-none",
-                            placeholder="Optional description",
                         ),
                     ),
                     button(
-                        type_="submit",
+                        type="submit",
                         class_="self-start px-4 py-1 rounded-lg bg-pin-main hover:bg-pin-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
                     )["Create Set"],
                 ],
@@ -202,8 +200,9 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
             form_field(
                 label_text="Name",
                 field_id="name",
+                required=True,
                 child=input(
-                    type_="text",
+                    type="text",
                     id="name",
                     name="name",
                     value=pin_set.name,
@@ -213,16 +212,15 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
             ),
             form_field(
                 label_text="Description",
-                field_id="description",
-                child=textarea(
-                    id="description",
+                field_id="md-editor-description",
+                child=markdown_editor(
+                    field_id="description",
                     name="description",
-                    rows="2",
-                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text resize-none",
-                )[pin_set.description or ""],
+                    value=pin_set.description,
+                ),
             ),
             button(
-                type_="submit",
+                type="submit",
                 class_="self-start px-4 py-1 rounded-lg bg-pin-main hover:bg-pin-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
             )["Save"],
         ],
@@ -287,11 +285,11 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
         class_="relative flex flex-col w-[100px] shrink-0 rounded-lg bg-pin-base-450 border border-pin-base-400 overflow-hidden cursor-grab select-none hover:border-accent",
     )[
         button(
-            type_="button",
+            type="button",
             hx_delete=remove_url,
             hx_target=f"#pin-row-{pin.id}",
             hx_swap="outerHTML",
-            class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-400 hover:text-red-300 hover:border-red-400 p-0",
+            class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-200 hover:text-red-300 hover:border-red-400 p-0",
         )[i(data_lucide="x", class_="w-3 h-3")],
         a(
             href=str(request.url_for("get_pin", id=pin.id)),

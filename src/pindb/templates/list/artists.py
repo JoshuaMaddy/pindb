@@ -9,7 +9,12 @@ from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.card import card
 from pindb.templates.components.entity_grid_card import entity_grid_card
 from pindb.templates.components.thumbnail_grid import thumbnail_grid
-from pindb.templates.list.base import DEFAULT_PER_PAGE, base_list, entity_list_section
+from pindb.templates.list.base import (
+    DEFAULT_PER_PAGE,
+    base_list,
+    entity_list_section,
+    list_search_input,
+)
 
 
 def _grid_items(
@@ -56,6 +61,7 @@ def artists_list_section(
     page: int,
     total_count: int,
     base_url: str,
+    q: str = "",
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     items: list[Element] = (
@@ -63,6 +69,7 @@ def artists_list_section(
         if view == EntityListView.grid
         else _detailed_items(request=request, artists=artists)
     )
+    extra: dict[str, str] | None = {"q": q} if q else None
     return entity_list_section(
         items=items,
         page=page,
@@ -70,6 +77,7 @@ def artists_list_section(
         base_url=base_url,
         view=view,
         per_page=per_page,
+        extra_params=extra,
     )
 
 
@@ -80,12 +88,18 @@ def artists_list(
     page: int,
     total_count: int,
     base_url: str,
+    q: str = "",
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     return base_list(
         title="Artists",
         icon="palette",
         request=request,
+        search_controls=list_search_input(
+            base_url=base_url,
+            q=q,
+            placeholder="Search artists…",
+        ),
         section=artists_list_section(
             request=request,
             artists=artists,
@@ -93,6 +107,7 @@ def artists_list(
             page=page,
             total_count=total_count,
             base_url=base_url,
+            q=q,
             per_page=per_page,
         ),
         bread_crumb=bread_crumb(

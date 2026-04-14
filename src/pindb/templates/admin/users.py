@@ -121,7 +121,7 @@ def _user_row_template() -> Element:
             div(class_="flex gap-2 flex-wrap")[
                 form(method="post", **{":action": admin_action_url})[
                     button(
-                        type_="submit",
+                        type="submit",
                         **{
                             ":class": admin_btn_class,
                             ":disabled": is_self,
@@ -134,7 +134,7 @@ def _user_row_template() -> Element:
                     **{":action": editor_action_url, "x-show": "!row.is_admin"},
                 )[
                     button(
-                        type_="submit",
+                        type="submit",
                         **{
                             ":class": editor_btn_class,
                             "x-text": editor_btn_text,

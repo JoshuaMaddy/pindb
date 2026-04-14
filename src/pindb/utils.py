@@ -56,15 +56,21 @@ CURRENCY_DEFAULT_LOCALE: dict[str, str] = {
 }
 
 
-def format_currency_code(amount: float, code: str, locale: str | None = None) -> str:
+def format_currency_code(
+    amount: float | None, code: str, locale: str | None = None
+) -> str:
     """
     Format a number as a currency value based on ISO currency code.
 
-    - `amount`:    Number to format.
-    - `code`:      ISO currency code like "USD", "EUR", "JPY".
+    - `amount`:    Number to format. None returns "Unknown".
+    - `code`:      ISO currency code like "USD", "EUR", "JPY". "UNK" returns "Unknown".
     - `locale`:    Override locale (optional). If None, a default is chosen automatically.
     """
+    if amount is None:
+        return "Unknown"
     code: str = code.upper().strip()
+    if code == "UNK":
+        return "Unknown"
 
     if locale is None:
         locale: str = CURRENCY_DEFAULT_LOCALE.get(code, "en_US")

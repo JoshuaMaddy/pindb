@@ -14,11 +14,6 @@ def list_index(request: Request) -> Fragment:
             icon="store",
         ),
         card(
-            href=request.url_for("get_list_materials"),
-            content="Materials",
-            icon="anvil",
-        ),
-        card(
             href=request.url_for("get_list_tags"),
             content="Tags",
             icon="tag",

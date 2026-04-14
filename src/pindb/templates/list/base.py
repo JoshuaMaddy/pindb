@@ -1,5 +1,5 @@
 from fastapi import Request
-from htpy import Element, div, hr, span
+from htpy import Element, VoidElement, div, hr, input, span
 
 from pindb.models.list_view import EntityListView
 from pindb.templates.base import html_base
@@ -12,6 +12,33 @@ SECTION_ID: str = "entity-list-section"
 DEFAULT_PER_PAGE: int = 100
 
 
+def list_search_input(
+    base_url: str,
+    q: str = "",
+    placeholder: str = "Search…",
+) -> VoidElement:
+    """HTMX search input that replaces #entity-list-section on typing (500ms debounce).
+
+    Uses hx-include to pull the current view and category hidden inputs from
+    inside the section, so those values survive across searches.
+    """
+    return input(
+        type="search",
+        name="q",
+        value=q,
+        placeholder=placeholder,
+        hx_get=base_url,
+        hx_trigger="input changed delay:500ms, search",
+        hx_target=f"#{SECTION_ID}",
+        hx_swap="outerHTML",
+        hx_replace_url="true",
+        hx_include=f"#{SECTION_ID} [name='view'], #{SECTION_ID} [name='category']",
+        class_=(
+            "bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1.5 text-pin-base-text w-full"
+        ),
+    )
+
+
 def entity_list_section(
     items: list[Element],
     page: int,
@@ -19,6 +46,8 @@ def entity_list_section(
     base_url: str,
     view: EntityListView,
     per_page: int = DEFAULT_PER_PAGE,
+    extra_params: dict[str, str] | None = None,
+    extra_hidden: list[Element | VoidElement] | None = None,
 ) -> Element:
     if view == EntityListView.grid:
         content: Element = div(
@@ -27,12 +56,21 @@ def entity_list_section(
     else:
         content = div(class_="flex flex-col gap-2")[*items]
 
+    pagination_extra: dict[str, str] = {"view": view.value}
+    if extra_params:
+        pagination_extra.update(extra_params)
+
     return div(id=SECTION_ID)[
+        # Hidden view input — picked up by search input via hx-include
+        input(type="hidden", name="view", value=view.value),
+        # Any additional hidden inputs (e.g. category for tags)
+        *(extra_hidden or []),
         div(class_="flex items-center justify-between mb-4")[
             view_toggle(
                 base_url=base_url,
                 current_view=view,
                 section_id=SECTION_ID,
+                extra_params=extra_params,
             ),
             span(class_="text-sm text-pin-base-300")[f"{total_count} items"],
         ],
@@ -43,7 +81,7 @@ def entity_list_section(
             total_count=total_count,
             section_id=SECTION_ID,
             per_page=per_page,
-            extra_params={"view": view.value},
+            extra_params=pagination_extra,
         ),
     ]
 
@@ -54,6 +92,7 @@ def base_list(
     section: Element,
     bread_crumb: Element | None = None,
     request: Request | None = None,
+    search_controls: Element | VoidElement | None = None,
 ) -> Element:
     return html_base(
         title=title,
@@ -67,6 +106,7 @@ def base_list(
                     full_width=True,
                 ),
                 hr,
+                search_controls,
                 section,
             ],
             flex=True,

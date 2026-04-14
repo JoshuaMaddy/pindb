@@ -22,13 +22,13 @@ def confirm_modal(
     # Build the confirm button inside the modal
     confirm_btn_base_class = (
         "flex items-center gap-1 px-2 py-1 rounded border border-red-400 "
-        "bg-transparent cursor-pointer text-red-400 hover:bg-red-950/30"
+        "bg-transparent cursor-pointer text-red-200 hover:bg-red-950/30"
     )
 
     if form_action is not None:
         confirm_btn: Element = form(method="post", action=form_action)[
             button(
-                type_="submit",
+                type="submit",
                 class_=confirm_btn_base_class,
             )[confirm_label]
         ]
@@ -41,7 +41,7 @@ def confirm_modal(
             htmx_attrs["hx_target"] = hx_target
         htmx_attrs["hx_swap"] = hx_swap
         confirm_btn: Element = button(
-            type_="button",
+            type="button",
             class_=confirm_btn_base_class,
             **htmx_attrs,
         )[confirm_label]
@@ -66,7 +66,7 @@ def confirm_modal(
         )[
             # X close button
             button(
-                type_="button",
+                type="button",
                 class_=(
                     "absolute top-3 right-3 flex items-center justify-center "
                     "w-6 h-6 rounded border-0 bg-transparent cursor-pointer "
@@ -77,7 +77,7 @@ def confirm_modal(
             p(class_="text-base")[message],
             div(class_="flex gap-2 justify-end")[
                 button(
-                    type_="button",
+                    type="button",
                     class_=cancel_class,
                     **{"@click": "open = false"},
                 )["Cancel"],
@@ -87,10 +87,10 @@ def confirm_modal(
     ]
 
     return div(
-        class_="relative",
+        class_="inline-flex items-center self-center",
         x_data="{ open: false }",
     )[
         # Trigger — clicking it opens the modal
-        div(**{"@click": "open = true"})[trigger],
+        div(class_="inline-flex items-center", **{"@click": "open = true"})[trigger],
         modal_overlay,
     ]

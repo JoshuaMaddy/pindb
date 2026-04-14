@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from pindb.database import Shop, session_maker
 from pindb.models.list_view import EntityListView
+from pindb.search.search import search_shops
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 from pindb.templates.list.shops import shops_list, shops_list_section
 
@@ -19,18 +20,29 @@ def get_list_shops(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
+    q: str = Query(default=""),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        total_count: int = session.scalar(select(func.count(Shop.id))) or 0
-        shops: Sequence[Shop] = session.scalars(
-            select(Shop)
-            .options(selectinload(Shop.pins))
-            .order_by(Shop.name.asc())
-            .limit(DEFAULT_PER_PAGE)
-            .offset((page - 1) * DEFAULT_PER_PAGE)
-        ).all()
+    offset: int = (page - 1) * DEFAULT_PER_PAGE
+    base_url: str = str(request.url_for("get_list_shops"))
 
-        base_url: str = str(request.url_for("get_list_shops"))
+    with session_maker() as session:
+        if q:
+            shops_result, total_count = search_shops(
+                query=q,
+                session=session,
+                offset=offset,
+                limit=DEFAULT_PER_PAGE,
+            )
+            shops: Sequence[Shop] = shops_result
+        else:
+            total_count = session.scalar(select(func.count(Shop.id))) or 0
+            shops = session.scalars(
+                select(Shop)
+                .options(selectinload(Shop.pins))
+                .order_by(Shop.name.asc())
+                .limit(DEFAULT_PER_PAGE)
+                .offset(offset)
+            ).all()
 
         if request.headers.get("HX-Request"):
             return HTMLResponse(
@@ -41,6 +53,7 @@ def get_list_shops(
                     page=page,
                     total_count=total_count,
                     base_url=base_url,
+                    q=q,
                 )
             )
         return HTMLResponse(
@@ -51,5 +64,6 @@ def get_list_shops(
                 page=page,
                 total_count=total_count,
                 base_url=base_url,
+                q=q,
             )
         )

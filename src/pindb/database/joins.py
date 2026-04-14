@@ -2,13 +2,6 @@ from sqlalchemy import Column, ForeignKey, Integer, Table
 
 from pindb.database.base import Base
 
-pins_materials = Table(
-    "pins_materials",
-    Base.metadata,
-    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
-    Column("material_id", Integer, ForeignKey("materials.id"), primary_key=True),
-)
-
 pins_shops = Table(
     "pins_shops",
     Base.metadata,
@@ -85,4 +78,11 @@ user_favorite_pin_sets = Table(
     Base.metadata,
     Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
     Column("pin_set_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
+)
+
+tag_implications = Table(
+    "tag_implications",
+    Base.metadata,
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+    Column("implied_tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
 )

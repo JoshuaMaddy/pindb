@@ -12,7 +12,6 @@ from htpy import (
     div,
     form,
     fragment,
-    h1,
     h2,
     hr,
     i,
@@ -20,18 +19,21 @@ from htpy import (
     label,
     option,
     p,
+    script,
     select,
-    textarea,
+    span,
 )
 from markupsafe import Markup
 
-from pindb.database import Artist, Material, Shop, Tag
+from pindb.database import Artist, Shop, Tag
 from pindb.database.currency import Currency
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
+from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.page_heading import page_heading
 
 DIMENSION_PATTERN = r".*?(\d*\.?\d*)\s*(([Ii]nch(?:es)?)|(in)|(IN)|([Cc]entimeters?)|(cm)|(CM)|([Mm]illimeters?)|(mm)|(MM))"
 
@@ -45,12 +47,12 @@ with open(
 
 def pin_form(
     post_url: URL | str,
-    materials: Sequence[Material],
     currencies: Sequence[Currency],
     shops: Sequence[Shop],
     tags: Sequence[Tag],
     pin_sets: Sequence[PinSet],
     artists: Sequence[Artist],
+    options_base_url: str,
     request: Request,
     pin: Pin | None = None,
 ) -> Element:
@@ -58,7 +60,15 @@ def pin_form(
         title="Create Pin" if not pin else "Edit Pin",
         body_content=centered_div(
             content=[
-                h1["Create a Pin" if not pin else "Edit a Pin"],
+                script[
+                    Markup(
+                        f"window.PIN_FORM_REF = {json.dumps({'optionsBaseUrl': options_base_url})};"
+                    )
+                ],
+                page_heading(
+                    icon="circle-star" if not pin else "pencil",
+                    text="Create a Pin" if not pin else "Edit a Pin",
+                ),
                 _pending_notice(request=request, pin=pin),
                 hr,
                 form(
@@ -73,12 +83,12 @@ def pin_form(
                     ],
                     div(class_="grid grid-cols-[max-content_1fr] gap-2")[
                         __required_fields(
-                            materials=materials,
                             shops=shops,
                             tags=tags,
                             artists=artists,
                             pin=pin,
                             currencies=currencies,
+                            request=request,
                         ),
                         hr(class_="col-span-2"),
                         __optional_fields(pin=pin, pin_sets=pin_sets),
@@ -114,11 +124,11 @@ def _pending_notice(request: Request, pin: Pin | None) -> Element | str:
 
 
 def __required_fields(
-    materials: Sequence[Material],
     shops: Sequence[Shop],
     tags: Sequence[Tag],
     artists: Sequence[Artist],
     currencies: Sequence[Currency],
+    request: Request,
     pin: Pin | None = None,
 ) -> Fragment:
     return fragment[
@@ -127,8 +137,7 @@ def __required_fields(
         __shops_input(pin=pin, shops=shops),
         __acquisition_input(pin=pin),
         __grades_input(currencies=currencies, pin=pin),
-        __material_ids_input(pin=pin, materials=materials),
-        __tag_ids_input(pin=pin, tags=tags),
+        __tag_ids_input(pin=pin, tags=tags, request=request),
         __artist_ids_input(pin=pin, artists=artists),
     ]
 
@@ -165,7 +174,11 @@ def __front_image_input(pin: Pin | None) -> list[Element | VoidElement]:
             style=f"background-image: url(/get/image/{pin.front_image_guid})"
             if pin
             else False,
-        )["Front Image" if not pin else ""],
+        )[
+            fragment["Front Image", span(class_="text-red-200 ml-0.5")["*"]]
+            if not pin
+            else ""
+        ],
         input(
             type="file",
             id="front_image",
@@ -208,11 +221,12 @@ def __back_image_input(pin: Pin | None) -> list[Element | VoidElement]:
 
 def __name_input(pin: Pin | None) -> list[Element | VoidElement]:
     return [
-        label(for_="name")["Name"],
+        label(for_="name")["Name", span(class_="text-red-200 ml-0.5")["*"]],
         input(
             name="name",
             id="name",
             type="text",
+            required=True,
             value=pin.name if pin else "",
         ),
     ]
@@ -223,17 +237,18 @@ def __shops_input(
     pin: Pin | None,
 ) -> list[Element | VoidElement]:
     return [
-        label(for_="shop_ids")["Shops"],
+        label(for_="shop_ids")["Shops", span(class_="text-red-200 ml-0.5")["*"]],
         select(
             name="shop_ids",
             id="shop_ids",
             required=True,
             multiple=True,
             class_="multi-select",
+            data_entity_type="shop",
         )[
             [
                 option(
-                    value=shop.id,
+                    value=str(shop.id),
                     selected=shop in pin.shops if pin else False,
                 )["(P) " + shop.name if shop.is_pending else shop.name]
                 for shop in shops
@@ -244,7 +259,9 @@ def __shops_input(
 
 def __acquisition_input(pin: Pin | None) -> list[Element | VoidElement]:
     return [
-        label(for_="acquisition_type")["Acquisition"],
+        label(for_="acquisition_type")[
+            "Acquisition", span(class_="text-red-200 ml-0.5")["*"]
+        ],
         select(
             name="acquisition_type",
             id="acquisition_type",
@@ -270,26 +287,30 @@ def __grades_input(
     grades_data: list[dict[str, str]] = []
     if pin and pin.grades:
         grades_data = [
-            {"name": str(grade.name), "price": str(grade.price)} for grade in pin.grades
+            {
+                "name": str(grade.name),
+                "price": "" if grade.price is None else str(grade.price),
+            }
+            for grade in pin.grades
         ]
 
-    # Ensure at least one empty grade
+    # Ensure at least one default grade
     if not grades_data:
-        grades_data = [{"name": "", "price": ""}]
+        grades_data = [{"name": "Normal", "price": ""}]
 
     # Default currency
-    default_currency_id = pin.currency_id if pin else 840
+    default_currency_id = pin.currency_id if pin else 999
 
     grades_json = json.dumps(grades_data)
 
     return [
-        label(for_="grade")["Grade"],
+        label(for_="grade")["Grade", span(class_="text-red-200 ml-0.5")["*"]],
         Markup(f"""<div class="flex w-full gap-2">
             <div class="flex flex-col gap-2 grow" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
                 <template x-for="(grade, index) in grades" :key="index">
                     <div class="gap-2 flex">
                         <input class="grow" type="text" name="grade_names" x-model="grades[index].name" required autocomplete="off" placeholder="Grade">
-                        <input class="w-25" type="number" name="grade_prices" x-model="grades[index].price" required autocomplete="off" step="0.01" min="0" placeholder="Price">
+                        <input class="w-25" type="number" name="grade_prices" x-model="grades[index].price" autocomplete="off" step="0.01" min="0" placeholder="Unknown">
                         <button type="button" @click="grades.splice(index, 1)" x-show="grades.length > 1" class="remove-grade-button">Remove</button>
                     </div>
                 </template>
@@ -312,51 +333,35 @@ def __grades_input(
     ]
 
 
-def __material_ids_input(
-    pin: Pin | None,
-    materials: Sequence[Material],
-) -> list[Element | VoidElement]:
-    return [
-        label(for_="material_ids")["Materials"],
-        select(
-            name="material_ids",
-            id="material_ids",
-            required=True,
-            multiple=True,
-            class_="multi-select",
-        )[
-            [
-                option(
-                    value=material.id,
-                    selected=material in pin.materials if pin else False,
-                )["(P) " + material.name if material.is_pending else material.name]
-                for material in materials
-            ]
-        ],
-    ]
-
-
 def __tag_ids_input(
     pin: Pin | None,
     tags: Sequence[Tag],
+    request: Request,
 ) -> list[Element | VoidElement]:
+    preview_url = str(request.url_for("get_tag_implication_preview"))
     return [
-        label(for_="tag_ids")["Tags"],
+        label(for_="tag_ids")["Tags", span(class_="text-red-200 ml-0.5")["*"]],
         select(
             name="tag_ids",
             id="tag_ids",
             required=True,
             multiple=True,
             class_="multi-select",
+            data_entity_type="tag",
+            hx_get=preview_url,
+            hx_trigger="load, change",
+            hx_include="[name='tag_ids']",
+            hx_target="#implication-preview",
         )[
             [
                 option(
-                    value=tag.id,
+                    value=str(tag.id),
                     selected=tag in pin.tags if pin else False,
                 )["(P) " + tag.name if tag.is_pending else tag.name]
                 for tag in tags
             ]
         ],
+        div(id="implication-preview", class_="col-span-2"),
     ]
 
 
@@ -371,10 +376,11 @@ def __artist_ids_input(
             id="artist_ids",
             multiple=True,
             class_="multi-select",
+            data_entity_type="artist",
         )[
             [
                 option(
-                    value=artist.id,
+                    value=str(artist.id),
                     selected=artist in pin.artists if pin else False,
                 )["(P) " + artist.name if artist.is_pending else artist.name]
                 for artist in artists
@@ -394,10 +400,11 @@ def __pin_sets_ids_input(
             id="pin_sets_ids",
             multiple=True,
             class_="multi-select",
+            data_entity_type="pin_set",
         )[
             [
                 option(
-                    value=pin_set.id,
+                    value=str(pin_set.id),
                     selected=pin_set in pin.sets if pin else False,
                 )["(P) " + pin_set.name if pin_set.is_pending else pin_set.name]
                 for pin_set in pin_sets
@@ -568,12 +575,12 @@ def __links_input(pin: Pin | None) -> Element | Markup:
 
 def __description_input(pin: Pin | None) -> list[Element | VoidElement]:
     return [
-        label(for_="description", class_="col-span-2")["Description"],
-        textarea(
-            name="description",
-            id="description",
-            type="text",
-            class_="col-span-2",
-            value=pin.description if pin else "",
-        ),
+        label(for_="md-editor-description", class_="col-span-2")["Description"],
+        div(class_="col-span-2")[
+            markdown_editor(
+                field_id="description",
+                name="description",
+                value=pin.description if pin else None,
+            )
+        ],
     ]

@@ -13,6 +13,7 @@ from pindb.templates.components.description_block import description_block
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.paginated_pin_grid import paginated_pin_grid
+from pindb.templates.components.pending_edit_banner import pending_edit_banner
 
 
 def artist_page(
@@ -22,8 +23,12 @@ def artist_page(
     total_count: int,
     page: int,
     per_page: int,
+    has_pending_chain: bool = False,
+    viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
+    canonical_url = str(request.url_for("get_artist", id=artist.id))
+    pending_url = canonical_url + "?version=pending"
     return html_base(
         title=artist.name,
         request=request,
@@ -36,33 +41,37 @@ def artist_page(
                         ("(P) " + artist.name) if artist.is_pending else artist.name,
                     ]
                 ),
+                has_pending_chain
+                and pending_edit_banner(
+                    viewing_pending=viewing_pending,
+                    canonical_url=canonical_url,
+                    pending_url=pending_url,
+                ),
                 page_heading(
                     icon="palette",
                     text=("(P) " + artist.name) if artist.is_pending else artist.name,
                     full_width=True,
                     extras=fragment[
                         user
+                        and (user.is_admin or user.is_editor)
+                        and icon_button(
+                            icon="pen",
+                            title="Edit artist",
+                            href=str(request.url_for("get_edit_artist", id=artist.id)),
+                        ),
+                        user
                         and user.is_admin
-                        and fragment[
-                            icon_button(
-                                icon="pen",
-                                title="Edit artist",
-                                href=str(
-                                    request.url_for("get_edit_artist", id=artist.id)
-                                ),
+                        and confirm_modal(
+                            trigger=icon_button(
+                                icon="trash-2",
+                                title="Delete artist",
+                                variant="danger",
                             ),
-                            confirm_modal(
-                                trigger=icon_button(
-                                    icon="trash-2",
-                                    title="Delete artist",
-                                    variant="danger",
-                                ),
-                                message=f'Delete the artist "{artist.name}"?',
-                                form_action=str(
-                                    request.url_for("post_delete_artist", id=artist.id)
-                                ),
+                            message=f'Delete the artist "{artist.name}"?',
+                            form_action=str(
+                                request.url_for("post_delete_artist", id=artist.id)
                             ),
-                        ],
+                        ),
                     ],
                 ),
                 description_block(artist.description),

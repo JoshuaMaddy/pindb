@@ -19,17 +19,12 @@ def create_index(request: Request) -> Element:
                 card(
                     href=request.url_for("get_create_pin"),
                     content="Pin",
-                    icon="square-star",
+                    icon="circle-star",
                 ),
                 card(
                     href=request.url_for("get_create_shop"),
                     content="Shop",
                     icon="store",
-                ),
-                card(
-                    href=request.url_for("get_create_material"),
-                    content="Material",
-                    icon="anvil",
                 ),
                 card(
                     href=request.url_for("get_create_tag"),

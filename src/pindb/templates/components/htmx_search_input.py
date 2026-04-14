@@ -10,7 +10,7 @@ def htmx_search_input(
 ) -> VoidElement:
     """Search input wired to HTMX: GETs *url* on input and replaces *target* with the response."""
     return input(
-        type_="search",
+        type="search",
         name=name,
         placeholder=placeholder,
         hx_get=url,

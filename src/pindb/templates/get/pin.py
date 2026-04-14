@@ -1,6 +1,7 @@
 from fastapi import Request
 from htpy import (
     Element,
+    Fragment,
     a,
     div,
     fragment,
@@ -22,12 +23,19 @@ from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
 from pindb.templates.components.back_link import back_link
 from pindb.templates.components.confirm_modal import confirm_modal
+from pindb.templates.components.description_block import description_block
 from pindb.templates.components.dropdown_panel import dropdown_panel
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.icon_list_element import icon_list_item
 from pindb.templates.components.linked_items_row import linked_items_row
 from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.pending_edit_banner import pending_edit_banner
 from pindb.templates.components.pill_link import pill_link
+from pindb.templates.components.tag_branding import (
+    CATEGORY_COLORS,
+    CATEGORY_HOVER_CLASSES,
+    CATEGORY_ICONS,
+)
 from pindb.templates.components.toggle_button import toggle_button
 from pindb.utils import domain_from_url, format_currency_code
 
@@ -39,8 +47,12 @@ def pin_page(
     user_sets: list[PinSet] | None = None,
     owned_entries: list[UserOwnedPin] | None = None,
     wanted_entries: list[UserWantedPin] | None = None,
+    has_pending_chain: bool = False,
+    viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
+    canonical_url = str(request.url_for("get_pin", id=pin.id))
+    pending_url = canonical_url + "?version=pending"
     return html_base(
         title=pin.name,
         request=request,
@@ -50,33 +62,37 @@ def pin_page(
             )[
                 div(class_="min-md:col-span-2")[
                     back_link(),
+                    has_pending_chain
+                    and pending_edit_banner(
+                        viewing_pending=viewing_pending,
+                        canonical_url=canonical_url,
+                        pending_url=pending_url,
+                    ),
                     page_heading(
                         icon="circle-star",
                         text=("(P) " + pin.name) if pin.is_pending else pin.name,
                         full_width=True,
                         extras=fragment[
                             user
+                            and (user.is_admin or user.is_editor)
+                            and icon_button(
+                                icon="pen",
+                                title="Edit pin",
+                                href=str(request.url_for("get_edit_pin", id=pin.id)),
+                            ),
+                            user
                             and user.is_admin
-                            and fragment[
-                                icon_button(
-                                    icon="pen",
-                                    title="Edit pin",
-                                    href=str(
-                                        request.url_for("get_edit_pin", id=pin.id)
-                                    ),
+                            and confirm_modal(
+                                trigger=icon_button(
+                                    icon="trash-2",
+                                    title="Delete pin",
+                                    variant="danger",
                                 ),
-                                confirm_modal(
-                                    trigger=icon_button(
-                                        icon="trash-2",
-                                        title="Delete pin",
-                                        variant="danger",
-                                    ),
-                                    message=f'Delete the pin "{pin.name}"? This will delete the pin!',
-                                    form_action=str(
-                                        request.url_for("post_delete_pin", id=pin.id)
-                                    ),
+                                message=f'Delete the pin "{pin.name}"? This will delete the pin!',
+                                form_action=str(
+                                    request.url_for("post_delete_pin", id=pin.id)
                                 ),
-                            ],
+                            ),
                         ],
                     ),
                 ],
@@ -128,15 +144,13 @@ def __pin_details(
         ),
         h2["Details"],
         div(class_="flex flex-col gap-2")[
+            __description(pin=pin),
             __shops(pin=pin, request=request),
             __artists(pin=pin, request=request),
             __links(pin=pin),
             __acquisition(pin=pin),
             __grades(pin=pin),
             __pin_sets(pin=pin, request=request, user_sets=user_sets),
-            __tags(pin=pin, request=request),
-            __materials(pin=pin, request=request),
-            __description(pin=pin),
             __posts(pin=pin),
             __height(pin=pin),
             __width(pin=pin),
@@ -145,6 +159,7 @@ def __pin_details(
             __limited_edition(pin=pin),
             __number_produced(pin=pin),
             __funding(pin=pin),
+            __tags(pin=pin, request=request),
         ],
     ]
 
@@ -236,7 +251,7 @@ def __add_to_set_panel(
         trigger=div(
             class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text"
         )[
-            i(data_lucide="folder-plus", class_="inline-block"),
+            i(data_lucide="layout-grid", class_="inline-block"),
             "Add to Set",
         ],
         content=fragment[
@@ -328,19 +343,23 @@ def __grades(pin: Pin) -> Element | None:
             i(data_lucide="banknote", class_="inline-block pr-2"),
             "Grades",
         ],
-        table(class_="border-collapse")[
-            tbody[
-                [
-                    tr[
-                        td(class_="pr-2 border-r border-pin-base-400")[grade.name],
-                        td(class_="pl-2")[
-                            format_currency_code(
-                                amount=grade.price, code=pin.currency.code
-                            )
-                        ],
+        div(class_="ml-4 border border-pin-base-400 w-min")[
+            table(class_="border-collapse")[
+                tbody[
+                    [
+                        tr[
+                            td(class_="px-2 border-r border-pin-base-400")[grade.name],
+                            td(class_="px-2")[
+                                format_currency_code(
+                                    amount=grade.price, code=pin.currency.code
+                                )
+                            ],
+                        ]
+                        for grade in sorted(
+                            pin.grades, key=lambda grade: grade.price, reverse=True
+                        )
                     ]
-                    for grade in sorted(pin.grades, key=lambda grade: grade.name)
-                ]
+                ],
             ],
         ],
     ]
@@ -381,38 +400,21 @@ def __tags(
             pill_link(
                 href=str(request.url_for("get_tag", id=tag.id)),
                 text=("(P) " + tag.name) if tag.is_pending else tag.name,
+                icon=CATEGORY_ICONS.get(tag.category, "tag"),
+                color_classes=CATEGORY_COLORS.get(
+                    tag.category, "bg-pin-base-500 text-pin-base-text"
+                ),
+                hover_classes=CATEGORY_HOVER_CLASSES.get(
+                    tag.category, "hover:border-accent hover:text-accent"
+                ),
             )
-            for tag in sorted(pin.tags, key=lambda tag: tag.name)
+            for tag in sorted(pin.tags, key=lambda tag: (tag.category, tag.name))
         ],
     )
 
 
-def __materials(
-    pin: Pin,
-    request: Request,
-) -> Element:
-    return linked_items_row(
-        icon="anvil",
-        label="Materials",
-        items=[
-            pill_link(
-                href=str(request.url_for("get_material", id=material.id)),
-                text=("(P) " + material.name.title())
-                if material.is_pending
-                else material.name.title(),
-            )
-            for material in sorted(pin.materials, key=lambda material: material.name)
-        ],
-    )
-
-
-def __description(pin: Pin) -> Element | None:
-    if pin.description is None:
-        return
-    return div(class_="flex flex-wrap gap-2 items-baseline")[
-        p(class_="text-lg font-semibold")["Description"],
-        pin.description,
-    ]
+def __description(pin: Pin) -> Fragment:
+    return description_block(pin.description)
 
 
 def __posts(pin: Pin) -> Element:

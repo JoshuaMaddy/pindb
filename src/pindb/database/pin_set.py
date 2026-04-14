@@ -67,6 +67,15 @@ class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
         return value.id == self.id
 
+    def document(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "owner_id": self.owner_id,
+            "is_pending": self.is_pending,
+        }
+
     def __rich_repr__(self) -> Result:
         try:
             yield "id", self.id

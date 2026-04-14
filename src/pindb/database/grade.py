@@ -14,7 +14,7 @@ class Grade(AuditMixin, MappedAsDataclass, Base):
 
     # Required Attributes
     name: Mapped[str]
-    price: Mapped[float]
+    price: Mapped[float | None] = mapped_column(default=None)
 
     def __hash__(self) -> int:
         return hash(self.name + str(self.id))

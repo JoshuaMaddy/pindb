@@ -174,7 +174,7 @@ document.addEventListener('alpine:init', function () {{
 
 def _search_input() -> VoidElement:
     return input(
-        type_="search",
+        type="search",
         placeholder="Search…",
         **{"x-model": "search", "@input": "page = 1"},
         class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text max-w-sm",

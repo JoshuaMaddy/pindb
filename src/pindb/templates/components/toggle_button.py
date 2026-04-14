@@ -11,7 +11,7 @@ def toggle_button(
 ) -> Element:
     """Button that POSTs to *url* when inactive and DELETEs when active, swapping *target_id*."""
     return button(
-        type_="button",
+        type="button",
         hx_post=None if is_active else url,
         hx_delete=url if is_active else None,
         hx_target=f"#{target_id}",

@@ -1,15 +1,21 @@
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div, p, span
+from htpy import Element, div, input, option, p, select, span
 
-from pindb.database.tag import Tag
+from pindb.database.tag import Tag, TagCategory
 from pindb.models.list_view import EntityListView
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.card import card
 from pindb.templates.components.entity_grid_card import entity_grid_card
 from pindb.templates.components.thumbnail_grid import thumbnail_grid
-from pindb.templates.list.base import DEFAULT_PER_PAGE, base_list, entity_list_section
+from pindb.templates.get.tag import category_badge
+from pindb.templates.list.base import (
+    DEFAULT_PER_PAGE,
+    base_list,
+    entity_list_section,
+    list_search_input,
+)
 
 
 def _grid_items(
@@ -22,6 +28,7 @@ def _grid_items(
             href=str(request.url_for("get_tag", id=tag.id)),
             pins=tag.pins,
             name=("(P) " + tag.name) if tag.is_pending else tag.name,
+            badge=category_badge(tag.category),
         )
         for tag in tags
     ]
@@ -34,15 +41,54 @@ def _detailed_items(
     return [
         card(
             href=request.url_for("get_tag", id=tag.id),
-            content=div(class_="flex gap-2 w-full")[
+            content=div(class_="flex gap-2 w-full items-start")[
                 thumbnail_grid(request=request, pins=tag.pins),
-                p(class_="text-lg")[
-                    ("(P) " + tag.name) if tag.is_pending else tag.name,
-                    span(class_="text-pin-base-300 ml-1")[f"({len(tag.pins)})"],
+                div(class_="flex gap-2")[
+                    p(class_="text-lg")[
+                        ("(P) " + tag.name) if tag.is_pending else tag.name,
+                        span(class_="text-pin-base-300 ml-1")[f"({len(tag.pins)})"],
+                    ],
+                    category_badge(tag.category),
                 ],
             ],
         )
         for tag in tags
+    ]
+
+
+def _category_select(base_url: str, category: TagCategory | None) -> Element:
+    """Category dropdown — fires section swap on change, preserves current view and q."""
+    from pindb.templates.list.base import SECTION_ID
+
+    return select(
+        name="category",
+        hx_get=base_url,
+        hx_trigger="change",
+        hx_target=f"#{SECTION_ID}",
+        hx_swap="outerHTML",
+        hx_replace_url="true",
+        hx_include=f"#{SECTION_ID} [name='view'], [name='q']",
+        class_=(
+            "bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1.5 "
+            "text-pin-base-text text-sm"
+        ),
+    )[
+        option(value="", selected=(category is None))["All categories"],
+        *[
+            option(value=cat.value, selected=(category == cat))[cat.value.capitalize()]
+            for cat in TagCategory
+        ],
+    ]
+
+
+def _tag_search_controls(
+    base_url: str,
+    q: str,
+    category: TagCategory | None,
+) -> Element:
+    return div(class_="flex gap-2 items-center")[
+        list_search_input(base_url=base_url, q=q, placeholder="Search tags…"),
+        _category_select(base_url=base_url, category=category),
     ]
 
 
@@ -53,6 +99,8 @@ def tags_list_section(
     page: int,
     total_count: int,
     base_url: str,
+    q: str = "",
+    category: TagCategory | None = None,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     items: list[Element] = (
@@ -60,6 +108,12 @@ def tags_list_section(
         if view == EntityListView.grid
         else _detailed_items(request=request, tags=tags)
     )
+    extra: dict[str, str] = {}
+    if q:
+        extra["q"] = q
+    if category:
+        extra["category"] = category.value
+
     return entity_list_section(
         items=items,
         page=page,
@@ -67,6 +121,14 @@ def tags_list_section(
         base_url=base_url,
         view=view,
         per_page=per_page,
+        extra_params=extra or None,
+        extra_hidden=[
+            input(
+                type="hidden",
+                name="category",
+                value=category.value if category else "",
+            )
+        ],
     )
 
 
@@ -77,12 +139,19 @@ def tags_list(
     page: int,
     total_count: int,
     base_url: str,
+    q: str = "",
+    category: TagCategory | None = None,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     return base_list(
         title="Tags",
         icon="tag",
         request=request,
+        search_controls=_tag_search_controls(
+            base_url=base_url,
+            q=q,
+            category=category,
+        ),
         section=tags_list_section(
             request=request,
             tags=tags,
@@ -90,6 +159,8 @@ def tags_list(
             page=page,
             total_count=total_count,
             base_url=base_url,
+            q=q,
+            category=category,
             per_page=per_page,
         ),
         bread_crumb=bread_crumb(

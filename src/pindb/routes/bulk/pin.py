@@ -1,33 +1,37 @@
+import logging
 from datetime import date
 from typing import Sequence, TypeVar
 from uuid import UUID
 
-from fastapi import Form, Request, UploadFile
+from fastapi import Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+LOGGER = logging.getLogger("pindb.routes.bulk.pin")
+
 from pindb.database import (
     Artist,
-    Material,
     PinSet,
     Shop,
     Tag,
     session_maker,
 )
 from pindb.database.currency import Currency
+from pindb.database.entity_type import EntityType
 from pindb.database.grade import Grade
 from pindb.database.link import Link
 from pindb.database.pin import Pin
+from pindb.database.tag import resolve_implications
 from pindb.file_handler import save_file
 from pindb.model_utils import magnitude_to_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.templates.bulk.pin import bulk_pin_page
 
-_NameOnly = TypeVar("_NameOnly", Artist, Tag, Shop, Material, PinSet)
+_NameOnly = TypeVar("_NameOnly", Artist, Tag, Shop, PinSet)
 
 router = APIRouter()
 
@@ -39,7 +43,7 @@ router = APIRouter()
 
 class GradeInput(BaseModel):
     name: str
-    price: float
+    price: float | None = None
 
 
 class PinRowInput(BaseModel):
@@ -47,9 +51,8 @@ class PinRowInput(BaseModel):
     acquisition_type: AcquisitionType
     front_image_guid: str
     back_image_guid: str | None = None
-    currency_id: int = 840
+    currency_id: int = 999
     shop_names: list[str] = []
-    material_names: list[str] = []
     tag_names: list[str] = []
     artist_names: list[str] = []
     pin_set_names: list[str] = []
@@ -108,16 +111,26 @@ def _get_or_create(
 # ---------------------------------------------------------------------------
 
 
+@router.get(path="/options/{entity_type}")
+def get_bulk_options(
+    entity_type: EntityType,
+    q: str = Query(default=""),
+) -> JSONResponse:
+    model = entity_type.model
+    with session_maker() as session:
+        rows = session.scalars(
+            statement=select(model).where(model.name.ilike(f"%{q}%")).limit(50)
+        ).all()
+    return JSONResponse(content=[{"value": row.name, "text": row.name} for row in rows])
+
+
 @router.get(path="/pin")
 def get_bulk_pin(request: Request) -> HTMLResponse:
-    with session_maker.begin() as session:
-        shops: Sequence[Shop] = session.scalars(statement=select(Shop)).all()
-        materials: Sequence[Material] = session.scalars(
-            statement=select(Material)
-        ).all()
-        tags: Sequence[Tag] = session.scalars(statement=select(Tag)).all()
-        pin_sets: Sequence[PinSet] = session.scalars(statement=select(PinSet)).all()
-        artists: Sequence[Artist] = session.scalars(statement=select(Artist)).all()
+    options_base_url: str = str(
+        request.url_for("get_bulk_options", entity_type="placeholder")
+    ).removesuffix("/placeholder")
+
+    with session_maker() as session:
         currencies: Sequence[Currency] = session.scalars(
             statement=select(Currency)
         ).all()
@@ -126,11 +139,7 @@ def get_bulk_pin(request: Request) -> HTMLResponse:
             content=bulk_pin_page(
                 upload_image_url=str(request.url_for("post_bulk_image")),
                 submit_url=str(request.url_for("post_bulk_pins")),
-                shops=shops,
-                materials=materials,
-                tags=tags,
-                pin_sets=pin_sets,
-                artists=artists,
+                options_base_url=options_base_url,
                 currencies=currencies,
                 request=request,
             )
@@ -159,16 +168,12 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
                     for name in row.shop_names
                     if name
                 }
-                materials: set[Material] = {
-                    _get_or_create(session=session, model=Material, name=name)
-                    for name in row.material_names
-                    if name
-                }
                 tags: set[Tag] = {
                     _get_or_create(session=session, model=Tag, name=name)
                     for name in row.tag_names
                     if name
                 }
+                resolved_tags = resolve_implications(tags, session)
                 artists: set[Artist] = {
                     _get_or_create(session=session, model=Artist, name=name)
                     for name in row.artist_names
@@ -194,8 +199,7 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
                     else None,
                     currency=currency,
                     shops=shops,
-                    materials=materials,
-                    tags=tags,
+                    tags=resolved_tags,
                     artists=artists,
                     sets=pin_sets,
                     grades=grades,
@@ -226,6 +230,9 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
                     )
                 )
             except Exception as error:
+                LOGGER.error(
+                    "row[%d] %r failed: %s", index, row.name, error, exc_info=True
+                )
                 results.append(
                     PinRowResult(
                         index=index,
@@ -242,5 +249,5 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
             results=results,
             created_count=created,
             failed_count=failed,
-        ).model_dump_json()
+        ).model_dump()
     )

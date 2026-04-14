@@ -8,6 +8,7 @@ from pydantic import BeforeValidator
 from pindb.database import Shop, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
+from pindb.search.update import update_shop
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
@@ -52,6 +53,8 @@ def post_create_shop(
         session.add(instance=shop)
         session.flush()
         shop_id: int = shop.id
+
+    update_shop(shop=shop)
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_shop", id=shop_id))}

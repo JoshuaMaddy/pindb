@@ -93,7 +93,7 @@ def _search_section() -> Element:
             hx_swap="none",
         )[
             button(
-                type_="submit",
+                type="submit",
                 class_="btn btn-primary",
             )[
                 i(data_lucide="refresh-cw", class_="inline-block w-4 h-4 mr-1"),

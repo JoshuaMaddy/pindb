@@ -188,7 +188,7 @@ Alpine can set a `<form>`'s `action` attribute before submission:
 
 ```python
 form(method="post", **{":action": "row.is_admin ? row.demote_url : row.promote_url"})[
-    button(type_="submit", **{"x-text": "row.is_admin ? 'Demote' : 'Promote'"}),
+    button(type="submit", **{"x-text": "row.is_admin ? 'Demote' : 'Promote'"}),
 ]
 ```
 

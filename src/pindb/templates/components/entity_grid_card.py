@@ -2,7 +2,7 @@ from random import sample
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, VoidElement, a, div, img, span
+from htpy import BaseElement, Element, VoidElement, a, div, img, span
 
 from pindb.database.pin import Pin
 
@@ -20,6 +20,7 @@ def entity_grid_card(
     href: str,
     pins: Sequence[Pin] | set[Pin],
     name: str,
+    badge: BaseElement | None = None,
 ) -> Element:
     pin_list: list[Pin] = list(pins)
     pin_count: int = len(pin_list)
@@ -49,8 +50,11 @@ def entity_grid_card(
         div(class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2")[
             *images
         ],
-        div(class_="p-2 text-sm font-medium")[
-            name,
-            span(class_="text-pin-base-300 ml-1")[f"({pin_count})"],
+        div(class_="p-2 text-sm font-medium flex items-center justify-between gap-1")[
+            div[
+                name,
+                span(class_="text-pin-base-300 ml-1")[f"({pin_count})"],
+            ],
+            badge or "",
         ],
     ]

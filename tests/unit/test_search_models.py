@@ -42,7 +42,6 @@ class TestPinSearchResultFromRaw:
                     "id": 7,
                     "name": "Pikachu Pin",
                     "shops": ["Pokemon Center"],
-                    "materials": ["enamel"],
                     "tags": ["pokemon"],
                     "artists": ["some artist"],
                     "description": "A great pin",
@@ -55,15 +54,12 @@ class TestPinSearchResultFromRaw:
         assert hit.id == 7
         assert hit.name == "Pikachu Pin"
         assert hit.shops == ["Pokemon Center"]
-        assert hit.materials == ["enamel"]
         assert hit.tags == ["pokemon"]
         assert hit.artists == ["some artist"]
         assert hit.description == "A great pin"
 
     def test_hit_optional_fields_default(self):
-        raw = self._minimal_raw(
-            hits=[{"id": 1, "name": "Pin", "shops": [], "materials": []}]
-        )
+        raw = self._minimal_raw(hits=[{"id": 1, "name": "Pin", "shops": []}])
         result = PinSearchResult.from_raw(raw)
         hit = result.hits[0]
         assert hit.tags == []

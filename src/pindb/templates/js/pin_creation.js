@@ -52,11 +52,34 @@ window.addEventListener("load", function () {
   // Tom Select Initialization
   // -------------------------------
 
+  const _PIN_FORM_REF = window.PIN_FORM_REF;
+
   document.querySelectorAll("select.multi-select").forEach((el) => {
-    new TomSelect(el, {
-      maxItems: null,
-      plugins: ["caret_position", "remove_button"],
-    });
+    const entityType = el.dataset.entityType;
+    if (entityType && _PIN_FORM_REF) {
+      new TomSelect(el, {
+        preload: true,
+        load: (query, callback) => {
+          fetch(
+            `${_PIN_FORM_REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`
+          )
+            .then((res) => res.json())
+            .then(callback)
+            .catch(() => callback());
+        },
+        maxItems: null,
+        plugins: ["caret_position", "remove_button"],
+        valueField: "value",
+        labelField: "text",
+        searchField: "text",
+        persist: true,
+      });
+    } else {
+      new TomSelect(el, {
+        maxItems: null,
+        plugins: ["caret_position", "remove_button"],
+      });
+    }
   });
 
   document.querySelectorAll("select.single-select").forEach((el) => {

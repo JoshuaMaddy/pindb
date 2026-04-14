@@ -10,7 +10,6 @@ from pindb.audit_events import get_audit_user
 from pindb.auth import require_admin
 from pindb.database import session_maker
 from pindb.database.artist import Artist
-from pindb.database.material import Material
 from pindb.database.pin import Pin
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
@@ -36,21 +35,6 @@ def post_delete_pin(id: int) -> RedirectResponse:
             pin.deleted_by_id = user_id
 
     delete_pin_from_index(pin_id=id)
-    return RedirectResponse(url="/", status_code=303)
-
-
-@router.post(path="/material/{id}")
-def post_delete_material(id: int) -> RedirectResponse:
-    now = _utc_now()
-    user_id = get_audit_user()
-    with session_maker.begin() as session:
-        material: Material | None = session.scalar(
-            statement=select(Material).where(Material.id == id)
-        )
-        if material is not None:
-            material.deleted_at = now
-            material.deleted_by_id = user_id
-
     return RedirectResponse(url="/", status_code=303)
 
 

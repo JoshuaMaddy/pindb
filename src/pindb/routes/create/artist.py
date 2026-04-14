@@ -8,6 +8,7 @@ from pydantic import BeforeValidator
 from pindb.database import Artist, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
+from pindb.search.update import update_artist
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
@@ -52,6 +53,8 @@ def post_create_artist(
         session.add(instance=artist)
         session.flush()
         artist_id: int = artist.id
+
+    update_artist(artist=artist)
 
     return HTMLResponse(
         headers={

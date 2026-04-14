@@ -19,7 +19,6 @@ from htpy import (
 )
 from markupsafe import Markup
 
-from pindb.database import Artist, Material, PinSet, Shop, Tag
 from pindb.database.currency import Currency
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
@@ -35,11 +34,7 @@ with open(
 def bulk_pin_page(
     upload_image_url: str,
     submit_url: str,
-    shops: Sequence[Shop],
-    materials: Sequence[Material],
-    tags: Sequence[Tag],
-    pin_sets: Sequence[PinSet],
-    artists: Sequence[Artist],
+    options_base_url: str,
     currencies: Sequence[Currency],
     request: Request | None = None,
 ) -> Element:
@@ -48,11 +43,7 @@ def bulk_pin_page(
     ] = {
         "uploadImageUrl": upload_image_url,
         "submitUrl": submit_url,
-        "shops": [{"value": s.name, "text": s.name} for s in shops],
-        "materials": [{"value": m.name, "text": m.name} for m in materials],
-        "tags": [{"value": t.name, "text": t.name} for t in tags],
-        "pinSets": [{"value": p.name, "text": p.name} for p in pin_sets],
-        "artists": [{"value": a.name, "text": a.name} for a in artists],
+        "optionsBaseUrl": options_base_url,
         "currencies": [{"value": c.id, "text": c.code} for c in currencies],
         "acquisitionTypes": [
             {"value": a, "text": a.replace("_", " ").title()} for a in AcquisitionType
@@ -60,7 +51,7 @@ def bulk_pin_page(
         "fundingTypes": [
             {"value": f, "text": f.replace("_", " ").title()} for f in FundingType
         ],
-        "defaultCurrencyId": 840,
+        "defaultCurrencyId": 999,
     }
 
     optional_cols: list[tuple[str, str]] = [
@@ -153,10 +144,6 @@ def bulk_pin_page(
                                     class_="bulk-th min-w-[120px]",
                                     data_col_type="currency_id",
                                 )["Currency *"],
-                                th(
-                                    class_="bulk-th min-w-[160px]",
-                                    data_col_type="materials",
-                                )["Materials *"],
                                 th(
                                     class_="bulk-th min-w-[160px]", data_col_type="tags"
                                 )["Tags *"],

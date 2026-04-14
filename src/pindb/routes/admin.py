@@ -6,7 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pindb.auth import AdminUser, require_admin
-from pindb.database import Artist, Material, Pin, PinSet, Shop, Tag, session_maker
+from pindb.database import Artist, Pin, PinSet, Shop, Tag, session_maker
+from pindb.database.pending_edit import PendingEdit
 from pindb.database.user import User
 from pindb.search.update import update_all
 from pindb.templates.admin.index import admin_panel_page
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 def _count_pending(session: Session) -> int:
     opts: dict[str, bool] = {"include_pending": True}
     total = 0
-    for model in [Pin, Shop, Artist, Tag, Material, PinSet]:
+    for model in [Pin, Shop, Artist, Tag, PinSet]:
         count = session.scalar(
             select(func.count())
             .select_from(model)
@@ -30,6 +31,18 @@ def _count_pending(session: Session) -> int:
             .execution_options(**opts)  # type: ignore[arg-type]
         )
         total += count or 0
+
+    edit_group_subq = (
+        select(PendingEdit.entity_type, PendingEdit.entity_id)
+        .where(
+            PendingEdit.approved_at.is_(None),
+            PendingEdit.rejected_at.is_(None),
+        )
+        .distinct()
+        .subquery()
+    )
+    edit_group_count = session.scalar(select(func.count()).select_from(edit_group_subq))
+    total += edit_group_count or 0
     return total
 
 

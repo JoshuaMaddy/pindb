@@ -4,16 +4,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from pindb.config import CONFIGURATION
+from pindb.database.artist import Artist
 from pindb.database.pin import Pin
+from pindb.database.pin_set import PinSet
+from pindb.database.shop import Shop
+from pindb.database.tag import Tag, TagCategory
 
 PIN_INDEX: Index = CONFIGURATION.meili_client.index(uid=CONFIGURATION.meilisearch_index)
+TAGS_INDEX: Index = CONFIGURATION.meili_client.index(uid="tags")
+ARTISTS_INDEX: Index = CONFIGURATION.meili_client.index(uid="artists")
+SHOPS_INDEX: Index = CONFIGURATION.meili_client.index(uid="shops")
+PIN_SETS_INDEX: Index = CONFIGURATION.meili_client.index(uid="pin_sets")
 
 
 class PinSearchHit(BaseModel):
     id: int
     name: str
     shops: list[str]
-    materials: list[str]
     tags: list[str] = []
     artists: list[str] = []
     description: str | None = None
@@ -66,3 +73,118 @@ def search_pin(query: str, session: Session) -> list[Pin] | None:
         ).all()
     }
     return [pins_by_id[pid] for pid in pin_ids if pid in pins_by_id]
+
+
+def _search_index(
+    index: Index,
+    query: str,
+    offset: int = 0,
+    limit: int = 100,
+    filter_str: str | None = None,
+) -> tuple[list[int], int]:
+    """Return (ids in meili result order, estimated_total_hits)."""
+    opt_params: dict[str, object] = {"offset": offset, "limit": limit}
+    if filter_str:
+        opt_params["filter"] = filter_str
+    raw: dict[str, object] = index.search(query=query, opt_params=opt_params)  # type: ignore[assignment]
+    hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
+    total: int = int(raw.get("estimatedTotalHits") or raw.get("totalHits") or len(hits))
+    ids: list[int] = [int(h["id"]) for h in hits]
+    return ids, total
+
+
+def search_tags(
+    query: str,
+    session: Session,
+    category: TagCategory | None = None,
+    offset: int = 0,
+    limit: int = 100,
+) -> tuple[list[Tag], int]:
+    filter_str: str | None = f'category = "{category.value}"' if category else None
+    ids, total = _search_index(TAGS_INDEX, query, offset, limit, filter_str)
+    if not ids:
+        return [], total
+    tags_by_id: dict[int, Tag] = {
+        t.id: t
+        for t in session.scalars(
+            select(Tag).where(Tag.id.in_(ids)).options(selectinload(Tag.pins))
+        ).all()
+    }
+    return [tags_by_id[i] for i in ids if i in tags_by_id], total
+
+
+def search_artists(
+    query: str,
+    session: Session,
+    offset: int = 0,
+    limit: int = 100,
+) -> tuple[list[Artist], int]:
+    ids, total = _search_index(ARTISTS_INDEX, query, offset, limit)
+    if not ids:
+        return [], total
+    artists_by_id: dict[int, Artist] = {
+        a.id: a
+        for a in session.scalars(
+            select(Artist).where(Artist.id.in_(ids)).options(selectinload(Artist.pins))
+        ).all()
+    }
+    return [artists_by_id[i] for i in ids if i in artists_by_id], total
+
+
+def search_shops(
+    query: str,
+    session: Session,
+    offset: int = 0,
+    limit: int = 100,
+) -> tuple[list[Shop], int]:
+    ids, total = _search_index(SHOPS_INDEX, query, offset, limit)
+    if not ids:
+        return [], total
+    shops_by_id: dict[int, Shop] = {
+        s.id: s
+        for s in session.scalars(
+            select(Shop).where(Shop.id.in_(ids)).options(selectinload(Shop.pins))
+        ).all()
+    }
+    return [shops_by_id[i] for i in ids if i in shops_by_id], total
+
+
+def search_pin_sets(
+    query: str,
+    session: Session,
+    offset: int = 0,
+    limit: int = 100,
+) -> tuple[list[PinSet], int]:
+    ids, total = _search_index(PIN_SETS_INDEX, query, offset, limit)
+    if not ids:
+        return [], total
+    pin_sets_by_id: dict[int, PinSet] = {
+        ps.id: ps
+        for ps in session.scalars(
+            select(PinSet).where(PinSet.id.in_(ids)).options(selectinload(PinSet.pins))
+        ).all()
+    }
+    return [pin_sets_by_id[i] for i in ids if i in pin_sets_by_id], total
+
+
+def search_entity_options(
+    index: Index,
+    query: str,
+    limit: int = 50,
+) -> list[dict[str, str]]:
+    """Search an entity index and return Tom Select option dicts.
+
+    Hits come directly from meili (no DB roundtrip). is_pending is stored
+    in the document so the (P) prefix can be applied without a DB query.
+    """
+    raw: dict[str, object] = index.search(query=query, opt_params={"limit": limit})  # type: ignore[assignment]
+    hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
+    return [
+        {
+            "value": str(hit["id"]),
+            "text": ("(P) " + str(hit["name"]))
+            if hit.get("is_pending")
+            else str(hit["name"]),
+        }
+        for hit in hits
+    ]

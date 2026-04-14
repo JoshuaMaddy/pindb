@@ -22,6 +22,29 @@
   --color-pin-border: var(--color-pin-base-400);
   --color-pin-border-hover: var(--color-pin-base-350);
   --color-accent: var(--color-cat-sky);
+
+  /* Tag category badge colors (dark/mocha defaults) */
+  --color-tag-general: hsl(220, 9%, 28%);
+  --color-tag-general-fg: hsl(220, 9%, 74%);
+  --color-tag-general-hover: hsl(220, 20%, 92%);
+  --color-tag-artist: hsl(38, 48%, 24%);
+  --color-tag-artist-fg: hsl(42, 80%, 74%);
+  --color-tag-artist-hover: hsl(42, 90%, 88%);
+  --color-tag-copyright: hsl(355, 48%, 24%);
+  --color-tag-copyright-fg: hsl(355, 70%, 78%);
+  --color-tag-copyright-hover: hsl(355, 85%, 90%);
+  --color-tag-character: hsl(215, 50%, 24%);
+  --color-tag-character-fg: hsl(215, 78%, 78%);
+  --color-tag-character-hover: hsl(215, 90%, 90%);
+  --color-tag-species: hsl(140, 38%, 20%);
+  --color-tag-species-fg: hsl(140, 58%, 68%);
+  --color-tag-species-hover: hsl(140, 70%, 82%);
+  --color-tag-meta: hsl(270, 38%, 26%);
+  --color-tag-meta-fg: hsl(270, 58%, 78%);
+  --color-tag-meta-hover: hsl(270, 70%, 90%);
+  --color-tag-material: hsl(25, 48%, 24%);
+  --color-tag-material-fg: hsl(25, 78%, 74%);
+  --color-tag-material-hover: hsl(25, 88%, 88%);
 }
 
 @layer theme {
@@ -41,6 +64,29 @@
       --color-pin-base-450: hsl(223deg, 16%, 83%);
       --color-pin-base-500: hsl(220deg, 23%, 95%);
       --color-pin-base-550: hsl(220deg, 22%, 92%);
+
+      /* Tag category badge colors (latte overrides) */
+      --color-tag-general: hsl(220, 9%, 86%);
+      --color-tag-general-fg: hsl(220, 9%, 32%);
+      --color-tag-general-hover: hsl(220, 15%, 12%);
+      --color-tag-artist: hsl(38, 70%, 88%);
+      --color-tag-artist-fg: hsl(38, 70%, 28%);
+      --color-tag-artist-hover: hsl(38, 80%, 16%);
+      --color-tag-copyright: hsl(355, 70%, 90%);
+      --color-tag-copyright-fg: hsl(355, 70%, 30%);
+      --color-tag-copyright-hover: hsl(355, 80%, 18%);
+      --color-tag-character: hsl(215, 70%, 88%);
+      --color-tag-character-fg: hsl(215, 70%, 28%);
+      --color-tag-character-hover: hsl(215, 80%, 16%);
+      --color-tag-species: hsl(140, 50%, 86%);
+      --color-tag-species-fg: hsl(140, 50%, 22%);
+      --color-tag-species-hover: hsl(140, 60%, 12%);
+      --color-tag-meta: hsl(270, 50%, 90%);
+      --color-tag-meta-fg: hsl(270, 50%, 28%);
+      --color-tag-meta-hover: hsl(270, 60%, 16%);
+      --color-tag-material: hsl(25, 70%, 88%);
+      --color-tag-material-fg: hsl(25, 70%, 28%);
+      --color-tag-material-hover: hsl(25, 80%, 16%);
     }
   }
 }
@@ -103,7 +149,8 @@
 
 /** Tom Select **/
 /* Multi-Select Chips */
-.ts-wrapper.multi .ts-control [data-value] {
+.ts-wrapper.multi .ts-control [data-value],
+.ts-wrapper.multi .ts-control [data-value].active {
   background-image: none;
   background-color: inherit;
   background-repeat: inherit;
@@ -113,6 +160,10 @@
   text-pin-base-text 
   border-pin-border 
   bg-pin-base-450;
+}
+
+.ts-wrapper.plugin-remove_button:not(.rtl) .item.active .remove {
+  @apply border-l-pin-border;
 }
 
 /* Single Select */
@@ -141,7 +192,7 @@
   box-shadow: none;
   @apply border 
   border-pin-border 
-  bg-pin-base-450 
+  bg-pin-base-400 
   px-2 
   py-1 
   rounded-lg;
@@ -163,7 +214,14 @@
   @apply border-pin-border bg-pin-base-450;
 }
 
-.ts-dropdown .active {
+.ts-dropdown * {
+  @apply bg-pin-base-450 text-pin-base-text;
+}
+
+.ts-dropdown *.active,
+.ts-dropdown *.active.create,
+.ts-dropdown *.active > *,
+.ts-dropdown *.active.create > * {
   @apply bg-pin-base-400 text-pin-base-text;
 }
 
@@ -212,7 +270,7 @@
 }
 
 .row-error {
-  border-left: 3px solid theme('colors.red.500');
+  border-left: 3px solid theme("colors.red.500");
 }
 
 .row-error > td {
@@ -280,11 +338,66 @@
 }
 
 /* Alpine x-cloak: hide elements until Alpine initialises */
-[x-cloak] { display: none !important; }
+[x-cloak] {
+  display: none !important;
+}
+
+/* ── Overtype editor reset ────────────────────────────────────────────────── */
+/* Prevent global input/button/textarea base styles from leaking into overtype */
+.overtype-wrapper input,
+.overtype-wrapper textarea,
+.overtype-wrapper button,
+.overtype-wrapper select {
+  border: unset;
+  background: unset;
+  padding: unset;
+  border-radius: unset;
+}
+
+/* ── Markdown rendered output ─────────────────────────────────────────────── */
+.markdown-content p {
+  margin-bottom: 0.75rem;
+}
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+.markdown-content strong {
+  font-weight: 600;
+}
+.markdown-content em {
+  font-style: italic;
+}
+.markdown-content del {
+  text-decoration: line-through;
+}
+.markdown-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+.markdown-content blockquote {
+  border-left: 3px solid var(--color-pin-base-350);
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: var(--color-pin-base-200);
+}
+.markdown-content a {
+  @apply underline text-accent;
+}
 
 /* Spinner animation */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .animate-spin {
   animation: spin 0.8s linear infinite;

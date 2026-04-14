@@ -11,16 +11,17 @@ from pindb.database.artist import Artist
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.pending_mixin import PendingMixin
 from pindb.database.base import Base
+from pindb.database.entity_type import EntityType
 from pindb.database.change_log import ChangeLog
+from pindb.database.pending_edit import PendingEdit
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
-from pindb.database.material import Material
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.session import UserSession
 from pindb.database.shop import Shop
-from pindb.database.tag import Tag
+from pindb.database.tag import Tag, TagAlias, TagCategory
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
 from pindb.database.user_owned_pin import UserOwnedPin
@@ -29,6 +30,7 @@ from pindb.database.user_wanted_pin import UserWantedPin
 __all__: list[str] = [
     "seed_currencies",
     "Artist",
+    "EntityType",
     "AuditMixin",
     "PendingMixin",
     "Base",
@@ -36,11 +38,13 @@ __all__: list[str] = [
     "Currency",
     "Grade",
     "Link",
-    "Material",
+    "PendingEdit",
     "Pin",
     "PinSet",
     "Shop",
     "Tag",
+    "TagAlias",
+    "TagCategory",
     "User",
     "UserAuthProvider",
     "UserOwnedPin",

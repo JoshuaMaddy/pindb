@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from pindb.database import Artist, session_maker
 from pindb.models.list_view import EntityListView
+from pindb.search.search import search_artists
 from pindb.templates.list.artists import artists_list, artists_list_section
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 
@@ -19,18 +20,29 @@ def get_list_artists(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
+    q: str = Query(default=""),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        total_count: int = session.scalar(select(func.count(Artist.id))) or 0
-        artists: Sequence[Artist] = session.scalars(
-            select(Artist)
-            .options(selectinload(Artist.pins))
-            .order_by(Artist.name.asc())
-            .limit(DEFAULT_PER_PAGE)
-            .offset((page - 1) * DEFAULT_PER_PAGE)
-        ).all()
+    offset: int = (page - 1) * DEFAULT_PER_PAGE
+    base_url: str = str(request.url_for("get_list_artists"))
 
-        base_url: str = str(request.url_for("get_list_artists"))
+    with session_maker() as session:
+        if q:
+            artists_result, total_count = search_artists(
+                query=q,
+                session=session,
+                offset=offset,
+                limit=DEFAULT_PER_PAGE,
+            )
+            artists: Sequence[Artist] = artists_result
+        else:
+            total_count = session.scalar(select(func.count(Artist.id))) or 0
+            artists = session.scalars(
+                select(Artist)
+                .options(selectinload(Artist.pins))
+                .order_by(Artist.name.asc())
+                .limit(DEFAULT_PER_PAGE)
+                .offset(offset)
+            ).all()
 
         if request.headers.get("HX-Request"):
             return HTMLResponse(
@@ -41,6 +53,7 @@ def get_list_artists(
                     page=page,
                     total_count=total_count,
                     base_url=base_url,
+                    q=q,
                 )
             )
         return HTMLResponse(
@@ -51,5 +64,6 @@ def get_list_artists(
                 page=page,
                 total_count=total_count,
                 base_url=base_url,
+                q=q,
             )
         )

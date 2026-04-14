@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from htpy import Element, a, div
 
 from pindb.models.list_view import EntityListView
@@ -15,10 +17,14 @@ def view_toggle(
     base_url: str,
     current_view: EntityListView,
     section_id: str,
+    extra_params: dict[str, str] | None = None,
 ) -> Element:
     def _link(label: str, view: EntityListView) -> Element:
         is_active: bool = current_view == view
-        href: str = f"{base_url}?view={view.value}&page=1"
+        params: dict[str, str] = {"view": view.value, "page": "1"}
+        if extra_params:
+            params.update(extra_params)
+        href: str = f"{base_url}?{urlencode(params)}"
         return a(
             href=href,
             hx_get=href,

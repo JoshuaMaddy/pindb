@@ -51,13 +51,13 @@ def pin_preview_card(
             bool(shop_text or artist_text)
             and div(class_="flex flex-col gap-0.5 text-xs **:text-pin-base-300")[
                 bool(shop_text)
-                and span(class_="")[
-                    i(data_lucide="store", class_="inline-block h-4"),
+                and div(class_="flex gap-0.5")[
+                    i(data_lucide="store", class_="size-4"),
                     shop_text,
                 ],
                 bool(artist_text)
-                and span(class_="")[
-                    i(data_lucide="palette", class_="inline-block h-4"),
+                and div(class_="flex gap-0.5")[
+                    i(data_lucide="palette", class_="size-4"),
                     artist_text,
                 ],
             ],

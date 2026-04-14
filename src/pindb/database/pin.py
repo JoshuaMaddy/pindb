@@ -22,7 +22,6 @@ from pindb.database.joins import (
     pins_artists,
     pins_grades,
     pins_links,
-    pins_materials,
     pins_shops,
     pins_tags,
 )
@@ -33,7 +32,6 @@ if TYPE_CHECKING:
     from pindb.database.currency import Currency
     from pindb.database.grade import Grade
     from pindb.database.link import Link
-    from pindb.database.material import Material
     from pindb.database.pin_set import PinSet
     from pindb.database.shop import Shop
     from pindb.database.tag import Tag
@@ -54,10 +52,6 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     # Required Relationships
     grades: Mapped[set[Grade]] = relationship(
         secondary=pins_grades,
-    )
-    materials: Mapped[set[Material]] = relationship(
-        secondary=pins_materials,
-        back_populates="pins",
     )
     shops: Mapped[set[Shop]] = relationship(
         secondary=pins_shops,
@@ -120,7 +114,6 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
                 "id": self.id,
                 "name": self.name,
                 "shops": [shop.name for shop in self.shops],
-                "materials": [material.name for material in self.materials],
             }
         )
         document.update(
@@ -162,7 +155,6 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         if object_session(self):
             yield "currency", self.currency.code
             yield "shops", self.shops, set()
-            yield "materials", self.materials, set()
             yield "grades", self.grades, set()
             yield "artists", self.artists, set()
             yield "tags", self.tags, set()

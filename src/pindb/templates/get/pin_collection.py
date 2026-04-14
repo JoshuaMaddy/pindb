@@ -158,7 +158,7 @@ def _owned_row_existing(
                  title="Quantity tradeable"
                  @change="tradeable_qty = Math.min(Math.max(1, parseInt($el.value) || 1), max_qty); htmx.ajax('PATCH', '{patch_url}', {{target: '#{target_id}', swap: 'outerHTML', values: {{quantity: max_qty, tradeable_quantity: tradeable_qty}}}})">
           <button type="button"
-                  class="ml-auto shrink-0 text-pin-base-300 hover:text-red-400 cursor-pointer bg-transparent border-0 text-lg leading-none"
+                  class="ml-auto shrink-0 text-pin-base-300 hover:text-red-200 cursor-pointer bg-transparent border-0 text-lg leading-none"
                   title="Remove"
                   hx-delete="{delete_url}"
                   hx-target="#{target_id}"
@@ -285,7 +285,7 @@ def _wanted_grade_row(
             request.url_for("remove_wanted_pin", pin_id=pin_id, entry_id=entry.id)
         )
         return button(
-            type_="button",
+            type="button",
             hx_delete=delete_url,
             hx_target=f"#{target_id}",
             hx_swap="outerHTML",
@@ -298,7 +298,7 @@ def _wanted_grade_row(
     add_url: str = str(request.url_for("add_wanted_pin", pin_id=pin_id))
     grade_vals: str = f'{{"grade_id": {grade_id}}}' if grade_id is not None else "{}"
     return button(
-        type_="button",
+        type="button",
         hx_post=add_url,
         hx_target=f"#{target_id}",
         hx_swap="outerHTML",

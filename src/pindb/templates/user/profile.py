@@ -182,12 +182,12 @@ def __sets_section(
 
     return div(class_="flex flex-col gap-2")[
         page_heading(
-            icon="folder",
+            icon="layout-grid",
             text="Sets",
             extras=[
                 is_own_profile
                 and icon_button(
-                    icon="folder-plus",
+                    icon="layout-grid",
                     title="Create set",
                     href=str(request.url_for("get_create_user_set")),
                 ),

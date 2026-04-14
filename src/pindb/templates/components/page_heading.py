@@ -12,11 +12,11 @@ def page_heading(
 ) -> Element:
     """Icon + heading in a flex-baseline row. Extras are appended after the heading text."""
     heading_el: Element = h1[text] if level == 1 else h2[text]
-    classes = "flex items-baseline gap-2"
+    classes = "flex gap-2 items-baseline"
     if full_width:
         classes += " w-full"
     return div(class_=classes)[
-        i(data_lucide=icon, class_="inline-block"),
+        i(data_lucide=icon),
         heading_el,
         extras,
     ]

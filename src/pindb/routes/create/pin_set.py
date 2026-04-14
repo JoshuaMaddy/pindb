@@ -4,6 +4,7 @@ from fastapi.routing import APIRouter
 
 from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
+from pindb.search.update import update_pin_set
 
 router = APIRouter()
 
@@ -29,6 +30,8 @@ def post_create_pin_set(
         session.add(pin_set)
         session.flush()
         set_id: int = pin_set.id
+
+    update_pin_set(pin_set=pin_set)
 
     return RedirectResponse(
         url=str(request.url_for("get_edit_set", set_id=set_id)),

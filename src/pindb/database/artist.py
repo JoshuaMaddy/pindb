@@ -52,6 +52,15 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     def __hash__(self) -> int:
         return hash(self.name + str(self.id))
 
+    def document(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "active": self.active,
+            "is_pending": self.is_pending,
+        }
+
     def __rich_repr__(self) -> Result:
         try:
             yield "id", self.id

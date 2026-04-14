@@ -1,6 +1,9 @@
-from htpy import Fragment, div, fragment, p
+from htpy import Fragment, div, fragment
+
+from pindb.markdown_utils import render_md
 
 
 def description_block(text: str | None) -> Fragment:
-    """Renders a paragraph block when text is non-empty; renders nothing otherwise."""
-    return fragment[bool(text) and div[p[text]]]
+    """Render a markdown description block. No-op when text is empty."""
+    html = render_md(text)
+    return fragment[bool(html) and div(class_="markdown-content")[html]]

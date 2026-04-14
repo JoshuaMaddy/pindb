@@ -11,12 +11,16 @@
 
   const REF = window.BULK_REF;
 
+  const BULK_STORAGE_KEY = "bulk_persist";
+  const bulkNavType =
+    (performance.getEntriesByType("navigation")[0] || {}).type || "navigate";
+
   /** @type {Map<string, {frontImageGuid: string|null, backImageGuid: string|null}>} */
   const rowState = new Map();
 
   /**
    * Per-row Tom Select instances.
-   * @type {Map<string, {shops, materials, tags, artists, pinSets, acquisition, currency, funding}>}
+   * @type {Map<string, {shops, tags, artists, pinSets, acquisition, currency, funding}>}
    */
   const rowTS = new Map();
 
@@ -40,8 +44,44 @@
     wireSelectAll();
     wireHeaderButtons();
     wireHeaderPasteButtons();
-    addRow();
+
+    const savedBulk = sessionStorage.getItem(BULK_STORAGE_KEY);
+    if (bulkNavType === "reload" && savedBulk) {
+      try {
+        JSON.parse(savedBulk).forEach((pin) => addRow(pin));
+      } catch (_) {
+        addRow();
+      }
+    } else {
+      sessionStorage.removeItem(BULK_STORAGE_KEY);
+      addRow();
+    }
+
+    document.addEventListener("input", debouncedSaveBulkState);
+    document.addEventListener("change", debouncedSaveBulkState);
   });
+
+  // ---------------------------------------------------------------------------
+  // Bulk state persistence (sessionStorage)
+  // ---------------------------------------------------------------------------
+
+  let saveBulkDebounceTimer = null;
+
+  function debouncedSaveBulkState() {
+    clearTimeout(saveBulkDebounceTimer);
+    saveBulkDebounceTimer = setTimeout(saveBulkState, 300);
+  }
+
+  function saveBulkState() {
+    const rows = document.querySelectorAll("#bulk-tbody > tr.bulk-data-row");
+    const pins = [];
+    rows.forEach((tr) => {
+      try {
+        pins.push(collectRowData(tr.dataset.rowId));
+      } catch (_) {}
+    });
+    sessionStorage.setItem(BULK_STORAGE_KEY, JSON.stringify(pins));
+  }
 
   // ---------------------------------------------------------------------------
   // Column visibility (localStorage)
@@ -76,18 +116,26 @@
   // ---------------------------------------------------------------------------
 
   function wireHeaderButtons() {
-    document.getElementById("add-row-btn").addEventListener("click", () => addRow());
+    document
+      .getElementById("add-row-btn")
+      .addEventListener("click", () => addRow());
     document.getElementById("submit-btn").addEventListener("click", submitAll);
-    document.getElementById("modal-close-btn").addEventListener("click", closeModal);
-    document.getElementById("select-all-rows").addEventListener("change", (e) => {
-      document.querySelectorAll(".row-checkbox").forEach((cb) => {
-        cb.checked = e.target.checked;
+    document
+      .getElementById("modal-close-btn")
+      .addEventListener("click", closeModal);
+    document
+      .getElementById("select-all-rows")
+      .addEventListener("change", (e) => {
+        document.querySelectorAll(".row-checkbox").forEach((cb) => {
+          cb.checked = e.target.checked;
+        });
       });
-    });
   }
 
   function updateSubmitLabel() {
-    const count = document.querySelectorAll("#bulk-tbody > tr.bulk-data-row").length;
+    const count = document.querySelectorAll(
+      "#bulk-tbody > tr.bulk-data-row",
+    ).length;
     document.getElementById("submit-label").textContent = `Submit (${count})`;
   }
 
@@ -110,6 +158,7 @@
 
     initRow(id, prefill);
     updateSubmitLabel();
+    saveBulkState();
     return id;
   }
 
@@ -119,7 +168,9 @@
 
     const ts = rowTS.get(rowId);
     if (ts) {
-      Object.values(ts).forEach((instance) => instance && instance.destroy && instance.destroy());
+      Object.values(ts).forEach(
+        (instance) => instance && instance.destroy && instance.destroy(),
+      );
       rowTS.delete(rowId);
     }
     rowState.delete(rowId);
@@ -127,6 +178,7 @@
     const tr = document.getElementById(rowId);
     if (tr) tr.remove();
     updateSubmitLabel();
+    saveBulkState();
   }
 
   function duplicateRow(rowId) {
@@ -200,11 +252,6 @@
       <!-- Currency -->
       <td class="bulk-td copyable-cell" data-col-type="currency_id">
         <select class="bulk-ts-single" data-row="${id}" data-field="currency_id"></select>
-      </td>
-
-      <!-- Materials -->
-      <td class="bulk-td copyable-cell" data-col-type="materials">
-        <select class="bulk-ts-multi" data-row="${id}" data-field="materials" multiple></select>
       </td>
 
       <!-- Tags -->
@@ -298,19 +345,26 @@
     // Tom Selects
     const tsMap = {};
 
-    // Multi-selects
+    // Multi-selects — live DB search
     const multiConfigs = [
-      { field: "shops", options: REF.shops },
-      { field: "materials", options: REF.materials },
-      { field: "tags", options: REF.tags },
-      { field: "artists", options: REF.artists },
-      { field: "pinSets", options: REF.pinSets },
+      { field: "shops", entityType: "shop" },
+      { field: "tags", entityType: "tag" },
+      { field: "artists", entityType: "artist" },
+      { field: "pinSets", entityType: "pin_set" },
     ];
-    multiConfigs.forEach(({ field, options }) => {
+    multiConfigs.forEach(({ field, entityType }) => {
       const sel = tr.querySelector(`select[data-field="${field}"]`);
       if (!sel) return;
       tsMap[field] = new TomSelect(sel, {
-        options: options,
+        preload: true,
+        load: (query, callback) => {
+          fetch(
+            `${REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`,
+          )
+            .then((res) => res.json())
+            .then(callback)
+            .catch(() => callback());
+        },
         create: true,
         plugins: ["remove_button", "caret_position"],
         maxItems: null,
@@ -361,7 +415,9 @@
     // Image drops
     tr.querySelectorAll(".image-drop-cell").forEach((box) => {
       const side = box.dataset.side;
-      const fileInput = tr.querySelector(`input[type="file"][data-side="${side}"]`);
+      const fileInput = tr.querySelector(
+        `input[type="file"][data-side="${side}"]`,
+      );
       box.addEventListener("click", () => fileInput.click());
       box.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -383,26 +439,38 @@
 
     // Grades toggle
     tr.querySelector(".grades-toggle-btn").addEventListener("click", () =>
-      toggleGrades(rowId)
+      toggleGrades(rowId),
     );
 
     // Links toggle
     tr.querySelector(".links-toggle-btn").addEventListener("click", () =>
-      toggleLinks(rowId)
+      toggleLinks(rowId),
     );
 
     // Action buttons
-    tr.querySelector(".dup-btn").addEventListener("click", () => duplicateRow(rowId));
-    tr.querySelector(".del-btn").addEventListener("click", () => deleteRow(rowId));
+    tr.querySelector(".dup-btn").addEventListener("click", () =>
+      duplicateRow(rowId),
+    );
+    tr.querySelector(".del-btn").addEventListener("click", () =>
+      deleteRow(rowId),
+    );
 
     // Copy/paste wiring for copyable cells
-    tr.querySelectorAll(".copyable-cell").forEach((td) => wireCopyPaste(td, rowId));
+    tr.querySelectorAll(".copyable-cell").forEach((td) =>
+      wireCopyPaste(td, rowId),
+    );
 
     // Re-run Lucide on new row
     if (window.lucide) lucide.createIcons({ nodes: [tr] });
 
     // Prefill values if duplicating
     if (prefill) applyPrefill(rowId, prefill);
+
+    // Default grade for new rows (no prefill or prefill had no grades)
+    if (!tr.dataset.grades) {
+      tr.dataset.grades = JSON.stringify([{ name: "Normal", price: "" }]);
+      tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent = 1;
+    }
 
     // Re-apply column visibility to new cells
     document.querySelectorAll(".col-toggle-check").forEach((cb) => {
@@ -414,29 +482,52 @@
     const tr = document.getElementById(rowId);
     const ts = rowTS.get(rowId);
 
-    if (prefill.name) tr.querySelector(`input[data-field="name"]`).value = prefill.name;
+    if (prefill.name)
+      tr.querySelector(`input[data-field="name"]`).value = prefill.name;
     if (prefill.number_produced != null)
-      tr.querySelector(`input[data-field="number_produced"]`).value = prefill.number_produced;
-    if (prefill.posts) tr.querySelector(`input[data-field="posts"]`).value = prefill.posts;
-    if (prefill.width) tr.querySelector(`input[data-field="width"]`).value = prefill.width;
-    if (prefill.height) tr.querySelector(`input[data-field="height"]`).value = prefill.height;
+      tr.querySelector(`input[data-field="number_produced"]`).value =
+        prefill.number_produced;
+    if (prefill.posts)
+      tr.querySelector(`input[data-field="posts"]`).value = prefill.posts;
+    if (prefill.width)
+      tr.querySelector(`input[data-field="width"]`).value = prefill.width;
+    if (prefill.height)
+      tr.querySelector(`input[data-field="height"]`).value = prefill.height;
     if (prefill.description)
-      tr.querySelector(`input[data-field="description"]`).value = prefill.description;
+      tr.querySelector(`input[data-field="description"]`).value =
+        prefill.description;
     if (prefill.release_date)
-      tr.querySelector(`input[data-field="release_date"]`).value = prefill.release_date;
+      tr.querySelector(`input[data-field="release_date"]`).value =
+        prefill.release_date;
     if (prefill.end_date)
       tr.querySelector(`input[data-field="end_date"]`).value = prefill.end_date;
 
     if (prefill.shop_names?.length) ts.shops.addItems(prefill.shop_names);
-    if (prefill.material_names?.length) ts.materials.addItems(prefill.material_names);
     if (prefill.tag_names?.length) ts.tags.addItems(prefill.tag_names);
     if (prefill.artist_names?.length) ts.artists.addItems(prefill.artist_names);
-    if (prefill.pin_set_names?.length) ts.pinSets.addItems(prefill.pin_set_names);
-    if (prefill.acquisition_type) ts["acquisition_type"].setValue(prefill.acquisition_type);
-    if (prefill.currency_id) ts["currency_id"].setValue(String(prefill.currency_id));
+    if (prefill.pin_set_names?.length)
+      ts.pinSets.addItems(prefill.pin_set_names);
+    if (prefill.acquisition_type)
+      ts["acquisition_type"].setValue(prefill.acquisition_type);
+    if (prefill.currency_id)
+      ts["currency_id"].setValue(String(prefill.currency_id));
     if (prefill.funding_type) ts["funding_type"].setValue(prefill.funding_type);
     if (prefill.limited_edition != null)
       ts["limited_edition"].setValue(String(prefill.limited_edition));
+
+    if (prefill.grades?.length) {
+      tr.dataset.grades = JSON.stringify(prefill.grades);
+      const validCount = prefill.grades.filter((g) => g.name).length;
+      tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent =
+        validCount;
+    }
+
+    if (prefill.links?.length) {
+      tr.dataset.links = JSON.stringify(prefill.links);
+      const validCount = prefill.links.filter((l) => l.trim()).length;
+      tr.querySelector(`.links-count[data-row="${rowId}"]`).textContent =
+        validCount;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -495,7 +586,9 @@
     const visibleWidth = tr.closest(".overflow-x-auto")?.clientWidth ?? 900;
 
     // Collect existing grades from any previous sub-row data attribute
-    const existing = JSON.parse(tr.dataset.grades || '[{"name":"","price":""}]');
+    const existing = JSON.parse(
+      tr.dataset.grades || '[{"name":"Normal","price":""}]',
+    );
 
     const subTr = document.createElement("tr");
     subTr.id = `${rowId}-grades`;
@@ -516,11 +609,11 @@
               <input class="bulk-input" type="text" x-model="grades[index].name"
                      placeholder="Grade name" autocomplete="off">
               <input class="bulk-input" type="number" x-model="grades[index].price"
-                     placeholder="Price" step="0.01" min="0">
+                     placeholder="Unknown" step="0.01" min="0">
               <button type="button"
                       @click="grades.splice(index, 1)"
                       x-show="grades.length > 1"
-                      class="icon-btn text-red-400">
+                      class="icon-btn text-red-200">
                 <i data-lucide="minus-circle"></i>
               </button>
             </div>
@@ -540,7 +633,10 @@
     if (window.Alpine) Alpine.initTree(subTr);
     if (window.lucide) lucide.createIcons({ nodes: [subTr] });
 
-    tr.querySelector(".grades-toggle-btn").classList.add("border-accent", "text-accent");
+    tr.querySelector(".grades-toggle-btn").classList.add(
+      "border-accent",
+      "text-accent",
+    );
   }
 
   function closeGrades(rowId) {
@@ -562,7 +658,10 @@
       subTr.remove();
     }
     openGradesRowId = null;
-    tr.querySelector(".grades-toggle-btn").classList.remove("border-accent", "text-accent");
+    tr.querySelector(".grades-toggle-btn").classList.remove(
+      "border-accent",
+      "text-accent",
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -604,7 +703,7 @@
               <button type="button"
                       @click="links.splice(index, 1)"
                       x-show="links.length > 1"
-                      class="icon-btn text-red-400">
+                      class="icon-btn text-red-200">
                 <i data-lucide="minus-circle"></i>
               </button>
             </div>
@@ -623,7 +722,10 @@
     if (window.Alpine) Alpine.initTree(subTr);
     if (window.lucide) lucide.createIcons({ nodes: [subTr] });
 
-    tr.querySelector(".links-toggle-btn").classList.add("border-accent", "text-accent");
+    tr.querySelector(".links-toggle-btn").classList.add(
+      "border-accent",
+      "text-accent",
+    );
   }
 
   function closeLinks(rowId) {
@@ -643,7 +745,10 @@
       subTr.remove();
     }
     openLinksRowId = null;
-    tr.querySelector(".links-toggle-btn").classList.remove("border-accent", "text-accent");
+    tr.querySelector(".links-toggle-btn").classList.remove(
+      "border-accent",
+      "text-accent",
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -709,41 +814,63 @@
       pasteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (!cellClipboard || cellClipboard.type !== th.dataset.colType) return;
-        document.querySelectorAll("#bulk-tbody > tr.bulk-data-row").forEach((tr) => {
-          const rowId = tr.dataset.rowId;
-          const tdEl = tr.querySelector(`td[data-col-type="${cellClipboard.type}"]`);
-          if (tdEl) writeCellValues(tdEl, rowId, cellClipboard.type, cellClipboard.values);
-        });
+        document
+          .querySelectorAll("#bulk-tbody > tr.bulk-data-row")
+          .forEach((tr) => {
+            const rowId = tr.dataset.rowId;
+            const tdEl = tr.querySelector(
+              `td[data-col-type="${cellClipboard.type}"]`,
+            );
+            if (tdEl)
+              writeCellValues(
+                tdEl,
+                rowId,
+                cellClipboard.type,
+                cellClipboard.values,
+              );
+          });
       });
     });
-    if (window.lucide) lucide.createIcons({ nodes: Array.from(document.querySelectorAll("th[data-col-type]")) });
+    if (window.lucide)
+      lucide.createIcons({
+        nodes: Array.from(document.querySelectorAll("th[data-col-type]")),
+      });
   }
 
   function refreshPasteButtons(colType) {
     // Briefly flash paste buttons on all matching cells so user knows paste is available
-    document.querySelectorAll(`.copyable-cell[data-col-type="${colType}"]`).forEach((td) => {
-      const btn = td.querySelector(".cell-paste-btn");
-      if (btn) {
-        btn.classList.remove("hidden");
-        setTimeout(() => btn.classList.add("hidden"), 1500);
-      }
-    });
+    document
+      .querySelectorAll(`.copyable-cell[data-col-type="${colType}"]`)
+      .forEach((td) => {
+        const btn = td.querySelector(".cell-paste-btn");
+        if (btn) {
+          btn.classList.remove("hidden");
+          setTimeout(() => btn.classList.add("hidden"), 1500);
+        }
+      });
     // Show the header paste button for the matching column; hide all others
-    document.querySelectorAll("th[data-col-type] .header-paste-btn").forEach((btn) => {
-      btn.classList.toggle("hidden", btn.closest("th").dataset.colType !== colType);
-    });
+    document
+      .querySelectorAll("th[data-col-type] .header-paste-btn")
+      .forEach((btn) => {
+        btn.classList.toggle(
+          "hidden",
+          btn.closest("th").dataset.colType !== colType,
+        );
+      });
   }
 
   function readCellValues(tdEl, rowId, colType) {
     const ts = rowTS.get(rowId);
-    const multiFields = ["shops", "materials", "tags", "artists", "pin_sets"];
+    const multiFields = ["shops", "tags", "artists", "pin_sets"];
     const singleFields = ["acquisition_type", "currency_id", "funding_type"];
 
     if (colType === "grades") {
       const tr = document.getElementById(rowId);
       if (openGradesRowId === rowId) {
         const gradesDiv = document.querySelector(`#${rowId}-grades [x-data]`);
-        try { return Alpine.$data(gradesDiv).grades; } catch (_) {}
+        try {
+          return Alpine.$data(gradesDiv).grades;
+        } catch (_) {}
       }
       return JSON.parse(tr.dataset.grades || "[]");
     }
@@ -762,7 +889,7 @@
 
   function writeCellValues(tdEl, rowId, colType, values) {
     const ts = rowTS.get(rowId);
-    const multiFields = ["shops", "materials", "tags", "artists", "pin_sets"];
+    const multiFields = ["shops", "tags", "artists", "pin_sets"];
     const singleFields = ["acquisition_type", "currency_id", "funding_type"];
 
     if (colType === "grades") {
@@ -770,7 +897,8 @@
       const gradesCopy = JSON.parse(JSON.stringify(values));
       tr.dataset.grades = JSON.stringify(gradesCopy);
       const validGrades = gradesCopy.filter((g) => g.name);
-      tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent = validGrades.length;
+      tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent =
+        validGrades.length;
       if (openGradesRowId === rowId) {
         closeGrades(rowId);
         openGrades(rowId);
@@ -783,7 +911,8 @@
       const instance = ts[tsKey];
       if (instance) {
         instance.clear(true);
-        if (Array.isArray(values)) values.forEach((v) => instance.addItem(v, true));
+        if (Array.isArray(values))
+          values.forEach((v) => instance.addItem(v, true));
       }
       return;
     }
@@ -812,17 +941,29 @@
     const ts = rowTS.get(rowId);
     const state = rowState.get(rowId);
 
-    const field = (name) => tr.querySelector(`input[data-field="${name}"]`)?.value ?? "";
+    const field = (name) =>
+      tr.querySelector(`input[data-field="${name}"]`)?.value ?? "";
+
+    const normalizeGrades = (gs) =>
+      gs
+        .filter((g) => g.name)
+        .map((g) => ({
+          name: g.name,
+          price:
+            g.price !== "" && g.price !== null && g.price !== undefined
+              ? parseFloat(g.price)
+              : null,
+        }));
 
     const grades = (() => {
       // If grades sub-row is open, read from Alpine; else from dataset
       if (openGradesRowId === rowId) {
         const gradesDiv = document.querySelector(`#${rowId}-grades [x-data]`);
         try {
-          return Alpine.$data(gradesDiv).grades.filter((g) => g.name);
+          return normalizeGrades(Alpine.$data(gradesDiv).grades);
         } catch (_) {}
       }
-      return JSON.parse(tr.dataset.grades || "[]").filter((g) => g.name);
+      return normalizeGrades(JSON.parse(tr.dataset.grades || "[]"));
     })();
 
     const links = (() => {
@@ -842,16 +983,20 @@
       acquisition_type: ts["acquisition_type"]?.getValue() ?? "",
       front_image_guid: state?.frontImageGuid ?? null,
       back_image_guid: state?.backImageGuid ?? null,
-      currency_id: parseInt(ts["currency_id"]?.getValue() ?? REF.defaultCurrencyId),
+      currency_id: parseInt(
+        ts["currency_id"]?.getValue() ?? REF.defaultCurrencyId,
+      ),
       shop_names: ts.shops?.getValue() ?? [],
-      material_names: ts.materials?.getValue() ?? [],
       tag_names: ts.tags?.getValue() ?? [],
       artist_names: ts.artists?.getValue() ?? [],
       pin_set_names: ts.pinSets?.getValue() ?? [],
       grades,
       links,
-      limited_edition: leVal === "true" ? true : leVal === "false" ? false : null,
-      number_produced: field("number_produced") ? parseInt(field("number_produced")) : null,
+      limited_edition:
+        leVal === "true" ? true : leVal === "false" ? false : null,
+      number_produced: field("number_produced")
+        ? parseInt(field("number_produced"))
+        : null,
       release_date: field("release_date") || null,
       end_date: field("end_date") || null,
       funding_type: ts["funding_type"]?.getValue() || null,
@@ -889,6 +1034,19 @@
   // Submit
   // ---------------------------------------------------------------------------
 
+  function setLucideIcon(container, iconName) {
+    const existing =
+      container.querySelector("i") ?? container.querySelector("svg");
+    const el = document.createElement("i");
+    el.setAttribute("data-lucide", iconName);
+    if (existing) {
+      existing.replaceWith(el);
+    } else {
+      container.prepend(el);
+    }
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+  }
+
   async function submitAll() {
     // Close any open sub-rows so their data is saved to dataset
     if (openGradesRowId) closeGrades(openGradesRowId);
@@ -907,8 +1065,7 @@
 
     const submitBtn = document.getElementById("submit-btn");
     submitBtn.disabled = true;
-    submitBtn.querySelector("i").setAttribute("data-lucide", "loader-circle");
-    if (window.lucide) lucide.createIcons({ nodes: [submitBtn] });
+    setLucideIcon(submitBtn, "loader-circle");
 
     try {
       const res = await fetch(REF.submitUrl, {
@@ -916,6 +1073,10 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pins }),
       });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`Server error ${res.status}: ${detail}`);
+      }
       const result = await res.json();
       handleSubmitResult(result, rows);
     } catch (err) {
@@ -923,8 +1084,7 @@
       alert("Submit failed: " + err.message);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.querySelector("i").setAttribute("data-lucide", "upload");
-      if (window.lucide) lucide.createIcons({ nodes: [submitBtn] });
+      setLucideIcon(submitBtn, "upload");
     }
   }
 
@@ -946,7 +1106,9 @@
 
     if (result.failed_count === 0) {
       // All succeeded — clear table
-      Array.from(document.querySelectorAll("#bulk-tbody > tr")).forEach((tr) => tr.remove());
+      Array.from(document.querySelectorAll("#bulk-tbody > tr")).forEach((tr) =>
+        tr.remove(),
+      );
       rowTS.forEach((ts) => Object.values(ts).forEach((i) => i?.destroy?.()));
       rowTS.clear();
       rowState.clear();
@@ -992,8 +1154,9 @@
 
     if (result.failed_count > 0) {
       const errTitle = document.createElement("p");
-      errTitle.className = "col-span-full text-sm text-red-400 font-semibold";
-      errTitle.textContent = "Failed rows remain in the table — fix errors and resubmit.";
+      errTitle.className = "col-span-full text-sm text-red-200 font-semibold";
+      errTitle.textContent =
+        "Failed rows remain in the table — fix errors and resubmit.";
       grid.appendChild(errTitle);
     }
 
@@ -1009,6 +1172,9 @@
   // ---------------------------------------------------------------------------
 
   function escHtml(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 })();

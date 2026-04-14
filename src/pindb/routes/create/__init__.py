@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 
 from pindb.auth import require_editor
-from pindb.routes.create import artist, material, pin, pin_set, shop, tag
+from pindb.routes.create import artist, pin, pin_set, shop, tag
 from pindb.templates.create_and_edit.index import create_index
 
 router = APIRouter(prefix="/create", dependencies=[Depends(require_editor)])
@@ -15,7 +15,6 @@ def get_create_index(request: Request) -> HTMLResponse:
 
 
 router.include_router(pin.router)
-router.include_router(material.router)
 router.include_router(shop.router)
 router.include_router(tag.router)
 router.include_router(pin_set.router)

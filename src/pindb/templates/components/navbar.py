@@ -17,7 +17,7 @@ def navbar(
             )[user.username],
             form(method="post", action="/auth/logout")[
                 button(
-                    type_="submit",
+                    type="submit",
                     class_="no-underline text-pin-base-100 bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
                 )["Logout"]
             ],
