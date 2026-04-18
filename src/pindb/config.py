@@ -1,8 +1,9 @@
+import sys
 from pathlib import Path
 from typing import Literal
 
 import meilisearch
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -93,4 +94,8 @@ class Configuration(BaseSettings):
     log_file: str = Field(default="pindb.log")
 
 
-CONFIGURATION = Configuration()  # type: ignore
+try:
+    CONFIGURATION = Configuration()  # type: ignore
+except ValidationError as exc:
+    print(exc.json(indent=2), file=sys.stderr)
+    raise
