@@ -87,7 +87,7 @@ alembic/                     # Database migrations
 scripts/
 ├── README.md                # CSV import format docs (grades encoding, column format)
 ├── import_csv.py            # Bulk CSV import script
-├── dump_db.py               # Postgres dump/load (pg_dump/pg_restore); --via-docker if no local client tools
+├── dump_db.py               # Postgres dump/load (pg_dump/pg_restore); --via-docker by default; POSTGRES_* fallback URL for --no-via-docker
 ├── migrate_images.py        # Migrate images between filesystem and R2 backends
 ├── dev.sh                   # Bash: docker compose up + fastapi dev
 └── dev.ps1                  # PowerShell: same as above

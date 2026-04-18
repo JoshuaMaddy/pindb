@@ -1,9 +1,12 @@
 """
 Full logical backup and restore of the PinDB PostgreSQL database.
 
-Uses pg_dump / pg_restore (custom format) or pg_dump plain SQL + psql. Requires
-PostgreSQL client tools on PATH (same major version as the server is recommended),
-unless you use --via-docker (runs the CLI inside the Compose postgres service).
+By default, pg_dump / psql / pg_restore run **inside** the Compose Postgres service
+(`--via-docker`, default on), matching the app's Docker DB connection and avoiding
+local client tools.
+
+With `--no-via-docker`, uses pg_dump / pg_restore / psql on your PATH. Requires
+PostgreSQL client tools (same major version as the server is recommended).
 
 Typical uses:
 - Scheduled backups: point DATABASE_CONNECTION at production and write a .dump file.
@@ -13,9 +16,9 @@ Usage:
     uv run scripts/dump_db.py dump -o backups/pindb.dump
     uv run scripts/dump_db.py load -i backups/pindb.dump
 
-No local pg_dump (e.g. Windows): use Docker Compose Postgres from the repo root:
-    uv run scripts/dump_db.py dump -o backups/pindb.dump --via-docker
-    uv run scripts/dump_db.py load -i backups/pindb.dump --via-docker
+Local pg_* tools only (no docker exec):
+    uv run scripts/dump_db.py dump -o backups/pindb.dump --no-via-docker
+    uv run scripts/dump_db.py load -i backups/pindb.dump --no-via-docker
 
 Override connection (no .env required):
     uv run scripts/dump_db.py dump -o out.dump \\
@@ -30,8 +33,9 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote_plus
 
-from pydantic import ValidationError
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import make_url
 
@@ -40,8 +44,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMPOSE_CANDIDATES = ("docker-compose.dev.yaml", "docker-compose.yaml")
 
 
-class _DatabaseUrlSettings(BaseSettings):
-    """Only DATABASE_CONNECTION — avoids loading the full app Configuration."""
+class _DumpDbUrlSettings(BaseSettings):
+    """DATABASE_CONNECTION and/or Compose-style POSTGRES_* (same as docker-compose)."""
 
     model_config = SettingsConfigDict(
         env_file=_REPO_ROOT / ".env",
@@ -49,7 +53,25 @@ class _DatabaseUrlSettings(BaseSettings):
         case_sensitive=False,
     )
 
-    database_connection: str
+    database_connection: str | None = None
+    postgres_user: str = Field(default="pindb")
+    postgres_password: str | None = Field(default=None)
+    postgres_db: str = Field(default="pindb")
+    postgres_host: str = Field(default="postgres")
+    postgres_port: int = Field(default=5432)
+
+
+def _compose_default_database_url(settings: _DumpDbUrlSettings) -> str | None:
+    """Same shape as the app container: postgresql+psycopg://...@postgres:5432/pindb."""
+    pw = settings.postgres_password
+    if pw is None or pw == "":
+        return None
+    password = quote_plus(pw)
+    user = quote_plus(settings.postgres_user)
+    host = settings.postgres_host
+    port = settings.postgres_port
+    db = settings.postgres_db
+    return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{db}"
 
 
 def _sqlalchemy_url_to_libpq(sqlalchemy_url: str) -> str:
@@ -218,16 +240,19 @@ def _cmd_load_docker(args: argparse.Namespace, *, dump_path: Path) -> None:
 def _resolve_database_url(args: argparse.Namespace) -> str:
     if args.database_url is not None:
         return args.database_url
-    try:
-        return _DatabaseUrlSettings.model_validate({}).database_connection
-    except ValidationError as exc:
-        print(
-            "error: could not read database_connection from the environment or .env.\n"
-            "Set DATABASE_CONNECTION or pass --database-url.",
-            file=sys.stderr,
-        )
-        print(exc, file=sys.stderr)
-        sys.exit(1)
+    settings = _DumpDbUrlSettings.model_validate({})
+    if settings.database_connection and settings.database_connection.strip():
+        return settings.database_connection
+    built = _compose_default_database_url(settings)
+    if built is not None:
+        return built
+    print(
+        "error: could not resolve a database URL.\n"
+        "  Set DATABASE_CONNECTION or POSTGRES_PASSWORD in the environment / .env, or\n"
+        "  pass --database-url (Compose default: postgresql+psycopg://...@postgres:5432/pindb).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _guess_dump_format(path: Path) -> Literal["custom", "plain"]:
@@ -376,8 +401,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     dump_p.add_argument(
         "--via-docker",
-        action="store_true",
-        help="Run pg_dump in the Compose postgres container (uses tools bundled in the image).",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run pg_dump in the Compose postgres container (default: true). "
+        "Use --no-via-docker for a local pg_dump on PATH.",
     )
     dump_p.add_argument(
         "--compose-file",
@@ -430,8 +457,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     load_p.add_argument(
         "--via-docker",
-        action="store_true",
-        help="Run psql/pg_restore in the Compose postgres container.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run psql/pg_restore in the Compose postgres container (default: true). "
+        "Use --no-via-docker for local psql/pg_restore on PATH.",
     )
     load_p.add_argument(
         "--compose-file",
