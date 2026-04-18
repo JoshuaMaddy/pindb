@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from pindb.auth import hash_password, verify_password
+from pindb.auth import verify_password
 from pindb.database.user import User
 
 STRONG = "Correct-Horse-Battery-42!"

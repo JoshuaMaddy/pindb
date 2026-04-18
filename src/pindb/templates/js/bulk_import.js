@@ -334,12 +334,12 @@
 
       <!-- Width (optional) -->
       <td class="bulk-td copyable-cell" data-col="width" data-col-type="width">
-        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="width" placeholder="25mm">
+        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="width" pattern="${window.BULK_REF.magnitudeInputPattern || ''}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
       </td>
 
       <!-- Height (optional) -->
       <td class="bulk-td copyable-cell" data-col="height" data-col-type="height">
-        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="height" placeholder="25mm">
+        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="height" pattern="${window.BULK_REF.magnitudeInputPattern || ''}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
       </td>
 
       <!-- Links (optional) -->

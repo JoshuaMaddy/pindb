@@ -138,3 +138,31 @@ class TestTagCrud:
         refreshed = _refetch(db_session, Tag, tag_id)
         assert refreshed is not None
         assert refreshed.name == "new_tag"
+
+    def test_duplicate_tag_name_htmx_returns_toast_signal(
+        self, admin_client, db_session
+    ):
+        htmx_headers = {"HX-Request": "true", "HX-Target": "pindb-toast-host"}
+        admin_client.post(
+            "/create/tag",
+            data={
+                "name": "Unique Tag Name",
+                "description": "",
+                "category": TagCategory.general.value,
+            },
+            headers=htmx_headers,
+            follow_redirects=False,
+        )
+        response = admin_client.post(
+            "/create/tag",
+            data={
+                "name": "unique tag name",
+                "description": "",
+                "category": TagCategory.general.value,
+            },
+            headers=htmx_headers,
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+        assert "pindb-toast-signal" in response.text
+        assert "That name or alias is already in use." in response.text

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -35,6 +36,17 @@ if TYPE_CHECKING:
     from pindb.database.pin_set import PinSet
     from pindb.database.shop import Shop
     from pindb.database.tag import Tag
+
+
+def _ordered_unique_strings(strings: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in strings:
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
 
 
 class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
@@ -127,12 +139,20 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         result: dict[str, object] = {
             "id": self.id,
             "name": self.name,
-            "shops": [shop.name for shop in self.shops],
+            "shops": _ordered_unique_strings(
+                s
+                for shop in self.shops
+                for s in (shop.name, *(al.alias for al in shop.aliases))
+            ),
         }
         if self.tags:
             result["tags"] = [tag.name for tag in self.tags]
         if self.artists:
-            result["artists"] = [artist.name for artist in self.artists]
+            result["artists"] = _ordered_unique_strings(
+                s
+                for artist in self.artists
+                for s in (artist.name, *(al.alias for al in artist.aliases))
+            )
         if self.description:
             result["description"] = self.description
         return result

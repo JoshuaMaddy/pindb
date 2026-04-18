@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from fastapi import Request
-from htpy import BaseElement, body, head, html, link, meta, script
+from htpy import BaseElement, body, div, head, html, link, meta, script
 from htpy import title as title_el
 from markupsafe import Markup
 
@@ -63,6 +63,7 @@ def html_base(
             link(rel="icon", href="/static/favicon.png"),
             # HTMX
             script(src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js"),
+            script(src="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.js"),
             script(
                 src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"
             ),
@@ -70,6 +71,11 @@ def html_base(
             link(
                 rel="stylesheet",
                 href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.default.min.css",
+            ),
+            # Notyf (toasts)
+            link(
+                rel="stylesheet",
+                href="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.css",
             ),
             # Custom styles
             link(
@@ -93,6 +99,11 @@ def html_base(
             navbar(request=request),
             bread_crumb(entries=bread_crumb_links),
             body_content,
+            div(
+                id="pindb-toast-host",
+                class_="sr-only",
+                aria_live="polite",
+            ),
         ],
         script(src="https://unpkg.com/lucide@latest"),
         script["lucide.createIcons();"],
@@ -117,8 +128,34 @@ if (element != null) {
         }
     }
 }
-document.body.addEventListener('htmx:afterSwap', function() {
+window.pindbNotyf = new Notyf({
+    dismissible: true,
+    duration: 4500,
+    position: { x: 'right', y: 'bottom' },
+    ripple: true,
+});
+document.body.addEventListener('htmx:afterSwap', function(evt) {
     lucide.createIcons();
+    var target = evt.detail.target;
+    if (!target || target.id !== 'pindb-toast-host') {
+        return;
+    }
+    var sig = target.querySelector('#pindb-toast-signal');
+    if (!sig) {
+        return;
+    }
+    var msg = sig.dataset.pindbMessage;
+    if (!msg) {
+        target.innerHTML = '';
+        return;
+    }
+    var typ = sig.dataset.pindbType || 'error';
+    if (typ === 'success') {
+        window.pindbNotyf.success(msg);
+    } else {
+        window.pindbNotyf.error(msg);
+    }
+    target.innerHTML = '';
 });
 """
             )

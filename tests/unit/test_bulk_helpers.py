@@ -6,6 +6,7 @@ import pytest
 
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
+from pindb.model_utils import MagnitudeParseError
 from pindb.routes.bulk._helpers import (
     BULK_SCALAR_FIELDS,
     TagMode,
@@ -51,8 +52,18 @@ class TestCoerceScalar:
     def test_number_produced_int(self):
         assert _coerce_bulk_scalar("number_produced", "42") == 42
 
-    def test_width_float(self):
-        assert _coerce_bulk_scalar("width", "12.5") == 12.5
+    def test_width_parses_magnitude_like_pin_form(self):
+        assert _coerce_bulk_scalar("width", "12.5mm") == 12.5
+        assert _coerce_bulk_scalar("width", "1in") == 25.4
+        assert _coerce_bulk_scalar("height", "2cm") == 20.0
+
+    def test_width_idempotent_after_mm_float(self):
+        """apply_bulk_scalars coerces twice; stored mm floats must pass through."""
+        assert _coerce_bulk_scalar("width", 12.5) == 12.5
+
+    def test_invalid_width_raises(self):
+        with pytest.raises(MagnitudeParseError):
+            _coerce_bulk_scalar("width", "not-a-dimension")
 
     def test_release_date(self):
         assert _coerce_bulk_scalar("release_date", "2026-01-05") == date(2026, 1, 5)

@@ -46,6 +46,8 @@ def artist_form(
                 hr,
                 form(
                     hx_post=str(post_url),
+                    hx_target="#pindb-toast-host",
+                    hx_swap="innerHTML",
                     class_="flex flex-col gap-2 [&_label]:font-semibold",
                 )[
                     label(for_="name")["Name", span(class_="text-red-200 ml-0.5")["*"]],

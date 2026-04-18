@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import AdminUser, EditorUser
+from pindb.model_utils import MagnitudeParseError
 from pindb.database import session_maker
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_edit_utils import (
@@ -186,11 +187,14 @@ def post_bulk_edit_apply(
     }
     # Only keep fields the user ticked — coerce to the target type here so
     # downstream writers and snapshotters all see the same typed value.
-    field_updates: dict[str, object] = {
-        field: _coerce_bulk_scalar(field, submitted_field_values[field])
-        for field in BULK_SCALAR_FIELDS
-        if field in apply_field and field in submitted_field_values
-    }
+    try:
+        field_updates: dict[str, object] = {
+            field: _coerce_bulk_scalar(field, submitted_field_values[field])
+            for field in BULK_SCALAR_FIELDS
+            if field in apply_field and field in submitted_field_values
+        }
+    except MagnitudeParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     tag_change_requested: bool = bool(tag_ids) or tag_mode == TagMode.replace
 

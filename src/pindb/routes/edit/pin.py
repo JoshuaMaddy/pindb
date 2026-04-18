@@ -22,7 +22,12 @@ from pindb.database.pin_set import PinSet
 from pindb.database.pin_writes import upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
-from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
+from pindb.model_utils import (
+    MagnitudeParseError,
+    empty_str_list_to_none,
+    empty_str_to_none,
+    parse_magnitude_mm,
+)
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
@@ -140,6 +145,12 @@ async def post_edit_pin(
     ] = None,
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
+    try:
+        width_mm = parse_magnitude_mm(field_label="Width", raw=width)
+        height_mm = parse_magnitude_mm(field_label="Height", raw=height)
+    except MagnitudeParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     back_image_guid: UUID | None = None
     front_image_guid: UUID | None = None
 
@@ -147,9 +158,6 @@ async def post_edit_pin(
         front_image_guid = await save_image(file=front_image)
     if back_image:
         back_image_guid = await save_image(file=back_image)
-
-    width_mm: float | None = magnitude_to_mm(magnitude=width) if width else None
-    height_mm: float | None = magnitude_to_mm(magnitude=height) if height else None
 
     with session_maker.begin() as session:
         pin: Pin | None = session.scalar(

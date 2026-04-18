@@ -25,6 +25,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
+from pindb.model_utils import parse_magnitude_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 
@@ -160,7 +161,14 @@ def _coerce_bulk_scalar(field: str, raw: object) -> object:
     if field in {"number_produced", "posts"}:
         return int(str(raw))
     if field in {"width", "height"}:
-        return float(str(raw))
+        # apply_bulk_scalars re-invokes coerce on already-stored mm floats.
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            return float(raw)
+        label = "Width" if field == "width" else "Height"
+        return parse_magnitude_mm(
+            field_label=label,
+            raw=str(raw) if raw is not None else None,
+        )
     if field in {"release_date", "end_date"}:
         if isinstance(raw, date):
             return raw

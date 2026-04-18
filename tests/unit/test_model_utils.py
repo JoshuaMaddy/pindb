@@ -2,7 +2,14 @@
 
 import pytest
 
-from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
+from pindb.model_utils import (
+    MagnitudeParseError,
+    empty_str_list_to_none,
+    empty_str_to_none,
+    magnitude_is_valid,
+    magnitude_to_mm,
+    parse_magnitude_mm,
+)
 
 
 @pytest.mark.unit
@@ -89,6 +96,21 @@ class TestMagnitudeToMm:
     def test_empty_string_returns_zero(self):
         assert magnitude_to_mm("") == 0
 
-    def test_leading_text_ignored(self):
-        # Regex uses .*? so leading text is ok
-        assert magnitude_to_mm("size: 12 mm") == pytest.approx(12.0)
+    def test_leading_text_invalid(self):
+        assert magnitude_to_mm("size: 12 mm") == 0
+        assert not magnitude_is_valid("size: 12 mm")
+
+    def test_magnitude_is_valid(self):
+        assert magnitude_is_valid("")
+        assert magnitude_is_valid("  ")
+        assert magnitude_is_valid("12 mm")
+        assert not magnitude_is_valid("12")
+        assert not magnitude_is_valid("12 mmm")
+
+    def test_parse_magnitude_mm(self):
+        assert parse_magnitude_mm("Width", None) is None
+        assert parse_magnitude_mm("Width", "") is None
+        assert parse_magnitude_mm("Width", "  ") is None
+        assert parse_magnitude_mm("Width", "12 mm") == pytest.approx(12.0)
+        with pytest.raises(MagnitudeParseError):
+            parse_magnitude_mm("Width", "12")

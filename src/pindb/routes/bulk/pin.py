@@ -28,10 +28,9 @@ from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.tag import apply_pin_tags, normalize_tag_name
 from pindb.file_handler import save_image
-from pindb.model_utils import magnitude_to_mm
+from pindb.model_utils import parse_magnitude_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
-from pindb.search.search import search_entity_options
 from pindb.search.update import TAGS_INDEX
 from pindb.templates.bulk.pin import bulk_pin_page
 
@@ -229,6 +228,9 @@ async def post_bulk_pins(
                 }
                 links: set[Link] = {Link(path=url) for url in row.links if url}
 
+                width_mm = parse_magnitude_mm(field_label="Width", raw=row.width)
+                height_mm = parse_magnitude_mm(field_label="Height", raw=row.height)
+
                 new_pin = Pin(
                     name=row.name,
                     acquisition_type=row.acquisition_type,
@@ -248,10 +250,8 @@ async def post_bulk_pins(
                     end_date=row.end_date,
                     funding_type=row.funding_type,
                     posts=row.posts,
-                    width=magnitude_to_mm(magnitude=row.width) if row.width else None,
-                    height=magnitude_to_mm(magnitude=row.height)
-                    if row.height
-                    else None,
+                    width=width_mm,
+                    height=height_mm,
                     description=row.description,
                 )
 

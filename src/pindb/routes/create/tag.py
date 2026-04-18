@@ -2,9 +2,11 @@ from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from pindb.database import Tag, TagAlias, TagCategory, session_maker
 from pindb.database.tag import normalize_tag_name
+from pindb.htmx_toast import is_unique_violation, unique_constraint_response
 from pindb.search.update import update_tag
 from pindb.templates.create_and_edit.tag import tag_form
 
@@ -33,27 +35,32 @@ def post_create_tag(
     implication_ids: list[int] = Form(default_factory=list),
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        tag = Tag(
-            name=normalize_tag_name(name),
-            description=description or None,
-            category=category,
-        )
-        session.add(instance=tag)
-        session.flush()
+    try:
+        with session_maker.begin() as session:
+            tag = Tag(
+                name=normalize_tag_name(name),
+                description=description or None,
+                category=category,
+            )
+            session.add(instance=tag)
+            session.flush()
 
-        if implication_ids:
-            implied_tags = session.scalars(
-                select(Tag).where(Tag.id.in_(implication_ids))
-            ).all()
-            tag.implications = set(implied_tags)
+            if implication_ids:
+                implied_tags = session.scalars(
+                    select(Tag).where(Tag.id.in_(implication_ids))
+                ).all()
+                tag.implications = set(implied_tags)
 
-        tag.aliases = [
-            TagAlias(alias=normalize_tag_name(a)) for a in aliases if a.strip()
-        ]
+            tag.aliases = [
+                TagAlias(alias=normalize_tag_name(a)) for a in aliases if a.strip()
+            ]
 
-        session.flush()
-        tag_id: int = tag.id
+            session.flush()
+            tag_id: int = tag.id
+    except IntegrityError as exc:
+        if not is_unique_violation(exc):
+            raise
+        return unique_constraint_response(request=request)
 
     update_tag(tag=tag)
 

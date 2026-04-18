@@ -21,6 +21,7 @@ from markupsafe import Markup
 
 from pindb.database.currency import Currency
 from pindb.models import AcquisitionType, FundingType
+from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.templates.base import html_base
 
 with open(
@@ -52,6 +53,7 @@ def bulk_pin_page(
             {"value": f, "text": f.replace("_", " ").title()} for f in FundingType
         ],
         "defaultCurrencyId": 999,
+        "magnitudeInputPattern": MAGNITUDE_INPUT_PATTERN,
     }
 
     optional_cols: list[tuple[str, str]] = [

@@ -31,6 +31,7 @@ from markupsafe import Markup
 from pindb.database.tag import Tag
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
+from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.routes.bulk._helpers import TagMode
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
@@ -236,22 +237,24 @@ def _scalar_section() -> Fragment:
             ),
             _scalar_row(
                 field="width",
-                label_text="Width (mm)",
+                label_text="Width",
                 widget=input(
-                    type="number",
+                    type="text",
                     name="width_value",
-                    step="0.01",
-                    min=0,
+                    autocomplete="off",
+                    pattern=MAGNITUDE_INPUT_PATTERN,
+                    placeholder="e.g. 40mm or 1.5in",
                 ),
             ),
             _scalar_row(
                 field="height",
-                label_text="Height (mm)",
+                label_text="Height",
                 widget=input(
-                    type="number",
+                    type="text",
                     name="height_value",
-                    step="0.01",
-                    min=0,
+                    autocomplete="off",
+                    pattern=MAGNITUDE_INPUT_PATTERN,
+                    placeholder="e.g. 40mm or 1.5in",
                 ),
             ),
             _scalar_row(

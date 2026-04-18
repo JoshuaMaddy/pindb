@@ -3,7 +3,7 @@ from datetime import date
 from typing import Annotated, Sequence
 from uuid import UUID
 
-from fastapi import Form, Request, UploadFile
+from fastapi import Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
@@ -16,7 +16,12 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
-from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
+from pindb.model_utils import (
+    MagnitudeParseError,
+    empty_str_list_to_none,
+    empty_str_to_none,
+    parse_magnitude_mm,
+)
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.search.update import update_pin
@@ -104,6 +109,12 @@ async def post_create_pin(
 ) -> HTMLResponse:
     LOGGER.info(msg=f"Creating Pin with form: {await request.form()}")
 
+    try:
+        width_mm = parse_magnitude_mm(field_label="Width", raw=width)
+        height_mm = parse_magnitude_mm(field_label="Height", raw=height)
+    except MagnitudeParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     back_image_guid: UUID | None = None
     front_image_guid: UUID = await save_image(file=front_image)
 
@@ -149,8 +160,8 @@ async def post_create_pin(
             end_date=end_date,
             funding_type=funding_type,
             posts=posts,
-            width=magnitude_to_mm(magnitude=width) if width else width,  # type: ignore
-            height=magnitude_to_mm(magnitude=height) if height else height,  # type: ignore
+            width=width_mm,
+            height=height_mm,
             back_image_guid=back_image_guid,
             description=None,
             artists=pin_artists,
@@ -168,9 +179,9 @@ async def post_create_pin(
             select(Pin)
             .where(Pin.id == pin_id)
             .options(
-                selectinload(Pin.shops),
+                selectinload(Pin.shops).selectinload(Shop.aliases),
                 selectinload(Pin.tags),
-                selectinload(Pin.artists),
+                selectinload(Pin.artists).selectinload(Artist.aliases),
             )
         )
     if created_pin is not None:

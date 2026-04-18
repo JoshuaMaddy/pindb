@@ -211,9 +211,9 @@ def _fetch_all(
     return (
         session.scalars(
             select(Pin).options(
-                selectinload(Pin.shops),
+                selectinload(Pin.shops).selectinload(Shop.aliases),
                 selectinload(Pin.tags),
-                selectinload(Pin.artists),
+                selectinload(Pin.artists).selectinload(Artist.aliases),
             )
         ).all(),
         session.scalars(select(Tag).options(selectinload(Tag.aliases))).all(),

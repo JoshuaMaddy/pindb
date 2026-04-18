@@ -16,12 +16,10 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from pindb.database.artist import Artist
 from pindb.database.joins import pins_artists
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
-from pindb.database.tag import Tag, TagCategory
-from pindb.database.pin_set import PinSet
+from pindb.database.tag import TagCategory
 from pindb.database.joins import pin_set_memberships
 from tests.factories.artist import ArtistFactory
 from tests.factories.pin import PinFactory
@@ -67,7 +65,7 @@ class TestBulkEditFromArtistAsAdmin:
             data={
                 "apply_field": ["posts", "width"],
                 "posts_value": "3",
-                "width_value": "42.5",
+                "width_value": "42.5mm",
                 "tag_ids": [str(tag_new.id)],
                 "tag_mode": "add",
             },
@@ -88,6 +86,24 @@ class TestBulkEditFromArtistAsAdmin:
         assert db_session.scalar(select(PendingEdit).limit(1)) is None, (
             "Admin bulk edit should not create any pending edits"
         )
+
+    def test_invalid_width_returns_400(self, admin_client, db_session, admin_user):
+        artist = ArtistFactory(approved=True, created_by=admin_user)
+        pin = PinFactory(approved=True, created_by=admin_user)
+        _link_pin_to_artist(db_session, pin.id, artist.id)
+
+        response = admin_client.post(
+            "/bulk-edit/apply",
+            params={"source_type": "artist", "source_id": artist.id},
+            data={
+                "apply_field": ["width"],
+                "width_value": "not-valid",
+                "tag_ids": [],
+                "tag_mode": "add",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 400
 
 
 @pytest.mark.integration

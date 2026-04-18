@@ -35,7 +35,7 @@ from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 
-from pindb.model_utils import MAGNITUDE_PATTERN
+from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 
 with open(
     file=Path(__file__).parent.parent / "js/pin_creation.js",
@@ -547,7 +547,7 @@ def _dimension_field(
         name=name,
         label_text=label_text,
         value=f"{value_mm}mm" if value_mm else None,
-        pattern=MAGNITUDE_PATTERN,
+        pattern=MAGNITUDE_INPUT_PATTERN,
         placeholder="e.g. 40mm or 1.5in",
     )
 
