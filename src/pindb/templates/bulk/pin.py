@@ -230,7 +230,7 @@ def bulk_pin_page(
                     class_="bg-pin-main border border-pin-border rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
                 )[
                     div(class_="flex items-center justify-between")[
-                        h1(id="modal-title", class_="text-xl font-bold")[
+                        h1(id="modal-title", class_="text-lg font-bold sm:text-xl")[
                             "Import Complete"
                         ],
                         button(

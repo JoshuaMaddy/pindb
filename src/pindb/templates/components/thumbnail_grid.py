@@ -11,18 +11,15 @@ def thumbnail_grid(
     request: Request,
     pins: PinSet | Sequence[Pin] | set[Pin],
 ) -> Element:
-    if isinstance(pins, set):
-        if len(pins) <= 4:
-            pins: list[Pin] = list(pins)  # ty:ignore[invalid-argument-type, invalid-assignment]
-        else:
-            pins: list[Pin] = sample(list(pins), k=4)
-    elif isinstance(pins, PinSet):
-        if len(pins.pins) >= 5:
-            pins = pins.pins
-        else:
-            pins: list[Pin] = sample(pins.pins, k=4)
-    elif len(pins) >= 5:
-        pins: list[Pin] = sample(pins, k=4)
+    if isinstance(pins, PinSet):
+        pin_list: list[Pin] = list(pins.pins)
+    elif isinstance(pins, set):
+        pin_list = list(pins)
+    else:
+        pin_list = list(pins)
+
+    if len(pin_list) > 4:
+        pin_list = sample(pin_list, k=4)
 
     elements: list[VoidElement | Element] = [
         img(
@@ -33,7 +30,7 @@ def thumbnail_grid(
             ),
             class_="object-contain h-full",
         )
-        for pin in pins
+        for pin in pin_list
     ]
 
     while len(elements) < 4:

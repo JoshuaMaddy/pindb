@@ -7,7 +7,7 @@ from pindb.templates.legal._shared import legal_container
 
 
 def _h2(text: str) -> Element:
-    return h2(class_="text-xl font-semibold mt-6 mb-2")[text]
+    return h2(class_="text-lg font-semibold mt-6 mb-2 sm:text-xl")[text]
 
 
 def _p(text: str) -> Element:
@@ -32,7 +32,7 @@ def privacy_page(request: Request) -> Element:
         request=request,
         body_content=legal_container(
             div[
-                h1(class_="text-3xl font-bold mb-4")["Privacy Policy"],
+                h1(class_="text-2xl font-bold mb-4 sm:text-3xl")["Privacy Policy"],
                 _h2("1. Who we are"),
                 p(class_="mb-3")[
                     "PinDB is a community-run catalog of collectible pins. "

@@ -34,6 +34,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
+from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.page_heading import page_heading
@@ -211,24 +212,28 @@ def _entity_section(
                 class_="text-xs font-semibold px-2 py-0.5 rounded bg-pin-base-700 text-pin-base-300"
             )[str(len(items))],
         ],
-        table(class_="w-full text-sm")[
-            thead[
-                tr(class_="text-left text-pin-base-300 border-b border-pin-base-700")[
-                    th(class_="py-2 pr-6 font-medium")["Name"],
-                    th(class_="py-2 pr-6 font-medium")["Submitted by"],
-                    th(class_="py-2 pr-6 font-medium")["Submitted at"],
-                    th(class_="py-2 font-medium")["Actions"],
-                ]
-            ],
-            tbody[
-                [
-                    _entity_row(
-                        entity_type=entity_type,
-                        entity=item,
-                        creators=creators,
-                    )
-                    for item in items
-                ]
+        div(class_=TABLE_LIST_SCROLL)[
+            table(class_="w-full text-sm")[
+                thead[
+                    tr(
+                        class_="text-left text-pin-base-300 border-b border-pin-base-700"
+                    )[
+                        th(class_="py-2 pr-6 font-medium")["Name"],
+                        th(class_="py-2 pr-6 font-medium")["Submitted by"],
+                        th(class_="py-2 pr-6 font-medium")["Submitted at"],
+                        th(class_="py-2 font-medium")["Actions"],
+                    ]
+                ],
+                tbody[
+                    [
+                        _entity_row(
+                            entity_type=entity_type,
+                            entity=item,
+                            creators=creators,
+                        )
+                        for item in items
+                    ]
+                ],
             ],
         ],
     ]
@@ -325,33 +330,37 @@ def _edit_groups_section(
             "Edits proposed by editors to approved entries. "
             "Approving applies the accumulated chain to the canonical entry."
         ],
-        table(class_="w-full text-sm")[
-            thead[
-                tr(class_="text-left text-pin-base-300 border-b border-pin-base-700")[
-                    th(class_="py-2 pr-6 font-medium")["Entity"],
-                    th(class_="py-2 pr-6 font-medium")["Edits"],
-                    th(class_="py-2 pr-6 font-medium")["Latest editor"],
-                    th(class_="py-2 pr-6 font-medium")["Latest at"],
-                    th(class_="py-2 font-medium")["Actions"],
-                ]
-            ],
-            tbody[
-                [
-                    _edit_group_row(
-                        table_name=table_name,
-                        entity_id=entity_id,
-                        chain=chain,
-                        entity=entities.get((table_name, entity_id)),
-                        creators=creators,
-                    )
-                    for (table_name, entity_id), chain in sorted(
-                        edit_groups.items(),
-                        key=lambda group_entry: (
-                            group_entry[0][0],
-                            group_entry[0][1],
-                        ),
-                    )
-                ]
+        div(class_=TABLE_LIST_SCROLL)[
+            table(class_="w-full text-sm")[
+                thead[
+                    tr(
+                        class_="text-left text-pin-base-300 border-b border-pin-base-700"
+                    )[
+                        th(class_="py-2 pr-6 font-medium")["Entity"],
+                        th(class_="py-2 pr-6 font-medium")["Edits"],
+                        th(class_="py-2 pr-6 font-medium")["Latest editor"],
+                        th(class_="py-2 pr-6 font-medium")["Latest at"],
+                        th(class_="py-2 font-medium")["Actions"],
+                    ]
+                ],
+                tbody[
+                    [
+                        _edit_group_row(
+                            table_name=table_name,
+                            entity_id=entity_id,
+                            chain=chain,
+                            entity=entities.get((table_name, entity_id)),
+                            creators=creators,
+                        )
+                        for (table_name, entity_id), chain in sorted(
+                            edit_groups.items(),
+                            key=lambda group_entry: (
+                                group_entry[0][0],
+                                group_entry[0][1],
+                            ),
+                        )
+                    ]
+                ],
             ],
         ],
     ]

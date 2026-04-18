@@ -34,6 +34,7 @@ from pindb.templates.components.empty_state import empty_state
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.pill_link import pill_link
 from pindb.templates.components.pin_grid import pin_grid
+from pindb.templates.list.base import TABLE_LIST_SCROLL
 
 PAGE_SIZE: int = 24
 
@@ -45,10 +46,15 @@ _TOGGLE_INACTIVE: str = (
     " text-pin-base-300 text-sm no-underline hover:border-accent hover:text-pin-base-text"
 )
 _TH_CLASS: str = (
-    "text-left py-2 px-2 font-medium text-pin-base-300 border-b border-pin-base-400"
+    "text-left whitespace-nowrap py-2 px-2 font-medium text-pin-base-300 "
+    "border-b border-pin-base-400"
 )
 _TD_CLASS: str = "py-2 px-2 border-b border-pin-base-400 align-middle"
-_TD_CLASS_NO_BORDER: str = "py-2 px-2 align-middle"
+_TD_LINK: str = (
+    "py-2 px-2 border-b border-pin-base-400 align-middle max-w-none "
+    "[&_a]:whitespace-nowrap"
+)
+_TABLE_PIN_LIST: str = "border-collapse text-sm w-max min-w-full"
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +123,7 @@ def _list_shell(
                         breadcrumb_label,
                     ]
                 ),
-                div(class_="flex items-baseline justify-between gap-4")[
+                div(class_="flex w-full min-w-0 flex-col gap-2")[
                     page_heading(
                         icon="user",
                         text=f"{profile_user.username} / {breadcrumb_label}",
@@ -167,7 +173,9 @@ def _pin_button(request: Request, pin: Pin) -> Element:
 def _shop_links(request: Request, shops: set[Shop]) -> Element:
     if not shops:
         return span(class_="text-pin-base-400")["—"]
-    return div(class_="flex flex-wrap gap-x-2 gap-y-1")[
+    return div(
+        class_="inline-flex max-w-none flex-wrap gap-x-2 gap-y-1 [&_a]:whitespace-nowrap",
+    )[
         [
             pill_link(
                 href=str(request.url_for("get_shop", id=shop.id)),
@@ -181,7 +189,9 @@ def _shop_links(request: Request, shops: set[Shop]) -> Element:
 def _artist_links(request: Request, artists: set[Artist]) -> Element:
     if not artists:
         return span(class_="text-pin-base-400")["—"]
-    return div(class_="flex flex-wrap gap-x-2 gap-y-1")[
+    return div(
+        class_="inline-flex max-w-none flex-wrap gap-x-2 gap-y-1 [&_a]:whitespace-nowrap",
+    )[
         [
             pill_link(
                 href=str(request.url_for("get_artist", id=artist.id)),
@@ -235,8 +245,6 @@ def _pin_grouped_table(
 
         for index, entry in enumerate(group):
             is_first: bool = index == 0
-            is_last: bool = index == span_count - 1
-            grade_td_class: str = _TD_CLASS if is_last else _TD_CLASS_NO_BORDER
 
             row_cells: list[Element] = []
             if is_first:
@@ -245,13 +253,13 @@ def _pin_grouped_table(
                         td(class_=_TD_CLASS, rowspan=span_count)[
                             _thumbnail(request=request, pin=pin)
                         ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
+                        td(class_=_TD_LINK, rowspan=span_count)[
                             _pin_button(request=request, pin=pin)
                         ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
+                        td(class_=_TD_LINK, rowspan=span_count)[
                             _shop_links(request=request, shops=pin.shops)
                         ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
+                        td(class_=_TD_LINK, rowspan=span_count)[
                             _artist_links(request=request, artists=pin.artists)
                         ],
                     ]
@@ -259,17 +267,19 @@ def _pin_grouped_table(
             row_cells.extend(extra_cells(entry))
             rows.append(tr[row_cells])
 
-    return table(class_="w-full border-collapse text-sm")[
-        thead[
-            tr[
-                th(class_=_TH_CLASS)[""],
-                th(class_=_TH_CLASS)["Name"],
-                th(class_=_TH_CLASS)["Shops"],
-                th(class_=_TH_CLASS)["Artists"],
-                [th(class_=_TH_CLASS)[header] for header in extra_headers],
-            ]
+    return div(class_=TABLE_LIST_SCROLL)[
+        table(class_=_TABLE_PIN_LIST)[
+            thead[
+                tr[
+                    th(class_=_TH_CLASS)[""],
+                    th(class_=_TH_CLASS)["Name"],
+                    th(class_=_TH_CLASS)["Shops"],
+                    th(class_=_TH_CLASS)["Artists"],
+                    [th(class_=_TH_CLASS)[header] for header in extra_headers],
+                ]
+            ],
+            tbody[rows],
         ],
-        tbody[rows],
     ]
 
 
@@ -308,27 +318,31 @@ def favorites_list_page(
 
 
 def _favorites_table(request: Request, pins: list[Pin]) -> Element:
-    return table(class_="w-full border-collapse text-sm")[
-        thead[
-            tr[
-                th(class_=_TH_CLASS)[""],
-                th(class_=_TH_CLASS)["Name"],
-                th(class_=_TH_CLASS)["Shops"],
-                th(class_=_TH_CLASS)["Artists"],
-            ]
-        ],
-        tbody[
-            [
+    return div(class_=TABLE_LIST_SCROLL)[
+        table(class_=_TABLE_PIN_LIST)[
+            thead[
                 tr[
-                    td(class_=_TD_CLASS)[_thumbnail(request=request, pin=pin)],
-                    td(class_=_TD_CLASS)[_pin_button(request=request, pin=pin)],
-                    td(class_=_TD_CLASS)[_shop_links(request=request, shops=pin.shops)],
-                    td(class_=_TD_CLASS)[
-                        _artist_links(request=request, artists=pin.artists)
-                    ],
+                    th(class_=_TH_CLASS)[""],
+                    th(class_=_TH_CLASS)["Name"],
+                    th(class_=_TH_CLASS)["Shops"],
+                    th(class_=_TH_CLASS)["Artists"],
                 ]
-                for pin in pins
-            ]
+            ],
+            tbody[
+                [
+                    tr[
+                        td(class_=_TD_CLASS)[_thumbnail(request=request, pin=pin)],
+                        td(class_=_TD_LINK)[_pin_button(request=request, pin=pin)],
+                        td(class_=_TD_LINK)[
+                            _shop_links(request=request, shops=pin.shops)
+                        ],
+                        td(class_=_TD_LINK)[
+                            _artist_links(request=request, artists=pin.artists)
+                        ],
+                    ]
+                    for pin in pins
+                ]
+            ],
         ],
     ]
 

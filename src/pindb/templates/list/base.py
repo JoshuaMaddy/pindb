@@ -10,6 +10,7 @@ from pindb.templates.components.view_toggle import view_toggle
 
 SECTION_ID: str = "entity-list-section"
 DEFAULT_PER_PAGE: int = 100
+TABLE_LIST_SCROLL: str = "w-full min-w-0 overflow-x-auto"
 
 
 def list_search_input(
@@ -57,7 +58,10 @@ def entity_list_section(
             )
         )[*items]
     else:
-        content = div(class_="flex flex-col gap-2")[*items]
+        # overflow-visible so card hover:scale does not clip or spawn scrollbars
+        content = div(class_="flex w-full min-w-0 flex-col gap-2 overflow-visible")[
+            *items,
+        ]
 
     pagination_extra: dict[str, str] = {"view": view.value}
     if extra_params:

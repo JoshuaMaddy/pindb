@@ -7,7 +7,7 @@ def icon_list_item(
     value: str,
 ) -> Element:
     return div(class_="flex flex-wrap gap-2 items-baseline")[
-        p(class_="text-lg font-semibold")[
+        p(class_="text-base font-semibold sm:text-lg")[
             i(
                 data_lucide=icon,
                 class_="inline-block pr-2",

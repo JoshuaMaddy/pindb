@@ -500,7 +500,7 @@ def __grades(pin: Pin) -> Element | None:
     if not pin.grades:
         return None
     return div[
-        p(class_="text-lg font-semibold")[
+        p(class_="text-base font-semibold sm:text-lg")[
             i(data_lucide="banknote", class_="inline-block pr-2"),
             "Grades",
         ],
