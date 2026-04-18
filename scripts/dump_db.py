@@ -218,6 +218,7 @@ def _cmd_load_docker(args: argparse.Namespace, *, dump_path: Path) -> None:
         "-f",
         str(compose),
         "exec",
+        "-i",
         "-T",
         service,
         "sh",
@@ -225,7 +226,7 @@ def _cmd_load_docker(args: argparse.Namespace, *, dump_path: Path) -> None:
         inner,
     ]
     print(
-        f"Running: docker compose -f {compose.name} exec {service} "
+        f"Running: docker compose -f {compose.name} exec -i -T {service} "
         f"{'psql' if effective_format == 'plain' else 'pg_restore'} <- {dump_path}",
         file=sys.stderr,
     )
