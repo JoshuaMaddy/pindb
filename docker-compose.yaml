@@ -24,6 +24,10 @@ services:
 
   app:
     build: .
+    # Load host .env into the container. Compose only uses .env for ${VAR} substitution in
+    # this file unless we pass it here; explicit `environment` below still overrides duplicates.
+    env_file:
+      - .env
     restart: unless-stopped
     ports:
       - "8000:8000"

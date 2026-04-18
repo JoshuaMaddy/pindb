@@ -317,6 +317,8 @@ Pending items appear in create/edit form selection lists with a `(P) ` name pref
 - **Tag** — hierarchical (self-referential `parent_id`).
 
 ## Deployment (Docker)
+The `app` service uses `env_file: .env` so variables from the project `.env` (e.g. `SECRET_KEY`, OAuth) are passed into the container. Values under `environment:` in `docker-compose.yaml` override the same keys from `.env` — so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
+
 ```bash
 # Production
 docker compose up -d
