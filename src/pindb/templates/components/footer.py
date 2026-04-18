@@ -15,10 +15,14 @@ def footer() -> Element:
 
     return footer_el(class_="mt-8 bg-pin-base-600 text-pin-base-100 text-sm px-5 py-6")[
         div(class_="max-w-5xl mx-auto flex flex-col gap-3")[
-            div(class_="flex flex-wrap gap-4 items-center")[
-                p(class_="font-semibold")[f"\u00a9 {year} PinDB"],
-                p(class_="text-pin-base-200")[f"v{__version__}"],
-                div(class_="flex gap-4 ml-auto")[
+            div(
+                class_="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4"
+            )[
+                div(class_="flex flex-wrap gap-x-4 gap-y-1 items-center")[
+                    p(class_="font-semibold")[f"\u00a9 {year} PinDB"],
+                    p(class_="text-pin-base-200")[f"v{__version__}"],
+                ],
+                div(class_="flex flex-wrap gap-x-4 gap-y-1 items-center")[
                     a(class_=link_cls, href="/about")["About"],
                     a(class_=link_cls, href="/privacy")["Privacy"],
                     a(class_=link_cls, href="/terms")["Terms"],

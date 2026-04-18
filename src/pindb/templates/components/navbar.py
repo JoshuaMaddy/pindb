@@ -1,16 +1,26 @@
 from fastapi import Request
-from htpy import Element, a, button, div, form, nav
+from htpy import Element, a, button, div, form, i, nav
 
 from pindb.database.user import User
 
+_LINK: str = "no-underline text-pin-base-100 hover:text-accent"
 
-def navbar(
-    request: Request | None = None,
-) -> Element:
-    user: User | None = getattr(getattr(request, "state", None), "user", None)
 
+def _staff_nav_link_items(user: User) -> list[Element]:
+    items: list[Element] = [
+        a(class_=_LINK, href="/create")["Create"],
+        a(class_=_LINK, href="/list")["List"],
+        a(class_=_LINK, href="/search/pin")["Search Pin"],
+    ]
+    if user.is_admin:
+        items.append(a(class_=_LINK, href="/admin")["Admin"])
+    return items
+
+
+def _auth_block(user: User | None, *, ml_auto: bool) -> Element:
+    cls: str = "flex items-center gap-2" + (" ml-auto" if ml_auto else "")
     if user:
-        auth_link: Element = div(class_="ml-auto flex items-center gap-2")[
+        return div(class_=cls)[
             a(
                 class_="no-underline text-pin-base-100 hover:text-accent",
                 href=f"/user/{user.username}",
@@ -22,21 +32,64 @@ def navbar(
                 )["Logout"]
             ],
         ]
-    else:
-        auth_link: Element = a(
-            class_="ml-auto no-underline text-pin-base-100",
-            href="/auth/login",
-        )["Login"]
+    return a(
+        class_=cls + " no-underline text-pin-base-100",
+        href="/auth/login",
+    )["Login"]
 
-    return nav(class_="flex gap-4 px-2 py-1 bg-pin-base-500")[
-        a(class_="no-underline text-accent font-bold", href="/")["PinDB"],
-        user
-        and (user.is_admin or user.is_editor)
-        and a(class_="no-underline text-pin-base-100", href="/create")["Create"],
-        a(class_="no-underline text-pin-base-100", href="/list")["List"],
-        a(class_="no-underline text-pin-base-100", href="/search/pin")["Search Pin"],
-        user
-        and user.is_admin
-        and a(class_="no-underline text-pin-base-100", href="/admin")["Admin"],
-        auth_link,
+
+def navbar(
+    request: Request | None = None,
+) -> Element:
+    user: User | None = getattr(getattr(request, "state", None), "user", None)
+    is_staff: bool = bool(user and (user.is_admin or user.is_editor))
+
+    if not is_staff:
+        return nav(
+            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-pin-base-500"
+        )[
+            a(class_="no-underline text-accent font-bold shrink-0", href="/")["PinDB"],
+            a(class_=_LINK, href="/list")["List"],
+            a(class_=_LINK, href="/search/pin")["Search Pin"],
+            _auth_block(user, ml_auto=True),
+        ]
+
+    assert user is not None
+    return nav(class_="px-2 py-1 bg-pin-base-500")[
+        div(
+            class_="flex flex-col gap-2 sm:gap-0 w-full",
+            x_data="{ open: false }",
+            **{
+                "@keydown.escape.window": "open = false",
+                "@click.outside": "open = false",
+            },
+        )[
+            div(class_="flex items-center gap-3 w-full min-w-0")[
+                a(
+                    class_="no-underline text-accent font-bold shrink-0",
+                    href="/",
+                )["PinDB"],
+                div(
+                    class_="hidden sm:flex flex-1 flex-wrap items-center gap-x-4 gap-y-1 min-w-0"
+                )[*_staff_nav_link_items(user)],
+                div(class_="flex items-center gap-2 shrink-0 ml-auto")[
+                    button(
+                        type="button",
+                        class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-100 hover:bg-pin-base-450",
+                        aria_controls="staff-nav-panel",
+                        **{
+                            "@click": "open = !open",
+                            ":aria-expanded": "open",
+                            "aria-label": "Toggle navigation",
+                        },
+                    )[i(data_lucide="menu", class_="w-5 h-5")],
+                    _auth_block(user, ml_auto=False),
+                ],
+            ],
+            div(
+                id="staff-nav-panel",
+                class_="sm:hidden flex flex-col gap-2 border-t border-pin-base-400 pt-2",
+                x_show="open",
+            )[*_staff_nav_link_items(user)],
+        ]
     ]

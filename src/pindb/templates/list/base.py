@@ -51,7 +51,10 @@ def entity_list_section(
 ) -> Element:
     if view == EntityListView.grid:
         content: Element = div(
-            class_="grid grid-cols-[repeat(auto-fill,_minmax(180px,_1fr))] gap-3"
+            class_=(
+                "grid grid-cols-[repeat(auto-fill,_minmax(100px,_1fr))] "
+                "sm:grid-cols-[repeat(auto-fill,_minmax(180px,_1fr))] gap-3"
+            )
         )[*items]
     else:
         content = div(class_="flex flex-col gap-2")[*items]
