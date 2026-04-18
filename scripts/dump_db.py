@@ -209,7 +209,7 @@ def _cmd_load_docker(args: argparse.Namespace, *, dump_path: Path) -> None:
             "set -eu\n"
             'export PGPASSWORD="$POSTGRES_PASSWORD"\n'
             f'pg_restore -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" '
-            f"--no-owner --no-acl {clean_part} {verbose_part} -\n"
+            f"--no-owner --no-acl {clean_part} {verbose_part}\n"
         )
 
     cmd = [
