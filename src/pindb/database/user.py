@@ -33,6 +33,7 @@ class User(AuditMixin, MappedAsDataclass, Base):
     hashed_password: Mapped[str | None] = mapped_column(default=None)
     is_admin: Mapped[bool] = mapped_column(default=False)
     is_editor: Mapped[bool] = mapped_column(default=False)
+    theme: Mapped[str] = mapped_column(default="mocha", server_default="mocha")
 
     sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user",
@@ -82,6 +83,7 @@ class User(AuditMixin, MappedAsDataclass, Base):
             yield "email", self.email, None
             yield "is_admin", self.is_admin, False
             yield "is_editor", self.is_editor, False
+            yield "theme", self.theme, "mocha"
             yield "created_at", self.created_at
         except Exception:
             yield "detached", True

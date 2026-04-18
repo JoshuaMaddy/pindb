@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 
@@ -5,6 +6,26 @@ from fastapi import Request
 from htpy import BaseElement, body, head, html, link, meta, script
 from htpy import title as title_el
 from markupsafe import Markup
+
+from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+
+_TAG_CATEGORY_DATA_JS: str = (
+    "window.TagCategoryData = "
+    + json.dumps(
+        {
+            cat.value: {"icon": CATEGORY_ICONS[cat], "color": CATEGORY_COLORS[cat]}
+            for cat in CATEGORY_ICONS
+        }
+    )
+    + ";"
+)
+
+with open(
+    file=Path(__file__).parent / "js/tag_select.js",
+    mode="r",
+    encoding="utf-8",
+) as _fp:
+    _TAG_SELECT_SCRIPT: str = _fp.read()
 
 with open(
     file=Path(__file__).parent / "js/form_persist.js",
@@ -34,7 +55,8 @@ def html_base(
     title: str = "Document",
     request: Request | None = None,
 ):
-    return html(lang="en", class_="mocha bg-pin-base-550")[
+    theme: str = getattr(request.state, "theme", "mocha") if request else "mocha"
+    return html(lang="en", class_=f"{theme} bg-pin-base-550")[
         head[
             meta(charset="UTF-8"),
             meta(name="viewport", content="width=device-width, initial-scale=1.0"),
@@ -78,11 +100,21 @@ def html_base(
             Markup(
                 object="""
 var element = document.getElementById('back-link');
-if (element != null){
-    element.setAttribute('href', document.referrer);
-    element.onclick = function() {
-    history.back();
-    return false;
+if (element != null) {
+    var storageKey = 'pin_back:' + window.location.pathname;
+    var params = new URLSearchParams(window.location.search);
+    var backUrl = params.get('back');
+    if (backUrl) {
+        sessionStorage.setItem(storageKey, backUrl);
+        element.setAttribute('href', backUrl);
+    } else {
+        var stored = sessionStorage.getItem(storageKey);
+        if (stored) {
+            element.setAttribute('href', stored);
+        } else {
+            element.setAttribute('href', document.referrer || '#');
+            element.onclick = function() { history.back(); return false; };
+        }
     }
 }
 document.body.addEventListener('htmx:afterSwap', function() {
@@ -91,6 +123,8 @@ document.body.addEventListener('htmx:afterSwap', function() {
 """
             )
         ],
+        script[Markup(object=_TAG_CATEGORY_DATA_JS)],
+        script[Markup(object=_TAG_SELECT_SCRIPT)],
         script[Markup(object=_FORM_PERSIST_SCRIPT)],
         script[Markup(object=_MARKDOWN_EDITOR_SCRIPT)],
         script_content and script[Markup(object=script_content)],

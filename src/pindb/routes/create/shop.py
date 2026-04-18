@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
 
-from pindb.database import Shop, session_maker
+from pindb.database import Shop, ShopAlias, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.search.update import update_shop
@@ -38,6 +38,7 @@ def post_create_shop(
         Form(),
         BeforeValidator(func=empty_str_list_to_none),
     ] = None,
+    aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
     with session_maker.begin() as session:
         new_links: set[Link] = (
@@ -51,6 +52,9 @@ def post_create_shop(
         )
 
         session.add(instance=shop)
+        session.flush()
+
+        shop.aliases = [ShopAlias(alias=a) for a in aliases if a.strip()]
         session.flush()
         shop_id: int = shop.id
 

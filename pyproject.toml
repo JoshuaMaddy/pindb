@@ -17,12 +17,14 @@ dependencies = [
     "markdown-it-py>=4.0.0",
     "meilisearch>=0.38.0",
     "nh3>=0.3.4",
+    "boto3>=1.38.0",
     "pillow>=12.0.0",
     "polars>=1.34.0",
     "psycopg[binary]>=3.2.10",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
     "sqlalchemy>=2.0.43",
+    "zxcvbn>=4.5.0",
 ]
 
 [dependency-groups]
@@ -33,11 +35,15 @@ dev = [
     "pindb",
     "pytest>=8.4.1",
     "pytest-env>=1.1.3",
+    "pytest-playwright>=0.5.0",
+    "pytest-xdist>=3.8.0",
     "testcontainers[postgres]>=4.8.0",
 ]
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib"]
+# e2e tests require Playwright browsers + Meilisearch container and are skipped
+# by default. Opt in via `pytest -m e2e` (or override with a custom -m expr).
+addopts = ["--import-mode=importlib", "-m", "not e2e"]
 pythonpath = "src"
 testpaths = ["tests"]
 env = [
@@ -52,6 +58,7 @@ markers = [
     "integration: tests requiring real PostgreSQL via testcontainers",
     "meili: tests requiring a real Meilisearch container",
     "slow: tests that are slow by nature",
+    "e2e: browser-level end-to-end tests (Playwright, live uvicorn + real containers)",
 ]
 
 [build-system]

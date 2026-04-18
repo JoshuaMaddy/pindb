@@ -8,10 +8,16 @@ import factory
 import tests.factories.base as _factory_base
 from sqlalchemy import select
 
+from datetime import datetime, timezone
+
 from pindb.database.currency import Currency
 from pindb.database.pin import Pin
 from pindb.models.acquisition_type import AcquisitionType
 from tests.factories.base import BaseFactory
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class PinFactory(BaseFactory):
@@ -22,6 +28,11 @@ class PinFactory(BaseFactory):
     name = factory.Sequence(lambda n: f"Test Pin {n}")
     acquisition_type = AcquisitionType.single
     front_image_guid = factory.LazyFunction(uuid.uuid4)
+
+    # Control params (not model fields) — set approved=False for a pending pin
+    class Params:
+        approved = True
+        created_by = None
 
     @factory.lazy_attribute
     def currency(self):
@@ -44,5 +55,23 @@ class PinFactory(BaseFactory):
 
     # Relationship defaults — empty sets (no grades/shops/artists unless specified)
     grades = factory.LazyFunction(set)
-    materials = factory.LazyFunction(set)
     shops = factory.LazyFunction(set)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        approved = kwargs.pop("approved", True)
+        created_by = kwargs.pop("created_by", None)
+        pin = super()._create(model_class, *args, **kwargs)
+        session = _factory_base._current_session
+        # Override audit/pending fields post-create (they have init=False).
+        if created_by is not None:
+            pin.created_by_id = (
+                created_by.id if hasattr(created_by, "id") else created_by
+            )
+        if approved:
+            pin.approved_at = _utc_now()
+        else:
+            pin.approved_at = None
+            pin.approved_by_id = None
+        session.flush()
+        return pin

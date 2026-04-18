@@ -4,21 +4,23 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from pindb.auth import AuthenticatedUser
 from pindb.database import Pin, UserOwnedPin, UserWantedPin, session_maker
+from pindb.templates.get.pin_collection import owned_panel_content, wanted_panel_content
 
 router = APIRouter(prefix="/user/pins", tags=["collection"])
 
 
 def _get_owned_entries(
-    db,
+    *,
+    session: Session,
     pin_id: int,
     user_id: int,
 ) -> list[UserOwnedPin]:
     return list(
-        db.scalars(
+        session.scalars(
             select(UserOwnedPin)
             .where(
                 UserOwnedPin.pin_id == pin_id,
@@ -30,12 +32,13 @@ def _get_owned_entries(
 
 
 def _get_wanted_entries(
-    db,
+    *,
+    session: Session,
     pin_id: int,
     user_id: int,
 ) -> list[UserWantedPin]:
     return list(
-        db.scalars(
+        session.scalars(
             select(UserWantedPin)
             .where(
                 UserWantedPin.pin_id == pin_id,
@@ -44,6 +47,58 @@ def _get_wanted_entries(
             .options(selectinload(UserWantedPin.grade))
         ).all()
     )
+
+
+def _render_owned_panel(
+    *,
+    request: Request,
+    pin_id: int,
+    user_id: int,
+) -> HTMLResponse:
+    with session_maker() as session:
+        pin: Pin | None = session.scalars(
+            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
+        ).first()
+        assert pin is not None
+        owned_entries = _get_owned_entries(
+            session=session, pin_id=pin_id, user_id=user_id
+        )
+
+        return HTMLResponse(
+            content=str(
+                owned_panel_content(
+                    request=request,
+                    pin=pin,
+                    owned_entries=owned_entries,
+                )
+            )
+        )
+
+
+def _render_wanted_panel(
+    *,
+    request: Request,
+    pin_id: int,
+    user_id: int,
+) -> HTMLResponse:
+    with session_maker() as session:
+        pin: Pin | None = session.scalars(
+            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
+        ).first()
+        assert pin is not None
+        wanted_entries = _get_wanted_entries(
+            session=session, pin_id=pin_id, user_id=user_id
+        )
+
+        return HTMLResponse(
+            content=str(
+                wanted_panel_content(
+                    request=request,
+                    pin=pin,
+                    wanted_entries=wanted_entries,
+                )
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +119,6 @@ def add_owned_pin(
         if pin is None:
             raise HTTPException(status_code=404, detail="Pin not found")
 
-        # Check for existing entry (same user/pin/grade)
         existing: UserOwnedPin | None = db.scalars(
             select(UserOwnedPin).where(
                 UserOwnedPin.user_id == current_user.id,
@@ -88,28 +142,7 @@ def add_owned_pin(
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
-    from pindb.templates.get.pin_collection import owned_panel_content
-
-    with session_maker() as db:
-        pin = db.scalars(
-            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
-        ).first()
-        assert pin is not None
-        owned_entries: list[UserOwnedPin] = _get_owned_entries(
-            db=db,
-            pin_id=pin_id,
-            user_id=current_user.id,
-        )
-
-    return HTMLResponse(
-        content=str(
-            owned_panel_content(
-                request=request,
-                pin=pin,
-                owned_entries=owned_entries,
-            )
-        )
-    )
+    return _render_owned_panel(request=request, pin_id=pin_id, user_id=current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -137,28 +170,7 @@ def remove_owned_pin(
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
-    from pindb.templates.get.pin_collection import owned_panel_content
-
-    with session_maker() as db:
-        pin: Pin | None = db.scalars(
-            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
-        ).first()
-        assert pin is not None
-        owned_entries: list[UserOwnedPin] = _get_owned_entries(
-            db=db,
-            pin_id=pin_id,
-            user_id=current_user.id,
-        )
-
-    return HTMLResponse(
-        content=str(
-            owned_panel_content(
-                request=request,
-                pin=pin,
-                owned_entries=owned_entries,
-            )
-        )
-    )
+    return _render_owned_panel(request=request, pin_id=pin_id, user_id=current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -190,28 +202,7 @@ def update_owned_pin(
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
-    from pindb.templates.get.pin_collection import owned_panel_content
-
-    with session_maker() as db:
-        pin: Pin | None = db.scalars(
-            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
-        ).first()
-        assert pin is not None
-        owned_entries: list[UserOwnedPin] = _get_owned_entries(
-            db=db,
-            pin_id=pin_id,
-            user_id=current_user.id,
-        )
-
-    return HTMLResponse(
-        content=str(
-            owned_panel_content(
-                request=request,
-                pin=pin,
-                owned_entries=owned_entries,
-            )
-        )
-    )
+    return _render_owned_panel(request=request, pin_id=pin_id, user_id=current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -251,28 +242,7 @@ def add_wanted_pin(
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
-    from pindb.templates.get.pin_collection import wanted_panel_content
-
-    with session_maker() as db:
-        pin = db.scalars(
-            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
-        ).first()
-        assert pin is not None
-        wanted_entries: list[UserWantedPin] = _get_wanted_entries(
-            db=db,
-            pin_id=pin_id,
-            user_id=current_user.id,
-        )
-
-    return HTMLResponse(
-        content=str(
-            wanted_panel_content(
-                request=request,
-                pin=pin,
-                wanted_entries=wanted_entries,
-            )
-        )
-    )
+    return _render_wanted_panel(request=request, pin_id=pin_id, user_id=current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -300,25 +270,4 @@ def remove_wanted_pin(
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
-    from pindb.templates.get.pin_collection import wanted_panel_content
-
-    with session_maker() as db:
-        pin: Pin | None = db.scalars(
-            select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
-        ).first()
-        assert pin is not None
-        wanted_entries: list[UserWantedPin] = _get_wanted_entries(
-            db=db,
-            pin_id=pin_id,
-            user_id=current_user.id,
-        )
-
-    return HTMLResponse(
-        content=str(
-            wanted_panel_content(
-                request=request,
-                pin=pin,
-                wanted_entries=wanted_entries,
-            )
-        )
-    )
+    return _render_wanted_panel(request=request, pin_id=pin_id, user_id=current_user.id)

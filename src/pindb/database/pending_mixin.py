@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 
@@ -18,6 +20,7 @@ class PendingAuditEntity(Protocol):
     approved_by_id: int | None
     rejected_at: datetime | None
     rejected_by_id: int | None
+    bulk_id: UUID | None
 
     @property
     def is_pending(self) -> bool: ...
@@ -49,6 +52,12 @@ class PendingMixin(MappedAsDataclass):
         ForeignKey("users.id"),
         default=None,
         init=False,
+    )
+    bulk_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        default=None,
+        init=False,
+        index=True,
     )
 
     @property

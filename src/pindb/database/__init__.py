@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker as SessionMaker
 from sqlalchemy.orm.session import Session, sessionmaker
 
 from pindb.config import CONFIGURATION
-from pindb.database.artist import Artist
+from pindb.database.artist import Artist, ArtistAlias
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.pending_mixin import PendingMixin
 from pindb.database.base import Base
@@ -20,7 +20,7 @@ from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.session import UserSession
-from pindb.database.shop import Shop
+from pindb.database.shop import Shop, ShopAlias
 from pindb.database.tag import Tag, TagAlias, TagCategory
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
@@ -30,6 +30,7 @@ from pindb.database.user_wanted_pin import UserWantedPin
 __all__: list[str] = [
     "seed_currencies",
     "Artist",
+    "ArtistAlias",
     "EntityType",
     "AuditMixin",
     "PendingMixin",
@@ -42,6 +43,7 @@ __all__: list[str] = [
     "Pin",
     "PinSet",
     "Shop",
+    "ShopAlias",
     "Tag",
     "TagAlias",
     "TagCategory",

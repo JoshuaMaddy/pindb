@@ -6,9 +6,6 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response
-from sqlalchemy import select
-from sqlalchemy.sql.selectable import Select
-
 from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.database import UserSession
 from pindb.database import session_maker as db_session_maker
@@ -65,25 +62,39 @@ def clear_session_cookie(response: Response) -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_current_user(request: Request) -> User | None:
-    token: str | None = request.cookies.get(SESSION_COOKIE)
-    if not token:
-        return None
+def _resolve_user_from_token(
+    token: str,
+    *,
+    prune_expired: bool = False,
+) -> User | None:
+    """Load the User associated with a session token.
 
+    When ``prune_expired`` is True, an expired session row is deleted (used by
+    the FastAPI dependency). The middleware skips expired sessions via a WHERE
+    clause instead.
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with db_session_maker() as session:
         user_session: UserSession | None = session.get(UserSession, token)
         if user_session is None:
             return None
         if user_session.expires_at < now:
-            session.delete(user_session)
-            session.commit()
+            if prune_expired:
+                session.delete(user_session)
+                session.commit()
             return None
         user: User | None = session.get(User, user_session.user_id)
         if user is None:
             return None
         session.expunge(user)
         return user
+
+
+def get_current_user(request: Request) -> User | None:
+    token: str | None = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return None
+    return _resolve_user_from_token(token, prune_expired=True)
 
 
 CurrentUser = Annotated[User | None, Depends(get_current_user)]
@@ -129,24 +140,15 @@ async def attach_user_middleware(
     request.state.user = None
 
     if token:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        with db_session_maker() as session:
-            stmt: Select[tuple[UserSession]] = (
-                select(UserSession)
-                .where(UserSession.token == token)
-                .where(UserSession.expires_at > now)
-            )
-            user_session: UserSession | None = session.scalars(stmt).first()
-            if user_session is not None:
-                user: User | None = session.get(User, user_session.user_id)
-                if user is not None:
-                    session.expunge(user)
-                    request.state.user = user
+        request.state.user = _resolve_user_from_token(token)
 
-    u = request.state.user
-    set_audit_user(u.id if u else None)
+    current_user = request.state.user
+    request.state.theme = current_user.theme if current_user is not None else "mocha"
+    set_audit_user(current_user.id if current_user else None)
     set_audit_user_flags(
-        is_admin=u.is_admin if u else False,
-        is_editor=(u.is_editor or u.is_admin) if u else False,
+        is_admin=current_user.is_admin if current_user else False,
+        is_editor=(current_user.is_editor or current_user.is_admin)
+        if current_user
+        else False,
     )
     return await call_next(request)

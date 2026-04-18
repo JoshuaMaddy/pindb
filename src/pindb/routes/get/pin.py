@@ -7,12 +7,7 @@ from sqlalchemy.orm import selectinload
 from pindb.auth import CurrentUser
 from pindb.database import Pin, PinSet, User, UserOwnedPin, UserWantedPin, session_maker
 from pindb.database.joins import user_favorite_pins
-from pindb.database.pending_edit_utils import (
-    apply_snapshot_in_memory,
-    get_edit_chain,
-    get_effective_snapshot,
-    has_pending_edits,
-)
+from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.templates.get.pin import pin_page
 
 router = APIRouter()
@@ -25,11 +20,6 @@ def get_pin(
     current_user: CurrentUser,
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
-    can_see_pending = current_user is not None and (
-        current_user.is_editor or current_user.is_admin
-    )
-    viewing_pending: bool = version == "pending" and can_see_pending
-
     with session_maker() as session:
         pin_obj: Pin | None = session.scalar(
             select(Pin)
@@ -48,15 +38,13 @@ def get_pin(
         if not pin_obj:
             return RedirectResponse(url="/")
 
-        pending_chain_exists: bool = can_see_pending and has_pending_edits(
-            session, "pins", id
+        pending_chain_exists, viewing_pending = maybe_apply_pending_view(
+            session=session,
+            entity=pin_obj,
+            entity_table="pins",
+            current_user=current_user,
+            version=version,
         )
-
-        if viewing_pending and pending_chain_exists:
-            chain = get_edit_chain(session, "pins", id)
-            effective = get_effective_snapshot(pin_obj, chain)
-            with session.no_autoflush:
-                apply_snapshot_in_memory(pin_obj, effective, session)
 
         is_favorited = False
         user_sets: list[PinSet] = []

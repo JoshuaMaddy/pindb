@@ -45,6 +45,7 @@ class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         secondary=pin_set_memberships,
         default_factory=list,
         back_populates="sets",
+        order_by=pin_set_memberships.c.position,
     )
 
     # Optional Relationships

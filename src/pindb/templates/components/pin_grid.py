@@ -12,5 +12,5 @@ def pin_grid(
     pins: Iterable[Pin] | None,
 ) -> Element:
     return div(
-        class_="grid grid-cols-[repeat(auto-fill,_minmax(128px,_1fr))] auto auto-rows-[1fr_max-content] gap-2"
+        class_="grid grid-cols-[repeat(auto-fill,_minmax(192px,_1fr))] auto auto-rows-[1fr_max-content_max-content] gap-2"
     )[bool(pins) and [pin_preview_card(request=request, pin=pin) for pin in pins]]

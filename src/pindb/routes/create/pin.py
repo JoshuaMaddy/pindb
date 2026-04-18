@@ -8,14 +8,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
 
-from pindb.database import Artist, Shop, Tag, session_maker
+from pindb.database import Artist, Shop, session_maker
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
-from pindb.database.tag import resolve_implications
-from pindb.file_handler import save_file
+from pindb.database.tag import apply_pin_tags
+from pindb.file_handler import save_image
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
@@ -103,13 +103,12 @@ async def post_create_pin(
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
     LOGGER.info(msg=f"Creating Pin with form: {await request.form()}")
-    print(links)
 
     back_image_guid: UUID | None = None
-    front_image_guid: UUID = await save_file(file=front_image)
+    front_image_guid: UUID = await save_image(file=front_image)
 
     if back_image:
-        back_image_guid: UUID = await save_file(file=back_image)
+        back_image_guid: UUID = await save_image(file=back_image)
 
     with session_maker.begin() as session:
         pin_shops: set[Shop] = set(
@@ -117,12 +116,6 @@ async def post_create_pin(
                 statement=select(Shop).where(Shop.id.in_(other=shop_ids))
             ).all()
         )
-        pin_tags: set[Tag] = set(
-            session.scalars(
-                statement=select(Tag).where(Tag.id.in_(other=tag_ids))
-            ).all()
-        )
-        resolved_tags = resolve_implications(pin_tags, session)
         pin_sets: set[PinSet] = set(
             session.scalars(
                 statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
@@ -162,12 +155,12 @@ async def post_create_pin(
             description=None,
             artists=pin_artists,
             sets=pin_sets,
-            tags=resolved_tags,
             links=new_links,
         )
 
         session.add(instance=new_pin)
         session.flush()
+        apply_pin_tags(new_pin.id, tag_ids, session)
         pin_id: int = new_pin.id
 
     with session_maker() as session:

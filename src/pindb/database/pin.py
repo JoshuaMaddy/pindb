@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, and_
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -90,8 +90,24 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     )
     tags: Mapped[set[Tag]] = relationship(
         secondary=pins_tags,
+        primaryjoin=lambda: Pin.id == pins_tags.c.pin_id,
+        foreign_keys=lambda: [pins_tags.c.pin_id, pins_tags.c.tag_id],
         back_populates="pins",
+        viewonly=True,
+        init=False,
         default_factory=set,
+    )
+    explicit_tags: Mapped[set[Tag]] = relationship(
+        secondary=pins_tags,
+        primaryjoin=lambda: and_(
+            Pin.id == pins_tags.c.pin_id,
+            pins_tags.c.implied_by_tag_id.is_(None),
+        ),
+        foreign_keys=lambda: [pins_tags.c.pin_id, pins_tags.c.tag_id],
+        viewonly=True,
+        init=False,
+        default_factory=set,
+        overlaps="tags,pins",
     )
     links: Mapped[set[Link]] = relationship(
         secondary=pins_links,
@@ -107,34 +123,19 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
         return value.id == self.id
 
-    def document(self) -> dict[str, int | str | list[str]]:
-        document: dict[str, int | str | list[str]] = dict()
-        document.update(
-            {
-                "id": self.id,
-                "name": self.name,
-                "shops": [shop.name for shop in self.shops],
-            }
-        )
-        document.update(
-            {
-                "tags": [tag.name for tag in self.tags],
-            }
-        ) if self.tags else None
-
-        document.update(
-            {
-                "artists": [artist.name for artist in self.artists],
-            }
-        ) if self.artists else None
-
-        document.update(
-            {
-                "description": self.description,
-            }
-        ) if self.description else None
-
-        return document
+    def document(self) -> dict[str, object]:
+        result: dict[str, object] = {
+            "id": self.id,
+            "name": self.name,
+            "shops": [shop.name for shop in self.shops],
+        }
+        if self.tags:
+            result["tags"] = [tag.name for tag in self.tags]
+        if self.artists:
+            result["artists"] = [artist.name for artist in self.artists]
+        if self.description:
+            result["description"] = self.description
+        return result
 
     def __rich_repr__(self) -> Result:
         try:

@@ -27,10 +27,14 @@ def pin_preview_card(
         else None
     )
     return div(
-        class_="grid grid-rows-subgrid row-span-2 gap-0 rounded-lg overflow-clip bg-pin-base-450 border border-pin-base-400 hover:scale-[102%] hover:border-accent"
+        class_="grid grid-rows-subgrid row-span-3 gap-0 rounded-lg overflow-clip bg-pin-base-450 border border-pin-base-400 hover:scale-[102%] hover:border-accent"
     )[
         a(
-            href=str(request.url_for("get_pin", id=pin.id)),
+            href=str(
+                request.url_for("get_pin", id=pin.id).include_query_params(
+                    back=str(request.url)
+                )
+            ),
             class_="h-full",
         )[
             img(
@@ -45,9 +49,13 @@ def pin_preview_card(
         ],
         a(
             class_="p-2 text-pin-base-text no-underline flex flex-col gap-0.5",
-            href=str(request.url_for("get_pin", id=pin.id)),
-        )[
-            span[("(P) " + pin.name) if pin.is_pending else pin.name],
+            href=str(
+                request.url_for("get_pin", id=pin.id).include_query_params(
+                    back=str(request.url)
+                )
+            ),
+        )[span[("(P) " + pin.name) if pin.is_pending else pin.name],],
+        div(class_="p-2")[
             bool(shop_text or artist_text)
             and div(class_="flex flex-col gap-0.5 text-xs **:text-pin-base-300")[
                 bool(shop_text)

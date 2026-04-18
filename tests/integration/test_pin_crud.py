@@ -1,4 +1,10 @@
-"""Integration tests for pin GET routes and auth enforcement on create/edit/delete."""
+"""Integration tests for pin GET routes and auth enforcement on create/edit/delete.
+
+Role model under test:
+- `/create/*` requires the `editor` dependency (editor OR admin).
+- `/delete/*` requires admin. It's POST, not GET, and returns a 303 redirect.
+- `/edit/*` requires editor (ownership enforced by `assert_editor_can_edit`).
+"""
 
 import pytest
 
@@ -10,7 +16,7 @@ from tests.factories.shop import ShopFactory
 class TestGetPin:
     def test_nonexistent_pin_redirects(self, client):
         response = client.get("/get/pin/999999", follow_redirects=False)
-        assert response.status_code in (302, 307)  # RedirectResponse defaults to 307
+        assert response.status_code in (302, 307)
 
     def test_existing_pin_returns_200(self, client, db_session):
         pin = PinFactory(name="Special Pikachu Pin")
@@ -28,13 +34,20 @@ class TestGetPin:
 
 @pytest.mark.integration
 class TestCreatePinAuthEnforcement:
+    """`/create/pin` requires the `editor` role. Regular users get 403."""
+
     def test_unauthenticated_get_returns_401(self, client):
         response = client.get("/create/pin")
         assert response.status_code == 401
 
-    def test_non_admin_get_returns_403(self, auth_client):
+    def test_regular_user_get_returns_403(self, auth_client):
+        """`test_user` is a plain authenticated user — not editor or admin."""
         response = auth_client.get("/create/pin")
         assert response.status_code == 403
+
+    def test_editor_get_returns_200(self, editor_client):
+        response = editor_client.get("/create/pin")
+        assert response.status_code == 200
 
     def test_admin_get_returns_200(self, admin_client):
         response = admin_client.get("/create/pin")
@@ -44,26 +57,62 @@ class TestCreatePinAuthEnforcement:
         response = client.post("/create/pin", data={})
         assert response.status_code == 401
 
-    def test_non_admin_post_returns_403(self, auth_client):
+    def test_regular_user_post_returns_403(self, auth_client):
         response = auth_client.post("/create/pin", data={})
         assert response.status_code == 403
 
 
 @pytest.mark.integration
 class TestDeletePinAuthEnforcement:
-    # Delete uses GET /delete/pin/{id} (not POST)
+    """`POST /delete/pin/{id}` is admin-only and returns a 303 redirect on success."""
+
     def test_unauthenticated_delete_returns_401(self, client, db_session):
         pin = PinFactory()
-        response = client.get(f"/delete/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
+        response = client.post(
+            f"/delete/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
+            follow_redirects=False,
+        )
         assert response.status_code == 401
 
-    def test_non_admin_delete_returns_403(self, auth_client, db_session):
+    def test_regular_user_delete_returns_403(self, auth_client, db_session):
         pin = PinFactory()
-        response = auth_client.get(f"/delete/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
+        response = auth_client.post(
+            f"/delete/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
+            follow_redirects=False,
+        )
         assert response.status_code == 403
 
-    def test_admin_delete_succeeds(self, admin_client, db_session):
+    def test_editor_delete_returns_403(self, editor_client, db_session):
+        """Editors cannot hard/soft delete — admin only."""
+        pin = PinFactory()
+        response = editor_client.post(
+            f"/delete/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
+            follow_redirects=False,
+        )
+        assert response.status_code == 403
+
+    def test_admin_delete_soft_deletes(self, admin_client, db_session):
+        from sqlalchemy import select
+
+        from pindb.database import Pin
+
         pin = PinFactory()
         pin_id = pin.id  # ty:ignore[unresolved-attribute]
-        response = admin_client.get(f"/delete/pin/{pin_id}")
-        assert response.status_code == 200
+        response = admin_client.post(f"/delete/pin/{pin_id}", follow_redirects=False)
+        assert response.status_code == 303
+
+        # Route committed its savepoint; our session hasn't seen that yet.
+        db_session.expire_all()
+
+        # Soft delete: row still exists, hidden from default queries
+        visible = db_session.scalar(select(Pin).where(Pin.id == pin_id))
+        assert visible is None
+
+        from typing import Any
+
+        opts: Any = {"include_deleted": True, "include_pending": True}
+        raw = db_session.scalar(
+            select(Pin).where(Pin.id == pin_id).execution_options(**opts)
+        )
+        assert raw is not None
+        assert raw.deleted_at is not None

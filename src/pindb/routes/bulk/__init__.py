@@ -1,9 +1,13 @@
 from fastapi import Depends
 from fastapi.routing import APIRouter
 
-from pindb.auth import require_admin
-from pindb.routes.bulk import pin
+from pindb.auth import require_editor
+from pindb.routes.bulk import edit, pin
 
-router = APIRouter(prefix="/bulk", dependencies=[Depends(require_admin)])
+# Bulk creation and bulk editing are editor-allowed; admin-only operations
+# (such as bulk-editing search results) check `current_user.is_admin` at the
+# specific endpoint.
+router = APIRouter(dependencies=[Depends(require_editor)])
 
-router.include_router(pin.router)
+router.include_router(pin.router, prefix="/bulk")
+router.include_router(edit.router)

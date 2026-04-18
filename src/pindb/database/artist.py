@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.repr import Result
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -19,6 +20,19 @@ from pindb.database.link import Link
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
+
+
+class ArtistAlias(MappedAsDataclass, Base):
+    __tablename__ = "artist_aliases"
+
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    artist_id: Mapped[int] = mapped_column(ForeignKey("artists.id"), init=False)
+    alias: Mapped[str] = mapped_column(unique=True)
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "artist_id", self.artist_id
+        yield "alias", self.alias
 
 
 class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
@@ -43,6 +57,11 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         back_populates="artists",
     )
 
+    aliases: Mapped[list[ArtistAlias]] = relationship(
+        default_factory=list,
+        cascade="all, delete-orphan",
+    )
+
     # Optional Relationships
     links: Mapped[set[Link]] = relationship(
         secondary=artists_links,
@@ -56,6 +75,7 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return {
             "id": self.id,
             "name": self.name,
+            "aliases": [a.alias for a in self.aliases],
             "description": self.description,
             "active": self.active,
             "is_pending": self.is_pending,
@@ -72,4 +92,5 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             return
         if object_session(self):
             yield "number_of_pins", len(self.pins)
+            yield "aliases", self.aliases, []
             yield "links", self.links, set()

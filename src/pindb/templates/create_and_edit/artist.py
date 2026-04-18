@@ -2,7 +2,7 @@ import json
 
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, div, form, hr, input, label, span
+from htpy import Element, div, form, hr, input, label, option, select, span
 from markupsafe import Markup
 
 from pindb.database.artist import Artist
@@ -11,12 +11,24 @@ from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 
+_ALIAS_SCRIPT = """
+document.querySelectorAll("select.alias-select").forEach(function(el) {
+    new TomSelect(el, {
+        maxItems: null,
+        create: true,
+        persist: false,
+        plugins: ["remove_button"],
+    });
+});
+"""
+
 
 def artist_form(
     post_url: URL | str,
     request: Request,
     artist: Artist | None = None,
 ) -> Element:
+    current_aliases: list[str] = [a.alias for a in artist.aliases] if artist else []
     artist_links: list[str] = [link.path for link in artist.links] if artist else []
     if not artist_links:
         artist_links = [""]
@@ -42,6 +54,7 @@ def artist_form(
                         name="name",
                         id="name",
                         required=True,
+                        autocomplete="off",
                         class_="grow",
                         value=artist.name if artist else None,
                     ),
@@ -60,6 +73,7 @@ def artist_form(
                                         type="text"
                                         name="links"
                                         x-model="links[index]"
+                                        autocomplete="off"
                                         class="col-span-1">
                                     <button
                                         type="button"
@@ -72,8 +86,20 @@ def artist_form(
                                 type="button"
                                 @click="links.push('')"
                                 id="add-link-button"
-                                class="w-full mt-2">Add Link</button>
+                                class="w-full mt-2">Add Another Link</button>
                         </div>"""),
+                    ],
+                    label(for_="aliases")["Aliases"],
+                    select(
+                        name="aliases",
+                        id="aliases",
+                        multiple=True,
+                        class_="alias-select",
+                    )[
+                        [
+                            option(value=alias, selected=True)[alias]
+                            for alias in current_aliases
+                        ]
                     ],
                     input(
                         type="submit",
@@ -83,5 +109,6 @@ def artist_form(
                 ],
             ]
         ),
+        script_content=Markup(_ALIAS_SCRIPT),
         request=request,
     )

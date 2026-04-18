@@ -1,7 +1,20 @@
 @import "tailwindcss";
 
 @custom-variant mocha (&:where(.mocha, .mocha *));
+@custom-variant macchiato (&:where(.macchiato, .macchiato *));
+@custom-variant frappe (&:where(.frappe, .frappe *));
 @custom-variant latte (&:where(.latte, .latte *));
+@custom-variant dracula (&:where(.dracula, .dracula *));
+@custom-variant monokai (&:where(.monokai, .monokai *));
+@custom-variant monokai-pro (&:where(.monokai-pro, .monokai-pro *));
+@custom-variant nord (&:where(.nord, .nord *));
+@custom-variant nord-light (&:where(.nord-light, .nord-light *));
+@custom-variant gruvbox-dark-hard (&:where(.gruvbox-dark-hard, .gruvbox-dark-hard *));
+@custom-variant gruvbox-dark (&:where(.gruvbox-dark, .gruvbox-dark *));
+@custom-variant gruvbox-dark-soft (&:where(.gruvbox-dark-soft, .gruvbox-dark-soft *));
+@custom-variant gruvbox-light-hard (&:where(.gruvbox-light-hard, .gruvbox-light-hard *));
+@custom-variant gruvbox-light (&:where(.gruvbox-light, .gruvbox-light *));
+@custom-variant gruvbox-light-soft (&:where(.gruvbox-light-soft, .gruvbox-light-soft *));
 
 @theme {
   --color-cat-rosewater: hsl(10deg, 56%, 91%);
@@ -45,11 +58,98 @@
   --color-tag-material: hsl(25, 48%, 24%);
   --color-tag-material-fg: hsl(25, 78%, 74%);
   --color-tag-material-hover: hsl(25, 88%, 88%);
+  --color-tag-color: hsl(318, 48%, 24%);
+  --color-tag-color-fg: hsl(318, 70%, 78%);
+  --color-tag-color-hover: hsl(318, 85%, 90%);
 }
 
 @layer theme {
   :root,
   :host {
+    @variant macchiato {
+      --color-cat-rosewater: hsl(10deg, 58%, 90%);
+      --color-cat-sky: hsl(189deg, 59%, 73%);
+      --color-pin-base-text: hsl(227deg, 68%, 88%);
+      --color-pin-base-100: hsl(228deg, 39%, 80%);
+      --color-pin-base-150: hsl(228deg, 24%, 72%);
+      --color-pin-base-200: hsl(228deg, 20%, 65%);
+      --color-pin-base-250: hsl(230deg, 13%, 55%);
+      --color-pin-base-300: hsl(230deg, 12%, 48%);
+      --color-pin-base-350: hsl(232deg, 14%, 41%);
+      --color-pin-base-400: hsl(234deg, 14%, 35%);
+      --color-pin-base-450: hsl(232deg, 18%, 26%);
+      --color-pin-base-500: hsl(232deg, 23%, 18%);
+      --color-pin-base-550: hsl(233deg, 23%, 15%);
+
+      /* Tag category badge colors (macchiato — dark, same approach as mocha) */
+      --color-tag-general: hsl(220, 10%, 27%);
+      --color-tag-general-fg: hsl(220, 10%, 73%);
+      --color-tag-general-hover: hsl(220, 20%, 91%);
+      --color-tag-artist: hsl(38, 46%, 23%);
+      --color-tag-artist-fg: hsl(42, 78%, 73%);
+      --color-tag-artist-hover: hsl(42, 88%, 87%);
+      --color-tag-copyright: hsl(355, 46%, 23%);
+      --color-tag-copyright-fg: hsl(355, 68%, 77%);
+      --color-tag-copyright-hover: hsl(355, 83%, 89%);
+      --color-tag-character: hsl(215, 48%, 23%);
+      --color-tag-character-fg: hsl(215, 76%, 77%);
+      --color-tag-character-hover: hsl(215, 88%, 89%);
+      --color-tag-species: hsl(140, 36%, 19%);
+      --color-tag-species-fg: hsl(140, 56%, 67%);
+      --color-tag-species-hover: hsl(140, 68%, 81%);
+      --color-tag-meta: hsl(270, 36%, 25%);
+      --color-tag-meta-fg: hsl(270, 56%, 77%);
+      --color-tag-meta-hover: hsl(270, 68%, 89%);
+      --color-tag-material: hsl(25, 46%, 23%);
+      --color-tag-material-fg: hsl(25, 76%, 73%);
+      --color-tag-material-hover: hsl(25, 86%, 87%);
+      --color-tag-color: hsl(318, 46%, 23%);
+      --color-tag-color-fg: hsl(318, 68%, 77%);
+      --color-tag-color-hover: hsl(318, 83%, 89%);
+    }
+
+    @variant frappe {
+      --color-cat-rosewater: hsl(10deg, 57%, 88%);
+      --color-cat-sky: hsl(189deg, 48%, 73%);
+      --color-pin-base-text: hsl(227deg, 70%, 87%);
+      --color-pin-base-100: hsl(227deg, 44%, 80%);
+      --color-pin-base-150: hsl(228deg, 29%, 73%);
+      --color-pin-base-200: hsl(227deg, 22%, 66%);
+      --color-pin-base-250: hsl(229deg, 15%, 59%);
+      --color-pin-base-300: hsl(229deg, 12%, 53%);
+      --color-pin-base-350: hsl(232deg, 14%, 48%);
+      --color-pin-base-400: hsl(234deg, 16%, 41%);
+      --color-pin-base-450: hsl(236deg, 17%, 36%);
+      --color-pin-base-500: hsl(229deg, 19%, 23%);
+      --color-pin-base-550: hsl(231deg, 19%, 18%);
+
+      /* Tag category badge colors (frappe — dark, slightly lighter than mocha) */
+      --color-tag-general: hsl(220, 10%, 30%);
+      --color-tag-general-fg: hsl(220, 10%, 76%);
+      --color-tag-general-hover: hsl(220, 20%, 93%);
+      --color-tag-artist: hsl(38, 44%, 26%);
+      --color-tag-artist-fg: hsl(42, 76%, 76%);
+      --color-tag-artist-hover: hsl(42, 86%, 89%);
+      --color-tag-copyright: hsl(355, 44%, 26%);
+      --color-tag-copyright-fg: hsl(355, 66%, 80%);
+      --color-tag-copyright-hover: hsl(355, 81%, 91%);
+      --color-tag-character: hsl(215, 46%, 26%);
+      --color-tag-character-fg: hsl(215, 74%, 80%);
+      --color-tag-character-hover: hsl(215, 86%, 91%);
+      --color-tag-species: hsl(140, 34%, 22%);
+      --color-tag-species-fg: hsl(140, 54%, 70%);
+      --color-tag-species-hover: hsl(140, 66%, 84%);
+      --color-tag-meta: hsl(270, 34%, 28%);
+      --color-tag-meta-fg: hsl(270, 54%, 80%);
+      --color-tag-meta-hover: hsl(270, 66%, 91%);
+      --color-tag-material: hsl(25, 44%, 26%);
+      --color-tag-material-fg: hsl(25, 74%, 76%);
+      --color-tag-material-hover: hsl(25, 84%, 89%);
+      --color-tag-color: hsl(318, 44%, 26%);
+      --color-tag-color-fg: hsl(318, 66%, 80%);
+      --color-tag-color-hover: hsl(318, 81%, 91%);
+    }
+
     @variant latte {
       --color-cat-rosewater: hsl(11deg, 59%, 67%);
       --color-cat-sky: hsl(197deg, 97%, 46%);
@@ -87,6 +187,300 @@
       --color-tag-material: hsl(25, 70%, 88%);
       --color-tag-material-fg: hsl(25, 70%, 28%);
       --color-tag-material-hover: hsl(25, 80%, 16%);
+      --color-tag-color: hsl(318, 70%, 90%);
+      --color-tag-color-fg: hsl(318, 70%, 30%);
+      --color-tag-color-hover: hsl(318, 80%, 18%);
+    }
+
+    /* ── Dracula ────────────────────────────────────────────────────────── */
+    @variant dracula {
+      --color-cat-rosewater: hsl(316deg, 100%, 74%); /* pink #ff79c6 */
+      --color-cat-sky: hsl(191deg, 97%, 77%); /* cyan #8be9fd */
+      --color-pin-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 fg */
+      --color-pin-base-100: hsl(225deg, 22%, 82%);
+      --color-pin-base-150: hsl(225deg, 24%, 72%);
+      --color-pin-base-200: hsl(225deg, 25%, 62%);
+      --color-pin-base-250: hsl(225deg, 26%, 56%);
+      --color-pin-base-300: hsl(225deg, 27%, 51%); /* #6272a4 comment */
+      --color-pin-base-350: hsl(232deg, 14%, 42%);
+      --color-pin-base-400: hsl(232deg, 14%, 36%);
+      --color-pin-base-450: hsl(232deg, 14%, 31%); /* #44475a current line */
+      --color-pin-base-500: hsl(231deg, 15%, 18%); /* #282a36 background */
+      --color-pin-base-550: hsl(230deg, 15%, 12%);
+    }
+
+    /* ── Monokai ────────────────────────────────────────────────────────── */
+    @variant monokai {
+      --color-cat-rosewater: hsl(338deg, 94%, 56%); /* red #f92672 */
+      --color-cat-sky: hsl(80deg, 76%, 53%); /* green #a6e22e */
+      --color-pin-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 */
+      --color-pin-base-100: hsl(55deg, 20%, 80%);
+      --color-pin-base-150: hsl(50deg, 16%, 68%);
+      --color-pin-base-200: hsl(46deg, 14%, 56%);
+      --color-pin-base-250: hsl(42deg, 13%, 48%);
+      --color-pin-base-300: hsl(40deg, 13%, 41%); /* #75715e comment */
+      --color-pin-base-350: hsl(60deg, 9%, 32%);
+      --color-pin-base-400: hsl(63deg, 9%, 27%);
+      --color-pin-base-450: hsl(63deg, 10%, 22%); /* #3e3d32 editor bg */
+      --color-pin-base-500: hsl(70deg, 8%, 15%); /* #272822 background */
+      --color-pin-base-550: hsl(70deg, 8%, 10%);
+    }
+
+    /* ── Monokai Pro ────────────────────────────────────────────────────── */
+    @variant monokai-pro {
+      --color-cat-rosewater: hsl(347deg, 100%, 69%); /* pink #ff6188 */
+      --color-cat-sky: hsl(188deg, 72%, 69%); /* cyan #78dce8 */
+      --color-pin-base-text: hsl(60deg, 60%, 98%); /* #fcfcfa */
+      --color-pin-base-100: hsl(285deg, 6%, 80%);
+      --color-pin-base-150: hsl(285deg, 5%, 68%);
+      --color-pin-base-200: hsl(290deg, 3%, 58%);
+      --color-pin-base-250: hsl(300deg, 2%, 50%);
+      --color-pin-base-300: hsl(300deg, 1%, 45%); /* #727072 comment */
+      --color-pin-base-350: hsl(285deg, 3%, 36%);
+      --color-pin-base-400: hsl(285deg, 3%, 30%);
+      --color-pin-base-450: hsl(285deg, 2%, 25%); /* #403e41 editor */
+      --color-pin-base-500: hsl(285deg, 5%, 17%); /* #2d2a2e background */
+      --color-pin-base-550: hsl(285deg, 5%, 12%);
+    }
+
+    /* ── Nord ───────────────────────────────────────────────────────────── */
+    @variant nord {
+      --color-cat-rosewater: hsl(352deg, 37%, 57%); /* aurora red #bf616a */
+      --color-cat-sky: hsl(193deg, 43%, 68%); /* frost #88c0d0 */
+      --color-pin-base-text: hsl(219deg, 27%, 88%); /* nord4 #d8dee9 */
+      --color-pin-base-100: hsl(219deg, 25%, 78%);
+      --color-pin-base-150: hsl(219deg, 22%, 68%);
+      --color-pin-base-200: hsl(219deg, 18%, 58%);
+      --color-pin-base-250: hsl(220deg, 17%, 50%);
+      --color-pin-base-300: hsl(220deg, 16%, 43%);
+      --color-pin-base-350: hsl(220deg, 17%, 36%); /* nord3 #4c566a */
+      --color-pin-base-400: hsl(222deg, 17%, 32%); /* nord2 #434c5e */
+      --color-pin-base-450: hsl(222deg, 16%, 28%); /* nord1 #3b4252 */
+      --color-pin-base-500: hsl(220deg, 16%, 22%); /* nord0 #2e3440 */
+      --color-pin-base-550: hsl(220deg, 17%, 16%);
+    }
+
+    /* ── Nord Light ─────────────────────────────────────────────────────── */
+    @variant nord-light {
+      --color-cat-rosewater: hsl(352deg, 37%, 57%); /* aurora red */
+      --color-cat-sky: hsl(213deg, 32%, 52%); /* nord10 #5e81ac */
+      --color-pin-base-text: hsl(220deg, 16%, 22%); /* nord0 dark text */
+      --color-pin-base-100: hsl(222deg, 16%, 28%); /* nord1 */
+      --color-pin-base-150: hsl(222deg, 17%, 32%); /* nord2 */
+      --color-pin-base-200: hsl(220deg, 17%, 36%); /* nord3 */
+      --color-pin-base-250: hsl(217deg, 19%, 54%);
+      --color-pin-base-300: hsl(216deg, 22%, 64%);
+      --color-pin-base-350: hsl(215deg, 24%, 74%);
+      --color-pin-base-400: hsl(219deg, 26%, 82%);
+      --color-pin-base-450: hsl(219deg, 27%, 88%); /* nord4 #d8dee9 */
+      --color-pin-base-500: hsl(218deg, 27%, 92%); /* nord5 #e5e9f0 */
+      --color-pin-base-550: hsl(218deg, 27%, 94%); /* nord6 #eceff4 */
+
+      /* Light theme tag colors */
+      --color-tag-general: hsl(220, 9%, 86%);
+      --color-tag-general-fg: hsl(220, 9%, 32%);
+      --color-tag-general-hover: hsl(220, 15%, 12%);
+      --color-tag-artist: hsl(38, 70%, 88%);
+      --color-tag-artist-fg: hsl(38, 70%, 28%);
+      --color-tag-artist-hover: hsl(38, 80%, 16%);
+      --color-tag-copyright: hsl(355, 70%, 90%);
+      --color-tag-copyright-fg: hsl(355, 70%, 30%);
+      --color-tag-copyright-hover: hsl(355, 80%, 18%);
+      --color-tag-character: hsl(215, 70%, 88%);
+      --color-tag-character-fg: hsl(215, 70%, 28%);
+      --color-tag-character-hover: hsl(215, 80%, 16%);
+      --color-tag-species: hsl(140, 50%, 86%);
+      --color-tag-species-fg: hsl(140, 50%, 22%);
+      --color-tag-species-hover: hsl(140, 60%, 12%);
+      --color-tag-meta: hsl(270, 50%, 90%);
+      --color-tag-meta-fg: hsl(270, 50%, 28%);
+      --color-tag-meta-hover: hsl(270, 60%, 16%);
+      --color-tag-material: hsl(25, 70%, 88%);
+      --color-tag-material-fg: hsl(25, 70%, 28%);
+      --color-tag-material-hover: hsl(25, 80%, 16%);
+      --color-tag-color: hsl(318, 70%, 90%);
+      --color-tag-color-fg: hsl(318, 70%, 30%);
+      --color-tag-color-hover: hsl(318, 80%, 18%);
+    }
+
+    /* ── Gruvbox Dark Hard ──────────────────────────────────────────────── */
+    @variant gruvbox-dark-hard {
+      --color-cat-rosewater: hsl(3deg, 72%, 45%); /* red #cc241d */
+      --color-cat-sky: hsl(107deg, 32%, 62%); /* bright aqua #8ec07c */
+      --color-pin-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-pin-base-100: hsl(43deg, 40%, 72%);
+      --color-pin-base-150: hsl(42deg, 26%, 63%);
+      --color-pin-base-200: hsl(38deg, 16%, 55%);
+      --color-pin-base-250: hsl(28deg, 10%, 47%);
+      --color-pin-base-300: hsl(22deg, 9%, 40%);
+      --color-pin-base-350: hsl(18deg, 7%, 32%);
+      --color-pin-base-400: hsl(12deg, 6%, 25%);
+      --color-pin-base-450: hsl(7deg, 5%, 20%);
+      --color-pin-base-500: hsl(195deg, 7%, 12%); /* #1d2021 bg-hard */
+      --color-pin-base-550: hsl(195deg, 8%, 8%);
+    }
+
+    /* ── Gruvbox Dark ───────────────────────────────────────────────────── */
+    @variant gruvbox-dark {
+      --color-cat-rosewater: hsl(3deg, 72%, 45%);
+      --color-cat-sky: hsl(107deg, 32%, 62%);
+      --color-pin-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-pin-base-100: hsl(43deg, 40%, 73%); /* #d5c4a1 */
+      --color-pin-base-150: hsl(42deg, 26%, 66%); /* #bdae93 */
+      --color-pin-base-200: hsl(38deg, 16%, 58%); /* #a89984 */
+      --color-pin-base-250: hsl(30deg, 11%, 50%);
+      --color-pin-base-300: hsl(21deg, 11%, 44%); /* #7c6f64 bg4 */
+      --color-pin-base-350: hsl(21deg, 10%, 36%); /* #665c54 bg3 */
+      --color-pin-base-400: hsl(11deg, 7%, 29%); /* #504945 bg2 */
+      --color-pin-base-450: hsl(12deg, 5%, 22%); /* #3c3836 bg1 */
+      --color-pin-base-500: hsl(0deg, 0%, 16%); /* #282828 bg */
+      --color-pin-base-550: hsl(195deg, 7%, 12%); /* #1d2021 bg-hard */
+    }
+
+    /* ── Gruvbox Dark Soft ──────────────────────────────────────────────── */
+    @variant gruvbox-dark-soft {
+      --color-cat-rosewater: hsl(3deg, 72%, 45%);
+      --color-cat-sky: hsl(107deg, 32%, 62%);
+      --color-pin-base-text: hsl(43deg, 59%, 81%);
+      --color-pin-base-100: hsl(43deg, 40%, 73%);
+      --color-pin-base-150: hsl(42deg, 26%, 66%);
+      --color-pin-base-200: hsl(38deg, 16%, 58%);
+      --color-pin-base-250: hsl(30deg, 11%, 51%);
+      --color-pin-base-300: hsl(21deg, 11%, 44%); /* bg4 */
+      --color-pin-base-350: hsl(21deg, 10%, 37%); /* bg3 */
+      --color-pin-base-400: hsl(11deg, 7%, 29%); /* bg2 */
+      --color-pin-base-450: hsl(9deg, 5%, 24%);
+      --color-pin-base-500: hsl(17deg, 3%, 19%); /* #32302f bg-soft */
+      --color-pin-base-550: hsl(0deg, 0%, 16%); /* #282828 */
+    }
+
+    /* ── Gruvbox Light Hard ─────────────────────────────────────────────── */
+    @variant gruvbox-light-hard {
+      --color-cat-rosewater: hsl(0deg, 100%, 31%); /* dark red #9d0006 */
+      --color-cat-sky: hsl(184deg, 35%, 38%); /* teal #458588 */
+      --color-pin-base-text: hsl(12deg, 5%, 22%); /* #3c3836 */
+      --color-pin-base-100: hsl(11deg, 7%, 29%);
+      --color-pin-base-150: hsl(21deg, 10%, 36%);
+      --color-pin-base-200: hsl(21deg, 11%, 44%);
+      --color-pin-base-250: hsl(30deg, 11%, 52%);
+      --color-pin-base-300: hsl(38deg, 14%, 60%);
+      --color-pin-base-350: hsl(38deg, 36%, 73%);
+      --color-pin-base-400: hsl(43deg, 50%, 79%);
+      --color-pin-base-450: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-pin-base-500: hsl(52deg, 78%, 91%); /* #f9f5d7 bg-hard */
+      --color-pin-base-550: hsl(52deg, 82%, 93%);
+
+      /* Light theme tag colors */
+      --color-tag-general: hsl(220, 9%, 86%);
+      --color-tag-general-fg: hsl(220, 9%, 32%);
+      --color-tag-general-hover: hsl(220, 15%, 12%);
+      --color-tag-artist: hsl(38, 70%, 88%);
+      --color-tag-artist-fg: hsl(38, 70%, 28%);
+      --color-tag-artist-hover: hsl(38, 80%, 16%);
+      --color-tag-copyright: hsl(355, 70%, 90%);
+      --color-tag-copyright-fg: hsl(355, 70%, 30%);
+      --color-tag-copyright-hover: hsl(355, 80%, 18%);
+      --color-tag-character: hsl(215, 70%, 88%);
+      --color-tag-character-fg: hsl(215, 70%, 28%);
+      --color-tag-character-hover: hsl(215, 80%, 16%);
+      --color-tag-species: hsl(140, 50%, 86%);
+      --color-tag-species-fg: hsl(140, 50%, 22%);
+      --color-tag-species-hover: hsl(140, 60%, 12%);
+      --color-tag-meta: hsl(270, 50%, 90%);
+      --color-tag-meta-fg: hsl(270, 50%, 28%);
+      --color-tag-meta-hover: hsl(270, 60%, 16%);
+      --color-tag-material: hsl(25, 70%, 88%);
+      --color-tag-material-fg: hsl(25, 70%, 28%);
+      --color-tag-material-hover: hsl(25, 80%, 16%);
+      --color-tag-color: hsl(318, 70%, 90%);
+      --color-tag-color-fg: hsl(318, 70%, 30%);
+      --color-tag-color-hover: hsl(318, 80%, 18%);
+    }
+
+    /* ── Gruvbox Light ──────────────────────────────────────────────────── */
+    @variant gruvbox-light {
+      --color-cat-rosewater: hsl(0deg, 100%, 31%);
+      --color-cat-sky: hsl(184deg, 35%, 38%);
+      --color-pin-base-text: hsl(12deg, 5%, 22%);
+      --color-pin-base-100: hsl(11deg, 7%, 29%);
+      --color-pin-base-150: hsl(21deg, 10%, 36%);
+      --color-pin-base-200: hsl(21deg, 11%, 44%);
+      --color-pin-base-250: hsl(30deg, 11%, 52%);
+      --color-pin-base-300: hsl(38deg, 14%, 60%);
+      --color-pin-base-350: hsl(38deg, 36%, 73%);
+      --color-pin-base-400: hsl(43deg, 50%, 79%);
+      --color-pin-base-450: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-pin-base-500: hsl(47deg, 84%, 88%); /* #fbf1c7 bg */
+      --color-pin-base-550: hsl(52deg, 78%, 91%); /* #f9f5d7 (lighter) */
+
+      /* Light theme tag colors */
+      --color-tag-general: hsl(220, 9%, 86%);
+      --color-tag-general-fg: hsl(220, 9%, 32%);
+      --color-tag-general-hover: hsl(220, 15%, 12%);
+      --color-tag-artist: hsl(38, 70%, 88%);
+      --color-tag-artist-fg: hsl(38, 70%, 28%);
+      --color-tag-artist-hover: hsl(38, 80%, 16%);
+      --color-tag-copyright: hsl(355, 70%, 90%);
+      --color-tag-copyright-fg: hsl(355, 70%, 30%);
+      --color-tag-copyright-hover: hsl(355, 80%, 18%);
+      --color-tag-character: hsl(215, 70%, 88%);
+      --color-tag-character-fg: hsl(215, 70%, 28%);
+      --color-tag-character-hover: hsl(215, 80%, 16%);
+      --color-tag-species: hsl(140, 50%, 86%);
+      --color-tag-species-fg: hsl(140, 50%, 22%);
+      --color-tag-species-hover: hsl(140, 60%, 12%);
+      --color-tag-meta: hsl(270, 50%, 90%);
+      --color-tag-meta-fg: hsl(270, 50%, 28%);
+      --color-tag-meta-hover: hsl(270, 60%, 16%);
+      --color-tag-material: hsl(25, 70%, 88%);
+      --color-tag-material-fg: hsl(25, 70%, 28%);
+      --color-tag-material-hover: hsl(25, 80%, 16%);
+      --color-tag-color: hsl(318, 70%, 90%);
+      --color-tag-color-fg: hsl(318, 70%, 30%);
+      --color-tag-color-hover: hsl(318, 80%, 18%);
+    }
+
+    /* ── Gruvbox Light Soft ─────────────────────────────────────────────── */
+    @variant gruvbox-light-soft {
+      --color-cat-rosewater: hsl(0deg, 100%, 31%);
+      --color-cat-sky: hsl(184deg, 35%, 38%);
+      --color-pin-base-text: hsl(12deg, 5%, 22%);
+      --color-pin-base-100: hsl(11deg, 7%, 29%);
+      --color-pin-base-150: hsl(21deg, 10%, 36%);
+      --color-pin-base-200: hsl(21deg, 11%, 44%);
+      --color-pin-base-250: hsl(30deg, 11%, 52%);
+      --color-pin-base-300: hsl(38deg, 14%, 60%);
+      --color-pin-base-350: hsl(38deg, 36%, 73%);
+      --color-pin-base-400: hsl(43deg, 50%, 79%);
+      --color-pin-base-450: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-pin-base-500: hsl(43deg, 66%, 84%); /* #f2e5bc bg-soft */
+      --color-pin-base-550: hsl(43deg, 72%, 87%);
+
+      /* Light theme tag colors */
+      --color-tag-general: hsl(220, 9%, 86%);
+      --color-tag-general-fg: hsl(220, 9%, 32%);
+      --color-tag-general-hover: hsl(220, 15%, 12%);
+      --color-tag-artist: hsl(38, 70%, 88%);
+      --color-tag-artist-fg: hsl(38, 70%, 28%);
+      --color-tag-artist-hover: hsl(38, 80%, 16%);
+      --color-tag-copyright: hsl(355, 70%, 90%);
+      --color-tag-copyright-fg: hsl(355, 70%, 30%);
+      --color-tag-copyright-hover: hsl(355, 80%, 18%);
+      --color-tag-character: hsl(215, 70%, 88%);
+      --color-tag-character-fg: hsl(215, 70%, 28%);
+      --color-tag-character-hover: hsl(215, 80%, 16%);
+      --color-tag-species: hsl(140, 50%, 86%);
+      --color-tag-species-fg: hsl(140, 50%, 22%);
+      --color-tag-species-hover: hsl(140, 60%, 12%);
+      --color-tag-meta: hsl(270, 50%, 90%);
+      --color-tag-meta-fg: hsl(270, 50%, 28%);
+      --color-tag-meta-hover: hsl(270, 60%, 16%);
+      --color-tag-material: hsl(25, 70%, 88%);
+      --color-tag-material-fg: hsl(25, 70%, 28%);
+      --color-tag-material-hover: hsl(25, 80%, 16%);
+      --color-tag-color: hsl(318, 70%, 90%);
+      --color-tag-color-fg: hsl(318, 70%, 30%);
+      --color-tag-color-hover: hsl(318, 80%, 18%);
     }
   }
 }
@@ -119,7 +513,14 @@
     bg-pin-base-450 
     px-2 
     py-1 
-    rounded-lg;
+    rounded-lg
+    outline-0;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply bg-pin-base-400;
   }
 
   a {
@@ -163,7 +564,7 @@
 }
 
 .ts-wrapper.plugin-remove_button:not(.rtl) .item.active .remove {
-  @apply border-l-pin-border;
+  border-left-color: currentColor;
 }
 
 /* Single Select */
@@ -227,13 +628,77 @@
 
 .ts-wrapper.plugin-remove_button:not(.rtl) .item .remove,
 .ts-wrapper.plugin-remove_button .item .remove {
-  @apply border-l-pin-border;
+  border-left-color: currentColor;
+  color: inherit;
 }
 
 .ts-control,
 .ts-control input,
 .ts-dropdown {
   @apply text-pin-base-text;
+}
+
+/** Tag category chips (Tom Select multi-select items) **/
+
+/* Force children of category chips to inherit color.
+   Needed because @layer base { * { color: pin-base-text } } explicitly sets
+   color on every element — explicit beats inherited regardless of specificity.
+   Unlayered rules beat @layer rules, so this wins without !important. */
+.ts-wrapper.multi .ts-control [data-value][data-category] *,
+.ts-wrapper.single[data-selected-category] .ts-control * {
+  color: inherit;
+}
+
+.ts-wrapper.multi .ts-control [data-value][data-category="general"] {
+  @apply bg-tag-general text-tag-general-fg fill-tag-general-fg stroke-tag-general-fg border-tag-general-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="copyright"] {
+  @apply bg-tag-copyright text-tag-copyright-fg stroke-tag-copyright-fg border-tag-copyright-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="character"] {
+  @apply bg-tag-character text-tag-character-fg fill-tag-character-fg stroke-tag-character-fg border-tag-character-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="species"] {
+  @apply bg-tag-species text-tag-species-fg fill-tag-species-fg stroke-tag-species-fg border-tag-species-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="meta"] {
+  @apply bg-tag-meta text-tag-meta-fg stroke-tag-meta-fg border-tag-meta-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="material"] {
+  @apply bg-tag-material text-tag-material-fg fill-tag-material-fg stroke-tag-material-fg border-tag-material-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="color"] {
+  @apply bg-tag-color text-tag-color-fg fill-tag-color-fg stroke-tag-color-fg border-tag-color-fg;
+}
+
+/** Tag category single-select (Category field) — fix item layout and color the whole control box **/
+
+.ts-wrapper.single .ts-control .item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ts-wrapper.single[data-selected-category="general"] .ts-control {
+  @apply bg-tag-general text-tag-general-fg border-tag-general-fg;
+}
+.ts-wrapper.single[data-selected-category="copyright"] .ts-control {
+  @apply bg-tag-copyright text-tag-copyright-fg border-tag-copyright-fg;
+}
+.ts-wrapper.single[data-selected-category="character"] .ts-control {
+  @apply bg-tag-character text-tag-character-fg border-tag-character-fg;
+}
+.ts-wrapper.single[data-selected-category="species"] .ts-control {
+  @apply bg-tag-species text-tag-species-fg border-tag-species-fg;
+}
+.ts-wrapper.single[data-selected-category="meta"] .ts-control {
+  @apply bg-tag-meta text-tag-meta-fg border-tag-meta-fg;
+}
+.ts-wrapper.single[data-selected-category="material"] .ts-control {
+  @apply bg-tag-material text-tag-material-fg border-tag-material-fg;
+}
+.ts-wrapper.single[data-selected-category="color"] .ts-control {
+  @apply bg-tag-color text-tag-color-fg border-tag-color-fg;
 }
 
 /** Bulk Import Table **/
@@ -251,13 +716,11 @@
 }
 
 .bulk-data-row {
-  height: 88px;
+  height: 88px; /* soft minimum — tr expands beyond this when content is taller */
 }
 
-/* Prevent Tom Select chip area from growing cells (and thus rows) */
+/* Allow Tom Select chip area to grow — row height expands to tallest cell */
 .bulk-td .ts-control {
-  max-height: 64px;
-  overflow-y: auto;
   overflow-x: hidden;
 }
 
@@ -278,11 +741,20 @@
 }
 
 /* Copy / Paste buttons */
-.cell-copy-btn,
+.cell-copy-btn {
+  position: absolute;
+  top: 3px;
+  right: 20px; /* offset left of paste so they don't overlap */
+  z-index: 1;
+  @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-pin-base-400;
+  line-height: 1;
+}
+
 .cell-paste-btn {
   position: absolute;
   top: 3px;
   right: 3px;
+  z-index: 1;
   @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-pin-base-400;
   line-height: 1;
 }
@@ -297,12 +769,45 @@
   @apply opacity-100;
 }
 
-.copyable-cell:hover .cell-paste-btn:not(.hidden) {
-  @apply opacity-100;
+/* Hover: paste grayed (no clipboard) or full (clipboard match) */
+.copyable-cell:hover .cell-paste-btn {
+  @apply opacity-20 text-pin-base-200;
+}
+
+.copyable-cell.has-clipboard:hover .cell-paste-btn {
+  @apply opacity-100 text-inherit;
 }
 
 .cell-copy-btn.copied {
   @apply text-accent opacity-100;
+}
+
+/* Sticky left columns — pure CSS, no JS measurement */
+.bulk-sticky-left {
+  z-index: 20; /* above regular sticky-top TH (z-10) */
+}
+
+/* Column position classes — applied to both TH and TD */
+.bulk-sticky-col-0 {
+  position: sticky;
+  left: 0;
+}
+.bulk-sticky-col-1 {
+  position: sticky;
+  left: 2rem;
+} /* 32px = w-8 (checkbox width) */
+.bulk-sticky-col-2 {
+  position: sticky;
+  left: 120px;
+} /* 32px + 88px (checkbox + front image) */
+
+.bulk-sticky-td {
+  z-index: 5;
+  @apply bg-pin-main; /* solid bg prevents bleed-through on horizontal scroll */
+}
+
+.bulk-data-row:hover > .bulk-sticky-td {
+  @apply bg-pin-base-500;
 }
 
 /* Header paste-all button */

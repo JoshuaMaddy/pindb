@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.repr import Result
-from sqlalchemy import Index
+from sqlalchemy import ForeignKey, Index
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -20,6 +20,19 @@ from pindb.database.link import Link
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
+
+
+class ShopAlias(MappedAsDataclass, Base):
+    __tablename__ = "shop_aliases"
+
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), init=False)
+    alias: Mapped[str] = mapped_column(unique=True)
+
+    def __rich_repr__(self) -> Result:
+        yield "id", self.id
+        yield "shop_id", self.shop_id
+        yield "alias", self.alias
 
 
 class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
@@ -52,6 +65,11 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         back_populates="shops",
     )
 
+    aliases: Mapped[list[ShopAlias]] = relationship(
+        default_factory=list,
+        cascade="all, delete-orphan",
+    )
+
     # Optional Relationships
     links: Mapped[set[Link]] = relationship(
         secondary=shops_links,
@@ -71,6 +89,7 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return {
             "id": self.id,
             "name": self.name,
+            "aliases": [a.alias for a in self.aliases],
             "description": self.description,
             "active": self.active,
             "is_pending": self.is_pending,
@@ -87,4 +106,5 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             return
         if object_session(self):
             yield "number_of_pins", len(self.pins)
+            yield "aliases", self.aliases, []
             yield "links", self.links, set()

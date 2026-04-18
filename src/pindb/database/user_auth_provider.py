@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class OAuthProvider(StrEnum):
     google = "google"
     discord = "discord"
+    meta = "meta"
 
 
 class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
@@ -28,6 +29,8 @@ class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
     provider: Mapped[OAuthProvider]
     provider_user_id: Mapped[str]
     provider_email: Mapped[str | None] = mapped_column(default=None)
+    provider_username: Mapped[str | None] = mapped_column(default=None)
+    email_verified: Mapped[bool] = mapped_column(default=False)
 
     user: Mapped[User] = relationship(
         back_populates="auth_providers", init=False, foreign_keys=[user_id]
@@ -40,5 +43,7 @@ class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
             yield "provider", self.provider
             yield "provider_user_id", self.provider_user_id
             yield "provider_email", self.provider_email, None
+            yield "provider_username", self.provider_username, None
+            yield "email_verified", self.email_verified, False
         except Exception:
             yield "detached", True

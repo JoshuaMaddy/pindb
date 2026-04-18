@@ -86,6 +86,7 @@ alembic/                     # Database migrations
 scripts/
 ├── README.md                # CSV import format docs (grades encoding, column format)
 ├── import_csv.py            # Bulk CSV import script
+├── migrate_images.py        # Migrate images between filesystem and R2 backends
 ├── dev.sh                   # Bash: docker compose up + fastapi dev
 └── dev.ps1                  # PowerShell: same as above
 
@@ -109,7 +110,13 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `image_directory` | Yes | — | Path to uploaded pin images |
+| `image_backend` | No | `filesystem` | `filesystem` or `r2` |
+| `image_directory` | If `filesystem` | — | Path to uploaded pin images |
+| `r2_account_id` | If `r2` | — | Cloudflare account ID |
+| `r2_bucket` | If `r2` | — | R2 bucket name |
+| `r2_access_key_id` | If `r2` | — | R2 API token key ID |
+| `r2_secret_access_key` | If `r2` | — | R2 API token secret |
+| `r2_public_url` | No | None | Public CDN base URL for R2 (enables redirect instead of proxy) |
 | `database_connection` | Yes | — | PostgreSQL connection string |
 | `meilisearch_key` | Yes | — | Meilisearch master key |
 | `meilisearch_url` | No | `http://127.0.0.1:7700` | Meilisearch URL |
@@ -121,6 +128,11 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 | `google_client_secret` | No | None | Google OAuth client secret |
 | `discord_client_id` | No | None | Discord OAuth client ID |
 | `discord_client_secret` | No | None | Discord OAuth client secret |
+| `meta_client_id` | No | None | Meta (Facebook Login) OAuth client ID |
+| `meta_client_secret` | No | None | Meta (Facebook Login) OAuth client secret |
+| `password_min_length` | No | `12` | Minimum password length enforced on signup / password change |
+| `password_min_zxcvbn_score` | No | `3` | Minimum zxcvbn strength score (0–4) |
+| `allow_test_oauth_provider` | No | `False` | Enables `/auth/_test-oauth/*` for e2e tests — must be `False` in prod |
 
 ## Audit & History System
 
@@ -190,7 +202,7 @@ return HTMLResponse(content=str(template(pin=pin)))
   - `EditorUser` → `User` (403 if not editor or admin)
   - `AdminUser` → `User` (403 if not admin)
 - Startup: `lifespan._ensure_admins()` grants admin to hardcoded usernames (default: `["josh"]`).
-- OAuth: Google (OIDC) and Discord, both in `routes/auth/router.py`.
+- OAuth: Google (OIDC) and Discord, both in `routes/auth/router.py`. Authlib stores OAuth state in Starlette `SessionMiddleware` using cookie `pindb_starlette_session` (not `session`, which is reserved for the login token).
 
 ### Global vs Personal PinSets
 - `PinSet.owner_id = NULL` → global/curator set (admin-editable only)
@@ -204,8 +216,12 @@ return HTMLResponse(content=str(template(pin=pin)))
 
 ### Images
 - Pins store `front_image_guid` (required) and `back_image_guid` (optional) as UUIDs.
-- Files at `{image_directory}/{uuid}`, thumbnails at `{uuid}.thumbnail` (256px WebP).
-- Route: `GET /get/image/{uuid}?size=thumbnail`
+- Files stored by UUID key; thumbnails at `{uuid}.thumbnail` (256px WebP). Thumbnails generated eagerly at ingest.
+- Two backends (mutually exclusive): `filesystem` (local dir) or `r2` (Cloudflare R2 via S3-compatible API).
+- R2 serving: redirects to `r2_public_url/{key}` if set; otherwise proxies bytes. Filesystem serving: `FileResponse`.
+- 20 MB upload limit enforced in `file_handler.save_image()`.
+- Migration: `uv run python scripts/migrate_images.py --direction fs-to-r2|r2-to-fs`
+- Route: `GET /get/image/{uuid}?thumbnail=true`
 
 ### Search (Meilisearch)
 - `Pin.document()` returns dict with `id`, `name`, `shops`, `materials`, `tags`, `artists`, `description`.

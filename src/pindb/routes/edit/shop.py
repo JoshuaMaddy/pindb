@@ -1,6 +1,6 @@
-from typing import Annotated, Any
+from typing import Annotated
 
-from fastapi import Form, Request
+from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
@@ -8,18 +8,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Shop, session_maker
-from pindb.database.link import Link
-from pindb.database.pending_edit import PendingEdit
+from pindb.database import Shop, ShopAlias, session_maker
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
-    compute_patch,
     get_edit_chain,
     get_effective_snapshot,
-    get_head_edit,
 )
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
@@ -30,14 +27,16 @@ def get_edit_shop(
     request: Request,
     id: int,
     current_user: EditorUser,
-) -> HTMLResponse | None:
+) -> HTMLResponse:
     with session_maker() as session:
         shop: Shop | None = session.scalar(
-            select(Shop).where(Shop.id == id).options(selectinload(Shop.links))
+            select(Shop)
+            .where(Shop.id == id)
+            .options(selectinload(Shop.links), selectinload(Shop.aliases))
         )
 
         if shop is None:
-            return None
+            raise HTTPException(status_code=404, detail="Shop not found")
 
         assert_editor_can_edit(shop, current_user)
 
@@ -75,64 +74,43 @@ def post_edit_shop(
         Form(),
         BeforeValidator(func=empty_str_list_to_none),
     ] = None,
-) -> HTMLResponse | None:
+    aliases: list[str] = Form(default_factory=list),
+) -> HTMLResponse:
     with session_maker.begin() as session:
         shop: Shop | None = session.scalar(
-            select(Shop).where(Shop.id == id).options(selectinload(Shop.links))
+            select(Shop)
+            .where(Shop.id == id)
+            .options(selectinload(Shop.links), selectinload(Shop.aliases))
         )
 
         if not shop:
-            return None
+            raise HTTPException(status_code=404, detail="Shop not found")
 
         assert_editor_can_edit(shop, current_user)
 
         if needs_pending_edit(shop, current_user):
-            chain = get_edit_chain(session, "shops", id)
-            old_snapshot: dict[str, Any] = get_effective_snapshot(shop, chain)
-
-            new_snapshot: dict[str, Any] = dict(old_snapshot)
-            new_snapshot.update(
-                {
+            return submit_pending_edit(
+                session=session,
+                entity=shop,
+                entity_table="shops",
+                entity_id=id,
+                field_updates={
                     "name": name,
                     "description": description,
                     "links": sorted(links or []),
-                }
-            )
-
-            patch = compute_patch(old_snapshot, new_snapshot)
-            if not patch:
-                return HTMLResponse(
-                    headers={"HX-Redirect": str(request.url_for("get_shop", id=id))}
-                )
-
-            head = get_head_edit(session, "shops", id)
-            session.add(
-                PendingEdit(
-                    entity_type="shops",
-                    entity_id=id,
-                    patch=patch,
-                    created_by_id=current_user.id,
-                    parent_id=head.id if head else None,
-                )
-            )
-
-            return HTMLResponse(
-                headers={
-                    "HX-Redirect": str(request.url_for("get_shop", id=id))
-                    + "?version=pending"
-                }
+                    "aliases": sorted(alias for alias in aliases if alias.strip()),
+                },
+                current_user=current_user,
+                request=request,
+                redirect_route="get_shop",
             )
 
         shop.name = name
         shop.description = description
 
-        for old_link in list(shop.links):
-            session.delete(old_link)
+        replace_links(entity=shop, urls=links, session=session)
 
-        new_links: set[Link] = set()
-        for new_link in links or []:
-            new_links.add(Link(new_link))
-        shop.links = new_links
+        shop.aliases = [ShopAlias(alias=alias) for alias in aliases if alias.strip()]
 
         session.flush()
         shop_id: int = shop.id

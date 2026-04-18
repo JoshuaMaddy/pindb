@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
 
-from pindb.database import Artist, session_maker
+from pindb.database import Artist, ArtistAlias, session_maker
 from pindb.database.link import Link
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.search.update import update_artist
@@ -38,6 +38,7 @@ def post_create_artist(
         Form(),
         BeforeValidator(func=empty_str_list_to_none),
     ] = None,
+    aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
     with session_maker.begin() as session:
         new_links: set[Link] = (
@@ -51,6 +52,9 @@ def post_create_artist(
         )
 
         session.add(instance=artist)
+        session.flush()
+
+        artist.aliases = [ArtistAlias(alias=a) for a in aliases if a.strip()]
         session.flush()
         artist_id: int = artist.id
 

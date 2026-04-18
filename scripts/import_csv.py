@@ -13,8 +13,8 @@ from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
-from pindb.database.tag import Tag
-from pindb.file_handler import save_file
+from pindb.database.tag import Tag, apply_pin_tags
+from pindb.file_handler import save_image
 
 image_folder: Path = Path(__file__).parent / "images"
 
@@ -110,30 +110,30 @@ async def import_csv():
                 if (grade := raw.split("|")) and len(grade) == 3 and grade[0].strip()
             }
 
-            session.add(
-                Pin(
-                    name=row["name"],
-                    acquisition_type=row["acquisition"],
-                    front_image_guid=await save_file(image_path),
-                    currency=currency,
-                    shops=set(shops),
-                    limited_edition=row["limited_edition"],
-                    number_produced=row["number_produced"],
-                    release_date=row["release_date"],
-                    end_date=row["end_date"],
-                    funding_type=row["funding_type"],
-                    posts=row["posts"],
-                    width=row["width"],
-                    height=row["height"],
-                    description=row["description"],
-                    sku=row["sku"],
-                    artists=set(artists),
-                    sets=set(pin_sets),
-                    tags=set(tags),
-                    links=set(links),
-                    grades=grades,
-                )
+            new_pin = Pin(
+                name=row["name"],
+                acquisition_type=row["acquisition"],
+                front_image_guid=await save_image(image_path),
+                currency=currency,
+                shops=set(shops),
+                limited_edition=row["limited_edition"],
+                number_produced=row["number_produced"],
+                release_date=row["release_date"],
+                end_date=row["end_date"],
+                funding_type=row["funding_type"],
+                posts=row["posts"],
+                width=row["width"],
+                height=row["height"],
+                description=row["description"],
+                sku=row["sku"],
+                artists=set(artists),
+                sets=set(pin_sets),
+                links=set(links),
+                grades=grades,
             )
+            session.add(new_pin)
+            session.flush()
+            apply_pin_tags(new_pin.id, {t.id for t in tags}, session)
 
 
 if __name__ == "__main__":

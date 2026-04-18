@@ -54,11 +54,17 @@ window.addEventListener("load", function () {
 
   const _PIN_FORM_REF = window.PIN_FORM_REF;
 
+  const _noResultsRender = {
+    no_results: (data) => {
+      const msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search…";
+      return `<div class="no-results">${msg}</div>`;
+    },
+  };
+
   document.querySelectorAll("select.multi-select").forEach((el) => {
     const entityType = el.dataset.entityType;
     if (entityType && _PIN_FORM_REF) {
-      new TomSelect(el, {
-        preload: true,
+      const opts = {
         load: (query, callback) => {
           fetch(
             `${_PIN_FORM_REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`
@@ -67,13 +73,24 @@ window.addEventListener("load", function () {
             .then(callback)
             .catch(() => callback());
         },
+        shouldLoad: (q) => q.length > 0,
         maxItems: null,
         plugins: ["caret_position", "remove_button"],
         valueField: "value",
         labelField: "text",
         searchField: "text",
         persist: true,
-      });
+        render: { ..._noResultsRender },
+      };
+      if (entityType === "tag") {
+        opts.render = {
+          ..._noResultsRender,
+          item: TagSelect.tagItemRender,
+          option: TagSelect.tagOptionRender,
+        };
+        Object.assign(opts, TagSelect.tagSelectLucideCallbacks());
+      }
+      new TomSelect(el, opts);
     } else {
       new TomSelect(el, {
         maxItems: null,
@@ -90,6 +107,8 @@ window.addEventListener("load", function () {
   // Drag & Drop Upload Boxes
   // -------------------------------
 
+  let _hoveredImageBox = null;
+
   document.querySelectorAll(".image-drop").forEach((box) => {
     const inputId = box.dataset.inputId;
     const input = document.getElementById(inputId);
@@ -99,6 +118,9 @@ window.addEventListener("load", function () {
     input.addEventListener("change", () => {
       if (input.files[0]) showPreview(box, input.files[0]);
     });
+
+    box.addEventListener("mouseenter", () => { _hoveredImageBox = { box, input }; });
+    box.addEventListener("mouseleave", () => { _hoveredImageBox = null; });
 
     box.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -125,6 +147,24 @@ window.addEventListener("load", function () {
     });
   });
 
+  document.addEventListener("paste", (e) => {
+    if (!_hoveredImageBox) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (!file) continue;
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        _hoveredImageBox.input.files = dt.files;
+        showPreview(_hoveredImageBox.box, file);
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+
   function showPreview(box, file) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -142,23 +182,25 @@ window.addEventListener("load", function () {
   const limitedEditionYes = document.getElementById("limited_edition_yes");
   const limitedEditionNo = document.getElementById("limited_edition_no");
 
-  const limitedEditionSelected = [
-    "bg-pin-main",
-    "border-accent",
-    "text-accent",
-  ];
+  if (limitedEditionCheckbox && limitedEditionYes && limitedEditionNo) {
+    const limitedEditionSelected = [
+      "bg-pin-main",
+      "border-accent",
+      "text-accent",
+    ];
 
-  limitedEditionYes.addEventListener("click", (e) => {
-    e.preventDefault();
-    limitedEditionCheckbox.value = true;
-    limitedEditionYes.classList.add(...limitedEditionSelected);
-    limitedEditionNo.classList.remove(...limitedEditionSelected);
-  });
+    limitedEditionYes.addEventListener("click", (e) => {
+      e.preventDefault();
+      limitedEditionCheckbox.value = true;
+      limitedEditionYes.classList.add(...limitedEditionSelected);
+      limitedEditionNo.classList.remove(...limitedEditionSelected);
+    });
 
-  limitedEditionNo.addEventListener("click", (e) => {
-    e.preventDefault();
-    limitedEditionCheckbox.value = false;
-    limitedEditionNo.classList.add(...limitedEditionSelected);
-    limitedEditionYes.classList.remove(...limitedEditionSelected);
-  });
+    limitedEditionNo.addEventListener("click", (e) => {
+      e.preventDefault();
+      limitedEditionCheckbox.value = false;
+      limitedEditionNo.classList.add(...limitedEditionSelected);
+      limitedEditionYes.classList.remove(...limitedEditionSelected);
+    });
+  }
 });

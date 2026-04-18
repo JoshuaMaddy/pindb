@@ -165,6 +165,29 @@ def patch_meilisearch(monkeypatch) -> MagicMock:
 
     monkeypatch.setattr(_search_update, "PIN_INDEX", mock_index)
     monkeypatch.setattr(_search_search, "PIN_INDEX", mock_index)
+    # Also stub the secondary indexes used by update_all / bulk options.
+    for name in ("TAGS_INDEX", "ARTISTS_INDEX", "SHOPS_INDEX", "PIN_SETS_INDEX"):
+        if hasattr(_search_update, name):
+            monkeypatch.setattr(_search_update, name, mock_index)
+
+    # Patch INDEX_BY_ENTITY_TYPE so the generic update_one/update_many/delete_one
+    # functions also use the mock instead of real (import-time) index objects.
+    if hasattr(_search_update, "INDEX_BY_ENTITY_TYPE"):
+        from pindb.database.entity_type import EntityType
+
+        monkeypatch.setattr(
+            _search_update,
+            "INDEX_BY_ENTITY_TYPE",
+            {et: mock_index for et in EntityType},
+        )
+
+    # Modules that import these names at top level need to be patched too.
+    try:
+        _bulk_pin = importlib.import_module("pindb.routes.bulk.pin")
+        if hasattr(_bulk_pin, "TAGS_INDEX"):
+            monkeypatch.setattr(_bulk_pin, "TAGS_INDEX", mock_index)
+    except ImportError:
+        pass
 
     return mock_index
 
@@ -201,6 +224,16 @@ def test_app():
 @pytest.fixture
 def client(test_app, patch_session_maker, patch_meilisearch):
     """Unauthenticated Starlette TestClient."""
+    from starlette.testclient import TestClient
+
+    with TestClient(test_app, raise_server_exceptions=True) as c:
+        yield c
+
+
+@pytest.fixture
+def anon_client(test_app, patch_session_maker, patch_meilisearch):
+    """A second unauthenticated TestClient, used when tests also need
+    `admin_client`/`auth_client` (which both mutate the shared `client`'s cookies)."""
     from starlette.testclient import TestClient
 
     with TestClient(test_app, raise_server_exceptions=True) as c:
@@ -265,6 +298,40 @@ def admin_user(db_session: Session, seed_currencies):
     return user
 
 
+@pytest.fixture
+def editor_user(db_session: Session, seed_currencies):
+    """Non-admin editor user. Creates pending entities; can edit own pending entries."""
+    from pindb.auth import hash_password
+    from pindb.database.user import User
+
+    user = User(
+        username="editoruser",
+        email="editor@example.com",
+        hashed_password=hash_password("editorpassword"),
+        is_editor=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+@pytest.fixture
+def other_editor_user(db_session: Session, seed_currencies):
+    """A second editor, for ownership boundary tests."""
+    from pindb.auth import hash_password
+    from pindb.database.user import User
+
+    user = User(
+        username="editor2",
+        email="editor2@example.com",
+        hashed_password=hash_password("editor2password"),
+        is_editor=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
 def _make_session_token(user, db_session: Session) -> str:
     """Insert a UserSession row and return its token."""
     from pindb.database.session import UserSession
@@ -283,19 +350,115 @@ def _make_session_token(user, db_session: Session) -> str:
 
 
 @pytest.fixture
-def auth_client(client, test_user, db_session: Session):
-    """TestClient pre-authenticated as test_user."""
+def auth_client(
+    test_app, patch_session_maker, patch_meilisearch, test_user, db_session: Session
+):
+    """TestClient pre-authenticated as test_user.
+
+    Uses its own TestClient instance so tests that mix multiple authenticated
+    clients in one request do not have their session cookies clobbered.
+    """
+    from starlette.testclient import TestClient
+
+    c = TestClient(test_app, raise_server_exceptions=True)
     token = _make_session_token(test_user, db_session)
-    client.cookies.set("session", token)
-    return client
+    c.cookies.set("session", token)
+    return c
 
 
 @pytest.fixture
-def admin_client(client, admin_user, db_session: Session):
-    """TestClient pre-authenticated as admin_user."""
+def admin_client(
+    test_app, patch_session_maker, patch_meilisearch, admin_user, db_session: Session
+):
+    """TestClient pre-authenticated as admin_user.
+
+    Uses its own TestClient instance so tests that mix multiple authenticated
+    clients in one request do not have their session cookies clobbered.
+    """
+    from starlette.testclient import TestClient
+
+    c = TestClient(test_app, raise_server_exceptions=True)
     token = _make_session_token(admin_user, db_session)
-    client.cookies.set("session", token)
-    return client
+    c.cookies.set("session", token)
+    return c
+
+
+@pytest.fixture
+def editor_client(
+    test_app, patch_session_maker, patch_meilisearch, editor_user, db_session: Session
+):
+    """TestClient pre-authenticated as editor_user.
+
+    Uses its own TestClient so tests that also use `admin_client`/`auth_client`
+    don't have their session cookies clobbered on the shared `client`.
+    """
+    from starlette.testclient import TestClient
+
+    c = TestClient(test_app, raise_server_exceptions=True)
+    token = _make_session_token(editor_user, db_session)
+    c.cookies.set("session", token)
+    return c
+
+
+@pytest.fixture
+def other_editor_client(
+    test_app,
+    patch_session_maker,
+    patch_meilisearch,
+    other_editor_user,
+    db_session: Session,
+):
+    """Pre-authenticated as a second editor."""
+    from starlette.testclient import TestClient
+
+    c = TestClient(test_app, raise_server_exceptions=True)
+    token = _make_session_token(other_editor_user, db_session)
+    c.cookies.set("session", token)
+    return c
+
+
+# ---------------------------------------------------------------------------
+# Image fixtures — 1×1 PNG for Pin front_image uploads
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def png_bytes() -> bytes:
+    """A valid 1×1 PNG byte string, PIL can open it."""
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.fixture
+def png_upload(png_bytes: bytes):
+    """Tuple suitable for TestClient files={"front_image": png_upload}."""
+    return ("test.png", png_bytes, "image/png")
+
+
+# ---------------------------------------------------------------------------
+# Audit context reset — prevent ContextVar leakage between tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_audit_context():
+    """Clear the audit user ContextVars before and after each test.
+
+    The `attach_user_middleware` sets these on every request, but direct
+    db_session writes (factories, fixtures) can leave them stale.
+    """
+    from pindb.audit_events import set_audit_user, set_audit_user_flags
+
+    set_audit_user(None)
+    set_audit_user_flags(is_admin=False, is_editor=False)
+    yield
+    set_audit_user(None)
+    set_audit_user_flags(is_admin=False, is_editor=False)
 
 
 # ---------------------------------------------------------------------------

@@ -118,15 +118,20 @@ def bulk_pin_page(
                     table(class_="bulk-table w-full border-collapse text-sm")[
                         thead[
                             tr(class_="border-b border-pin-border")[
-                                th(class_="bulk-th w-8")[
+                                th(
+                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-0 w-8"
+                                )[
                                     Markup(
                                         '<input type="checkbox" id="select-all-rows">'
                                     )
                                 ],
-                                th(class_="bulk-th w-20")["Front *"],
-                                th(class_="bulk-th w-20")["Back"],
                                 th(
-                                    class_="bulk-th min-w-[160px]", data_col_type="name"
+                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-1 w-[88px]"
+                                )["Front *"],
+                                th(class_="bulk-th w-[88px]")["Back"],
+                                th(
+                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-2 min-w-[15ch]",
+                                    data_col_type="name",
                                 )["Name *"],
                                 th(
                                     class_="bulk-th min-w-[180px]",
@@ -145,7 +150,7 @@ def bulk_pin_page(
                                     data_col_type="currency_id",
                                 )["Currency *"],
                                 th(
-                                    class_="bulk-th min-w-[160px]", data_col_type="tags"
+                                    class_="bulk-th min-w-[320px]", data_col_type="tags"
                                 )["Tags *"],
                                 # Optional columns
                                 th(

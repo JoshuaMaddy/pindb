@@ -90,7 +90,11 @@ def pin_page(
                                 ),
                                 message=f'Delete the pin "{pin.name}"? This will delete the pin!',
                                 form_action=str(
-                                    request.url_for("post_delete_pin", id=pin.id)
+                                    request.url_for(
+                                        "post_delete_entity",
+                                        entity_type="pin",
+                                        id=pin.id,
+                                    )
                                 ),
                             ),
                         ],
@@ -399,7 +403,9 @@ def __tags(
         items=[
             pill_link(
                 href=str(request.url_for("get_tag", id=tag.id)),
-                text=("(P) " + tag.name) if tag.is_pending else tag.name,
+                text=("(P) " + tag.display_name)
+                if tag.is_pending
+                else tag.display_name,
                 icon=CATEGORY_ICONS.get(tag.category, "tag"),
                 color_classes=CATEGORY_COLORS.get(
                     tag.category, "bg-pin-base-500 text-pin-base-text"

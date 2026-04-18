@@ -23,5 +23,5 @@ class BaseFactory(SQLAlchemyModelFactory):
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
         # Ensure the factory always uses the current test session
-        cls._meta.sqlalchemy_session = _current_session  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
+        cls._meta.sqlalchemy_session = _current_session  # type: ignore[assignment]  # ty:ignore[unresolved-attribute]
         return super()._create(model_class, *args, **kwargs)

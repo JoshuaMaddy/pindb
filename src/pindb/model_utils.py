@@ -14,10 +14,10 @@ def empty_str_to_none(v: str | None) -> str | None:
 def empty_str_list_to_none(v: list[str] | None) -> list[str] | None:
     if v is None:
         return None
-    if len(v) == 1 and v[0] == "":
+    filtered: list[str] = [item for item in v if item != ""]
+    if not filtered:
         return None
-    else:
-        return v
+    return filtered
 
 
 def magnitude_to_mm(magnitude: str) -> float:

@@ -1,11 +1,16 @@
-from pathlib import Path
 from uuid import UUID
 
-from fastapi.responses import FileResponse
+from fastapi import HTTPException, Response
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.routing import APIRouter
 
-from pindb.config import CONFIGURATION
-from pindb.file_handler import create_thumbnail
+from pindb.file_handler import (
+    THUMBNAIL_SUFFIX,
+    ensure_thumbnail,
+    image_file_path,
+    image_public_url,
+    load_image,
+)
 
 router = APIRouter()
 
@@ -14,18 +19,24 @@ router = APIRouter()
 async def get_image(
     guid: UUID,
     thumbnail: bool = False,
-) -> FileResponse | None:
-    image_path: Path = (CONFIGURATION.image_directory / str(guid)).resolve()
+) -> FileResponse | RedirectResponse | Response:
+    key = f"{guid}{THUMBNAIL_SUFFIX}" if thumbnail else str(guid)
 
-    if not image_path.exists() or not image_path.is_file():
-        return None
+    pub_url = image_public_url(key)
+    if pub_url:
+        return RedirectResponse(url=pub_url, status_code=302)
 
-    if thumbnail:
-        image_path: Path = (
-            CONFIGURATION.image_directory / f"{guid}.thumbnail"
-        ).resolve()
+    path = image_file_path(key)
+    if path is None and thumbnail:
+        if not ensure_thumbnail(str(guid)):
+            raise HTTPException(status_code=404, detail="Image not found")
+        path = image_file_path(key)
+    if path is not None:
+        return FileResponse(
+            path=path, media_type="image/webp" if thumbnail else "image"
+        )
 
-        if not image_path.exists():
-            await create_thumbnail(file_uuid=str(guid))
-
-    return FileResponse(path=image_path, media_type="image")
+    data = load_image(key)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return Response(content=data, media_type="image/webp" if thumbnail else "image")

@@ -35,7 +35,7 @@ from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 
-DIMENSION_PATTERN = r".*?(\d*\.?\d*)\s*(([Ii]nch(?:es)?)|(in)|(IN)|([Cc]entimeters?)|(cm)|(CM)|([Mm]illimeters?)|(mm)|(MM))"
+from pindb.model_utils import MAGNITUDE_PATTERN
 
 with open(
     file=Path(__file__).parent.parent / "js/pin_creation.js",
@@ -85,13 +85,16 @@ def pin_form(
                         __required_fields(
                             shops=shops,
                             tags=tags,
-                            artists=artists,
                             pin=pin,
                             currencies=currencies,
                             request=request,
                         ),
                         hr(class_="col-span-2"),
-                        __optional_fields(pin=pin, pin_sets=pin_sets),
+                        __optional_fields(
+                            pin=pin,
+                            pin_sets=pin_sets,
+                            artists=artists,
+                        ),
                         input(type="submit", value="Submit", class_="col-span-2 mt-2"),
                     ],
                 ],
@@ -126,7 +129,6 @@ def _pending_notice(request: Request, pin: Pin | None) -> Element | str:
 def __required_fields(
     shops: Sequence[Shop],
     tags: Sequence[Tag],
-    artists: Sequence[Artist],
     currencies: Sequence[Currency],
     request: Request,
     pin: Pin | None = None,
@@ -138,17 +140,18 @@ def __required_fields(
         __acquisition_input(pin=pin),
         __grades_input(currencies=currencies, pin=pin),
         __tag_ids_input(pin=pin, tags=tags, request=request),
-        __artist_ids_input(pin=pin, artists=artists),
     ]
 
 
 def __optional_fields(
+    artists: Sequence[Artist],
     pin_sets: Sequence[PinSet],
     pin: Pin | None = None,
 ) -> Fragment:
     return fragment[
         h2(class_="col-span-2")["Optional"],
         # Images
+        __artist_ids_input(pin=pin, artists=artists),
         __pin_sets_ids_input(pin=pin, pin_sets=pin_sets),
         # Production
         __limited_edition_input(pin=pin),
@@ -219,17 +222,52 @@ def __back_image_input(pin: Pin | None) -> list[Element | VoidElement]:
     ]
 
 
-def __name_input(pin: Pin | None) -> list[Element | VoidElement]:
+def _text_field(
+    *,
+    name: str,
+    label_text: str,
+    value: str | int | float | None,
+    required: bool = False,
+    input_type: str = "text",
+    placeholder: str | None = None,
+    pattern: str | None = None,
+    min_value: int | None = None,
+    step: int | str | None = None,
+) -> list[Element | VoidElement]:
+    """Reusable label + input pair for the pin form grid."""
+    lbl = (
+        label(for_=name)[label_text, span(class_="text-red-200 ml-0.5")["*"]]
+        if required
+        else label(for_=name)[label_text]
+    )
+    normalized_value: str | int | None = (
+        str(value) if isinstance(value, float) else value
+    )
     return [
-        label(for_="name")["Name", span(class_="text-red-200 ml-0.5")["*"]],
+        lbl,
         input(
-            name="name",
-            id="name",
-            type="text",
-            required=True,
-            value=pin.name if pin else "",
+            name=name,
+            id=name,
+            type=input_type,
+            required=required or None,
+            autocomplete="off",
+            value=normalized_value if normalized_value is not None else False,
+            placeholder=placeholder or False,
+            pattern=pattern or False,
+            min=min_value,
+            step=step,
         ),
     ]
+
+
+def __name_input(pin: Pin | None) -> list[Element | VoidElement]:
+    return _text_field(
+        name="name",
+        label_text="Name",
+        value=pin.name if pin else "",
+        required=True,
+        placeholder="e.g. Cherry Blossom Artist Edition",
+    )
 
 
 def __shops_input(
@@ -357,8 +395,9 @@ def __tag_ids_input(
                 option(
                     value=str(tag.id),
                     selected=tag in pin.tags if pin else False,
-                )["(P) " + tag.name if tag.is_pending else tag.name]
-                for tag in tags
+                    data_category=tag.category.value,
+                )["(P) " + tag.display_name if tag.is_pending else tag.display_name]
+                for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
             ]
         ],
         div(id="implication-preview", class_="col-span-2"),
@@ -441,41 +480,33 @@ def __limited_edition_input(pin: Pin | None) -> list[Element | VoidElement]:
 
 
 def __number_produced_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="number_produced")["Number Produced"],
-        input(
-            name="number_produced",
-            id="number_produced",
-            type="number",
-            min=0,
-            step=1,
-            value=pin.number_produced if pin and pin.number_produced else None,
-        ),
-    ]
+    return _text_field(
+        name="number_produced",
+        label_text="Number Produced",
+        value=pin.number_produced if pin and pin.number_produced else None,
+        input_type="number",
+        min_value=0,
+        step=1,
+        placeholder="e.g. 100",
+    )
 
 
 def __release_date_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="release_date")["Release Date"],
-        input(
-            name="release_date",
-            id="release_date",
-            type="date",
-            value=str(pin.release_date) if pin and pin.release_date else None,
-        ),
-    ]
+    return _text_field(
+        name="release_date",
+        label_text="Release Date",
+        value=str(pin.release_date) if pin and pin.release_date else None,
+        input_type="date",
+    )
 
 
 def __end_date_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="end_date")["End Date"],
-        input(
-            name="end_date",
-            id="end_date",
-            type="date",
-            value=str(pin.end_date) if pin and pin.end_date else None,
-        ),
-    ]
+    return _text_field(
+        name="end_date",
+        label_text="End Date",
+        value=str(pin.end_date) if pin and pin.end_date else None,
+        input_type="date",
+    )
 
 
 def __funding_input(pin: Pin | None) -> list[Element | VoidElement]:
@@ -498,43 +529,35 @@ def __funding_input(pin: Pin | None) -> list[Element | VoidElement]:
 
 
 def __posts_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="posts")["Posts"],
-        input(
-            name="posts",
-            id="posts",
-            type="number",
-            min=1,
-            step=1,
-            value=pin.posts if pin else 1,
-        ),
-    ]
+    return _text_field(
+        name="posts",
+        label_text="Posts",
+        value=pin.posts if pin else 1,
+        input_type="number",
+        min_value=1,
+        step=1,
+    )
+
+
+def _dimension_field(
+    *, name: str, label_text: str, pin: Pin | None
+) -> list[Element | VoidElement]:
+    value_mm = getattr(pin, name, None) if pin else None
+    return _text_field(
+        name=name,
+        label_text=label_text,
+        value=f"{value_mm}mm" if value_mm else None,
+        pattern=MAGNITUDE_PATTERN,
+        placeholder="e.g. 40mm or 1.5in",
+    )
 
 
 def __width_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="width")["Width"],
-        input(
-            name="width",
-            id="width",
-            type="text",
-            pattern=DIMENSION_PATTERN,
-            value=f"{pin.width}mm" if pin and pin.width else False,
-        ),
-    ]
+    return _dimension_field(name="width", label_text="Width", pin=pin)
 
 
 def __height_input(pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        label(for_="height")["Height"],
-        input(
-            name="height",
-            id="height",
-            type="text",
-            pattern=DIMENSION_PATTERN,
-            value=f"{pin.height}mm" if pin and pin.height else False,
-        ),
-    ]
+    return _dimension_field(name="height", label_text="Height", pin=pin)
 
 
 def __links_input(pin: Pin | None) -> Element | Markup:
@@ -553,10 +576,12 @@ def __links_input(pin: Pin | None) -> Element | Markup:
         Markup(f"""<div class="mt-2" x-data="{{ links: {links_json.replace('"', "'")} }}">
             <template x-for="(link, index) in links" :key="index">
                 <div class="grid grid-cols-[1fr_min-content] gap-2 mb-2">
-                    <input 
+                    <input
                         type="text"
                         name="links"
                         x-model="links[index]"
+                        autocomplete="off"
+                        placeholder="https://..."
                         class="col-span-1">
                     <button 
                         type="button" 
@@ -568,7 +593,7 @@ def __links_input(pin: Pin | None) -> Element | Markup:
             <button 
                 type="button" 
                 @click="links.push('')" 
-                class="w-full mt-2">Add Link</button>
+                class="w-full mt-2">Add Another Link</button>
         </div>"""),
     ]
 

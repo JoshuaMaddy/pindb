@@ -29,6 +29,7 @@ pins_tags = Table(
     Base.metadata,
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+    Column("implied_by_tag_id", Integer, ForeignKey("tags.id"), nullable=True),
 )
 
 shops_links = Table(

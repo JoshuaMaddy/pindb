@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from fastapi import Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -9,22 +9,34 @@ from sqlalchemy.orm import selectinload
 from pindb.auth import CurrentUser
 from pindb.database import Pin, Tag, session_maker
 from pindb.database.joins import pins_tags
-from pindb.database.pending_edit_utils import (
-    apply_snapshot_in_memory,
-    get_edit_chain,
-    get_effective_snapshot,
-    has_pending_edits,
-)
+from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.database.tag import resolve_implications
+from pindb.search.search import search_entity_options
+from pindb.search.update import TAGS_INDEX
 from pindb.templates.components.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
 )
-from pindb.templates.get.tag import tag_implication_preview, tag_page
+from pindb.templates.get.tag import (
+    tag_implication_preview,
+    tag_page,
+    tag_relation_items,
+)
 
 router = APIRouter()
 
 _PER_PAGE: int = 100
+
+
+@router.get(path="/tag-options")
+def get_tag_options(
+    q: str = Query(default=""),
+    exclude_id: int | None = Query(default=None),
+) -> JSONResponse:
+    results = search_entity_options(TAGS_INDEX, q)
+    if exclude_id is not None:
+        results = [r for r in results if r["value"] != str(exclude_id)]
+    return JSONResponse(content=results)
 
 
 @router.get(path="/tag-implication-preview")
@@ -42,7 +54,34 @@ def get_tag_implication_preview(
             ).all()
         )
         resolved = resolve_implications(selected, session)
-    return HTMLResponse(content=str(tag_implication_preview(resolved, selected)))
+    return HTMLResponse(
+        content=str(tag_implication_preview(set(resolved.keys()), selected))
+    )
+
+
+@router.get(path="/tag/{id}/relations/{direction}", response_model=None)
+def get_tag_relations(
+    request: Request,
+    id: int,
+    direction: str,
+) -> HTMLResponse:
+    if direction not in ("implications", "implied_by"):
+        return HTMLResponse("")
+    with session_maker() as session:
+        tag_obj: Tag | None = session.scalar(
+            select(Tag)
+            .where(Tag.id == id)
+            .options(
+                selectinload(Tag.implications),
+                selectinload(Tag.implied_by),
+            )
+        )
+        if not tag_obj:
+            return HTMLResponse("")
+        tags = list(getattr(tag_obj, direction))
+    return HTMLResponse(
+        content=str(tag_relation_items(tags, request, id, direction, collapsed=False))
+    )
 
 
 @router.get(path="/tag/{id}", response_model=None)
@@ -53,11 +92,6 @@ def get_tag(
     page: int = Query(default=1, ge=1),
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
-    can_see_pending = current_user is not None and (
-        current_user.is_editor or current_user.is_admin
-    )
-    viewing_pending: bool = version == "pending" and can_see_pending
-
     with session_maker() as session:
         tag_obj: Tag | None = session.scalar(
             select(Tag)
@@ -72,15 +106,13 @@ def get_tag(
         if not tag_obj:
             return RedirectResponse(url="/")
 
-        pending_chain_exists: bool = can_see_pending and has_pending_edits(
-            session, "tags", id
+        pending_chain_exists, viewing_pending = maybe_apply_pending_view(
+            session=session,
+            entity=tag_obj,
+            entity_table="tags",
+            current_user=current_user,
+            version=version,
         )
-
-        if viewing_pending and pending_chain_exists:
-            chain = get_edit_chain(session, "tags", id)
-            effective = get_effective_snapshot(tag_obj, chain)
-            with session.no_autoflush:
-                apply_snapshot_in_memory(tag_obj, effective, session)
 
         offset: int = (page - 1) * _PER_PAGE
 

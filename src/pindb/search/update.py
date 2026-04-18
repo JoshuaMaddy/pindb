@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable, Sequence
+from typing import Iterable, Protocol, Sequence
 
 from meilisearch.index import Index
 from meilisearch.models.document import DocumentsResults
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from pindb.config import CONFIGURATION
 from pindb.database import session_maker
 from pindb.database.artist import Artist
+from pindb.database.entity_type import EntityType
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
@@ -21,6 +22,26 @@ TAGS_INDEX: Index = CONFIGURATION.meili_client.index(uid="tags")
 ARTISTS_INDEX: Index = CONFIGURATION.meili_client.index(uid="artists")
 SHOPS_INDEX: Index = CONFIGURATION.meili_client.index(uid="shops")
 PIN_SETS_INDEX: Index = CONFIGURATION.meili_client.index(uid="pin_sets")
+
+
+INDEX_BY_ENTITY_TYPE: dict[EntityType, Index] = {
+    EntityType.pin: PIN_INDEX,
+    EntityType.tag: TAGS_INDEX,
+    EntityType.artist: ARTISTS_INDEX,
+    EntityType.shop: SHOPS_INDEX,
+    EntityType.pin_set: PIN_SETS_INDEX,
+}
+
+
+class _Indexable(Protocol):
+    id: int
+
+    def document(self) -> dict[str, object]: ...
+
+
+# ---------------------------------------------------------------------------
+# Index bootstrap
+# ---------------------------------------------------------------------------
 
 
 def _create_index(
@@ -44,93 +65,104 @@ def setup_index() -> None:
         searchable=["name", "tags", "artists", "shops", "description"],
     )
     _create_index(
-        uid="tags", searchable=["name", "aliases", "category"], filterable=["category"]
+        uid="tags",
+        searchable=["display_name", "name", "aliases", "category"],
+        filterable=["category"],
     )
-    _create_index(uid="artists", searchable=["name", "description"])
-    _create_index(uid="shops", searchable=["name", "description"])
+    _create_index(uid="artists", searchable=["name", "aliases", "description"])
+    _create_index(uid="shops", searchable=["name", "aliases", "description"])
     _create_index(uid="pin_sets", searchable=["name", "description"])
 
 
-# --- Pins ---
+# ---------------------------------------------------------------------------
+# Generic CRUD keyed off EntityType
+# ---------------------------------------------------------------------------
+
+
+def update_one(entity_type: EntityType, entity: _Indexable) -> None:
+    INDEX_BY_ENTITY_TYPE[entity_type].add_documents(documents=[entity.document()])
+
+
+def update_many(entity_type: EntityType, entities: Iterable[_Indexable]) -> None:
+    documents = [entity.document() for entity in entities]
+    LOGGER.info(f"Updating {len(documents)} {entity_type.slug} documents")
+    INDEX_BY_ENTITY_TYPE[entity_type].add_documents(documents=documents)
+
+
+def delete_one(entity_type: EntityType, entity_id: int) -> None:
+    LOGGER.info(f"Deleting {entity_type.slug} ID {entity_id} from index.")
+    INDEX_BY_ENTITY_TYPE[entity_type].delete_document(entity_id)
+
+
+# ---------------------------------------------------------------------------
+# Thin entity-specific wrappers — keep existing call sites working
+# ---------------------------------------------------------------------------
 
 
 def update_pin(pin: Pin) -> None:
-    LOGGER.info(msg=f"Updating Pin with ID: {pin.id}")
-    PIN_INDEX.add_documents(documents=[pin.document()])
+    LOGGER.info(f"Updating Pin with ID: {pin.id}")
+    update_one(EntityType.pin, pin)
 
 
 def update_pins(pins: Iterable[Pin]) -> None:
-    docs = [pin.document() for pin in pins]
-    LOGGER.info(msg=f"Updating {len(docs)} pins")
-    PIN_INDEX.add_documents(documents=docs)
+    update_many(EntityType.pin, pins)
 
 
 def delete_pin(pin_id: int) -> None:
-    LOGGER.info(f"Deleting Pin ID {pin_id} from index.")
-    PIN_INDEX.delete_document(pin_id)
-
-
-# --- Tags ---
+    delete_one(EntityType.pin, pin_id)
 
 
 def update_tag(tag: Tag) -> None:
-    TAGS_INDEX.add_documents(documents=[tag.document()])
+    update_one(EntityType.tag, tag)
 
 
 def update_tags(tags: Iterable[Tag]) -> None:
-    TAGS_INDEX.add_documents(documents=[t.document() for t in tags])
+    update_many(EntityType.tag, tags)
 
 
 def delete_tag(tag_id: int) -> None:
-    TAGS_INDEX.delete_document(tag_id)
-
-
-# --- Artists ---
+    delete_one(EntityType.tag, tag_id)
 
 
 def update_artist(artist: Artist) -> None:
-    ARTISTS_INDEX.add_documents(documents=[artist.document()])
+    update_one(EntityType.artist, artist)
 
 
 def update_artists(artists: Iterable[Artist]) -> None:
-    ARTISTS_INDEX.add_documents(documents=[a.document() for a in artists])
+    update_many(EntityType.artist, artists)
 
 
 def delete_artist(artist_id: int) -> None:
-    ARTISTS_INDEX.delete_document(artist_id)
-
-
-# --- Shops ---
+    delete_one(EntityType.artist, artist_id)
 
 
 def update_shop(shop: Shop) -> None:
-    SHOPS_INDEX.add_documents(documents=[shop.document()])
+    update_one(EntityType.shop, shop)
 
 
 def update_shops(shops: Iterable[Shop]) -> None:
-    SHOPS_INDEX.add_documents(documents=[s.document() for s in shops])
+    update_many(EntityType.shop, shops)
 
 
 def delete_shop(shop_id: int) -> None:
-    SHOPS_INDEX.delete_document(shop_id)
-
-
-# --- PinSets ---
+    delete_one(EntityType.shop, shop_id)
 
 
 def update_pin_set(pin_set: PinSet) -> None:
-    PIN_SETS_INDEX.add_documents(documents=[pin_set.document()])
+    update_one(EntityType.pin_set, pin_set)
 
 
 def update_pin_sets(pin_sets: Iterable[PinSet]) -> None:
-    PIN_SETS_INDEX.add_documents(documents=[ps.document() for ps in pin_sets])
+    update_many(EntityType.pin_set, pin_sets)
 
 
 def delete_pin_set(pin_set_id: int) -> None:
-    PIN_SETS_INDEX.delete_document(pin_set_id)
+    delete_one(EntityType.pin_set, pin_set_id)
 
 
-# --- Sync helpers ---
+# ---------------------------------------------------------------------------
+# Full-index sync
+# ---------------------------------------------------------------------------
 
 
 def _get_all_meili_ids(index: Index) -> set[int]:
@@ -144,22 +176,22 @@ def _get_all_meili_ids(index: Index) -> set[int]:
             result: DocumentsResults = index.get_documents(
                 {"fields": ["id"], "limit": limit, "offset": offset}
             )
-        except MeilisearchApiError as e:
-            if e.code == "index_not_found":
+        except MeilisearchApiError as error:
+            if error.code == "index_not_found":
                 return ids
             raise
-        for doc in result.results:
-            ids.add(getattr(doc, "id"))
+        for document in result.results:
+            ids.add(getattr(document, "id"))
         if offset + limit >= result.total:
             break
         offset += limit
     return ids
 
 
-def _sync_index(index: Index, entities: Sequence[object]) -> None:
-    db_ids: set[int] = {getattr(e, "id") for e in entities}
+def _sync_index(index: Index, entities: Sequence[_Indexable]) -> None:
+    db_ids: set[int] = {entity.id for entity in entities}
     if entities:
-        index.add_documents([getattr(e, "document")() for e in entities])
+        index.add_documents([entity.document() for entity in entities])
     meili_ids: set[int] = _get_all_meili_ids(index)
     stale: list[int] = list(meili_ids - db_ids)
     if stale:
@@ -185,14 +217,14 @@ def _fetch_all(
             )
         ).all(),
         session.scalars(select(Tag).options(selectinload(Tag.aliases))).all(),
-        session.scalars(select(Artist)).all(),
-        session.scalars(select(Shop)).all(),
+        session.scalars(select(Artist).options(selectinload(Artist.aliases))).all(),
+        session.scalars(select(Shop).options(selectinload(Shop.aliases))).all(),
         session.scalars(select(PinSet)).all(),
     )
 
 
 def update_all() -> None:
-    LOGGER.info(msg="Updating all search indexes.")
+    LOGGER.info("Updating all search indexes.")
     with session_maker() as session:
         pins, tags, artists, shops, pin_sets = _fetch_all(session)
 

@@ -1,5 +1,4 @@
 from typing import Sequence
-
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
@@ -41,26 +40,14 @@ def get_pin_set(
             or 0
         )
 
-        if pin_set_obj.owner_id is None:
-            # Curator set — alphabetical by pin name
-            pins: Sequence[Pin] = session.scalars(
-                select(Pin)
-                .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
-                .where(pin_set_memberships.c.set_id == id)
-                .order_by(Pin.name.asc())
-                .limit(per_page)
-                .offset(offset)
-            ).all()
-        else:
-            # Personal set — ordered by membership position
-            pins = session.scalars(
-                select(Pin)
-                .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
-                .where(pin_set_memberships.c.set_id == id)
-                .order_by(pin_set_memberships.c.position.asc())
-                .limit(per_page)
-                .offset(offset)
-            ).all()
+        pins: Sequence[Pin] = session.scalars(
+            select(Pin)
+            .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
+            .where(pin_set_memberships.c.set_id == id)
+            .order_by(pin_set_memberships.c.position.asc())
+            .limit(per_page)
+            .offset(offset)
+        ).all()
 
         if request.headers.get("HX-Target") == _SECTION_ID:
             return HTMLResponse(

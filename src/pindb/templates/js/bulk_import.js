@@ -11,6 +11,7 @@
 
   const REF = window.BULK_REF;
 
+
   const BULK_STORAGE_KEY = "bulk_persist";
   const bulkNavType =
     (performance.getEntriesByType("navigation")[0] || {}).type || "navigate";
@@ -33,7 +34,18 @@
   /** Copy/paste clipboard: {type: string, values: any} */
   let cellClipboard = null;
 
+  /** Currently hovered image drop cell: {rowId, side} | null */
+  let _hoveredImageDropCell = null;
+
   let rowCounter = 0;
+
+  /**
+   * Locally-created Tom Select options, keyed by entityType.
+   * When a user creates a new option (e.g. tag "red") it lives here so other
+   * rows of the same field type can find it before the DB is updated.
+   * @type {Map<string, Map<string, {value: string, text: string}>>}
+   */
+  const localOptionsByType = new Map();
 
   // ---------------------------------------------------------------------------
   // Init
@@ -57,7 +69,25 @@
       addRow();
     }
 
-    document.addEventListener("input", debouncedSaveBulkState);
+    document.addEventListener("paste", (e) => {
+      if (!_hoveredImageDropCell) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+          uploadImage(_hoveredImageDropCell.rowId, _hoveredImageDropCell.side, file);
+          e.preventDefault();
+          break;
+        }
+      }
+    });
+
+    document.addEventListener("input", function (e) {
+      debouncedSaveBulkState();
+      if (e.target.matches('input[data-field="name"]')) syncNameColWidth();
+    });
     document.addEventListener("change", debouncedSaveBulkState);
   });
 
@@ -197,12 +227,14 @@
 
   function buildRowHTML(id) {
     return `
-      <td class="bulk-td w-8 text-center">
+      <td class="bulk-td bulk-sticky-td bulk-sticky-col-0 w-8 text-center">
         <input type="checkbox" class="row-checkbox">
       </td>
 
       <!-- Front image -->
-      <td class="bulk-td relative" data-col-type="front_image">
+      <td class="bulk-td bulk-sticky-td bulk-sticky-col-1"
+          data-col-type="front_image"
+          style="width:88px;min-width:88px;">
         <div class="image-drop-cell" data-row="${id}" data-side="front"
              style="width:72px;height:72px;border:2px dashed var(--color-pin-border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
           Front
@@ -228,7 +260,8 @@
       </td>
 
       <!-- Name -->
-      <td class="bulk-td copyable-cell" data-col-type="name">
+      <td class="bulk-td bulk-sticky-td bulk-sticky-col-2 copyable-cell"
+          data-col-type="name">
         <input type="text" class="bulk-input w-full" data-row="${id}" data-field="name" placeholder="Pin name" autocomplete="off">
       </td>
 
@@ -345,32 +378,82 @@
     // Tom Selects
     const tsMap = {};
 
-    // Multi-selects — live DB search
+    // Multi-selects — live DB search + local option registry
     const multiConfigs = [
       { field: "shops", entityType: "shop" },
       { field: "tags", entityType: "tag" },
       { field: "artists", entityType: "artist" },
       { field: "pinSets", entityType: "pin_set" },
     ];
+    const noResultsRender = {
+      no_results: (data) => {
+        const msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search…";
+        return `<div class="no-results">${msg}</div>`;
+      },
+    };
+
     multiConfigs.forEach(({ field, entityType }) => {
       const sel = tr.querySelector(`select[data-field="${field}"]`);
       if (!sel) return;
-      tsMap[field] = new TomSelect(sel, {
-        preload: true,
+      const tsOpts = {
         load: (query, callback) => {
           fetch(
             `${REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`,
           )
             .then((res) => res.json())
-            .then(callback)
+            .then((results) => {
+              // Merge in locally-created options that match the query
+              const locals = localOptionsByType.get(entityType);
+              if (locals) {
+                const q = query.toLowerCase();
+                locals.forEach((item) => {
+                  if (
+                    (!q || item.text.toLowerCase().includes(q)) &&
+                    !results.find((r) => String(r.value) === String(item.value))
+                  ) {
+                    results.push(item);
+                  }
+                });
+              }
+              callback(results);
+            })
             .catch(() => callback());
         },
-        create: true,
+        shouldLoad: (q) => q.length > 0,
+        create: (input, callback) => {
+          const item = { value: input, text: input };
+          // Register in local registry
+          if (!localOptionsByType.has(entityType)) {
+            localOptionsByType.set(entityType, new Map());
+          }
+          localOptionsByType.get(entityType).set(input, item);
+          // Broadcast to all other existing instances of same type
+          broadcastLocalOption(entityType, input, item, rowId, field);
+          callback(item);
+        },
         plugins: ["remove_button", "caret_position"],
         maxItems: null,
         persist: false,
         dropdownParent: "body",
-      });
+        render: { ...noResultsRender },
+      };
+      if (entityType === "tag") {
+        tsOpts.render = {
+          ...noResultsRender,
+          item: TagSelect.tagItemRender,
+          option: TagSelect.tagOptionRender,
+        };
+        Object.assign(tsOpts, TagSelect.tagSelectLucideCallbacks());
+      }
+      const instance = new TomSelect(sel, tsOpts);
+      // Inject any options already created in other rows
+      const existingLocals = localOptionsByType.get(entityType);
+      if (existingLocals) {
+        existingLocals.forEach((item) => {
+          if (!instance.options[item.value]) instance.addOption(item);
+        });
+      }
+      tsMap[field] = instance;
     });
 
     // Acquisition type single-select (required)
@@ -419,6 +502,8 @@
         `input[type="file"][data-side="${side}"]`,
       );
       box.addEventListener("click", () => fileInput.click());
+      box.addEventListener("mouseenter", () => { _hoveredImageDropCell = { rowId, side }; });
+      box.addEventListener("mouseleave", () => { _hoveredImageDropCell = null; });
       box.addEventListener("dragover", (e) => {
         e.preventDefault();
         box.style.borderColor = "var(--color-accent)";
@@ -472,10 +557,20 @@
       tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent = 1;
     }
 
+    // Apply has-clipboard to new row's cells if clipboard is active
+    if (cellClipboard) {
+      tr.querySelectorAll(`.copyable-cell[data-col-type="${cellClipboard.type}"]`).forEach(
+        (td) => td.classList.add("has-clipboard"),
+      );
+    }
+
     // Re-apply column visibility to new cells
     document.querySelectorAll(".col-toggle-check").forEach((cb) => {
       applyColumnVisibility(cb.dataset.col, cb.checked);
     });
+
+    // Sync name column width in case prefill name is longer
+    syncNameColWidth();
   }
 
   function applyPrefill(rowId, prefill) {
@@ -502,11 +597,18 @@
     if (prefill.end_date)
       tr.querySelector(`input[data-field="end_date"]`).value = prefill.end_date;
 
-    if (prefill.shop_names?.length) ts.shops.addItems(prefill.shop_names);
-    if (prefill.tag_names?.length) ts.tags.addItems(prefill.tag_names);
-    if (prefill.artist_names?.length) ts.artists.addItems(prefill.artist_names);
-    if (prefill.pin_set_names?.length)
-      ts.pinSets.addItems(prefill.pin_set_names);
+    const prefillMulti = (instance, opts) => {
+      if (!opts?.length || !instance) return;
+      opts.forEach((opt) => {
+        const item = typeof opt === "object" ? opt : { value: opt, text: opt };
+        if (!instance.options[item.value]) instance.addOption(item);
+      });
+      instance.addItems(opts.map((opt) => (typeof opt === "object" ? opt.value : opt)));
+    };
+    prefillMulti(ts.shops, prefill.shop_options ?? prefill.shop_names);
+    prefillMulti(ts.tags, prefill.tag_options ?? prefill.tag_names);
+    prefillMulti(ts.artists, prefill.artist_options ?? prefill.artist_names);
+    prefillMulti(ts.pinSets, prefill.pin_set_options ?? prefill.pin_set_names);
     if (prefill.acquisition_type)
       ts["acquisition_type"].setValue(prefill.acquisition_type);
     if (prefill.currency_id)
@@ -711,7 +813,7 @@
           <button type="button"
                   @click="links.push('')"
                   class="w-full mt-1">
-            + Add Link
+            + Add Another Link
           </button>
         </div>
         </div>
@@ -756,7 +858,10 @@
   // ---------------------------------------------------------------------------
 
   function wireCopyPaste(tdEl, rowId) {
-    tdEl.style.position = "relative";
+    // Don't override position:sticky (set via CSS class) with position:relative
+    if (getComputedStyle(tdEl).position !== "sticky") {
+      tdEl.style.position = "relative";
+    }
 
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
@@ -767,7 +872,7 @@
 
     const pasteBtn = document.createElement("button");
     pasteBtn.type = "button";
-    pasteBtn.className = "cell-paste-btn hidden";
+    pasteBtn.className = "cell-paste-btn";
     pasteBtn.innerHTML = '<i data-lucide="clipboard-paste"></i>';
     pasteBtn.title = "Paste cell value";
     tdEl.appendChild(pasteBtn);
@@ -781,7 +886,7 @@
       cellClipboard = { type: colType, values };
       copyBtn.classList.add("copied");
       setTimeout(() => copyBtn.classList.remove("copied"), 800);
-      // Show paste on sibling cells of same type
+      // Show paste on all same-type cells; hide on others
       refreshPasteButtons(colType);
     });
 
@@ -791,15 +896,7 @@
       writeCellValues(tdEl, rowId, cellClipboard.type, cellClipboard.values);
     });
 
-    tdEl.addEventListener("mouseenter", () => {
-      const colType = tdEl.dataset.colType;
-      if (cellClipboard?.type === colType) {
-        pasteBtn.classList.remove("hidden");
-      }
-    });
-    tdEl.addEventListener("mouseleave", () => {
-      pasteBtn.classList.add("hidden");
-    });
+    // No mouseenter/mouseleave — paste visibility is controlled by has-clipboard class
   }
 
   function wireHeaderPasteButtons() {
@@ -838,17 +935,15 @@
   }
 
   function refreshPasteButtons(colType) {
-    // Briefly flash paste buttons on all matching cells so user knows paste is available
-    document
-      .querySelectorAll(`.copyable-cell[data-col-type="${colType}"]`)
-      .forEach((td) => {
-        const btn = td.querySelector(".cell-paste-btn");
-        if (btn) {
-          btn.classList.remove("hidden");
-          setTimeout(() => btn.classList.add("hidden"), 1500);
-        }
-      });
-    // Show the header paste button for the matching column; hide all others
+    // Show paste button on cells matching copied type; hide on all others
+    document.querySelectorAll(".copyable-cell").forEach((td) => {
+      if (td.dataset.colType === colType) {
+        td.classList.add("has-clipboard");
+      } else {
+        td.classList.remove("has-clipboard");
+      }
+    });
+    // Show header paste button for matching column only
     document
       .querySelectorAll("th[data-col-type] .header-paste-btn")
       .forEach((btn) => {
@@ -877,7 +972,15 @@
     if (multiFields.includes(colType) && ts) {
       const fieldMap = { pin_sets: "pinSets" };
       const tsKey = fieldMap[colType] || colType;
-      return ts[tsKey]?.getValue() ?? [];
+      const instance = ts[tsKey];
+      if (!instance) return [];
+      // Return {value, text, category?} pairs so paste can addOption with full metadata
+      return instance.getValue().map((v) => {
+        const opt = instance.options[v] || {};
+        const item = { value: v, text: opt.text || v };
+        if (opt.category) item.category = opt.category;
+        return item;
+      });
     }
     if (singleFields.includes(colType) && ts) {
       return ts[colType]?.getValue() ?? "";
@@ -911,8 +1014,18 @@
       const instance = ts[tsKey];
       if (instance) {
         instance.clear(true);
-        if (Array.isArray(values))
-          values.forEach((v) => instance.addItem(v, true));
+        if (Array.isArray(values)) {
+          values.forEach((item) => {
+            const val = typeof item === "object" ? item.value : item;
+            const text = typeof item === "object" ? item.text : item;
+            if (!instance.options[val]) {
+              const newOpt = { value: val, text };
+              if (typeof item === "object" && item.category) newOpt.category = item.category;
+              instance.addOption(newOpt);
+            }
+            instance.addItem(val, true);
+          });
+        }
       }
       return;
     }
@@ -978,6 +1091,14 @@
 
     const leVal = ts["limited_edition"]?.getValue();
 
+    const getMultiOptions = (instance) =>
+      (instance?.getValue() ?? []).map((v) => {
+        const opt = instance.options[v] || {};
+        const item = { value: v, text: opt.text || v };
+        if (opt.category) item.category = opt.category;
+        return item;
+      });
+
     return {
       name: field("name"),
       acquisition_type: ts["acquisition_type"]?.getValue() ?? "",
@@ -990,6 +1111,10 @@
       tag_names: ts.tags?.getValue() ?? [],
       artist_names: ts.artists?.getValue() ?? [],
       pin_set_names: ts.pinSets?.getValue() ?? [],
+      shop_options: getMultiOptions(ts.shops),
+      tag_options: getMultiOptions(ts.tags),
+      artist_options: getMultiOptions(ts.artists),
+      pin_set_options: getMultiOptions(ts.pinSets),
       grades,
       links,
       limited_edition:
@@ -1165,6 +1290,51 @@
 
   function closeModal() {
     document.getElementById("success-modal").classList.add("hidden");
+  }
+
+  // ---------------------------------------------------------------------------
+  // Name column auto-width
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Expands the name column to fit the longest current value (min 15ch).
+   * Called on every input event for name fields.
+   */
+  function syncNameColWidth() {
+    let maxChars = 15;
+    document.querySelectorAll('input[data-field="name"]').forEach((inp) => {
+      if (inp.value.length > maxChars) maxChars = inp.value.length;
+    });
+    const minW = maxChars + 2 + "ch";
+    document.querySelectorAll('[data-col-type="name"]').forEach((el) => {
+      el.style.minWidth = minW;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Local option broadcasting
+  // ---------------------------------------------------------------------------
+
+  /**
+   * When a user creates a new option in one row's TS instance, broadcast it to
+   * all other existing instances of the same entity type so they can find it.
+   */
+  function broadcastLocalOption(entityType, value, item, sourceRowId, sourceField) {
+    const fieldByType = {
+      shop: "shops",
+      tag: "tags",
+      artist: "artists",
+      pin_set: "pinSets",
+    };
+    const tsField = fieldByType[entityType];
+    if (!tsField) return;
+    rowTS.forEach((tsMap, rowId) => {
+      if (rowId === sourceRowId) return; // already has it (just created)
+      const instance = tsMap[tsField];
+      if (instance && !instance.options[value]) {
+        instance.addOption(item);
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------

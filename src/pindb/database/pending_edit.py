@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from rich.repr import Result
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 from pindb.database.base import Base
@@ -45,6 +47,11 @@ class PendingEdit(MappedAsDataclass, Base):
 
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("pending_edits.id"), default=None
+    )
+    bulk_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        default=None,
+        index=True,
     )
 
     @property

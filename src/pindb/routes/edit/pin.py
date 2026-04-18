@@ -1,36 +1,32 @@
 from datetime import date
-from typing import Annotated, Any, Sequence
+from typing import Annotated, Sequence
 from uuid import UUID
 
-from fastapi import Form, Request, UploadFile
+from fastapi import Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Artist, Shop, Tag, session_maker
+from pindb.database import Artist, Shop, session_maker
 from pindb.database.currency import Currency
-from pindb.database.grade import Grade
-from pindb.database.link import Link
-from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
-    compute_patch,
     get_edit_chain,
     get_effective_snapshot,
-    get_head_edit,
 )
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
-from pindb.database.tag import resolve_implications
-from pindb.database.user_owned_pin import UserOwnedPin
-from pindb.file_handler import save_file
+from pindb.database.pin_writes import upsert_grades
+from pindb.database.tag import apply_pin_tags
+from pindb.file_handler import save_image
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none, magnitude_to_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.pin import pin_form
 
 router = APIRouter()
@@ -39,6 +35,7 @@ router = APIRouter()
 _PIN_SELECTINLOADS = (
     selectinload(Pin.shops),
     selectinload(Pin.tags),
+    selectinload(Pin.explicit_tags),
     selectinload(Pin.artists),
     selectinload(Pin.sets),
     selectinload(Pin.links),
@@ -52,14 +49,14 @@ def get_edit_pin(
     request: Request,
     id: int,
     current_user: EditorUser,
-) -> HTMLResponse | None:
+) -> HTMLResponse:
     with session_maker() as session:
         pin: Pin | None = session.scalar(
             select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
         )
 
         if pin is None:
-            return None
+            raise HTTPException(status_code=404, detail="Pin not found")
 
         assert_editor_can_edit(pin, current_user)
 
@@ -82,7 +79,7 @@ def get_edit_pin(
             content=pin_form(
                 post_url=request.url_for("post_edit_pin", id=id),
                 shops=list(pin.shops),
-                tags=list(pin.tags),
+                tags=list(pin.explicit_tags),
                 pin_sets=list(pin.sets),
                 pin=pin,
                 currencies=currencies,
@@ -142,14 +139,14 @@ async def post_edit_pin(
         BeforeValidator(func=empty_str_list_to_none),
     ] = None,
     back_image: UploadFile | None = Form(default=None),
-) -> HTMLResponse | None:
+) -> HTMLResponse:
     back_image_guid: UUID | None = None
     front_image_guid: UUID | None = None
 
     if front_image:
-        front_image_guid = await save_file(file=front_image)
+        front_image_guid = await save_image(file=front_image)
     if back_image:
-        back_image_guid = await save_file(file=back_image)
+        back_image_guid = await save_image(file=back_image)
 
     width_mm: float | None = magnitude_to_mm(magnitude=width) if width else None
     height_mm: float | None = magnitude_to_mm(magnitude=height) if height else None
@@ -159,37 +156,33 @@ async def post_edit_pin(
             select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
         )
         if not pin:
-            return None
+            raise HTTPException(status_code=404, detail="Pin not found")
 
         assert_editor_can_edit(pin, current_user)
 
         if needs_pending_edit(pin, current_user):
             chain = get_edit_chain(session, "pins", id)
-            old_snapshot: dict[str, Any] = get_effective_snapshot(pin, chain)
+            old_snapshot: dict[str, object] = get_effective_snapshot(pin, chain)
 
-            # Resolve tag implications so the snapshot matches approval semantics.
-            raw_tags = set(
-                session.scalars(select(Tag).where(Tag.id.in_(tag_ids))).all()
-            )
-            resolved_tags = resolve_implications(raw_tags, session)
-            resolved_tag_ids: list[int] = sorted(t.id for t in resolved_tags)
-
-            grades_list = []
+            grades_list: list[dict[str, object]] = []
             for grade_name, price_str in zip(grade_names, grade_prices):
                 if not grade_name.strip():
                     continue
-                p = price_str.strip()
+                stripped_price = price_str.strip()
                 grades_list.append(
                     {
                         "name": grade_name,
-                        "price": float(p) if p else None,
+                        "price": float(stripped_price) if stripped_price else None,
                     }
                 )
-            grades_list.sort(key=lambda g: g["name"])
+            grades_list.sort(key=lambda grade: grade["name"])  # type: ignore[arg-type, return-value]
 
-            new_snapshot: dict[str, Any] = dict(old_snapshot)
-            new_snapshot.update(
-                {
+            return submit_pending_edit(
+                session=session,
+                entity=pin,
+                entity_table="pins",
+                entity_id=id,
+                field_updates={
                     "name": name,
                     "acquisition_type": acquisition_type.value,
                     "limited_edition": limited_edition,
@@ -208,36 +201,15 @@ async def post_edit_pin(
                     if back_image_guid
                     else old_snapshot["back_image_guid"],
                     "shop_ids": sorted(shop_ids),
-                    "tag_ids": resolved_tag_ids,
+                    "tag_ids": sorted(tag_ids),
                     "artist_ids": sorted(artist_ids),
                     "pin_set_ids": sorted(pin_sets_ids),
                     "links": sorted(links or []),
                     "grades": grades_list,
-                }
-            )
-
-            patch = compute_patch(old_snapshot, new_snapshot)
-            if not patch:
-                return HTMLResponse(
-                    headers={"HX-Redirect": str(request.url_for("get_pin", id=id))}
-                )
-
-            head = get_head_edit(session, "pins", id)
-            session.add(
-                PendingEdit(
-                    entity_type="pins",
-                    entity_id=id,
-                    patch=patch,
-                    created_by_id=current_user.id,
-                    parent_id=head.id if head else None,
-                )
-            )
-
-            return HTMLResponse(
-                headers={
-                    "HX-Redirect": str(request.url_for("get_pin", id=id))
-                    + "?version=pending"
-                }
+                },
+                current_user=current_user,
+                request=request,
+                redirect_route="get_pin",
             )
 
         # Direct edit — admin, or editor on their own pending-new entry.
@@ -246,12 +218,6 @@ async def post_edit_pin(
                 statement=select(Shop).where(Shop.id.in_(other=shop_ids))
             ).all()
         )
-        pin_tags: set[Tag] = set(
-            session.scalars(
-                statement=select(Tag).where(Tag.id.in_(other=tag_ids))
-            ).all()
-        )
-        resolved_edit_tags = resolve_implications(pin_tags, session)
         pin_sets: set[PinSet] = set(
             session.scalars(
                 statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
@@ -271,7 +237,6 @@ async def post_edit_pin(
             pin.front_image_guid = front_image_guid
         pin.shops = pin_shops
         pin.sets = pin_sets
-        pin.tags = resolved_edit_tags
         pin.artists = pin_artists
         pin.limited_edition = limited_edition
         pin.number_produced = number_produced
@@ -284,39 +249,23 @@ async def post_edit_pin(
         if back_image_guid:
             pin.back_image_guid = back_image_guid
 
-        for old_link in list(pin.links):
-            session.delete(old_link)
+        replace_links(entity=pin, urls=links, session=session)
 
-        new_links: set[Link] = set()
-        for new_link in links or []:
-            new_links.add(Link(new_link))
-        pin.links = new_links
-
-        existing_by_name: dict[str, Grade] = {g.name: g for g in pin.grades}
-        next_grades: set[Grade] = set()
-
-        for new_grade_name, price_str in zip(grade_names, grade_prices):
-            if not new_grade_name.strip():
+        parsed_grades: list[dict[str, object]] = []
+        for grade_name, price_str in zip(grade_names, grade_prices):
+            if not grade_name.strip():
                 continue
-            p = price_str.strip()
-            price: float | None = float(p) if p else None
-            if new_grade_name in existing_by_name:
-                grade = existing_by_name[new_grade_name]
-                grade.price = price
-                next_grades.add(grade)
-            else:
-                next_grades.add(Grade(name=new_grade_name, price=price))
-
-        for removed in pin.grades - next_grades:
-            session.execute(
-                update(UserOwnedPin)
-                .where(UserOwnedPin.grade_id == removed.id)
-                .values(grade_id=None)
+            stripped_price = price_str.strip()
+            parsed_grades.append(
+                {
+                    "name": grade_name,
+                    "price": float(stripped_price) if stripped_price else None,
+                }
             )
-            session.delete(removed)
 
-        pin.grades = next_grades
+        upsert_grades(pin=pin, grades=parsed_grades, session=session)
 
+        apply_pin_tags(pin.id, tag_ids, session)
         session.flush()
         pin_id: int = pin.id
 

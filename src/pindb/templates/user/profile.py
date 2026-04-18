@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import Request
-from htpy import Element, a, div, hr, i, p, span
+from htpy import Element, a, div, form, h3, hr, i, input, label, p, span
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -9,6 +9,7 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
+from pindb.templates.user.pin_list_pages import unique_pins
 from pindb.templates.components.card import card
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
@@ -34,6 +35,9 @@ def user_profile_page(
     current_user: User | None,
 ) -> Element:
     username: str = profile_user.username
+    is_own_profile: bool = (
+        current_user is not None and current_user.id == profile_user.id
+    )
 
     return html_base(
         title=f"{username}'s Profile",
@@ -78,6 +82,12 @@ def user_profile_page(
                     tradeable_entries=tradeable_entries,
                     total=tradeable_count,
                     username=username,
+                ),
+                is_own_profile and hr,
+                is_own_profile
+                and __settings_section(
+                    request=request,
+                    current_user=current_user,
                 ),
             ],
             flex=True,
@@ -124,26 +134,6 @@ def _pin_preview_row(
         ),
         _see_all_card(url=see_all_url),
     ]
-
-
-def _unique_pins_from_owned(owned_pins: list[UserOwnedPin]) -> list[Pin]:
-    seen: set[int] = set()
-    pins: list[Pin] = []
-    for entry in owned_pins:
-        if entry.pin_id not in seen:
-            seen.add(entry.pin_id)
-            pins.append(entry.pin)
-    return pins
-
-
-def _unique_pins_from_wanted(wanted_pins: list[UserWantedPin]) -> list[Pin]:
-    seen: set[int] = set()
-    pins: list[Pin] = []
-    for entry in wanted_pins:
-        if entry.pin_id not in seen:
-            seen.add(entry.pin_id)
-            pins.append(entry.pin)
-    return pins
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +240,7 @@ def __collection_section(
     username: str,
 ) -> Element:
     see_all_url: str = str(request.url_for("user_collection_list", username=username))
-    pins: list[Pin] = _unique_pins_from_owned(owned_pins=owned_pins)
+    pins: list[Pin] = unique_pins(entries=owned_pins)
     return div(class_="flex flex-col gap-2")[
         page_heading(
             icon="package-check",
@@ -270,7 +260,7 @@ def __want_list_section(
     username: str,
 ) -> Element:
     see_all_url: str = str(request.url_for("user_wants_list", username=username))
-    pins: list[Pin] = _unique_pins_from_wanted(wanted_pins=wanted_pins)
+    pins: list[Pin] = unique_pins(entries=wanted_pins)
     return div(class_="flex flex-col gap-2")[
         page_heading(
             icon="star",
@@ -290,7 +280,7 @@ def __tradeable_section(
     username: str,
 ) -> Element:
     see_all_url: str = str(request.url_for("user_trades_list", username=username))
-    pins: list[Pin] = _unique_pins_from_owned(owned_pins=tradeable_entries)
+    pins: list[Pin] = unique_pins(entries=tradeable_entries)
     return div(class_="flex flex-col gap-2")[
         page_heading(
             icon="arrow-left-right",
@@ -300,4 +290,111 @@ def __tradeable_section(
         _pin_preview_row(request=request, pins=pins, see_all_url=see_all_url)
         if total > 0
         else empty_state("No pins marked as tradeable yet."),
+    ]
+
+
+# (css_class, display_name, inspired_by, swatch_hex)
+THEME_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
+    (
+        "Catppuccin",
+        [
+            ("mocha", "Mocha", "#89b4fa"),
+            ("macchiato", "Macchiato", "#8aadf4"),
+            ("frappe", "Frappé", "#8caaee"),
+            ("latte", "Latte", "#1e66f5"),
+        ],
+    ),
+    (
+        "Dracula",
+        [
+            ("dracula", "Dracula", "#bd93f9"),
+        ],
+    ),
+    (
+        "Monokai",
+        [
+            ("monokai", "Monokai", "#a6e22e"),
+            ("monokai-pro", "Monokai Pro", "#ff6188"),
+        ],
+    ),
+    (
+        "Nord",
+        [
+            ("nord", "Nord", "#88c0d0"),
+            ("nord-light", "Nord Light", "#5e81ac"),
+        ],
+    ),
+    (
+        "Gruvbox",
+        [
+            ("gruvbox-dark-hard", "Dark Hard", "#cc241d"),
+            ("gruvbox-dark", "Dark", "#d79921"),
+            ("gruvbox-dark-soft", "Dark Soft", "#98971a"),
+            ("gruvbox-light-soft", "Light Soft", "#79740e"),
+            ("gruvbox-light", "Light", "#b57614"),
+            ("gruvbox-light-hard", "Light Hard", "#d65d0e"),
+        ],
+    ),
+]
+
+
+VALID_THEME_VALUES: frozenset[str] = frozenset(
+    value for _source, variants in THEME_GROUPS for value, _label, _swatch in variants
+)
+
+
+def __settings_section(
+    request: Request,
+    current_user: User | None,
+) -> Element:
+    current_theme: str = current_user.theme if current_user else "mocha"
+    return div(class_="flex flex-col gap-4")[
+        page_heading(icon="settings-2", text="Settings", level=2),
+        div(class_="flex flex-col gap-4")[
+            a(href="/user/me/security", class_="underline")[
+                "Password & sign-in providers"
+            ],
+            form(
+                hx_post=str(request.url_for("update_user_settings")),
+                hx_trigger="change",
+                hx_swap="none",
+            )[
+                [
+                    div(class_="flex flex-col gap-2 mb-4")[
+                        h3(
+                            class_="text-xs font-semibold uppercase tracking-wider text-pin-base-300"
+                        )[f"Inspired by {source}"],
+                        div(class_="flex flex-wrap gap-2")[
+                            [
+                                label(
+                                    class_=(
+                                        "flex items-center gap-2 px-3 py-2 rounded-lg border"
+                                        " cursor-pointer border-pin-border"
+                                        " hover:border-pin-border-hover"
+                                        " has-[:checked]:border-accent"
+                                        " has-[:checked]:bg-pin-base-450"
+                                    ),
+                                )[
+                                    input(
+                                        type="radio",
+                                        name="theme",
+                                        value=value,
+                                        checked=current_theme == value or None,
+                                        class_="sr-only",
+                                        onchange=f"document.documentElement.className = '{value} bg-pin-base-550'",
+                                    ),
+                                    span(
+                                        class_="w-3 h-3 rounded-full shrink-0 border border-black/10",
+                                        style=f"background-color:{swatch}",
+                                    ),
+                                    span(class_="text-sm")[label_text],
+                                ]
+                                for value, label_text, swatch in variants
+                            ]
+                        ],
+                    ]
+                    for source, variants in THEME_GROUPS
+                ]
+            ],
+        ],
     ]

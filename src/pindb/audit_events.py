@@ -14,6 +14,7 @@ from sqlalchemy.orm.state import InstanceState
 
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.pending_mixin import PendingMixin
+from pindb.utils import utc_now
 
 _AUDIT_FIELDS: frozenset[str] = frozenset(
     {
@@ -100,15 +101,11 @@ def _compute_patch(obj: AuditMixin) -> dict:
     return patch
 
 
-def _utc_now() -> datetime:
-    return datetime.now().replace(microsecond=0)
-
-
 def _before_flush(session: Session, flush_context: object, instances: object) -> None:
     from pindb.database.change_log import ChangeLog
 
     user_id = _audit_user_id.get()
-    now = _utc_now()
+    now = utc_now()
     pending: list[tuple[Any, str, dict | None]] = _pending_audit.get() or []
 
     is_admin = _audit_user_is_admin.get()
@@ -131,11 +128,21 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
         obj.updated_at = now
         obj.updated_by_id = user_id
         diff = _compute_patch(obj)
-        if not diff:
-            continue
-        if "deleted_at" in diff:
+        # `deleted_at` is excluded from `_AUDIT_FIELDS`, so we detect a
+        # soft-delete by inspecting the column transition directly.
+        deleted_hist = get_history(obj, "deleted_at")
+        added = list(deleted_hist.added or ())
+        deleted = list(deleted_hist.deleted or ())
+        new_deleted_at = added[0] if added else None
+        old_deleted_at = deleted[0] if deleted else None
+        became_deleted = new_deleted_at is not None and old_deleted_at is None
+        if became_deleted:
+            diff["deleted_at"] = {
+                "old": _serialize_value(old_deleted_at),
+                "new": _serialize_value(new_deleted_at),
+            }
             pending.append((obj, "delete", diff))
-        else:
+        elif diff:
             pending.append((obj, "update", diff))
 
     _pending_audit.set(pending)

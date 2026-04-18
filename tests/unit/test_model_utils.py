@@ -32,12 +32,17 @@ class TestEmptyStrListToNone:
     def test_non_empty_list_unchanged(self):
         assert empty_str_list_to_none(["a", "b"]) == ["a", "b"]
 
-    def test_multiple_items_including_empty_unchanged(self):
-        # Only [""] (exactly one empty string) collapses to None
-        assert empty_str_list_to_none(["", "b"]) == ["", "b"]
+    def test_mixed_list_drops_empty_items(self):
+        # Empty strings are filtered out; remaining items are preserved.
+        assert empty_str_list_to_none(["", "b"]) == ["b"]
+        assert empty_str_list_to_none(["a", "", "c"]) == ["a", "c"]
 
-    def test_empty_list_unchanged(self):
-        assert empty_str_list_to_none([]) == []
+    def test_all_empty_items_becomes_none(self):
+        assert empty_str_list_to_none(["", ""]) is None
+
+    def test_empty_list_becomes_none(self):
+        # Filtered result is empty → None.
+        assert empty_str_list_to_none([]) is None
 
 
 @pytest.mark.unit

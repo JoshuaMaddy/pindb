@@ -1,11 +1,10 @@
-from typing import Sequence
-
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
 
 from pindb.database import Tag, TagAlias, TagCategory, session_maker
+from pindb.database.tag import normalize_tag_name
 from pindb.search.update import update_tag
 from pindb.templates.create_and_edit.tag import tag_form
 
@@ -14,19 +13,15 @@ router = APIRouter()
 
 @router.get(path="/tag")
 def get_create_tag(request: Request) -> HTMLResponse:
-    with session_maker() as session:
-        all_tags: Sequence[Tag] = session.scalars(
-            select(Tag).order_by(Tag.name.asc())
-        ).all()
-        return HTMLResponse(
-            content=str(
-                tag_form(
-                    post_url=request.url_for("post_create_tag"),
-                    request=request,
-                    all_tags=list(all_tags),
-                )
+    return HTMLResponse(
+        content=str(
+            tag_form(
+                post_url=request.url_for("post_create_tag"),
+                request=request,
+                options_url=str(request.url_for("get_tag_options")),
             )
         )
+    )
 
 
 @router.post(path="/tag")
@@ -39,7 +34,11 @@ def post_create_tag(
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
     with session_maker.begin() as session:
-        tag = Tag(name=name, description=description or None, category=category)
+        tag = Tag(
+            name=normalize_tag_name(name),
+            description=description or None,
+            category=category,
+        )
         session.add(instance=tag)
         session.flush()
 
@@ -49,7 +48,9 @@ def post_create_tag(
             ).all()
             tag.implications = set(implied_tags)
 
-        tag.aliases = [TagAlias(alias=a.strip()) for a in aliases if a.strip()]
+        tag.aliases = [
+            TagAlias(alias=normalize_tag_name(a)) for a in aliases if a.strip()
+        ]
 
         session.flush()
         tag_id: int = tag.id

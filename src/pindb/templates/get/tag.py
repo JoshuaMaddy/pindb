@@ -25,6 +25,49 @@ from pindb.templates.components.tag_branding import (
 )
 
 
+_RELATION_CAP = 5
+
+
+def _relation_pills(tags: list[Tag], request: Request) -> list[Element]:
+    return [
+        pill_link(
+            href=str(request.url_for("get_tag", id=t.id)),
+            text=("(P) " + t.display_name) if t.is_pending else t.display_name,
+            icon=CATEGORY_ICONS.get(t.category, "tag"),
+            color_classes=CATEGORY_COLORS.get(
+                t.category, "bg-pin-base-500 text-pin-base-text"
+            ),
+            hover_classes=CATEGORY_HOVER_CLASSES.get(
+                t.category, "hover:border-accent hover:text-accent"
+            ),
+        )
+        for t in sorted(tags, key=lambda t: (t.category, t.name))
+    ]
+
+
+def tag_relation_items(
+    tags: list[Tag],
+    request: Request,
+    tag_id: int,
+    direction: str,
+    collapsed: bool = True,
+) -> Element:
+    pills = _relation_pills(tags, request)
+    target_id = f"tag-{direction}-items-{tag_id}"
+    if collapsed and len(pills) > _RELATION_CAP:
+        expand_url = str(
+            request.url_for("get_tag_relations", id=tag_id, direction=direction)
+        )
+        expand_btn = span(
+            hx_get=expand_url,
+            hx_target=f"#{target_id}",
+            hx_swap="outerHTML",
+            class_="cursor-pointer text-sm text-pin-base-300 hover:text-accent px-1",
+        )["…"]
+        return div(id=target_id, class_="contents")[*pills[:_RELATION_CAP], expand_btn]
+    return div(id=target_id, class_="contents")[*pills]
+
+
 def tag_implication_preview(resolved: set[Tag], selected: set[Tag]) -> Element:
     """HTMX fragment: shows source→implied pairs for tags not already selected."""
     pairs: list[tuple[Tag, set[Tag]]] = sorted(
@@ -48,7 +91,7 @@ def tag_implication_preview(resolved: set[Tag], selected: set[Tag]) -> Element:
             title=tag.category.value.title(),
         )[
             i(data_lucide=icon_name, class_=f"w-4 h-4 shrink-0 {color}"),
-            tag.name,
+            tag.display_name,
         ]
 
     return div(class_="flex flex-col gap-1 mt-1")[
@@ -80,11 +123,11 @@ def tag_page(
     viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    display_name = ("(P) " + tag.name) if tag.is_pending else tag.name
+    display_name = ("(P) " + tag.display_name) if tag.is_pending else tag.display_name
     canonical_url = str(request.url_for("get_tag", id=tag.id))
     pending_url = canonical_url + "?version=pending"
     return html_base(
-        title=tag.name,
+        title=tag.display_name,
         request=request,
         body_content=centered_div(
             content=fragment[
@@ -110,6 +153,13 @@ def tag_page(
                         user
                         and (user.is_admin or user.is_editor)
                         and icon_button(
+                            icon="layers",
+                            title="Bulk edit pins with this tag",
+                            href=f"/bulk-edit/from/tag/{tag.id}",
+                        ),
+                        user
+                        and (user.is_admin or user.is_editor)
+                        and icon_button(
                             icon="pen",
                             title="Edit tag",
                             href=str(request.url_for("get_edit_tag", id=tag.id)),
@@ -122,9 +172,13 @@ def tag_page(
                                 title="Delete tag",
                                 variant="danger",
                             ),
-                            message=f'Delete the tag "{tag.name}"?',
+                            message=f'Delete the tag "{tag.display_name}"?',
                             form_action=str(
-                                request.url_for("post_delete_tag", id=tag.id)
+                                request.url_for(
+                                    "post_delete_entity",
+                                    entity_type="tag",
+                                    id=tag.id,
+                                )
                             ),
                         ),
                     ],
@@ -146,18 +200,9 @@ def tag_page(
                     icon="arrow-right",
                     label="Child of",
                     items=[
-                        pill_link(
-                            href=str(request.url_for("get_tag", id=t.id)),
-                            text=("(P) " + t.name) if t.is_pending else t.name,
-                            icon=CATEGORY_ICONS.get(t.category, "tag"),
-                            color_classes=CATEGORY_COLORS.get(
-                                t.category, "bg-pin-base-500 text-pin-base-text"
-                            ),
-                            hover_classes=CATEGORY_HOVER_CLASSES.get(
-                                t.category, "hover:border-accent hover:text-accent"
-                            ),
+                        tag_relation_items(
+                            list(tag.implications), request, tag.id, "implications"
                         )
-                        for t in sorted(tag.implications, key=lambda t: t.name)
                     ],
                 ),
                 tag.implied_by
@@ -165,18 +210,9 @@ def tag_page(
                     icon="arrow-left",
                     label="Parent of",
                     items=[
-                        pill_link(
-                            href=str(request.url_for("get_tag", id=t.id)),
-                            text=("(P) " + t.name) if t.is_pending else t.name,
-                            icon=CATEGORY_ICONS.get(t.category, "tag"),
-                            color_classes=CATEGORY_COLORS.get(
-                                t.category, "bg-pin-base-500 text-pin-base-text"
-                            ),
-                            hover_classes=CATEGORY_HOVER_CLASSES.get(
-                                t.category, "hover:border-accent hover:text-accent"
-                            ),
+                        tag_relation_items(
+                            list(tag.implied_by), request, tag.id, "implied_by"
                         )
-                        for t in sorted(tag.implied_by, key=lambda t: t.name)
                     ],
                 ),
                 paginated_pin_grid(

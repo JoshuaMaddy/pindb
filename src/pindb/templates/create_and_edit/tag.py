@@ -1,5 +1,3 @@
-from typing import Sequence
-
 from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, form, hr, input, label, option, select, span
@@ -13,48 +11,38 @@ from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
 
 _INIT_SCRIPT = """
-function _tagRenderOption(data, escape) {
-    var icon = data.icon || 'tag';
-    var color = data.color || '';
-    return '<div class="flex items-center gap-2">' +
-        '<span class="inline-flex items-center p-0.5 rounded border ' + color + '">' +
-        '<i data-lucide="' + icon + '" class="w-3.5 h-3.5"></i>' +
-        '</span>' +
-        '<span>' + escape(data.text) + '</span>' +
-        '</div>';
-}
-
-function _tagRenderItem(data, escape) {
-    var icon = data.icon || 'tag';
-    var color = data.color || '';
-    return '<div class="inline-flex items-center gap-1">' +
-        '<span class="inline-flex items-center p-0.5 rounded border ' + color + '">' +
-        '<i data-lucide="' + icon + '" class="w-3 h-3"></i>' +
-        '</span>' +
-        '<span>' + escape(data.text) + '</span>' +
-        '</div>';
-}
-
-function _tagSelectCallbacks() {
-    return {
-        onDropdownOpen: function() { lucide.createIcons(); },
-        onItemAdd: function() { requestAnimationFrame(function() { lucide.createIcons(); }); },
-        onInitialize: function() { lucide.createIcons(); }
-    };
-}
+var _tagRender = { option: TagSelect.tagOptionRender, item: TagSelect.tagItemRender };
+var _noResults = {
+    no_results: function(data) {
+        var msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search\u2026";
+        return '<div class="no-results">' + msg + '</div>';
+    }
+};
 
 document.querySelectorAll("select.multi-select").forEach(function(el) {
+    var optionsUrl = el.dataset.optionsUrl;
     new TomSelect(el, Object.assign({
+        load: function(query, callback) {
+            var sep = optionsUrl.includes('?') ? '&' : '?';
+            fetch(optionsUrl + sep + 'q=' + encodeURIComponent(query))
+                .then(function(r) { return r.json(); })
+                .then(callback)
+                .catch(function() { callback(); });
+        },
+        shouldLoad: function(q) { return q.length > 0; },
         maxItems: null,
+        valueField: "value",
+        labelField: "text",
+        persist: true,
         plugins: ["caret_position", "remove_button"],
-        render: { option: _tagRenderOption, item: _tagRenderItem }
-    }, _tagSelectCallbacks()));
+        render: Object.assign({}, _noResults, _tagRender)
+    }, TagSelect.tagSelectLucideCallbacks()));
 });
 
 document.querySelectorAll("select.single-select").forEach(function(el) {
     new TomSelect(el, Object.assign({
-        render: { option: _tagRenderOption, item: _tagRenderItem }
-    }, _tagSelectCallbacks()));
+        render: _tagRender
+    }, TagSelect.tagSingleSelectCallbacks()));
 });
 
 document.querySelectorAll("select.alias-select").forEach(function(el) {
@@ -72,10 +60,10 @@ document.querySelectorAll("select.alias-select").forEach(function(el) {
 def tag_form(
     post_url: URL | str,
     request: Request,
-    all_tags: Sequence[Tag],
+    options_url: str,
     tag: Tag | None = None,
 ) -> Element:
-    current_implications: set[int] = {t.id for t in tag.implications} if tag else set()
+    selected_implications: list[Tag] = list(tag.implications) if tag else []
     current_aliases: list[str] = [a.alias for a in tag.aliases] if tag else []
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
@@ -96,7 +84,8 @@ def tag_form(
                         name="name",
                         id="name",
                         required=True,
-                        value=tag.name if tag else None,
+                        autocomplete="off",
+                        value=tag.display_name if tag else None,
                     ),
                     label(for_="md-editor-description")["Description"],
                     markdown_editor(
@@ -113,6 +102,7 @@ def tag_form(
                                 == (tag.category if tag else TagCategory.general),
                                 data_icon=CATEGORY_ICONS[cat],
                                 data_color=CATEGORY_COLORS[cat],
+                                data_category=cat.value,
                             )[cat.value.title()]
                             for cat in TagCategory
                         ]
@@ -123,15 +113,17 @@ def tag_form(
                         id="implication_ids",
                         multiple=True,
                         class_="multi-select",
+                        data_options_url=options_url,
                     )[
                         [
                             option(
                                 value=t.id,
-                                selected=t.id in current_implications,
+                                selected=True,
                                 data_icon=CATEGORY_ICONS.get(t.category, "tag"),
                                 data_color=CATEGORY_COLORS.get(t.category, ""),
+                                data_category=t.category.value,
                             )["(P) " + t.name if t.is_pending else t.name]
-                            for t in all_tags
+                            for t in selected_implications
                         ]
                     ],
                     label(for_="aliases")["Aliases"],

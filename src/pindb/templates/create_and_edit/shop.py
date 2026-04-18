@@ -1,9 +1,8 @@
 import json
-from pathlib import Path
 
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, div, form, hr, input, label, span
+from htpy import Element, div, form, hr, input, label, option, select, span
 from markupsafe import Markup
 
 from pindb.database.shop import Shop
@@ -12,12 +11,16 @@ from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 
-with open(
-    file=Path(__file__).parent.parent / "js/pin_creation.js",
-    mode="r",
-    encoding="utf-8",
-) as js_file:
-    SCRIPT_CONTENT: str = js_file.read()
+_ALIAS_SCRIPT = """
+document.querySelectorAll("select.alias-select").forEach(function(el) {
+    new TomSelect(el, {
+        maxItems: null,
+        create: true,
+        persist: false,
+        plugins: ["remove_button"],
+    });
+});
+"""
 
 
 def shop_form(
@@ -25,6 +28,7 @@ def shop_form(
     request: Request,
     shop: Shop | None = None,
 ) -> Element:
+    current_aliases: list[str] = [a.alias for a in shop.aliases] if shop else []
     shop_links: list[str] = [link.path for link in shop.links] if shop else []
     if not shop_links:
         shop_links = [""]
@@ -50,6 +54,7 @@ def shop_form(
                         name="name",
                         id="name",
                         required=True,
+                        autocomplete="off",
                         class_="grow",
                         value=shop.name if shop else None,
                     ),
@@ -68,6 +73,7 @@ def shop_form(
                                         type="text"
                                         name="links"
                                         x-model="links[index]"
+                                        autocomplete="off"
                                         class="col-span-1">
                                     <button
                                         type="button"
@@ -80,8 +86,20 @@ def shop_form(
                                 type="button"
                                 @click="links.push('')"
                                 id="add-link-button"
-                                class="w-full mt-2">Add Link</button>
+                                class="w-full mt-2">Add Another Link</button>
                         </div>"""),
+                    ],
+                    label(for_="aliases")["Aliases"],
+                    select(
+                        name="aliases",
+                        id="aliases",
+                        multiple=True,
+                        class_="alias-select",
+                    )[
+                        [
+                            option(value=alias, selected=True)[alias]
+                            for alias in current_aliases
+                        ]
                     ],
                     input(
                         type="submit",
@@ -91,6 +109,6 @@ def shop_form(
                 ],
             ]
         ),
-        script_content=SCRIPT_CONTENT,
+        script_content=Markup(_ALIAS_SCRIPT),
         request=request,
     )

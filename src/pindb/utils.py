@@ -1,6 +1,12 @@
+from datetime import datetime, timezone
 from urllib.parse import ParseResult, urlparse
 
 from babel.numbers import format_currency
+
+
+def utc_now() -> datetime:
+    """Return the current UTC time as a naive datetime (no tzinfo)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def domain_from_url(url: str) -> str:

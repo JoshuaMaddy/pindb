@@ -179,12 +179,14 @@ def search_entity_options(
     """
     raw: dict[str, object] = index.search(query=query, opt_params={"limit": limit})  # type: ignore[assignment]
     hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
-    return [
-        {
+    results = []
+    for hit in hits:
+        text = str(hit.get("display_name") or hit["name"])
+        item: dict[str, str] = {
             "value": str(hit["id"]),
-            "text": ("(P) " + str(hit["name"]))
-            if hit.get("is_pending")
-            else str(hit["name"]),
+            "text": ("(P) " + text) if hit.get("is_pending") else text,
         }
-        for hit in hits
-    ]
+        if "category" in hit:
+            item["category"] = str(hit["category"])
+        results.append(item)
+    return results

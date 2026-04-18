@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, a, br, div, fragment, h2
+from htpy import Element, a, br, code, div, fragment, h2
 
 from pindb.database import Artist, User
 from pindb.database.pin import Pin
@@ -11,6 +11,7 @@ from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
 from pindb.templates.components.description_block import description_block
 from pindb.templates.components.icon_button import icon_button
+from pindb.templates.components.linked_items_row import linked_items_row
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.pending_edit_banner import pending_edit_banner
@@ -55,6 +56,13 @@ def artist_page(
                         user
                         and (user.is_admin or user.is_editor)
                         and icon_button(
+                            icon="layers",
+                            title="Bulk edit this artist's pins",
+                            href=f"/bulk-edit/from/artist/{artist.id}",
+                        ),
+                        user
+                        and (user.is_admin or user.is_editor)
+                        and icon_button(
                             icon="pen",
                             title="Edit artist",
                             href=str(request.url_for("get_edit_artist", id=artist.id)),
@@ -69,12 +77,27 @@ def artist_page(
                             ),
                             message=f'Delete the artist "{artist.name}"?',
                             form_action=str(
-                                request.url_for("post_delete_artist", id=artist.id)
+                                request.url_for(
+                                    "post_delete_entity",
+                                    entity_type="artist",
+                                    id=artist.id,
+                                )
                             ),
                         ),
                     ],
                 ),
                 description_block(artist.description),
+                bool(artist.aliases)
+                and linked_items_row(
+                    icon="arrow-left-right",
+                    label="Also known as",
+                    items=[
+                        code(
+                            class_="bg-pin-base-700 text-pin-base-text rounded px-1.5 py-0.5 text-sm font-mono"
+                        )[a.alias]
+                        for a in sorted(artist.aliases, key=lambda a: a.alias)
+                    ],
+                ),
                 fragment[
                     bool(len(artist.links))
                     and div[

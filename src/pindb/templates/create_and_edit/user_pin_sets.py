@@ -42,6 +42,7 @@ def _create_form(request: Request) -> Element:
                     id="name",
                     name="name",
                     required=True,
+                    autocomplete="off",
                     class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
                     placeholder="My Collection",
                 ),

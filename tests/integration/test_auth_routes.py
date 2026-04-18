@@ -5,6 +5,8 @@ from sqlalchemy import select
 
 from pindb.database.user import User
 
+STRONG_PASSWORD = "Correct-Horse-Battery-42!"
+
 
 @pytest.mark.integration
 class TestGetLoginPage:
@@ -32,7 +34,7 @@ class TestPostSignup:
             data={
                 "username": "newuser",
                 "email": "newuser@example.com",
-                "password": "password123",
+                "password": STRONG_PASSWORD,
             },
             follow_redirects=False,
         )
@@ -51,12 +53,24 @@ class TestPostSignup:
             data={
                 "username": "cookieuser",
                 "email": "cookie@example.com",
-                "password": "pass",
+                "password": STRONG_PASSWORD,
             },
             follow_redirects=False,
         )
         assert response.status_code == 303
         assert "session" in response.cookies
+
+    def test_weak_password_rejected(self, client):
+        response = client.post(
+            "/auth/signup",
+            data={
+                "username": "weakuser",
+                "email": "weak@example.com",
+                "password": "password",
+            },
+        )
+        assert response.status_code == 400
+        assert "password" in response.text.lower()
 
     def test_duplicate_username_returns_400(self, client, test_user):
         response = client.post(
@@ -64,7 +78,7 @@ class TestPostSignup:
             data={
                 "username": "testuser",  # already exists via test_user fixture
                 "email": "other@example.com",
-                "password": "pass",
+                "password": STRONG_PASSWORD,
             },
         )
         assert response.status_code == 400
@@ -76,7 +90,7 @@ class TestPostSignup:
             data={
                 "username": "brandnewuser",
                 "email": "test@example.com",  # already exists via test_user fixture
-                "password": "pass",
+                "password": STRONG_PASSWORD,
             },
         )
         assert response.status_code == 400

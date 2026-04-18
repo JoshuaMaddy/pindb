@@ -1,5 +1,7 @@
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Sequence
+from uuid import UUID
 
 from fastapi import Request
 from htpy import (
@@ -10,6 +12,7 @@ from htpy import (
     div,
     form,
     h2,
+    h3,
     hr,
     i,
     p,
@@ -23,6 +26,7 @@ from htpy import (
 )
 
 from pindb.database.artist import Artist
+from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.database.pin import Pin
@@ -34,13 +38,17 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.page_heading import page_heading
 
-_TABLE_TO_SLUG: dict[str, str] = {
-    "pins": "pin",
-    "shops": "shop",
-    "artists": "artist",
-    "tags": "tag",
-    "pin_sets": "pin_set",
-}
+
+@dataclass
+class BulkGroupView:
+    """Display-time bundle of every pending row that shares a ``bulk_id``."""
+
+    bulk_id: UUID
+    entities: list[tuple[str, PendingAuditEntity]] = field(default_factory=list)
+    edits: list[tuple[tuple[str, int], list[PendingEdit]]] = field(default_factory=list)
+    edit_entities: dict[tuple[str, int], PendingAuditEntity] = field(
+        default_factory=dict
+    )
 
 
 def pending_page(
@@ -53,9 +61,11 @@ def pending_page(
     creators: dict[int, User],
     edit_groups: dict[tuple[str, int], list[PendingEdit]] | None = None,
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity] | None = None,
+    bulk_groups: Sequence[BulkGroupView] | None = None,
 ) -> Element:
     edit_groups = edit_groups or {}
     edit_group_entities = edit_group_entities or {}
+    bulk_groups = bulk_groups or []
     total = (
         len(pending_pins)
         + len(pending_shops)
@@ -63,6 +73,7 @@ def pending_page(
         + len(pending_tags)
         + len(pending_pin_sets)
         + len(edit_groups)
+        + len(bulk_groups)
     )
 
     return html_base(
@@ -91,6 +102,7 @@ def pending_page(
                     creators,
                     edit_groups,
                     edit_group_entities,
+                    bulk_groups,
                 ),
             ],
             flex=True,
@@ -109,6 +121,7 @@ def _sections(
     creators: dict[int, User],
     edit_groups: dict[tuple[str, int], list[PendingEdit]],
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity],
+    bulk_groups: Sequence[BulkGroupView],
 ) -> list[Element | VoidElement]:
     sections: list[Element | VoidElement] = []
 
@@ -166,6 +179,10 @@ def _sections(
                 creators=creators,
             )
         )
+        sections.append(hr)
+
+    if bulk_groups:
+        sections.append(_bulk_groups_section(bulk_groups=bulk_groups))
         sections.append(hr)
 
     if not sections:
@@ -226,9 +243,9 @@ def _entity_row(
     creator: User | None = (
         creators.get(entity.created_by_id) if entity.created_by_id else None
     )
-    creator_name: str = creator.username if creator else "—"
+    creator_name: str = creator.username if creator else "â€”"
     created_at: datetime | None = entity.created_at
-    created_str: str = created_at.strftime("%Y-%m-%d %H:%M") if created_at else "—"
+    created_str: str = created_at.strftime("%Y-%m-%d %H:%M") if created_at else "â€”"
 
     approve_url = f"/admin/pending/approve/{entity_type}/{entity.id}"
     reject_url = f"/admin/pending/reject/{entity_type}/{entity.id}"
@@ -240,7 +257,7 @@ def _entity_row(
         pending_deps = (
             [shop.name for shop in entity.shops if shop.is_pending]
             + [artist.name for artist in entity.artists if artist.is_pending]
-            + [tag.name for tag in entity.tags if tag.is_pending]
+            + [tag.display_name for tag in entity.tags if tag.is_pending]
         )
         if pending_deps:
             dep_note = span(class_="block text-xs text-amber-400 mt-0.5")[
@@ -329,7 +346,10 @@ def _edit_groups_section(
                     )
                     for (table_name, entity_id), chain in sorted(
                         edit_groups.items(),
-                        key=lambda kv: (kv[0][0], kv[0][1]),
+                        key=lambda group_entry: (
+                            group_entry[0][0],
+                            group_entry[0][1],
+                        ),
                     )
                 ]
             ],
@@ -344,11 +364,12 @@ def _edit_group_row(
     entity: PendingAuditEntity | None,
     creators: dict[int, User],
 ) -> Element:
-    slug: str = _TABLE_TO_SLUG.get(table_name, table_name)
+    entity_type = EntityType.from_table_name(table_name)
+    slug: str = entity_type.slug if entity_type is not None else table_name
     name: str = getattr(entity, "name", f"#{entity_id}") if entity else f"#{entity_id}"
     latest = chain[-1] if chain else None
-    latest_editor: str = "—"
-    latest_at: str = "—"
+    latest_editor: str = "â€”"
+    latest_at: str = "â€”"
     if latest is not None:
         if latest.created_by_id and latest.created_by_id in creators:
             latest_editor = creators[latest.created_by_id].username
@@ -404,4 +425,134 @@ def _edit_group_row(
                 ],
             ]
         ],
+    ]
+
+
+def _bulk_groups_section(
+    bulk_groups: Sequence[BulkGroupView],
+) -> Element:
+    return div(class_="flex flex-col gap-4")[
+        div(class_="flex items-baseline gap-2")[
+            i(data_lucide="layers", class_="inline-block w-4 h-4"),
+            h2["Bulk Bundles"],
+            span(
+                class_="text-xs font-semibold px-2 py-0.5 rounded bg-pin-base-700 text-pin-base-300"
+            )[str(len(bulk_groups))],
+        ],
+        p(class_="text-pin-base-300 text-sm")[
+            "Pending items submitted together in a single bulk create or bulk edit. "
+            "Approving, rejecting, or deleting operates on the whole bundle."
+        ],
+        div(class_="flex flex-col gap-3")[
+            [_bulk_group_card(group=group) for group in bulk_groups]
+        ],
+    ]
+
+
+def _bulk_group_card(group: BulkGroupView) -> Element:
+    entity_count = len(group.entities)
+    edit_count = sum(len(chain) for _key, chain in group.edits)
+    if entity_count and not edit_count:
+        kind = "create"
+    elif edit_count and not entity_count:
+        kind = "edit"
+    else:
+        kind = "mixed"
+    summary_parts: list[str] = []
+    if entity_count:
+        summary_parts.append(f"{entity_count} new item(s)")
+    if edit_count:
+        summary_parts.append(f"{edit_count} pending edit(s)")
+    summary = ", ".join(summary_parts) or "empty"
+
+    approve_url = f"/admin/pending/approve-bulk/{group.bulk_id}"
+    reject_url = f"/admin/pending/reject-bulk/{group.bulk_id}"
+    delete_url = f"/admin/pending/delete-bulk/{group.bulk_id}"
+
+    return div(
+        class_="rounded border border-pin-border bg-pin-base-600 p-4 flex flex-col gap-3"
+    )[
+        div(class_="flex items-center gap-2 flex-wrap")[
+            i(data_lucide="layers", class_="inline-block w-4 h-4"),
+            h3(class_="font-semibold")[f"Bulk {kind}"],
+            span(class_="text-xs text-pin-base-300")[f"({summary})"],
+            span(class_="text-xs text-pin-base-400 ml-auto font-mono")[
+                str(group.bulk_id)
+            ],
+        ],
+        group.entities
+        and div(class_="flex flex-col gap-1")[
+            span(class_="text-xs text-pin-base-300")["New items"],
+            *[
+                div(class_="flex items-baseline gap-2 text-sm")[
+                    span(class_="text-pin-base-400 w-20")[entity_type_slug],
+                    a(
+                        href=f"/get/{entity_type_slug}/{entity.id}",
+                        class_="hover:text-accent",
+                    )[getattr(entity, "name", f"#{entity.id}")],
+                ]
+                for entity_type_slug, entity in group.entities
+            ],
+        ],
+        group.edits
+        and div(class_="flex flex-col gap-1")[
+            span(class_="text-xs text-pin-base-300")["Edits"],
+            *[
+                _bulk_edit_row(
+                    table_name=table_name,
+                    entity_id=entity_id,
+                    chain=chain,
+                    entity=group.edit_entities.get((table_name, entity_id)),
+                )
+                for (table_name, entity_id), chain in group.edits
+            ],
+        ],
+        div(class_="flex gap-2")[
+            form(method="post", action=approve_url)[
+                button(
+                    type="submit",
+                    class_="btn btn-sm btn-primary",
+                )[
+                    i(data_lucide="check", class_="inline-block w-3 h-3 mr-1"),
+                    "Approve bundle",
+                ]
+            ],
+            form(method="post", action=reject_url)[
+                button(
+                    type="submit",
+                    class_="btn btn-sm btn-warning",
+                )[
+                    i(data_lucide="x", class_="inline-block w-3 h-3 mr-1"),
+                    "Reject bundle",
+                ]
+            ],
+            form(method="post", action=delete_url)[
+                button(
+                    type="submit",
+                    class_="btn btn-sm btn-error",
+                )[
+                    i(data_lucide="trash-2", class_="inline-block w-3 h-3 mr-1"),
+                    "Delete bundle",
+                ]
+            ],
+        ],
+    ]
+
+
+def _bulk_edit_row(
+    *,
+    table_name: str,
+    entity_id: int,
+    chain: list[PendingEdit],
+    entity: PendingAuditEntity | None,
+) -> Element:
+    entity_type = EntityType.from_table_name(table_name)
+    slug: str = entity_type.slug if entity_type is not None else table_name
+    name: str = getattr(entity, "name", f"#{entity_id}") if entity else f"#{entity_id}"
+    return div(class_="flex items-baseline gap-2 text-sm")[
+        span(class_="text-pin-base-400 w-20")[slug],
+        a(href=f"/get/{slug}/{entity_id}?version=pending", class_="hover:text-accent")[
+            name
+        ],
+        span(class_="text-xs text-pin-base-400")[f"({len(chain)} edit(s))"],
     ]

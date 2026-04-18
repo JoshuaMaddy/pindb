@@ -1,6 +1,6 @@
-from typing import Annotated, Any
+from typing import Annotated
 
-from fastapi import Form, Request
+from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
@@ -8,18 +8,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Artist, session_maker
-from pindb.database.link import Link
-from pindb.database.pending_edit import PendingEdit
+from pindb.database import Artist, ArtistAlias, session_maker
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
-    compute_patch,
     get_edit_chain,
     get_effective_snapshot,
-    get_head_edit,
 )
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
@@ -30,14 +27,16 @@ def get_edit_artist(
     request: Request,
     id: int,
     current_user: EditorUser,
-) -> HTMLResponse | None:
+) -> HTMLResponse:
     with session_maker() as session:
         artist: Artist | None = session.scalar(
-            select(Artist).where(Artist.id == id).options(selectinload(Artist.links))
+            select(Artist)
+            .where(Artist.id == id)
+            .options(selectinload(Artist.links), selectinload(Artist.aliases))
         )
 
         if artist is None:
-            return None
+            raise HTTPException(status_code=404, detail="Artist not found")
 
         assert_editor_can_edit(artist, current_user)
 
@@ -73,64 +72,45 @@ def post_edit_artist(
         Form(),
         BeforeValidator(func=empty_str_list_to_none),
     ] = None,
-) -> HTMLResponse | None:
+    aliases: list[str] = Form(default_factory=list),
+) -> HTMLResponse:
     with session_maker.begin() as session:
         artist: Artist | None = session.scalar(
-            select(Artist).where(Artist.id == id).options(selectinload(Artist.links))
+            select(Artist)
+            .where(Artist.id == id)
+            .options(selectinload(Artist.links), selectinload(Artist.aliases))
         )
 
         if not artist:
-            return None
+            raise HTTPException(status_code=404, detail="Artist not found")
 
         assert_editor_can_edit(artist, current_user)
 
         if needs_pending_edit(artist, current_user):
-            chain = get_edit_chain(session, "artists", id)
-            old_snapshot: dict[str, Any] = get_effective_snapshot(artist, chain)
-
-            new_snapshot: dict[str, Any] = dict(old_snapshot)
-            new_snapshot.update(
-                {
+            return submit_pending_edit(
+                session=session,
+                entity=artist,
+                entity_table="artists",
+                entity_id=id,
+                field_updates={
                     "name": name,
                     "description": description,
                     "links": sorted(links or []),
-                }
-            )
-
-            patch = compute_patch(old_snapshot, new_snapshot)
-            if not patch:
-                return HTMLResponse(
-                    headers={"HX-Redirect": str(request.url_for("get_artist", id=id))}
-                )
-
-            head = get_head_edit(session, "artists", id)
-            session.add(
-                PendingEdit(
-                    entity_type="artists",
-                    entity_id=id,
-                    patch=patch,
-                    created_by_id=current_user.id,
-                    parent_id=head.id if head else None,
-                )
-            )
-
-            return HTMLResponse(
-                headers={
-                    "HX-Redirect": str(request.url_for("get_artist", id=id))
-                    + "?version=pending"
-                }
+                    "aliases": sorted(alias for alias in aliases if alias.strip()),
+                },
+                current_user=current_user,
+                request=request,
+                redirect_route="get_artist",
             )
 
         artist.name = name
         artist.description = description
 
-        for old_link in list(artist.links):
-            session.delete(old_link)
+        replace_links(entity=artist, urls=links, session=session)
 
-        new_links: set[Link] = set()
-        for new_link in links or []:
-            new_links.add(Link(new_link))
-        artist.links = new_links
+        artist.aliases = [
+            ArtistAlias(alias=alias) for alias in aliases if alias.strip()
+        ]
 
         session.flush()
         artist_id: int = artist.id

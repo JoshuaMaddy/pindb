@@ -12,17 +12,26 @@ from pindb.config import CONFIGURATION
 from pindb.lifespan import lifespan
 from pindb.routes import admin, approve, create, delete, edit, get, list, search
 from pindb.routes.auth import router as auth_router
+from pindb.routes.auth._test_oauth import router as test_oauth_router
 from pindb.routes.bulk import router as bulk_router
 from pindb.routes.user import router as user_router
 from pindb.routes.user.collection import router as collection_router
+from pindb.routes.user.security import router as security_router
 from pindb.templates.homepage import homepage
 
 register_audit_events()
 
 app = FastAPI(lifespan=lifespan)
 
-# SessionMiddleware is required by authlib for OAuth state handling
-app.add_middleware(SessionMiddleware, secret_key=CONFIGURATION.secret_key)
+# SessionMiddleware is required by authlib for OAuth state handling.
+# Must not use the default cookie name "session" — that collides with
+# pindb.auth.SESSION_COOKIE; after OAuth clears Starlette's session, the
+# middleware would emit Set-Cookie to expire "session" and wipe the login token.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=CONFIGURATION.secret_key,
+    session_cookie="pindb_starlette_session",
+)
 
 # Attach current user to request.state on every request
 app.add_middleware(BaseHTTPMiddleware, dispatch=attach_user_middleware)
@@ -42,6 +51,9 @@ def root(request: Request):
 app.include_router(admin.router)
 app.include_router(approve.router)
 app.include_router(auth_router)
+if CONFIGURATION.allow_test_oauth_provider:
+    app.include_router(test_oauth_router)
+app.include_router(security_router)
 app.include_router(user_router)
 app.include_router(collection_router)
 app.include_router(create.router)

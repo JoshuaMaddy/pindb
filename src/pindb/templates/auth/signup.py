@@ -9,21 +9,28 @@ from htpy import (
     hr,
     input,
     label,
+    li,
+    p,
+    small,
+    ul,
 )
 
-from pindb.config import CONFIGURATION
+from pindb.password_policy import describe_policy
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.error_message import error_message
 
 
-def signup_page(request: Request, error: str | None = None) -> Element:
-    google_enabled = bool(
-        CONFIGURATION.google_client_id and CONFIGURATION.google_client_secret
-    )
-    discord_enabled = bool(
-        CONFIGURATION.discord_client_id and CONFIGURATION.discord_client_secret
-    )
+def signup_page(
+    request: Request,
+    error: str | None = None,
+    password_errors: list[str] | None = None,
+    *,
+    google_enabled: bool = False,
+    discord_enabled: bool = False,
+    meta_enabled: bool = False,
+) -> Element:
+    policy = describe_policy()
 
     return html_base(
         title="Sign Up",
@@ -33,6 +40,11 @@ def signup_page(request: Request, error: str | None = None) -> Element:
                 h1["Sign Up"],
                 hr,
                 error_message(error),
+                ul(class_="text-red-200 list-disc pl-5")[
+                    [li[rule] for rule in password_errors]
+                ]
+                if password_errors
+                else None,
                 form(
                     method="post",
                     action="/auth/signup",
@@ -61,7 +73,18 @@ def signup_page(request: Request, error: str | None = None) -> Element:
                         type="password",
                         required=True,
                         autocomplete="new-password",
+                        minlength=str(policy.min_length),
                     ),
+                    div(class_="text-sm text-subtle")[
+                        p["Password requirements:"],
+                        ul(class_="list-disc pl-5")[
+                            [li[bullet] for bullet in policy.bullets()]
+                        ],
+                        small[
+                            "We also check your password against a strength "
+                            "estimator to reject easily guessed passphrases."
+                        ],
+                    ],
                     button(type="submit")["Create account"],
                 ],
                 div(class_="flex flex-col gap-2 mt-4")[
@@ -75,6 +98,11 @@ def signup_page(request: Request, error: str | None = None) -> Element:
                     ]
                 ]
                 if discord_enabled
+                else None,
+                div(class_="flex flex-col gap-2 mt-2")[
+                    a(href="/auth/meta", class_="text-center")["Continue with Meta"]
+                ]
+                if meta_enabled
                 else None,
                 div(class_="mt-4")[
                     "Already have an account? ",

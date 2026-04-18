@@ -48,6 +48,12 @@ def pin_set_page(
                     if pin_set.is_pending
                     else pin_set.name.title(),
                     extras=[
+                        (user is not None and (user.is_admin or user.is_editor))
+                        and icon_button(
+                            icon="layers",
+                            title="Bulk edit pins in this set",
+                            href=f"/bulk-edit/from/pin_set/{pin_set.id}",
+                        ),
                         (can_edit or can_delete)
                         and fragment[
                             can_edit
@@ -70,7 +76,7 @@ def pin_set_page(
                                     )
                                 ),
                             ),
-                        ]
+                        ],
                     ],
                     full_width=True,
                 ),

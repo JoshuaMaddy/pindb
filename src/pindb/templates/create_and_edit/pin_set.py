@@ -87,6 +87,7 @@ def pin_set_create_page(request: Request) -> Element:
                             id="name",
                             name="name",
                             required=True,
+                            autocomplete="off",
                             class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
                             placeholder="Set Name",
                         ),
@@ -207,6 +208,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
                     name="name",
                     value=pin_set.name,
                     required=True,
+                    autocomplete="off",
                     class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
                 ),
             ),
@@ -292,7 +294,11 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
             class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-200 hover:text-red-300 hover:border-red-400 p-0",
         )[i(data_lucide="x", class_="w-3 h-3")],
         a(
-            href=str(request.url_for("get_pin", id=pin.id)),
+            href=str(
+                request.url_for("get_pin", id=pin.id).include_query_params(
+                    back=str(request.url)
+                )
+            ),
             class_="block",
             tabindex="-1",
         )[

@@ -13,21 +13,28 @@ from datetime import date
 from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import literal, select, update
+from sqlalchemy import literal, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, attributes
 
 from pindb.database.artist import Artist
 from pindb.database.currency import Currency
-from pindb.database.entity_type import EntityType
 from pindb.database.grade import Grade
 from pindb.database.joins import pins_tags
 from pindb.database.link import Link
+from pindb.database.pin_writes import upsert_grades
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
+from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
-from pindb.database.tag import Tag, TagAlias, TagCategory, resolve_implications
-from pindb.database.user_owned_pin import UserOwnedPin
+from pindb.database.tag import (
+    Tag,
+    TagAlias,
+    TagCategory,
+    apply_pin_tags,
+    _cascade_remove_implied,
+    resolve_implications,
+)
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 
@@ -54,14 +61,14 @@ def snapshot_pin(pin: Pin) -> dict[str, Any]:
         "currency_id": pin.currency_id,
         "front_image_guid": str(pin.front_image_guid),
         "back_image_guid": str(pin.back_image_guid) if pin.back_image_guid else None,
-        "shop_ids": sorted(s.id for s in pin.shops),
-        "tag_ids": sorted(t.id for t in pin.tags),
-        "artist_ids": sorted(a.id for a in pin.artists),
-        "pin_set_ids": sorted(ps.id for ps in pin.sets),
+        "shop_ids": sorted(shop.id for shop in pin.shops),
+        "tag_ids": sorted(tag.id for tag in pin.explicit_tags),
+        "artist_ids": sorted(artist.id for artist in pin.artists),
+        "pin_set_ids": sorted(pin_set.id for pin_set in pin.sets),
         "links": sorted(link.path for link in pin.links),
         "grades": sorted(
-            [{"name": g.name, "price": g.price} for g in pin.grades],
-            key=lambda g: g["name"],
+            [{"name": grade.name, "price": grade.price} for grade in pin.grades],
+            key=lambda grade: grade["name"],
         ),
     }
 
@@ -89,8 +96,8 @@ def snapshot_tag(tag: Tag) -> dict[str, Any]:
         "name": tag.name,
         "description": tag.description,
         "category": tag.category.value,
-        "implication_ids": sorted(t.id for t in tag.implications),
-        "aliases": sorted(a.alias for a in tag.aliases),
+        "implication_ids": sorted(implied_tag.id for implied_tag in tag.implications),
+        "aliases": sorted(tag_alias.alias for tag_alias in tag.aliases),
     }
 
 
@@ -181,6 +188,39 @@ def has_pending_edits(session: Session, entity_type: str, entity_id: int) -> boo
     return get_head_edit(session, entity_type, entity_id) is not None
 
 
+def maybe_apply_pending_view(
+    *,
+    session: Session,
+    entity: Pin | Artist | Shop | Tag,
+    entity_table: str,
+    current_user: object,
+    version: str | None,
+) -> tuple[bool, bool]:
+    """Returns ``(pending_chain_exists, viewing_pending)``.
+
+    If the viewer is allowed to see pending edits *and* requested
+    ``?version=pending``, mutates ``entity`` in-memory to reflect the pending
+    chain. The mutation happens inside ``session.no_autoflush``.
+    """
+    can_see_pending = current_user is not None and (
+        getattr(current_user, "is_editor", False)
+        or getattr(current_user, "is_admin", False)
+    )
+    viewing_pending = version == "pending" and can_see_pending
+
+    pending_chain_exists = can_see_pending and has_pending_edits(
+        session, entity_table, entity.id
+    )
+
+    if viewing_pending and pending_chain_exists:
+        chain = get_edit_chain(session, entity_table, entity.id)
+        effective = get_effective_snapshot(entity, chain)
+        with session.no_autoflush:
+            apply_snapshot_in_memory(entity, effective, session)
+
+    return pending_chain_exists, viewing_pending
+
+
 # ---------------------------------------------------------------------------
 # In-memory apply (for form pre-population / pending view rendering)
 # ---------------------------------------------------------------------------
@@ -250,13 +290,15 @@ def _apply_pin_snapshot_in_memory(
             .execution_options(include_pending=True)
         ).all()
     )
-    pin.tags = set(
+    explicit_tag_objs = set(
         session.scalars(
             select(Tag)
             .where(Tag.id.in_(snapshot["tag_ids"]))
             .execution_options(include_pending=True)
         ).all()
     )
+    attributes.set_committed_value(pin, "explicit_tags", explicit_tag_objs)
+    attributes.set_committed_value(pin, "tags", explicit_tag_objs)
     pin.artists = set(
         session.scalars(
             select(Artist)
@@ -264,8 +306,6 @@ def _apply_pin_snapshot_in_memory(
             .execution_options(include_pending=True)
         ).all()
     )
-    from pindb.database.pin_set import PinSet
-
     if snapshot.get("pin_set_ids"):
         pin.sets = set(
             session.scalars(
@@ -279,7 +319,8 @@ def _apply_pin_snapshot_in_memory(
 
     pin.links = {Link(path=path) for path in snapshot["links"]}
     pin.grades = {
-        Grade(name=g["name"], price=g.get("price")) for g in snapshot["grades"]
+        Grade(name=grade["name"], price=grade.get("price"))
+        for grade in snapshot["grades"]
     }
 
 
@@ -310,7 +351,7 @@ def _apply_tag_snapshot_in_memory(
             .execution_options(include_pending=True)
         ).all()
     )
-    tag.aliases = [TagAlias(alias=a) for a in snapshot["aliases"]]
+    tag.aliases = [TagAlias(alias=alias_name) for alias_name in snapshot["aliases"]]
 
 
 # ---------------------------------------------------------------------------
@@ -340,10 +381,12 @@ def apply_snapshot_to_entity(
         raise TypeError(f"No approval apply for {type(entity).__name__}")
 
 
-def _replace_links(entity: Any, new_urls: list[str], session: Session) -> None:
+def _replace_links(
+    entity: Pin | Artist | Shop, new_urls: list[str], session: Session
+) -> None:
     for old_link in list(entity.links):
         session.delete(old_link)
-    entity.links = {Link(path=u) for u in new_urls}
+    entity.links = {Link(path=url) for url in new_urls}
 
 
 def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) -> None:
@@ -378,14 +421,7 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
             .execution_options(include_pending=True)
         ).all()
     )
-    raw_tags = set(
-        session.scalars(
-            select(Tag)
-            .where(Tag.id.in_(snapshot["tag_ids"]))
-            .execution_options(include_pending=True)
-        ).all()
-    )
-    pin.tags = resolve_implications(raw_tags, session)
+    apply_pin_tags(pin.id, snapshot["tag_ids"], session)
     pin.artists = set(
         session.scalars(
             select(Artist)
@@ -393,8 +429,6 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
             .execution_options(include_pending=True)
         ).all()
     )
-    from pindb.database.pin_set import PinSet
-
     if snapshot.get("pin_set_ids"):
         pin.sets = set(
             session.scalars(
@@ -407,27 +441,7 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
         pin.sets = set()
 
     _replace_links(pin, snapshot["links"], session)
-
-    # Grades: match by name, update prices, delete removed, add new
-    existing_by_name: dict[str, Grade] = {g.name: g for g in pin.grades}
-    next_grades: set[Grade] = set()
-    for g in snapshot["grades"]:
-        name: str = g["name"]
-        price = g.get("price")
-        if name in existing_by_name:
-            grade = existing_by_name[name]
-            grade.price = price
-            next_grades.add(grade)
-        else:
-            next_grades.add(Grade(name=name, price=price))
-    for removed in pin.grades - next_grades:
-        session.execute(
-            update(UserOwnedPin)
-            .where(UserOwnedPin.grade_id == removed.id)
-            .values(grade_id=None)
-        )
-        session.delete(removed)
-    pin.grades = next_grades
+    upsert_grades(pin=pin, grades=snapshot["grades"], session=session)
 
 
 def _approve_artist_snapshot(
@@ -453,7 +467,7 @@ def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) 
     tag.description = snapshot["description"]
     tag.category = TagCategory(snapshot["category"])
 
-    old_implication_ids: set[int] = {t.id for t in tag.implications}
+    old_implication_ids: set[int] = {implied_tag.id for implied_tag in tag.implications}
     implied_tags = set(
         session.scalars(
             select(Tag)
@@ -462,46 +476,38 @@ def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) 
         ).all()
     )
     tag.implications = implied_tags
-    tag.aliases = [TagAlias(alias=a) for a in snapshot["aliases"]]
+    tag.aliases = [TagAlias(alias=alias_name) for alias_name in snapshot["aliases"]]
 
-    new_implication_ids: set[int] = {t.id for t in implied_tags}
+    new_implication_ids: set[int] = {implied_tag.id for implied_tag in implied_tags}
     newly_added_ids: set[int] = new_implication_ids - old_implication_ids
+    removed_ids: set[int] = old_implication_ids - new_implication_ids
+
+    session.flush()  # persist tag_implications changes before cascading
 
     if newly_added_ids:
-        session.flush()  # persist new tag_implications rows before resolving
         newly_added_tags: list[Tag] = [
-            t for t in implied_tags if t.id in newly_added_ids
+            implied_tag
+            for implied_tag in implied_tags
+            if implied_tag.id in newly_added_ids
         ]
-        all_new_implied: set[Tag] = resolve_implications(
+        all_new_implied: dict[Tag, Tag | None] = resolve_implications(
             initial=newly_added_tags, session=session
         )
-        for implied_tag in all_new_implied:
+        for implied_tag, source_tag in all_new_implied.items():
             session.execute(
                 pg_insert(pins_tags)
                 .from_select(
-                    ["pin_id", "tag_id"],
+                    ["pin_id", "tag_id", "implied_by_tag_id"],
                     select(
                         pins_tags.c.pin_id,
                         literal(implied_tag.id).label("tag_id"),
+                        literal(source_tag.id if source_tag else None).label(
+                            "implied_by_tag_id"
+                        ),
                     ).where(pins_tags.c.tag_id == tag.id),
                 )
                 .on_conflict_do_nothing()
             )
 
-
-# ---------------------------------------------------------------------------
-# entity_type <-> table name mapping
-# ---------------------------------------------------------------------------
-
-
-ENTITY_TYPE_TO_TABLE: dict[EntityType, str] = {
-    EntityType.pin: "pins",
-    EntityType.shop: "shops",
-    EntityType.artist: "artists",
-    EntityType.tag: "tags",
-    EntityType.pin_set: "pin_sets",
-}
-
-
-def table_name_for(entity: Any) -> str:
-    return entity.__tablename__  # type: ignore[no-any-return]
+    if removed_ids:
+        _cascade_remove_implied(tag.id, removed_ids, session)

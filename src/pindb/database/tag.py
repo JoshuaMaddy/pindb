@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import Enum as SQLAlchemyEnum, ForeignKey, Index, select
+from sqlalchemy import Enum as SQLAlchemyEnum, ForeignKey, Index, delete, insert, select
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -30,6 +30,7 @@ class TagCategory(str, Enum):
     species = "species"
     meta = "meta"
     material = "material"
+    color = "color"
 
 
 class TagAlias(MappedAsDataclass, Base):
@@ -43,6 +44,11 @@ class TagAlias(MappedAsDataclass, Base):
         yield "id", self.id
         yield "tag_id", self.tag_id
         yield "alias", self.alias
+
+
+def normalize_tag_name(name: str) -> str:
+    """Normalize to e621 form: lowercase, spaces → underscores."""
+    return name.strip().lower().replace(" ", "_")
 
 
 class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
@@ -72,8 +78,11 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
     pins: Mapped[set[Pin]] = relationship(
         secondary=pins_tags,
+        primaryjoin=lambda: Tag.id == pins_tags.c.tag_id,
+        foreign_keys=lambda: [pins_tags.c.pin_id, pins_tags.c.tag_id],
         default_factory=set,
         back_populates="tags",
+        viewonly=True,
     )
 
     implications: Mapped[set[Tag]] = relationship(
@@ -93,6 +102,10 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         default_factory=set,
     )
 
+    @property
+    def display_name(self) -> str:
+        return self.name.replace("_", " ").title()
+
     def __hash__(self) -> int:
         return hash(self.name) + (self.id or 0)
 
@@ -105,6 +118,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return {
             "id": self.id,
             "name": self.name,
+            "display_name": self.display_name,
             "description": self.description,
             "category": self.category.value,
             "is_pending": self.is_pending,
@@ -128,13 +142,16 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             yield "implied_by", self.implied_by, set()
 
 
-def resolve_implications(initial: Iterable[Tag], session: Session) -> set[Tag]:
-    """BFS transitive closure of tag implications. Cycle-safe."""
-    resolved: set[Tag] = set(initial)
-    queue: list[Tag] = list(initial)
+def resolve_implications(
+    initial: Iterable[Tag], session: Session
+) -> dict[Tag, Tag | None]:
+    """BFS transitive closure of tag implications. Returns mapping of tag → direct source (None = explicit). Cycle-safe."""
+    init_list = list(initial)
+    result: dict[Tag, Tag | None] = {t: None for t in init_list}
+    queue: list[tuple[Tag, Tag | None]] = [(t, None) for t in init_list]
     seen_ids: set[int] = set()
     while queue:
-        tag = queue.pop()
+        tag, source = queue.pop()
         if tag.id in seen_ids:
             continue
         seen_ids.add(tag.id)
@@ -145,6 +162,52 @@ def resolve_implications(initial: Iterable[Tag], session: Session) -> set[Tag]:
         ).all()
         for t in implied:
             if t.id not in seen_ids:
-                resolved.add(t)
-                queue.append(t)
-    return resolved
+                if t not in result:
+                    result[t] = tag
+                queue.append((t, tag))
+    return result
+
+
+def apply_pin_tags(
+    pin_id: int,
+    explicit_tag_ids: Iterable[int],
+    session: Session,
+) -> None:
+    """Replace all pins_tags rows for a pin. Explicit tags get NULL implied_by; implied tags get their direct source."""
+    session.execute(delete(pins_tags).where(pins_tags.c.pin_id == pin_id))
+    explicit_tags = set(
+        session.scalars(select(Tag).where(Tag.id.in_(list(explicit_tag_ids)))).all()
+    )
+    resolved = resolve_implications(explicit_tags, session)
+    for tag, source in resolved.items():
+        session.execute(
+            insert(pins_tags).values(
+                pin_id=pin_id,
+                tag_id=tag.id,
+                implied_by_tag_id=source.id if source else None,
+            )
+        )
+
+
+def _cascade_remove_implied(
+    parent_tag_id: int, removed_child_ids: set[int], session: Session
+) -> None:
+    """Re-sync affected pins after implication removal. Correctly handles multi-path implications."""
+    affected_pin_ids: set[int] = set()
+    for child_tag_id in removed_child_ids:
+        pin_ids = session.scalars(
+            select(pins_tags.c.pin_id).where(
+                pins_tags.c.tag_id == child_tag_id,
+                pins_tags.c.implied_by_tag_id == parent_tag_id,
+            )
+        ).all()
+        affected_pin_ids.update(pin_ids)
+
+    for pin_id in affected_pin_ids:
+        explicit_tag_ids = session.scalars(
+            select(pins_tags.c.tag_id).where(
+                pins_tags.c.pin_id == pin_id,
+                pins_tags.c.implied_by_tag_id.is_(None),
+            )
+        ).all()
+        apply_pin_tags(pin_id, set(explicit_tag_ids), session)

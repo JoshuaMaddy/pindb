@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from itertools import groupby
 from typing import Literal
 
@@ -154,7 +155,11 @@ def _thumbnail(request: Request, pin: Pin) -> VoidElement:
 
 def _pin_button(request: Request, pin: Pin) -> Element:
     return pill_link(
-        href=str(request.url_for("get_pin", id=pin.id)),
+        href=str(
+            request.url_for("get_pin", id=pin.id).include_query_params(
+                back=str(request.url)
+            )
+        ),
         text=("(P) " + pin.name) if pin.is_pending else pin.name,
     )
 
@@ -187,35 +192,84 @@ def _artist_links(request: Request, artists: set[Artist]) -> Element:
     ]
 
 
-def _unique_pins_from_owned(owned_pins: list[UserOwnedPin]) -> list[Pin]:
+_PinEntry = UserOwnedPin | UserWantedPin
+
+
+def unique_pins(entries: Sequence[_PinEntry]) -> list[Pin]:
+    """Deduplicate entries by pin_id, preserving order."""
     seen: set[int] = set()
     pins: list[Pin] = []
-    for entry in owned_pins:
+    for entry in entries:
         if entry.pin_id not in seen:
             seen.add(entry.pin_id)
             pins.append(entry.pin)
     return pins
 
 
-def _unique_pins_from_wanted(wanted_pins: list[UserWantedPin]) -> list[Pin]:
-    seen: set[int] = set()
-    pins: list[Pin] = []
-    for entry in wanted_pins:
-        if entry.pin_id not in seen:
-            seen.add(entry.pin_id)
-            pins.append(entry.pin)
-    return pins
-
-
-def _group_by_pin(entries: list[UserOwnedPin]) -> list[list[UserOwnedPin]]:
+def _group_by_pin(entries: Sequence[_PinEntry]) -> list[list[_PinEntry]]:
     return [
         list(group) for _, group in groupby(entries, key=lambda entry: entry.pin_id)
     ]
 
 
-def _group_wanted_by_pin(entries: list[UserWantedPin]) -> list[list[UserWantedPin]]:
-    return [
-        list(group) for _, group in groupby(entries, key=lambda entry: entry.pin_id)
+def _pin_grouped_table(
+    *,
+    request: Request,
+    entries: Sequence[_PinEntry],
+    extra_headers: list[str],
+    extra_cells: Callable[[_PinEntry], list[Element]],
+) -> Element:
+    """Generic rowspan table for pin entries grouped by pin.
+
+    ``extra_headers`` are the column headers after the common
+    (thumbnail, name, shops, artists) columns.
+    ``extra_cells`` receives a single entry row and returns
+    the td elements for the extra columns.
+    """
+    groups = _group_by_pin(entries)
+    rows: list[Element] = []
+
+    for group in groups:
+        pin: Pin = group[0].pin
+        span_count: int = len(group)
+
+        for index, entry in enumerate(group):
+            is_first: bool = index == 0
+            is_last: bool = index == span_count - 1
+            grade_td_class: str = _TD_CLASS if is_last else _TD_CLASS_NO_BORDER
+
+            row_cells: list[Element] = []
+            if is_first:
+                row_cells.extend(
+                    [
+                        td(class_=_TD_CLASS, rowspan=span_count)[
+                            _thumbnail(request=request, pin=pin)
+                        ],
+                        td(class_=_TD_CLASS, rowspan=span_count)[
+                            _pin_button(request=request, pin=pin)
+                        ],
+                        td(class_=_TD_CLASS, rowspan=span_count)[
+                            _shop_links(request=request, shops=pin.shops)
+                        ],
+                        td(class_=_TD_CLASS, rowspan=span_count)[
+                            _artist_links(request=request, artists=pin.artists)
+                        ],
+                    ]
+                )
+            row_cells.extend(extra_cells(entry))
+            rows.append(tr[row_cells])
+
+    return table(class_="w-full border-collapse text-sm")[
+        thead[
+            tr[
+                th(class_=_TH_CLASS)[""],
+                th(class_=_TH_CLASS)["Name"],
+                th(class_=_TH_CLASS)["Shops"],
+                th(class_=_TH_CLASS)["Artists"],
+                [th(class_=_TH_CLASS)[header] for header in extra_headers],
+            ]
+        ],
+        tbody[rows],
     ]
 
 
@@ -298,7 +352,7 @@ def collection_list_page(
     content: Element = (
         pin_grid(
             request=request,
-            pins=_unique_pins_from_owned(owned_pins=owned_pins),
+            pins=unique_pins(entries=owned_pins),
         )
         if view == "grid"
         else _collection_table(request=request, owned_pins=owned_pins)
@@ -320,65 +374,22 @@ def _collection_table(
     request: Request,
     owned_pins: list[UserOwnedPin],
 ) -> Element:
-    groups: list[list[UserOwnedPin]] = _group_by_pin(entries=owned_pins)
-    rows: list[Element] = []
+    def extra_cells(entry: _PinEntry) -> list[Element]:
+        assert isinstance(entry, UserOwnedPin)
+        return [
+            td(class_=_TD_CLASS)[entry.grade.name if entry.grade is not None else "—"],
+            td(class_=_TD_CLASS)[str(entry.quantity)],
+            td(class_=_TD_CLASS)[
+                str(entry.tradeable_quantity) if entry.tradeable_quantity > 0 else "—"
+            ],
+        ]
 
-    for group in groups:
-        pin: Pin = group[0].pin
-        span_count: int = len(group)
-
-        for index, entry in enumerate(group):
-            is_first: bool = index == 0
-            is_last: bool = index == span_count - 1
-            grade_td_class: str = _TD_CLASS if is_last else _TD_CLASS_NO_BORDER
-
-            row_cells: list[Element] = []
-            if is_first:
-                row_cells.extend(
-                    [
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _thumbnail(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _pin_button(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _shop_links(request=request, shops=pin.shops)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _artist_links(request=request, artists=pin.artists)
-                        ],
-                    ]
-                )
-            row_cells.extend(
-                [
-                    td(class_=grade_td_class)[
-                        entry.grade.name if entry.grade is not None else "—"
-                    ],
-                    td(class_=grade_td_class)[str(entry.quantity)],
-                    td(class_=grade_td_class)[
-                        str(entry.tradeable_quantity)
-                        if entry.tradeable_quantity > 0
-                        else "—"
-                    ],
-                ]
-            )
-            rows.append(tr[row_cells])
-
-    return table(class_="w-full border-collapse text-sm")[
-        thead[
-            tr[
-                th(class_=_TH_CLASS)[""],
-                th(class_=_TH_CLASS)["Name"],
-                th(class_=_TH_CLASS)["Shops"],
-                th(class_=_TH_CLASS)["Artists"],
-                th(class_=_TH_CLASS)["Grade"],
-                th(class_=_TH_CLASS)["Qty"],
-                th(class_=_TH_CLASS)["Tradeable"],
-            ]
-        ],
-        tbody[rows],
-    ]
+    return _pin_grouped_table(
+        request=request,
+        entries=owned_pins,
+        extra_headers=["Grade", "Qty", "Tradeable"],
+        extra_cells=extra_cells,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +411,7 @@ def wants_list_page(
     content: Element = (
         pin_grid(
             request=request,
-            pins=_unique_pins_from_wanted(wanted_pins=wanted_pins),
+            pins=unique_pins(entries=wanted_pins),
         )
         if view == "grid"
         else _wants_table(request=request, wanted_pins=wanted_pins)
@@ -422,55 +433,17 @@ def _wants_table(
     request: Request,
     wanted_pins: list[UserWantedPin],
 ) -> Element:
-    groups: list[list[UserWantedPin]] = _group_wanted_by_pin(entries=wanted_pins)
-    rows: list[Element] = []
+    def extra_cells(entry: _PinEntry) -> list[Element]:
+        return [
+            td(class_=_TD_CLASS)[entry.grade.name if entry.grade is not None else "—"],
+        ]
 
-    for group in groups:
-        pin: Pin = group[0].pin
-        span_count: int = len(group)
-
-        for index, entry in enumerate(group):
-            is_first: bool = index == 0
-            is_last: bool = index == span_count - 1
-            grade_td_class: str = _TD_CLASS if is_last else _TD_CLASS_NO_BORDER
-
-            row_cells: list[Element] = []
-            if is_first:
-                row_cells.extend(
-                    [
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _thumbnail(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _pin_button(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _shop_links(request=request, shops=pin.shops)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _artist_links(request=request, artists=pin.artists)
-                        ],
-                    ]
-                )
-            row_cells.append(
-                td(class_=grade_td_class)[
-                    entry.grade.name if entry.grade is not None else "—"
-                ]
-            )
-            rows.append(tr[row_cells])
-
-    return table(class_="w-full border-collapse text-sm")[
-        thead[
-            tr[
-                th(class_=_TH_CLASS)[""],
-                th(class_=_TH_CLASS)["Name"],
-                th(class_=_TH_CLASS)["Shops"],
-                th(class_=_TH_CLASS)["Artists"],
-                th(class_=_TH_CLASS)["Grade"],
-            ]
-        ],
-        tbody[rows],
-    ]
+    return _pin_grouped_table(
+        request=request,
+        entries=wanted_pins,
+        extra_headers=["Grade"],
+        extra_cells=extra_cells,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -492,7 +465,7 @@ def trades_list_page(
     content: Element = (
         pin_grid(
             request=request,
-            pins=_unique_pins_from_owned(owned_pins=tradeable_entries),
+            pins=unique_pins(entries=tradeable_entries),
         )
         if view == "grid"
         else _trades_table(request=request, tradeable_entries=tradeable_entries)
@@ -514,56 +487,16 @@ def _trades_table(
     request: Request,
     tradeable_entries: list[UserOwnedPin],
 ) -> Element:
-    groups: list[list[UserOwnedPin]] = _group_by_pin(entries=tradeable_entries)
-    rows: list[Element] = []
+    def extra_cells(entry: _PinEntry) -> list[Element]:
+        assert isinstance(entry, UserOwnedPin)
+        return [
+            td(class_=_TD_CLASS)[entry.grade.name if entry.grade is not None else "—"],
+            td(class_=_TD_CLASS)[str(entry.tradeable_quantity)],
+        ]
 
-    for group in groups:
-        pin: Pin = group[0].pin
-        span_count: int = len(group)
-
-        for index, entry in enumerate(group):
-            is_first: bool = index == 0
-            is_last: bool = index == span_count - 1
-            grade_td_class: str = _TD_CLASS if is_last else _TD_CLASS_NO_BORDER
-
-            row_cells: list[Element] = []
-            if is_first:
-                row_cells.extend(
-                    [
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _thumbnail(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _pin_button(request=request, pin=pin)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _shop_links(request=request, shops=pin.shops)
-                        ],
-                        td(class_=_TD_CLASS, rowspan=span_count)[
-                            _artist_links(request=request, artists=pin.artists)
-                        ],
-                    ]
-                )
-            row_cells.extend(
-                [
-                    td(class_=grade_td_class)[
-                        entry.grade.name if entry.grade is not None else "—"
-                    ],
-                    td(class_=grade_td_class)[str(entry.tradeable_quantity)],
-                ]
-            )
-            rows.append(tr[row_cells])
-
-    return table(class_="w-full border-collapse text-sm")[
-        thead[
-            tr[
-                th(class_=_TH_CLASS)[""],
-                th(class_=_TH_CLASS)["Name"],
-                th(class_=_TH_CLASS)["Shops"],
-                th(class_=_TH_CLASS)["Artists"],
-                th(class_=_TH_CLASS)["Grade"],
-                th(class_=_TH_CLASS)["Tradeable Qty"],
-            ]
-        ],
-        tbody[rows],
-    ]
+    return _pin_grouped_table(
+        request=request,
+        entries=tradeable_entries,
+        extra_headers=["Grade", "Tradeable Qty"],
+        extra_cells=extra_cells,
+    )

@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, cast
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -19,22 +20,18 @@ from pindb.database.pending_edit_utils import (
 )
 from pindb.database.pending_mixin import PendingAuditEntity, PendingMixin
 from pindb.database.user import User
-from pindb.templates.admin.pending import pending_page
+from pindb.templates.admin.pending import BulkGroupView, pending_page
+from pindb.utils import utc_now
 
 router = APIRouter(prefix="/admin/pending", dependencies=[Depends(require_admin)])
 
 
-_ENTITY_TYPE_TO_TABLE: dict[EntityType, str] = {
-    EntityType.pin: "pins",
-    EntityType.shop: "shops",
-    EntityType.artist: "artists",
-    EntityType.tag: "tags",
-    EntityType.pin_set: "pin_sets",
-}
+class _BulkGroupBucket:
+    """Staging container for a bulk_id's pending entities and edits."""
 
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    def __init__(self) -> None:
+        self.entities: list[tuple[str, PendingAuditEntity]] = []
+        self.edits: list[tuple[tuple[str, int], list[PendingEdit]]] = []
 
 
 def _get_pending_entity(
@@ -183,14 +180,20 @@ def get_pending_queue(request: Request) -> HTMLResponse:
             .execution_options(**opts)  # type: ignore[arg-type]
         ).all()
 
+        pending_pins_list: list[Pin] = list(pending_pins)
+        pending_shops_list: list[Shop] = list(pending_shops)
+        pending_artists_list: list[Artist] = list(pending_artists)
+        pending_tags_list: list[Tag] = list(pending_tags)
+        pending_pin_sets_list: list[PinSet] = list(pending_pin_sets)
+
         creator_ids: set[int] = {
             e.created_by_id
             for group in [
-                pending_pins,
-                pending_shops,
-                pending_artists,
-                pending_tags,
-                pending_pin_sets,
+                pending_pins_list,
+                pending_shops_list,
+                pending_artists_list,
+                pending_tags_list,
+                pending_pin_sets_list,
             ]
             for e in group
             if e.created_by_id is not None
@@ -210,6 +213,41 @@ def get_pending_queue(request: Request) -> HTMLResponse:
         for edit in pending_edits:
             edit_groups.setdefault((edit.entity_type, edit.entity_id), []).append(edit)
 
+        # Bulk groups: collect pending entities and edits keyed by bulk_id.
+        # Any row with a bulk_id is pulled out of the flat per-type sections
+        # and rendered as a single collapsible bundle.
+        bulk_groups: dict[UUID, _BulkGroupBucket] = {}
+        per_type_lists: list[tuple[list[PendingAuditEntity], str]] = [
+            (cast(list[PendingAuditEntity], pending_pins_list), "pin"),
+            (cast(list[PendingAuditEntity], pending_shops_list), "shop"),
+            (cast(list[PendingAuditEntity], pending_artists_list), "artist"),
+            (cast(list[PendingAuditEntity], pending_tags_list), "tag"),
+            (cast(list[PendingAuditEntity], pending_pin_sets_list), "pin_set"),
+        ]
+        for pending_list, entity_type_slug in per_type_lists:
+            for entity in list(pending_list):
+                entity_bulk_id: UUID | None = getattr(entity, "bulk_id", None)
+                if entity_bulk_id is None:
+                    continue
+                bucket = bulk_groups.setdefault(entity_bulk_id, _BulkGroupBucket())
+                bucket.entities.append((entity_type_slug, entity))
+                pending_list.remove(entity)
+
+        for (table_name, entity_id), chain in list(edit_groups.items()):
+            bulk_ids_in_chain = {edit.bulk_id for edit in chain if edit.bulk_id}
+            if not bulk_ids_in_chain:
+                continue
+            # An entity's chain belongs to a bulk only if every pending edit on
+            # it shares the bulk_id. Otherwise leave it in the per-entity list.
+            if len(bulk_ids_in_chain) != 1 or any(
+                edit.bulk_id is None for edit in chain
+            ):
+                continue
+            bulk_id_val = next(iter(bulk_ids_in_chain))
+            bucket = bulk_groups.setdefault(bulk_id_val, _BulkGroupBucket())
+            bucket.edits.append(((table_name, entity_id), chain))
+            edit_groups.pop((table_name, entity_id))
+
         for edit in pending_edits:
             if edit.created_by_id is not None:
                 creator_ids.add(edit.created_by_id)
@@ -218,12 +256,16 @@ def get_pending_queue(request: Request) -> HTMLResponse:
         group_entities: dict[tuple[str, int], PendingAuditEntity] = {}
         pending_opts: Any = {"include_pending": True}
         for (table_name, entity_id), _edits in edit_groups.items():
-            et = _table_to_entity_type(table_name)
-            if et is None:
+            entity_type = EntityType.from_table_name(table_name)
+            if entity_type is None:
                 continue
-            obj = session.get(et.model, entity_id, execution_options=pending_opts)
-            if obj is not None:
-                group_entities[(table_name, entity_id)] = cast(PendingAuditEntity, obj)
+            entity = session.get(
+                entity_type.model, entity_id, execution_options=pending_opts
+            )
+            if entity is not None:
+                group_entities[(table_name, entity_id)] = cast(
+                    PendingAuditEntity, entity
+                )
 
         creators: dict[int, User] = {}
         if creator_ids:
@@ -234,28 +276,36 @@ def get_pending_queue(request: Request) -> HTMLResponse:
                 ).all()
             }
 
+        bulk_view_groups: list[BulkGroupView] = [
+            BulkGroupView(
+                bulk_id=bulk_id_val,
+                entities=bucket.entities,
+                edits=bucket.edits,
+                edit_entities={
+                    (table_name, entity_id): group_entities[(table_name, entity_id)]
+                    for ((table_name, entity_id), _chain) in bucket.edits
+                    if (table_name, entity_id) in group_entities
+                },
+            )
+            for bulk_id_val, bucket in bulk_groups.items()
+        ]
+
         return HTMLResponse(
             content=str(
                 pending_page(
                     request=request,
-                    pending_pins=list(pending_pins),
-                    pending_shops=list(pending_shops),
-                    pending_artists=list(pending_artists),
-                    pending_tags=list(pending_tags),
-                    pending_pin_sets=list(pending_pin_sets),
+                    pending_pins=pending_pins_list,
+                    pending_shops=pending_shops_list,
+                    pending_artists=pending_artists_list,
+                    pending_tags=pending_tags_list,
+                    pending_pin_sets=pending_pin_sets_list,
                     creators=creators,
                     edit_groups=edit_groups,
                     edit_group_entities=group_entities,
+                    bulk_groups=bulk_view_groups,
                 )
             )
         )
-
-
-def _table_to_entity_type(table_name: str) -> EntityType | None:
-    for et, tn in _ENTITY_TYPE_TO_TABLE.items():
-        if tn == table_name:
-            return et
-    return None
 
 
 @router.post("/approve/{entity_type}/{entity_id}")
@@ -264,7 +314,7 @@ def approve_entity(
     entity_id: int,
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
-    now = _utc_now()
+    now = utc_now()
     with session_maker.begin() as session:
         entity = _get_pending_entity(session, entity_type, entity_id)
 
@@ -293,7 +343,7 @@ def reject_entity(
     entity_id: int,
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
-    now = _utc_now()
+    now = utc_now()
     with session_maker.begin() as session:
         entity = _get_pending_entity(session, entity_type, entity_id)
         if entity.rejected_at is None:
@@ -309,7 +359,7 @@ def delete_pending_entity(
     entity_id: int,
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
-    now = _utc_now()
+    now = utc_now()
     with session_maker.begin() as session:
         entity = _get_pending_entity(session, entity_type, entity_id)
         if isinstance(entity, AuditMixin):
@@ -330,8 +380,8 @@ def approve_pending_edits(
     entity_id: int,
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
-    now = _utc_now()
-    table_name = _ENTITY_TYPE_TO_TABLE[entity_type]
+    now = utc_now()
+    table_name = entity_type.table_name
     with session_maker.begin() as session:
         entity = _load_entity_for_edit(session, entity_type, entity_id)
         if entity is None:
@@ -363,8 +413,8 @@ def reject_pending_edits(
     entity_id: int,
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
-    now = _utc_now()
-    table_name = _ENTITY_TYPE_TO_TABLE[entity_type]
+    now = utc_now()
+    table_name = entity_type.table_name
     with session_maker.begin() as session:
         chain = get_edit_chain(session, table_name, entity_id)
         for edit in chain:
@@ -379,10 +429,115 @@ def delete_pending_edits(
     entity_type: EntityType,
     entity_id: int,
 ) -> RedirectResponse:
-    table_name = _ENTITY_TYPE_TO_TABLE[entity_type]
+    table_name = entity_type.table_name
     with session_maker.begin() as session:
         chain = get_edit_chain(session, table_name, entity_id)
         for edit in chain:
+            session.delete(edit)
+
+    return RedirectResponse(url="/admin/pending", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Bulk approval helpers — operate on every pending edit and every pending
+# PendingMixin entity that shares a given ``bulk_id``.
+# ---------------------------------------------------------------------------
+
+
+def _collect_bulk_entities(session: Session, bulk_id: UUID) -> list[PendingAuditEntity]:
+    opts: Any = {"include_pending": True}
+    collected: list[PendingAuditEntity] = []
+    for entity_type in EntityType:
+        rows = session.scalars(
+            select(entity_type.model)
+            .where(entity_type.model.bulk_id == bulk_id)
+            .execution_options(**opts)
+        ).all()
+        collected.extend(cast(list[PendingAuditEntity], list(rows)))
+    return collected
+
+
+def _collect_bulk_edits(session: Session, bulk_id: UUID) -> list[PendingEdit]:
+    return list(
+        session.scalars(
+            select(PendingEdit).where(
+                PendingEdit.bulk_id == bulk_id,
+                PendingEdit.approved_at.is_(None),
+                PendingEdit.rejected_at.is_(None),
+            )
+        ).all()
+    )
+
+
+@router.post("/approve-bulk/{bulk_id}")
+def approve_bulk(
+    bulk_id: UUID,
+    current_user: User = Depends(require_admin),
+) -> RedirectResponse:
+    now = utc_now()
+    with session_maker.begin() as session:
+        for entity in _collect_bulk_entities(session, bulk_id):
+            if entity.approved_at is None and entity.rejected_at is None:
+                _approve_with_cascade(entity, current_user.id, now)
+
+        edits = _collect_bulk_edits(session, bulk_id)
+        edits_by_entity: dict[tuple[str, int], list[PendingEdit]] = {}
+        for edit in edits:
+            edits_by_entity.setdefault((edit.entity_type, edit.entity_id), []).append(
+                edit
+            )
+
+        for (table_name, entity_id), chain in edits_by_entity.items():
+            entity_type = EntityType.from_table_name(table_name)
+            if entity_type is None:
+                continue
+            canonical = _load_entity_for_edit(session, entity_type, entity_id)
+            if canonical is None:
+                continue
+            # Apply the full effective chain, not just the bulk slice, so other
+            # pending edits that happened to stack on top are preserved.
+            full_chain = get_edit_chain(session, table_name, entity_id)
+            effective = get_effective_snapshot(canonical, full_chain)
+            apply_snapshot_to_entity(canonical, effective, session)
+            for edit in full_chain:
+                edit.approved_at = now
+                edit.approved_by_id = current_user.id
+
+    return RedirectResponse(url="/admin/pending", status_code=303)
+
+
+@router.post("/reject-bulk/{bulk_id}")
+def reject_bulk(
+    bulk_id: UUID,
+    current_user: User = Depends(require_admin),
+) -> RedirectResponse:
+    now = utc_now()
+    with session_maker.begin() as session:
+        for entity in _collect_bulk_entities(session, bulk_id):
+            if entity.rejected_at is None and entity.approved_at is None:
+                entity.rejected_at = now  # type: ignore[misc]
+                entity.rejected_by_id = current_user.id  # type: ignore[misc]
+
+        for edit in _collect_bulk_edits(session, bulk_id):
+            edit.rejected_at = now
+            edit.rejected_by_id = current_user.id
+
+    return RedirectResponse(url="/admin/pending", status_code=303)
+
+
+@router.post("/delete-bulk/{bulk_id}")
+def delete_bulk(
+    bulk_id: UUID,
+    current_user: User = Depends(require_admin),
+) -> RedirectResponse:
+    now = utc_now()
+    with session_maker.begin() as session:
+        for entity in _collect_bulk_entities(session, bulk_id):
+            if isinstance(entity, AuditMixin) and entity.deleted_at is None:
+                entity.deleted_at = now
+                entity.deleted_by_id = current_user.id
+
+        for edit in _collect_bulk_edits(session, bulk_id):
             session.delete(edit)
 
     return RedirectResponse(url="/admin/pending", status_code=303)
