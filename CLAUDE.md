@@ -19,6 +19,7 @@ uvx ty check
 - **Database:** PostgreSQL 17 (primary), Meilisearch (search index)
 - **Migrations:** Alembic (active — run on container start, not on app startup)
 - **Tooling:** UV (package manager), Ruff (format/lint), ty (type check)
+- **CSS build:** Node.js **20+** (Tailwind v4’s `@tailwindcss/oxide` native addon requires it). From repo root: `npm ci` (or `npm install`), then `npm run css:build` or `npm run css:watch`. Do not use Node 18 — optional platform packages won’t install and the CLI fails with “Cannot find native binding”.
 
 ## Project Structure
 ```

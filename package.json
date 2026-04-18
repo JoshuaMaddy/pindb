@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
     "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify"
