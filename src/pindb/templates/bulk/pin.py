@@ -9,6 +9,7 @@ from htpy import (
     div,
     h1,
     hr,
+    p,
     script,
     span,
     table,
@@ -79,147 +80,161 @@ def bulk_pin_page(
             script[Markup(f"window.BULK_REF = {json.dumps(ref_data)};")],
             # Page wrapper — full width with padding
             div(class_="px-4 py-4 flex flex-col gap-2 h-full")[
-                # Header bar
-                div(class_="flex items-center gap-2 flex-wrap")[
-                    h1(class_="grow")["Bulk Import Pins"],
-                    # Columns toggle (Alpine dropdown)
-                    Markup(f"""<div class="relative" x-data="{{open: false}}">
+                div(
+                    class_="min-md:hidden rounded-lg border border-amber-600 bg-amber-950/80 px-3 py-2 text-sm text-amber-100"
+                )[
+                    p(class_="font-semibold")["Not available on small screens."],
+                    p(class_="mt-1 text-amber-200/90")[
+                        "Bulk pin import needs a wider layout. Resize the window or use a tablet or desktop to add rows and submit."
+                    ],
+                ],
+                # Header bar + table (disabled below md — wide table layout)
+                div(
+                    class_="max-md:pointer-events-none max-md:cursor-not-allowed max-md:select-none max-md:opacity-60 flex flex-col gap-2"
+                )[
+                    # Header bar
+                    div(class_="flex items-center gap-2 flex-wrap")[
+                        h1(class_="grow")["Bulk Import Pins"],
+                        # Columns toggle (Alpine dropdown)
+                        Markup(f"""<div class="relative" x-data="{{open: false}}">
                         <button type="button" @click="open = !open" class="flex items-center gap-1">
                             <i data-lucide="columns-3"></i> Columns
                         </button>
                         <div x-show="open" @click.outside="open = false"
                              class="absolute right-0 top-full mt-1 z-50 bg-pin-main border border-pin-border rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
                             {
-                        "".join(
-                            f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
-                            f'<input type="checkbox" checked data-col="{key}" class="col-toggle-check"> {label}</label>'
-                            for key, label in optional_cols
-                        )
-                    }
+                            "".join(
+                                f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
+                                f'<input type="checkbox" checked data-col="{key}" class="col-toggle-check"> {label}</label>'
+                                for key, label in optional_cols
+                            )
+                        }
                         </div>
                     </div>"""),
-                    button(
-                        id="add-row-btn",
-                        type="button",
-                        class_="flex items-center gap-1",
-                    )[Markup('<i data-lucide="plus"></i>'), " Add Row"],
-                    button(
-                        id="submit-btn",
-                        type="button",
-                        class_="flex items-center gap-1 border-accent text-accent",
-                    )[
-                        Markup('<i data-lucide="upload"></i>'),
-                        span(id="submit-label")["Submit (0)"],
-                    ],
-                ],
-                hr,
-                # Scrollable table container
-                div(
-                    class_="overflow-x-auto overflow-y-clip rounded-lg border border-pin-border"
-                )[
-                    table(class_="bulk-table w-full border-collapse text-sm")[
-                        thead[
-                            tr(class_="border-b border-pin-border")[
-                                th(
-                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-0 w-8"
-                                )[
-                                    Markup(
-                                        '<input type="checkbox" id="select-all-rows">'
-                                    )
-                                ],
-                                th(
-                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-1 w-[88px]"
-                                )["Front *"],
-                                th(class_="bulk-th w-[88px]")["Back"],
-                                th(
-                                    class_="bulk-th bulk-sticky-left bulk-sticky-col-2 min-w-[15ch]",
-                                    data_col_type="name",
-                                )["Name *"],
-                                th(
-                                    class_="bulk-th min-w-[180px]",
-                                    data_col_type="shops",
-                                )["Shops *"],
-                                th(
-                                    class_="bulk-th min-w-[140px]",
-                                    data_col_type="acquisition_type",
-                                )["Acquisition *"],
-                                th(
-                                    class_="bulk-th min-w-[100px]",
-                                    data_col_type="grades",
-                                )["Grades *"],
-                                th(
-                                    class_="bulk-th min-w-[120px]",
-                                    data_col_type="currency_id",
-                                )["Currency *"],
-                                th(
-                                    class_="bulk-th min-w-[320px]", data_col_type="tags"
-                                )["Tags *"],
-                                # Optional columns
-                                th(
-                                    class_="bulk-th min-w-[160px]",
-                                    data_col="artists",
-                                    data_col_type="artists",
-                                )["Artists"],
-                                th(
-                                    class_="bulk-th min-w-[160px]",
-                                    data_col="pin_sets",
-                                    data_col_type="pin_sets",
-                                )["Pin Sets"],
-                                th(
-                                    class_="bulk-th min-w-[80px]",
-                                    data_col="limited_edition",
-                                )["Ltd. Ed."],
-                                th(
-                                    class_="bulk-th min-w-[100px]",
-                                    data_col="number_produced",
-                                    data_col_type="number_produced",
-                                )["# Produced"],
-                                th(
-                                    class_="bulk-th min-w-[130px]",
-                                    data_col="release_date",
-                                    data_col_type="release_date",
-                                )["Release Date"],
-                                th(
-                                    class_="bulk-th min-w-[130px]",
-                                    data_col="end_date",
-                                    data_col_type="end_date",
-                                )["End Date"],
-                                th(
-                                    class_="bulk-th min-w-[130px]",
-                                    data_col="funding_type",
-                                    data_col_type="funding_type",
-                                )["Funding"],
-                                th(
-                                    class_="bulk-th min-w-[70px]",
-                                    data_col="posts",
-                                    data_col_type="posts",
-                                )["Posts"],
-                                th(
-                                    class_="bulk-th min-w-[90px]",
-                                    data_col="width",
-                                    data_col_type="width",
-                                )["Width"],
-                                th(
-                                    class_="bulk-th min-w-[90px]",
-                                    data_col="height",
-                                    data_col_type="height",
-                                )["Height"],
-                                th(class_="bulk-th min-w-[100px]", data_col="links")[
-                                    "Links"
-                                ],
-                                th(
-                                    class_="bulk-th min-w-[180px]",
-                                    data_col="description",
-                                    data_col_type="description",
-                                )["Description"],
-                                th(class_="bulk-th w-20")["Actions"],
-                            ]
+                        button(
+                            id="add-row-btn",
+                            type="button",
+                            class_="flex items-center gap-1",
+                        )[Markup('<i data-lucide="plus"></i>'), " Add Row"],
+                        button(
+                            id="submit-btn",
+                            type="button",
+                            class_="flex items-center gap-1 border-accent text-accent",
+                        )[
+                            Markup('<i data-lucide="upload"></i>'),
+                            span(id="submit-label")["Submit (0)"],
                         ],
-                        tbody(id="bulk-tbody"),
-                    ]
+                    ],
+                    hr,
+                    # Scrollable table container
+                    div(
+                        class_="overflow-x-auto overflow-y-clip rounded-lg border border-pin-border"
+                    )[
+                        table(class_="bulk-table w-full border-collapse text-sm")[
+                            thead[
+                                tr(class_="border-b border-pin-border")[
+                                    th(
+                                        class_="bulk-th bulk-sticky-left bulk-sticky-col-0 w-8"
+                                    )[
+                                        Markup(
+                                            '<input type="checkbox" id="select-all-rows">'
+                                        )
+                                    ],
+                                    th(
+                                        class_="bulk-th bulk-sticky-left bulk-sticky-col-1 w-[88px]"
+                                    )["Front *"],
+                                    th(class_="bulk-th w-[88px]")["Back"],
+                                    th(
+                                        class_="bulk-th bulk-sticky-left bulk-sticky-col-2 min-w-[15ch]",
+                                        data_col_type="name",
+                                    )["Name *"],
+                                    th(
+                                        class_="bulk-th min-w-[180px]",
+                                        data_col_type="shops",
+                                    )["Shops *"],
+                                    th(
+                                        class_="bulk-th min-w-[140px]",
+                                        data_col_type="acquisition_type",
+                                    )["Acquisition *"],
+                                    th(
+                                        class_="bulk-th min-w-[100px]",
+                                        data_col_type="grades",
+                                    )["Grades *"],
+                                    th(
+                                        class_="bulk-th min-w-[120px]",
+                                        data_col_type="currency_id",
+                                    )["Currency *"],
+                                    th(
+                                        class_="bulk-th min-w-[320px]",
+                                        data_col_type="tags",
+                                    )["Tags *"],
+                                    # Optional columns
+                                    th(
+                                        class_="bulk-th min-w-[160px]",
+                                        data_col="artists",
+                                        data_col_type="artists",
+                                    )["Artists"],
+                                    th(
+                                        class_="bulk-th min-w-[160px]",
+                                        data_col="pin_sets",
+                                        data_col_type="pin_sets",
+                                    )["Pin Sets"],
+                                    th(
+                                        class_="bulk-th min-w-[80px]",
+                                        data_col="limited_edition",
+                                    )["Ltd. Ed."],
+                                    th(
+                                        class_="bulk-th min-w-[100px]",
+                                        data_col="number_produced",
+                                        data_col_type="number_produced",
+                                    )["# Produced"],
+                                    th(
+                                        class_="bulk-th min-w-[130px]",
+                                        data_col="release_date",
+                                        data_col_type="release_date",
+                                    )["Release Date"],
+                                    th(
+                                        class_="bulk-th min-w-[130px]",
+                                        data_col="end_date",
+                                        data_col_type="end_date",
+                                    )["End Date"],
+                                    th(
+                                        class_="bulk-th min-w-[130px]",
+                                        data_col="funding_type",
+                                        data_col_type="funding_type",
+                                    )["Funding"],
+                                    th(
+                                        class_="bulk-th min-w-[70px]",
+                                        data_col="posts",
+                                        data_col_type="posts",
+                                    )["Posts"],
+                                    th(
+                                        class_="bulk-th min-w-[90px]",
+                                        data_col="width",
+                                        data_col_type="width",
+                                    )["Width"],
+                                    th(
+                                        class_="bulk-th min-w-[90px]",
+                                        data_col="height",
+                                        data_col_type="height",
+                                    )["Height"],
+                                    th(
+                                        class_="bulk-th min-w-[100px]", data_col="links"
+                                    )["Links"],
+                                    th(
+                                        class_="bulk-th min-w-[180px]",
+                                        data_col="description",
+                                        data_col_type="description",
+                                    )["Description"],
+                                    th(class_="bulk-th w-20")["Actions"],
+                                ]
+                            ],
+                            tbody(id="bulk-tbody"),
+                        ]
+                    ],
+                    # Results panel (hidden until submit)
+                    div(id="results-panel", class_="hidden"),
                 ],
-                # Results panel (hidden until submit)
-                div(id="results-panel", class_="hidden"),
             ],
             # Success modal (hidden until submit succeeds)
             div(

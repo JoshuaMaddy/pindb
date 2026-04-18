@@ -55,7 +55,9 @@ def search_pin_page(
         request=request,
         body_content=centered_div(
             content=[
-                div(class_="flex items-center justify-between gap-4")[
+                div(
+                    class_="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+                )[
                     h1["Search for a Pin"],
                     header_extras,
                 ],

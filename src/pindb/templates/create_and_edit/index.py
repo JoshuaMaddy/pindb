@@ -1,5 +1,5 @@
 from fastapi import Request
-from htpy import Element, div, h1, hr
+from htpy import Element, div, h1, hr, i
 
 from pindb.templates.base import html_base
 from pindb.templates.components.card import card
@@ -47,7 +47,19 @@ def create_index(request: Request) -> Element:
                         href=request.url_for("get_bulk_pin"),
                         content="Bulk Import Pins",
                         icon="table-2",
+                        additional_classes="max-md:hidden",
                     ),
+                    div(
+                        class_="min-md:hidden flex gap-2 rounded-xl border border-pin-base-350 bg-pin-main p-2 text-pin-base-text opacity-80"
+                    )[
+                        i(data_lucide="table-2", class_="inline-block shrink-0"),
+                        div(class_="flex min-w-0 flex-col gap-0.5")[
+                            div(class_="font-semibold")["Bulk Import Pins"],
+                            div(class_="text-sm text-pin-base-200")[
+                                "Not available on small screens."
+                            ],
+                        ],
+                    ],
                 ],
             ],
             additional_classes="grid min-md:grid-cols-2",

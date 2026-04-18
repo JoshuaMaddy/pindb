@@ -1,6 +1,6 @@
 [project]
 name = "pindb"
-version = "0.1.2beta"
+version = "0.1.3beta"
 description = "A database for pins."
 readme = "README.md"
 requires-python = ">=3.13"

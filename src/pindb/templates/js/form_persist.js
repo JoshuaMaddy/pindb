@@ -69,6 +69,7 @@
           if (Array.isArray(names) && names.length) {
             alpine.grades = names.map(function (gradeName, i) {
               return {
+                id: crypto.randomUUID(),
                 name: gradeName,
                 price: prices && prices[i] != null ? prices[i] : "",
               };

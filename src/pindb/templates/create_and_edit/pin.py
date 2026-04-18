@@ -1,4 +1,5 @@
 import json
+import uuid
 from pathlib import Path
 from typing import Sequence
 
@@ -74,14 +75,16 @@ def pin_form(
                 form(
                     hx_post=str(post_url),
                     enctype="multipart/form-data",
-                    class_="grid grid-cols-[1fr_2fr] max-sm:grid-cols-1 gap-2 [&_label]:font-semibold",
+                    class_="grid w-full min-w-0 grid-cols-[1fr_2fr] max-sm:grid-cols-1 gap-2 [&_label]:font-semibold",
                     autocomplete="off",
                 )[
-                    div(class_="flex flex-col gap-2")[
+                    div(class_="flex flex-col gap-2 min-w-0")[
                         __front_image_input(pin=pin),
                         __back_image_input(pin=pin),
                     ],
-                    div(class_="grid grid-cols-[max-content_1fr] gap-2")[
+                    div(
+                        class_="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[max-content_1fr] sm:items-start"
+                    )[
                         __required_fields(
                             shops=shops,
                             tags=tags,
@@ -89,13 +92,17 @@ def pin_form(
                             currencies=currencies,
                             request=request,
                         ),
-                        hr(class_="col-span-2"),
+                        hr(class_="col-span-full"),
                         __optional_fields(
                             pin=pin,
                             pin_sets=pin_sets,
                             artists=artists,
                         ),
-                        input(type="submit", value="Submit", class_="col-span-2 mt-2"),
+                        input(
+                            type="submit",
+                            value="Submit",
+                            class_="col-span-full mt-2",
+                        ),
                     ],
                 ],
             ],
@@ -134,7 +141,7 @@ def __required_fields(
     pin: Pin | None = None,
 ) -> Fragment:
     return fragment[
-        h2(class_="col-span-2")["Required"],
+        h2(class_="col-span-full")["Required"],
         __name_input(pin=pin),
         __shops_input(pin=pin, shops=shops),
         __acquisition_input(pin=pin),
@@ -149,7 +156,7 @@ def __optional_fields(
     pin: Pin | None = None,
 ) -> Fragment:
     return fragment[
-        h2(class_="col-span-2")["Optional"],
+        h2(class_="col-span-full")["Optional"],
         # Images
         __artist_ids_input(pin=pin, artists=artists),
         __pin_sets_ids_input(pin=pin, pin_sets=pin_sets),
@@ -256,6 +263,7 @@ def _text_field(
             pattern=pattern or False,
             min=min_value,
             step=step,
+            class_="w-full min-w-0",
         ),
     ]
 
@@ -281,7 +289,7 @@ def __shops_input(
             id="shop_ids",
             required=True,
             multiple=True,
-            class_="multi-select",
+            class_="multi-select w-full min-w-0",
             data_entity_type="shop",
         )[
             [
@@ -303,7 +311,7 @@ def __acquisition_input(pin: Pin | None) -> list[Element | VoidElement]:
         select(
             name="acquisition_type",
             id="acquisition_type",
-            class_="single-select",
+            class_="single-select w-full min-w-0",
             required=True,
         )[
             [
@@ -321,11 +329,12 @@ def __grades_input(
     currencies: Sequence[Currency],
     pin: Pin | None,
 ) -> list[Element | VoidElement | Markup]:
-    # Prepare initial grades data
+    # Prepare initial grades data (each row needs a string `id` for Alpine :key)
     grades_data: list[dict[str, str]] = []
     if pin and pin.grades:
         grades_data = [
             {
+                "id": str(uuid.uuid4()),
                 "name": str(grade.name),
                 "price": "" if grade.price is None else str(grade.price),
             }
@@ -334,7 +343,7 @@ def __grades_input(
 
     # Ensure at least one default grade
     if not grades_data:
-        grades_data = [{"name": "Normal", "price": ""}]
+        grades_data = [{"id": str(uuid.uuid4()), "name": "Normal", "price": ""}]
 
     # Default currency
     default_currency_id = pin.currency_id if pin else 999
@@ -343,21 +352,22 @@ def __grades_input(
 
     return [
         label(for_="grade")["Grade", span(class_="text-red-200 ml-0.5")["*"]],
-        Markup(f"""<div class="flex w-full gap-2">
-            <div class="flex flex-col gap-2 grow" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
-                <template x-for="(grade, index) in grades" :key="index">
-                    <div class="gap-2 flex">
-                        <input class="grow" type="text" name="grade_names" x-model="grades[index].name" required autocomplete="off" placeholder="Grade">
-                        <input class="w-25" type="number" name="grade_prices" x-model="grades[index].price" autocomplete="off" step="0.01" min="0" placeholder="Unknown">
-                        <button type="button" @click="grades.splice(index, 1)" x-show="grades.length > 1" class="remove-grade-button">Remove</button>
+        Markup(f"""<div class="flex w-full min-w-0 flex-wrap gap-2">
+            <div class="flex min-w-0 flex-1 flex-col gap-2" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
+                <template x-for="grade in grades" :key="grade.id">
+                    <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                        <input class="w-full min-w-0 sm:w-auto sm:min-w-0 sm:flex-1" type="text" name="grade_names" x-model="grade.name" required autocomplete="off" placeholder="Grade">
+                        <input class="w-full min-w-0 sm:w-25" type="number" name="grade_prices" x-model="grade.price" autocomplete="off" step="0.01" min="0" placeholder="Unknown">
+                        <button type="button" @click="grades.splice(grades.indexOf(grade), 1)" x-show="grades.length > 1" class="remove-grade-button w-full sm:w-auto sm:shrink-0">Remove</button>
                     </div>
                 </template>
-                <button type="button" @click="grades.push({{name: '', price: ''}})" class="w-full">Add Grade</button>
+                <button type="button" @click="grades.push({{ id: crypto.randomUUID(), name: '', price: '' }})" class="w-full">Add Grade</button>
             </div>
         """),
         select(
             name="currency_id",
             id="currency_id",
+            class_="w-full min-w-0 sm:w-auto sm:min-w-[8rem]",
         )[
             [
                 option(
@@ -384,7 +394,7 @@ def __tag_ids_input(
             id="tag_ids",
             required=True,
             multiple=True,
-            class_="multi-select",
+            class_="multi-select w-full min-w-0",
             data_entity_type="tag",
             hx_get=preview_url,
             hx_trigger="load, change",
@@ -400,7 +410,7 @@ def __tag_ids_input(
                 for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
             ]
         ],
-        div(id="implication-preview", class_="col-span-2"),
+        div(id="implication-preview", class_="col-span-full"),
     ]
 
 
@@ -414,7 +424,7 @@ def __artist_ids_input(
             name="artist_ids",
             id="artist_ids",
             multiple=True,
-            class_="multi-select",
+            class_="multi-select w-full min-w-0",
             data_entity_type="artist",
         )[
             [
@@ -438,7 +448,7 @@ def __pin_sets_ids_input(
             name="pin_sets_ids",
             id="pin_sets_ids",
             multiple=True,
-            class_="multi-select",
+            class_="multi-select w-full min-w-0",
             data_entity_type="pin_set",
         )[
             [
@@ -456,25 +466,27 @@ def __limited_edition_input(pin: Pin | None) -> list[Element | VoidElement]:
     selected_classes = "bg-pin-main border-accent text-accent grow"
     return [
         label(for_="limited_edition")["Limited Edition"],
-        input(
-            name="limited_edition",
-            id="limited_edition",
-            type="checkbox",
-            class_="self-start",
-            hidden=True,
-            checked=pin.limited_edition if pin and pin.limited_edition else None,
-        ),
-        div(class_="flex gap-2 w-full")[
-            button(
-                id="limited_edition_yes",
-                class_=selected_classes if pin and pin.limited_edition else "grow",
-                type="button",
-            )["Yes"],
-            button(
-                id="limited_edition_no",
-                class_="grow" if pin and pin.limited_edition else selected_classes,
-                type="button",
-            )["No"],
+        div(class_="flex w-full min-w-0 flex-col gap-2")[
+            input(
+                name="limited_edition",
+                id="limited_edition",
+                type="checkbox",
+                class_="self-start",
+                hidden=True,
+                checked=pin.limited_edition if pin and pin.limited_edition else None,
+            ),
+            div(class_="flex w-full min-w-0 gap-2")[
+                button(
+                    id="limited_edition_yes",
+                    class_=selected_classes if pin and pin.limited_edition else "grow",
+                    type="button",
+                )["Yes"],
+                button(
+                    id="limited_edition_no",
+                    class_="grow" if pin and pin.limited_edition else selected_classes,
+                    type="button",
+                )["No"],
+            ],
         ],
     ]
 
@@ -515,7 +527,7 @@ def __funding_input(pin: Pin | None) -> list[Element | VoidElement]:
         select(
             name="funding_type",
             id="funding_type",
-            class_="single-select",
+            class_="single-select w-full min-w-0",
         )[
             [
                 option(
@@ -571,7 +583,7 @@ def __links_input(pin: Pin | None) -> Element | Markup:
 
     links_json = json.dumps(pin_links)
 
-    return div(class_="col-span-2")[
+    return div(class_="col-span-full")[
         label(for_="links")["Links"],
         Markup(f"""<div class="mt-2" x-data="{{ links: {links_json.replace('"', "'")} }}">
             <template x-for="(link, index) in links" :key="index">
@@ -600,8 +612,8 @@ def __links_input(pin: Pin | None) -> Element | Markup:
 
 def __description_input(pin: Pin | None) -> list[Element | VoidElement]:
     return [
-        label(for_="md-editor-description", class_="col-span-2")["Description"],
-        div(class_="col-span-2")[
+        label(for_="md-editor-description", class_="col-span-full")["Description"],
+        div(class_="col-span-full min-w-0")[
             markdown_editor(
                 field_id="description",
                 name="description",

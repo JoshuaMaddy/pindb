@@ -183,7 +183,7 @@ def _scalar_section() -> Fragment:
             "Only fields with the checkbox ticked are updated. Unticked fields "
             "are left unchanged on every pin.",
         ],
-        div(class_="grid grid-cols-[max-content_max-content_1fr] gap-2 items-center")[
+        div(class_="flex flex-col gap-3")[
             _scalar_row(
                 field="acquisition_type",
                 label_text="Acquisition",
@@ -276,18 +276,26 @@ def _scalar_row(
     field: str,
     label_text: str,
     widget: Element | VoidElement,
-) -> Fragment:
-    return fragment[
-        input(
-            type="checkbox",
-            name="apply_field",
-            value=field,
-            id=f"apply_{field}",
+) -> Element:
+    return div(
+        class_=(
+            "flex flex-col gap-2 md:grid md:grid-cols-[max-content_max-content_minmax(0,1fr)] "
+            "md:items-center md:gap-2"
         ),
-        label(for_=f"apply_{field}", class_="font-semibold whitespace-nowrap")[
-            label_text
+    )[
+        div(class_="flex items-center gap-2 md:contents")[
+            input(
+                type="checkbox",
+                name="apply_field",
+                value=field,
+                id=f"apply_{field}",
+            ),
+            label(
+                for_=f"apply_{field}",
+                class_="font-semibold max-md:whitespace-normal md:whitespace-nowrap",
+            )[label_text],
         ],
-        widget,
+        div(class_="min-w-0 w-full md:contents")[widget],
     ]
 
 
