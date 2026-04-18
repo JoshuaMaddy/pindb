@@ -36,8 +36,10 @@ services:
       meilisearch_url: http://meilisearch:7700
       meilisearch_key: ${MEILISEARCH_KEY}
       image_directory: /app/images
+      log_file: /app/logs/pindb.log
     volumes:
-      - images:/app/images
+      - ./images:/app/images
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,4 +49,3 @@ services:
 volumes:
   postgres_data:
   meili_data:
-  images:
