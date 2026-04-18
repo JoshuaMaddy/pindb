@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import Request
-from htpy import Element, a, div, form, h3, hr, i, input, label, p, span
+from htpy import Element, a, button, div, form, h3, hr, i, input, label, p, span
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -13,6 +13,7 @@ from pindb.templates.user.pin_list_pages import unique_pins
 from pindb.templates.components.card import card
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
+from pindb.templates.components.delete_account_modal import delete_account_modal
 from pindb.templates.components.empty_state import empty_state
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.page_heading import page_heading
@@ -347,7 +348,8 @@ def __settings_section(
     request: Request,
     current_user: User | None,
 ) -> Element:
-    current_theme: str = current_user.theme if current_user else "mocha"
+    assert current_user is not None
+    current_theme: str = current_user.theme
     return div(class_="flex flex-col gap-4")[
         page_heading(icon="settings-2", text="Settings", level=2),
         div(class_="flex flex-col gap-4")[
@@ -395,6 +397,26 @@ def __settings_section(
                     ]
                     for source, variants in THEME_GROUPS
                 ]
+            ],
+            div(class_=("mt-6 pt-6 border-t border-pin-base-400 flex flex-col gap-3"))[
+                h3(
+                    class_=(
+                        "text-xs font-semibold uppercase tracking-wider "
+                        "text-pin-base-300"
+                    )
+                )["Account"],
+                delete_account_modal(
+                    trigger=button(
+                        type="button",
+                        class_=(
+                            "self-start text-sm text-red-300 underline "
+                            "underline-offset-2 hover:text-red-200 cursor-pointer "
+                            "bg-transparent border-0 p-0"
+                        ),
+                    )["Delete account"],
+                    expected_username=current_user.username,
+                    form_action=str(request.url_for("delete_own_account")),
+                ),
             ],
         ],
     ]

@@ -9,11 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from pindb.database import Artist, ArtistAlias, session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import is_unique_violation, unique_constraint_response
+from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.search.update import update_artist
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.create.artist")
 
 
 @router.get(path="/artist")
@@ -42,6 +45,7 @@ def post_create_artist(
     ] = None,
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
+    LOGGER.info("Creating artist name=%r aliases=%s", name, aliases)
     try:
         with session_maker.begin() as session:
             new_links: set[Link] = (
@@ -66,6 +70,8 @@ def post_create_artist(
         return unique_constraint_response(request=request)
 
     update_artist(artist=artist)
+
+    LOGGER.info("Created artist id=%d name=%r", artist_id, name)
 
     return HTMLResponse(
         headers={

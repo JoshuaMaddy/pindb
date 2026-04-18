@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from pindb.auth import AdminUser, require_admin
 from pindb.database import Artist, Pin, PinSet, Shop, Tag, session_maker
+from pindb.database.erasure import erase_user_account
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.user import User
 from pindb.search.update import update_all
@@ -117,4 +118,23 @@ def demote_editor(user_id: int) -> RedirectResponse:
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         user.is_editor = False
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@router.post("/users/{user_id}/delete-account")
+def delete_account(user_id: int, current_user: AdminUser) -> RedirectResponse:
+    """GDPR-compliant account erasure.
+
+    Anonymises every audit-log reference to the user, drops user-owned
+    data (sessions, OAuth links, favorites, owned/wanted pins), demotes
+    personal pin sets to global, and hard-deletes the user row.
+    Irreversible.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    with session_maker.begin() as session:
+        user: User | None = session.get(User, user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        erase_user_account(session=session, user_id=user_id)
     return RedirectResponse(url="/admin/users", status_code=303)

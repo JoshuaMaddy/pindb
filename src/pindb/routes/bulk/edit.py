@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import AdminUser, EditorUser
+from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError
 from pindb.database import session_maker
 from pindb.database.pending_edit import PendingEdit
@@ -51,6 +52,8 @@ from pindb.search.search import search_pin
 from pindb.templates.bulk.edit import bulk_edit_page
 
 router = APIRouter(prefix="/bulk-edit")
+
+LOGGER = user_logger("pindb.routes.bulk.edit")
 
 
 _PIN_SELECTINLOADS = (
@@ -221,6 +224,18 @@ def post_bulk_edit_apply(
             ).all()
         )
 
+        LOGGER.info(
+            "Bulk edit start source=%s pins=%d field_updates=%s tag_mode=%s "
+            "tag_ids=%s pending=%s bulk_id=%s",
+            source_type.value if source_type else f"search:{search_query!r}",
+            len(pins),
+            sorted(field_updates.keys()),
+            tag_mode.value,
+            sorted(submitted_tags),
+            use_pending_flow,
+            bulk_id,
+        )
+
         for pin in pins:
             _apply_to_pin(
                 session=session,
@@ -234,6 +249,7 @@ def post_bulk_edit_apply(
                 bulk_id=bulk_id,
             )
 
+    LOGGER.info("Bulk edit complete bulk_id=%s", bulk_id)
     return RedirectResponse(url=redirect_url + f"?bulk={bulk_id}", status_code=303)
 
 

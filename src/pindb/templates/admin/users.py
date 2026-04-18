@@ -27,6 +27,9 @@ def admin_users_page(
                 request.url_for("promote_editor", user_id=user.id)
             ),
             "demote_editor_url": str(request.url_for("demote_editor", user_id=user.id)),
+            "delete_account_url": str(
+                request.url_for("delete_account", user_id=user.id)
+            ),
         }
         for user in users
     ]
@@ -89,6 +92,14 @@ def _user_row_template() -> Element:
     )
     editor_btn_text = "row.is_editor ? 'Revoke Editor' : 'Promote to Editor'"
 
+    is_self_any = "row.id === currentUserId"
+    delete_confirm_msg = (
+        "Permanently erase account '\" + row.username + \"'?\\n\\n"
+        "This anonymises all audit-log references, drops sessions, "
+        "OAuth links, favorites, owned and wanted pins, and deletes "
+        "their personal pin sets. Cannot be undone."
+    )
+
     return tr(class_="border-b border-pin-base-800")[
         td(class_="py-2 pr-6", **{"x-text": "row.username"}),
         td(
@@ -140,6 +151,19 @@ def _user_row_template() -> Element:
                             "x-text": editor_btn_text,
                         },
                     ),
+                ],
+                form(
+                    method="post",
+                    **{
+                        ":action": "row.delete_account_url",
+                        "x-show": f"!({is_self_any})",
+                        "@submit": f'return confirm("{delete_confirm_msg}")',
+                    },
+                )[
+                    button(
+                        type="submit",
+                        class_="btn btn-sm btn-error",
+                    )["Erase account"],
                 ],
             ]
         ],

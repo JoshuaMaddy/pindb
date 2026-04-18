@@ -23,6 +23,7 @@ df: DataFrame = read_csv(Path(__file__).parent / "import.csv")
 df = df.with_columns(
     tags=pl.col("tags").str.split(", "),
     shops=pl.col("shops").str.split(", "),
+    # Legacy CSV column name: extra tag names merged with `tags` (often material/finish).
     materials=pl.col("materials").str.split(", "),
     pin_sets=pl.col("pin_sets").str.split(", "),
     artists=pl.col("artists").str.split(", "),
@@ -35,6 +36,8 @@ df = df.with_columns(
 tags_set: set[str] = set()
 for row in df.select(pl.col("tags")).unique().rows():
     tags_set.update(row[0])
+for row in df.select(pl.col("materials")).unique().rows():
+    tags_set.update(x for x in (row[0] or []) if x)
 
 shops_set: set[str] = set()
 for row in df.select(pl.col("shops")).unique().rows():
@@ -89,9 +92,15 @@ async def import_csv():
                 print(f"No currency found with code: {row['currency']}")
                 continue
 
-            material_tag_names: list[str] = row.get("materials") or []
+            extra_tag_names_from_materials_column: list[str] = (
+                row.get("materials") or []
+            )
             tags = session.scalars(
-                select(Tag).where(Tag.name.in_(list(row["tags"]) + material_tag_names))
+                select(Tag).where(
+                    Tag.name.in_(
+                        list(row["tags"]) + extra_tag_names_from_materials_column
+                    )
+                )
             )
             pin_sets = session.scalars(
                 select(PinSet).where(PinSet.name.in_(row["pin_sets"]))

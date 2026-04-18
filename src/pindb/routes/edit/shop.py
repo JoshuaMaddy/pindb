@@ -14,12 +14,15 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
 )
+from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.edit.shop")
 
 
 @router.get(path="/shop/{id}", response_model=None)
@@ -89,6 +92,7 @@ def post_edit_shop(
         assert_editor_can_edit(shop, current_user)
 
         if needs_pending_edit(shop, current_user):
+            LOGGER.info("Submitting pending edit for shop id=%d name=%r", id, name)
             return submit_pending_edit(
                 session=session,
                 entity=shop,
@@ -105,6 +109,7 @@ def post_edit_shop(
                 redirect_route="get_shop",
             )
 
+        LOGGER.info("Editing shop id=%d name=%r", id, name)
         shop.name = name
         shop.description = description
 

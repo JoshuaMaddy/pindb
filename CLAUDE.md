@@ -44,7 +44,7 @@ src/pindb/
 │   ├── user.py              # User model (auth, favorites, personal sets)
 │   ├── session.py           # UserSession model (token-based sessions)
 │   ├── user_auth_provider.py# OAuth provider linkage (Google/Discord)
-│   ├── artist.py, material.py, shop.py, tag.py, grade.py, currency.py, link.py
+│   ├── artist.py, shop.py, tag.py, grade.py, currency.py, link.py
 │   └── joins.py             # All many-to-many association tables
 ├── models/                  # Pydantic enums (NOT SQLAlchemy models)
 │   ├── acquisition_type.py  # AcquisitionType: single / blind_box / set
@@ -71,8 +71,8 @@ src/pindb/
 │   ├── components/          # navbar, breadcrumbs, pin grid/cards, modals, buttons
 │   ├── auth/                # login_page(), signup_page()
 │   ├── create_and_edit/     # Forms for create/edit (pin, artist, shop, tag, pin_set, user_pin_sets)
-│   ├── get/                 # Detail templates (pin, artist, shop, material, tag, pin_set)
-│   ├── list/                # List templates (artists, shops, materials, tags, pin_sets)
+│   ├── get/                 # Detail templates (pin, artist, shop, tag, pin_set)
+│   ├── list/                # List templates (artists, shops, tags, pin_sets)
 │   ├── user/                # user_profile_page()
 │   ├── admin/               # admin_panel_page(), admin_users_page(), pending_page()
 │   ├── search/              # search_pin_page()
@@ -87,6 +87,7 @@ alembic/                     # Database migrations
 scripts/
 ├── README.md                # CSV import format docs (grades encoding, column format)
 ├── import_csv.py            # Bulk CSV import script
+├── dump_db.py               # Postgres dump/load (pg_dump/pg_restore); --via-docker if no local client tools
 ├── migrate_images.py        # Migrate images between filesystem and R2 backends
 ├── dev.sh                   # Bash: docker compose up + fastapi dev
 └── dev.ps1                  # PowerShell: same as above
@@ -134,6 +135,10 @@ Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
 | `password_min_length` | No | `12` | Minimum password length enforced on signup / password change |
 | `password_min_zxcvbn_score` | No | `3` | Minimum zxcvbn strength score (0–4) |
 | `allow_test_oauth_provider` | No | `False` | Enables `/auth/_test-oauth/*` for e2e tests — must be `False` in prod |
+| `contact_email` | Yes | — | Contact email shown in footer, privacy policy, ToS, and DMCA notices |
+| `log_file` | No | `pindb.log` | Path for rotating file logs |
+| `log_file_max_bytes` | No | `209715200` (200 MiB) | Rotate log file when it reaches this size |
+| `log_file_backup_count` | No | `7` | Rotated log files to keep (size-based rotation; ~one week of history at typical volume) |
 
 ## Audit & History System
 
@@ -221,11 +226,12 @@ return HTMLResponse(content=str(template(pin=pin)))
 - Two backends (mutually exclusive): `filesystem` (local dir) or `r2` (Cloudflare R2 via S3-compatible API).
 - R2 serving: redirects to `r2_public_url/{key}` if set; otherwise proxies bytes. Filesystem serving: `FileResponse`.
 - 20 MB upload limit enforced in `file_handler.save_image()`.
+- EXIF / ICC / XMP metadata stripped on ingest (`_strip_metadata`) — prevents GPS and device leaks.
 - Migration: `uv run python scripts/migrate_images.py --direction fs-to-r2|r2-to-fs`
 - Route: `GET /get/image/{uuid}?thumbnail=true`
 
 ### Search (Meilisearch)
-- `Pin.document()` returns dict with `id`, `name`, `shops`, `materials`, `tags`, `artists`, `description`.
+- `Pin.document()` returns dict with `id`, `name`, `shops`, `tags`, `artists`, `description` (and optional fields when present).
 - Searchable attributes configured on startup.
 - Background APScheduler job syncs every N minutes (configurable).
 - Manual sync via admin panel (`POST /admin/search/sync`).
@@ -266,7 +272,7 @@ Routes for add/remove/update owned and wanted pins: `routes/user/collection.py` 
 Editors (`User.is_editor = True`) can create all entity types, but their submissions enter a **pending** state requiring admin approval before becoming publicly visible. Admins have implicit editor privileges; their creations auto-approve.
 
 ### PendingMixin (`database/pending_mixin.py`)
-Applied to: `Pin`, `Shop`, `Artist`, `Tag`, `Material`, `PinSet`. Adds:
+Applied to: `Pin`, `Shop`, `Artist`, `Tag`, `PinSet`. Adds:
 - `approved_at`, `approved_by_id` — set on approval (NULL = pending)
 - `rejected_at`, `rejected_by_id` — set on rejection
 - Properties: `is_pending`, `is_approved`, `is_rejected`
@@ -300,22 +306,37 @@ Pending items appear in create/edit form selection lists with a `(P) ` name pref
 | `POST /admin/pending/reject/{type}/{id}` | Mark `rejected_at` (editor can still see/fix) |
 | `POST /admin/pending/delete/{type}/{id}` | Soft-delete the pending entry |
 
-**Cascade rule**: approving a Pin also approves any pending shops/artists/materials/tags on that pin — but does NOT bulk-approve other pins that reference those entities.
+**Cascade rule**: approving a Pin also approves any pending shops/artists/tags on that pin — but does NOT bulk-approve other pins that reference those entities.
 
 ### Admin management
 - `POST /admin/users/{id}/promote-editor` / `demote-editor` — grant/revoke editor role
 - Admin panel shows pending count badge; links to `/admin/pending`
 
+## Account Erasure (GDPR)
+- `database/erasure.py::erase_user_account(session, user_id)` — single entry point for deleting an account and anonymising every audit-log reference to it.
+- Uses raw bulk UPDATE/DELETE (bypasses ORM audit events) so old user_id values don't leak back into `change_log.patch`.
+- Steps: (1) NULL every AuditMixin FK (`created_by_id`, `updated_by_id`, `deleted_by_id`) to this user across all inheriting tables; (2) NULL PendingMixin `approved_by_id`, `rejected_by_id`; (3) NULL `change_log.changed_by_id` and `pending_edits.{created,approved,rejected}_by_id`; (4) hard-DELETE personal PinSets owned by this user (with their memberships / favorites-of / links); (5) DELETE favorites / sessions / OAuth providers / owned & wanted pins; (6) DELETE the user row.
+- Self-service: `POST /user/me/delete-account` (profile Settings: modal; must type username to enable submit). Clears session cookie and redirects home.
+- Admin route: `POST /admin/users/{user_id}/delete-account` (button in `/admin/users`, JS confirm). Admins cannot delete their own account via admin UI (use self-service or another admin).
+- No schema migration needed — all existing user-FK columns are already nullable with default ON DELETE behaviour.
+
+## Legal Pages & Footer
+- `routes/legal.py` serves `/about`, `/privacy`, `/terms` (all public, no auth).
+- Templates live in `templates/legal/` (`about.py`, `privacy.py`, `terms.py`). Shared container + "not legal advice" banner in `_shared.py`.
+- Footer component `templates/components/footer.py` rendered by `html_base()` on every full page (not on HTMX fragments). Shows version from `pindb.__version__` (via `importlib.metadata`) and `CONFIGURATION.contact_email`.
+- Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.flex-grow.min-h-screen` pushes footer below the fold on tall viewports and pins it to viewport bottom on short pages.
+- Copyright notice uses project name only ("PinDB"), no person named.
+
 ## Key Entities
-- **Pin** — central model. Has grades, materials, shops, artists, sets, tags, links, images, currency, acquisition/funding type.
+- **Pin** — central model. Has grades, shops, artists, sets, tags (including material-style tags via `TagCategory.material`), links, images, currency, acquisition/funding type.
 - **PinSet** — ordered pin collection. Global (admin) or personal (user). `owner_id` FK.
 - **User** — unique username, optional email/password (OAuth users may have no password), `is_admin`, `is_editor`.
 - **UserSession** — token (PK), user_id, expires_at.
 - **UserAuthProvider** — links User to Google/Discord accounts.
 - **UserOwnedPin** — owned pins per-grade with quantity and tradeable quantity.
 - **UserWantedPin** — wanted pins per-grade.
-- **Artist, Shop, Material, Tag, Grade, Currency, Link** — supporting entities.
-- **Tag** — hierarchical (self-referential `parent_id`).
+- **Artist, Shop, Tag, Grade, Currency, Link** — supporting entities.
+- **Tag** — hierarchical (self-referential `parent_id`); `TagCategory` includes `material` for finish/material (not a separate entity table).
 
 ## Deployment (Docker)
 The `app` service uses `env_file: .env` so variables from the project `.env` (e.g. `SECRET_KEY`, OAuth) are passed into the container. Values under `environment:` in `docker-compose.yaml` override the same keys from `.env` — so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).

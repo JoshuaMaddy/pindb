@@ -14,12 +14,15 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
 )
+from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.edit.artist")
 
 
 @router.get(path="/artist/{id}", response_model=None)
@@ -87,6 +90,7 @@ def post_edit_artist(
         assert_editor_can_edit(artist, current_user)
 
         if needs_pending_edit(artist, current_user):
+            LOGGER.info("Submitting pending edit for artist id=%d name=%r", id, name)
             return submit_pending_edit(
                 session=session,
                 entity=artist,
@@ -103,6 +107,7 @@ def post_edit_artist(
                 redirect_route="get_artist",
             )
 
+        LOGGER.info("Editing artist id=%d name=%r", id, name)
         artist.name = name
         artist.description = description
 

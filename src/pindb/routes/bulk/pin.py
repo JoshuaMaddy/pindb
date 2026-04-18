@@ -1,4 +1,3 @@
-import logging
 from datetime import date
 from typing import Sequence, TypeVar
 from uuid import UUID, uuid4
@@ -11,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pindb.auth import EditorUser
+from pindb.log import user_logger
 
-LOGGER = logging.getLogger("pindb.routes.bulk.pin")
+LOGGER = user_logger("pindb.routes.bulk.pin")
 
 from pindb.database import (
     Artist,
@@ -172,6 +172,7 @@ def get_bulk_pin(request: Request) -> HTMLResponse:
 @router.post(path="/pin/image")
 async def post_bulk_image(image: UploadFile = Form()) -> JSONResponse:
     guid: UUID = await save_image(file=image)
+    LOGGER.info("Bulk image upload guid=%s", guid)
     return JSONResponse(content={"guid": str(guid)})
 
 
@@ -186,6 +187,7 @@ async def post_bulk_pins(
     # via audit_events, so the bulk_id is effectively inert for admins; for
     # editors it groups the submitted pins (and new deps) in the approval queue.
     bulk_id: UUID = uuid4()
+    LOGGER.info("Bulk-creating %d pins bulk_id=%s", len(body.pins), bulk_id)
 
     with session_maker.begin() as session:
         for index, row in enumerate(body.pins):
@@ -283,6 +285,13 @@ async def post_bulk_pins(
 
     created = sum(1 for result in results if result.success)
     failed = sum(1 for result in results if not result.success)
+
+    LOGGER.info(
+        "Bulk pin submission complete bulk_id=%s created=%d failed=%d",
+        bulk_id,
+        created,
+        failed,
+    )
 
     return JSONResponse(
         content=BulkPinResult(

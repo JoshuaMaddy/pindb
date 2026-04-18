@@ -9,11 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from pindb.database import Shop, ShopAlias, session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import is_unique_violation, unique_constraint_response
+from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.search.update import update_shop
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.create.shop")
 
 
 @router.get(path="/shop")
@@ -42,6 +45,7 @@ def post_create_shop(
     ] = None,
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
+    LOGGER.info("Creating shop name=%r aliases=%s", name, aliases)
     try:
         with session_maker.begin() as session:
             new_links: set[Link] = (
@@ -66,6 +70,8 @@ def post_create_shop(
         return unique_constraint_response(request=request)
 
     update_shop(shop=shop)
+
+    LOGGER.info("Created shop id=%d name=%r", shop_id, name)
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_shop", id=shop_id))}

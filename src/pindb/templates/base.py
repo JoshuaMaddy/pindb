@@ -4,10 +4,15 @@ from pathlib import Path
 
 from fastapi import Request
 from htpy import BaseElement, body, div, head, html, link, meta, script
+from htpy import main as main_el
 from htpy import title as title_el
 from markupsafe import Markup
 
+from pindb.templates.components.bread_crumb import BreadCrumbLink, bread_crumb
+from pindb.templates.components.footer import footer
+from pindb.templates.components.navbar import navbar
 from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.templates.types import Content
 
 _TAG_CATEGORY_DATA_JS: str = (
     "window.TagCategoryData = "
@@ -41,9 +46,6 @@ with open(
 ) as _fp:
     _MARKDOWN_EDITOR_SCRIPT: str = _fp.read()
 
-from pindb.templates.components.bread_crumb import BreadCrumbLink, bread_crumb
-from pindb.templates.components.navbar import navbar
-from pindb.templates.types import Content
 
 _STARTUP_TIME = int(time.time())
 
@@ -95,10 +97,11 @@ def html_base(
             # marked (client-side markdown preview)
             script(src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"),
         ],
-        body()[
+        body(class_="min-h-screen flex flex-col")[
             navbar(request=request),
             bread_crumb(entries=bread_crumb_links),
-            body_content,
+            main_el(class_="min-h-screen")[body_content,],
+            footer(),
             div(
                 id="pindb-toast-host",
                 class_="sr-only",

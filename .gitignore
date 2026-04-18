@@ -24,3 +24,7 @@ main.css
 # Temp dirs
 scripts/images
 scripts/*.csv
+
+# Backups
+/backups
+*.dump

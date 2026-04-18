@@ -7,10 +7,13 @@ from sqlalchemy.exc import IntegrityError
 from pindb.database import Tag, TagAlias, TagCategory, session_maker
 from pindb.database.tag import normalize_tag_name
 from pindb.htmx_toast import is_unique_violation, unique_constraint_response
+from pindb.log import user_logger
 from pindb.search.update import update_tag
 from pindb.templates.create_and_edit.tag import tag_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.create.tag")
 
 
 @router.get(path="/tag")
@@ -35,6 +38,13 @@ def post_create_tag(
     implication_ids: list[int] = Form(default_factory=list),
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
+    LOGGER.info(
+        "Creating tag name=%r category=%s implications=%s aliases=%s",
+        name,
+        category.value,
+        implication_ids,
+        aliases,
+    )
     try:
         with session_maker.begin() as session:
             tag = Tag(
@@ -63,6 +73,8 @@ def post_create_tag(
         return unique_constraint_response(request=request)
 
     update_tag(tag=tag)
+
+    LOGGER.info("Created tag id=%d name=%r", tag_id, name)
 
     return HTMLResponse(
         headers={"HX-Redirect": str(request.url_for("get_tag", id=tag_id))}

@@ -68,6 +68,9 @@ class Configuration(BaseSettings):
     secret_key: str
     base_url: str = Field(default="http://localhost:8000")
 
+    # Legal / contact — shown in footer, privacy policy, ToS, DMCA notice
+    contact_email: str
+
     # Google OAuth (optional)
     google_client_id: str | None = Field(default=None)
     google_client_secret: str | None = Field(default=None)
@@ -92,6 +95,8 @@ class Configuration(BaseSettings):
     logging_date_format: str = Field(default="%d %b %Y | %H:%M:%S")
     logging_format: str = Field(default="%(asctime)s | %(name)s | %(message)s")
     log_file: str = Field(default="pindb.log")
+    log_file_max_bytes: int = Field(default=200 * 1024 * 1024)
+    log_file_backup_count: int = Field(default=7)
 
 
 try:

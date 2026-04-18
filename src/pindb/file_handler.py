@@ -28,6 +28,22 @@ def _make_thumbnail_bytes(data: bytes) -> bytes:
     return buf.getvalue()
 
 
+def _strip_metadata(data: bytes) -> bytes:
+    """Re-encode image without EXIF / ICC / XMP metadata.
+
+    Prevents leaking GPS coordinates, device info, and other embedded
+    metadata from user uploads. Preserves format (JPEG/PNG/WebP/etc) and
+    pixel data; drops everything else.
+    """
+    img = Image.open(io.BytesIO(data))
+    fmt = img.format or "JPEG"
+    clean = Image.new(img.mode, img.size)
+    clean.paste(img)
+    buf = io.BytesIO()
+    clean.save(buf, format=fmt)
+    return buf.getvalue()
+
+
 class FilesystemBackend:
     def __init__(self, directory: Path) -> None:
         self._dir = directory
@@ -139,9 +155,10 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
     data = await file.read() if isinstance(file, UploadFile) else file.read_bytes()
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image exceeds 20 MB limit")
+    stripped = _strip_metadata(data)
     file_uuid = uuid.uuid4()
     key = str(file_uuid)
     backend = get_backend()
-    backend.save(key, data)
-    backend.save(f"{key}{THUMBNAIL_SUFFIX}", _make_thumbnail_bytes(data))
+    backend.save(key, stripped)
+    backend.save(f"{key}{THUMBNAIL_SUFFIX}", _make_thumbnail_bytes(stripped))
     return file_uuid

@@ -22,6 +22,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.pin_writes import upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
+from pindb.log import user_logger
 from pindb.model_utils import (
     MagnitudeParseError,
     empty_str_list_to_none,
@@ -35,6 +36,8 @@ from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edi
 from pindb.templates.create_and_edit.pin import pin_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.edit.pin")
 
 
 _PIN_SELECTINLOADS = (
@@ -169,6 +172,7 @@ async def post_edit_pin(
         assert_editor_can_edit(pin, current_user)
 
         if needs_pending_edit(pin, current_user):
+            LOGGER.info("Submitting pending edit for pin id=%d name=%r", id, name)
             chain = get_edit_chain(session, "pins", id)
             old_snapshot: dict[str, object] = get_effective_snapshot(pin, chain)
 
@@ -221,6 +225,7 @@ async def post_edit_pin(
             )
 
         # Direct edit — admin, or editor on their own pending-new entry.
+        LOGGER.info("Editing pin id=%d name=%r", id, name)
         pin_shops: set[Shop] = set(
             session.scalars(
                 statement=select(Shop).where(Shop.id.in_(other=shop_ids))

@@ -20,11 +20,14 @@ from pindb.database.tag import (
     normalize_tag_name,
     resolve_implications,
 )
+from pindb.log import user_logger
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes.edit._pending_helpers import submit_pending_edit
 from pindb.templates.create_and_edit.tag import tag_form
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.edit.tag")
 
 
 @router.get(path="/tag/{id}", response_model=None)
@@ -90,6 +93,7 @@ def post_edit_tag(
         assert_editor_can_edit(tag, current_user)
 
         if needs_pending_edit(tag, current_user):
+            LOGGER.info("Submitting pending edit for tag id=%d name=%r", id, name)
             return submit_pending_edit(
                 session=session,
                 entity=tag,
@@ -109,6 +113,7 @@ def post_edit_tag(
                 redirect_route="get_tag",
             )
 
+        LOGGER.info("Editing tag id=%d name=%r category=%s", id, name, category.value)
         tag.name = normalize_tag_name(name)
         tag.description = description or None
         tag.category = category

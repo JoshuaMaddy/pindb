@@ -1,4 +1,3 @@
-import logging
 from datetime import date
 from typing import Annotated, Sequence
 from uuid import UUID
@@ -16,6 +15,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
+from pindb.log import user_logger
 from pindb.model_utils import (
     MagnitudeParseError,
     empty_str_list_to_none,
@@ -31,7 +31,7 @@ from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
-LOGGER = logging.getLogger(name="pindb.search.update")
+LOGGER = user_logger("pindb.routes.create.pin")
 
 
 @router.get(path="/pin")
@@ -107,7 +107,7 @@ async def post_create_pin(
     ] = None,
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
-    LOGGER.info(msg=f"Creating Pin with form: {await request.form()}")
+    LOGGER.info("Creating pin name=%r shops=%s artists=%s", name, shop_ids, artist_ids)
 
     try:
         width_mm = parse_magnitude_mm(field_label="Width", raw=width)
@@ -186,6 +186,8 @@ async def post_create_pin(
         )
     if created_pin is not None:
         update_pin(pin=created_pin)
+
+    LOGGER.info("Created pin id=%d name=%r", pin_id, name)
 
     return HTMLResponse(
         headers={

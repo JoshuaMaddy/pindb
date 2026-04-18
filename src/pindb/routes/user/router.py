@@ -11,8 +11,9 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 
-from pindb.auth import AuthenticatedUser, CurrentUser
+from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
 from pindb.database import PinSet, User, session_maker
+from pindb.database.erasure import erase_user_account
 from pindb.database.user_pin_queries import (
     count_favorites,
     count_owned,
@@ -54,6 +55,24 @@ def update_user_settings(
         if user is not None:
             user.theme = theme
     return Response(status_code=204)
+
+
+@router.post("/me/delete-account", response_model=None, name="delete_own_account")
+def delete_own_account(
+    current_user: AuthenticatedUser,
+    confirm_username: Annotated[str, Form()],
+) -> RedirectResponse:
+    """GDPR account erasure initiated by the logged-in user."""
+    if confirm_username != current_user.username:
+        raise HTTPException(status_code=400, detail="Username does not match")
+    with session_maker.begin() as session:
+        user: User | None = session.get(User, current_user.id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        erase_user_account(session=session, user_id=current_user.id)
+    response = RedirectResponse(url="/", status_code=303)
+    clear_session_cookie(response)
+    return response
 
 
 # Mount sub-routers BEFORE the catch-all profile route so that paths like

@@ -13,7 +13,7 @@ Images must be in a sibling `Images/` folder.
 | `currency` | string | yes | ISO 4217 currency code (e.g. `USD`) |
 | `grades` | string | yes | See [Grades](#grades) |
 | `shops` | string | yes | Comma-separated shop names (e.g. `Shop A, Shop B`) |
-| `materials` | string | yes | Comma-separated material names (e.g. `Hard Enamel, Gold`) |
+| `materials` | string | yes | Comma-separated tag names (legacy column name; e.g. `Hard Enamel, Gold`) merged with `tags` when attaching to a pin |
 | `tags` | string | yes | Comma-separated tag names |
 | `pin_sets` | string | yes | Comma-separated pin set names |
 | `artists` | string | yes | Comma-separated artist names |

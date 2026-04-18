@@ -19,7 +19,6 @@ DST = "postgresql+psycopg://pindb:kjsdfhklyhuaJHjkfhdesf@localhost:5433/pindb"
 TABLES = [
     "currencies",
     "grades",
-    "materials",
     "shops",
     "artists",
     "tags",  # self-referential parent_id — handled via deferred FK check
@@ -36,7 +35,6 @@ TABLES = [
     "pins_links",
     "pins_artists",
     "pins_grades",
-    "pins_materials",
     "pins_shops",
     "pins_tags",
     "pin_set_memberships",

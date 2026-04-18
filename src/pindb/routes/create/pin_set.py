@@ -4,9 +4,12 @@ from fastapi.routing import APIRouter
 
 from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
+from pindb.log import user_logger
 from pindb.search.update import update_pin_set
 
 router = APIRouter()
+
+LOGGER = user_logger("pindb.routes.create.pin_set")
 
 
 @router.get(path="/pin_set")
@@ -22,6 +25,7 @@ def post_create_pin_set(
     name: str = Form(),
     description: str | None = Form(default=None),
 ) -> RedirectResponse:
+    LOGGER.info("Creating pin_set name=%r", name)
     with session_maker.begin() as session:
         pin_set = PinSet(
             name=name.strip(),
@@ -32,6 +36,7 @@ def post_create_pin_set(
         set_id: int = pin_set.id
 
     update_pin_set(pin_set=pin_set)
+    LOGGER.info("Created pin_set id=%d name=%r", set_id, name)
 
     return RedirectResponse(
         url=str(request.url_for("get_edit_set", set_id=set_id)),

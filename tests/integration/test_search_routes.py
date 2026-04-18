@@ -37,7 +37,6 @@ class TestSearchPin:
                     "id": pin.id,  # ty:ignore[unresolved-attribute]
                     "name": pin.name,
                     "shops": [],
-                    "materials": [],
                     "tags": [],
                     "artists": [],
                     "description": None,
