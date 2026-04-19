@@ -22,22 +22,22 @@ from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.joins import pins_tags
 from pindb.database.link import Link
-from pindb.database.pin_writes import upsert_grades
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
+from pindb.database.pin_writes import upsert_grades
 from pindb.database.shop import Shop
 from pindb.database.tag import (
     Tag,
     TagAlias,
     TagCategory,
-    apply_pin_tags,
     _cascade_remove_implied,
+    apply_pin_tags,
+    replace_tag_aliases,
     resolve_implications,
 )
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
-
 
 # ---------------------------------------------------------------------------
 # Snapshot construction
@@ -351,7 +351,11 @@ def _apply_tag_snapshot_in_memory(
             .execution_options(include_pending=True)
         ).all()
     )
-    tag.aliases = [TagAlias(alias=alias_name) for alias_name in snapshot["aliases"]]
+    attributes.set_committed_value(
+        tag,
+        "aliases",
+        [TagAlias(alias=alias_name) for alias_name in snapshot["aliases"]],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +480,7 @@ def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) 
         ).all()
     )
     tag.implications = implied_tags
-    tag.aliases = [TagAlias(alias=alias_name) for alias_name in snapshot["aliases"]]
+    replace_tag_aliases(tag=tag, aliases=snapshot["aliases"], session=session)
 
     new_implication_ids: set[int] = {implied_tag.id for implied_tag in implied_tags}
     newly_added_ids: set[int] = new_implication_ids - old_implication_ids

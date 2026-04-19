@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy.exc import IntegrityError
-
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from htpy import div
+from sqlalchemy.exc import IntegrityError
 
 
 def is_unique_violation(exc: IntegrityError) -> bool:

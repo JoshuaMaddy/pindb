@@ -17,6 +17,7 @@ Tag system overhaul:
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "c9d4e5f6a7b8"

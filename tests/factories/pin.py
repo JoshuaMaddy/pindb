@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import uuid
-
-import factory
-import tests.factories.base as _factory_base
-from sqlalchemy import select
-
 from datetime import datetime, timezone
 
+import factory
+from sqlalchemy import select
+
+import tests.factories.base as _factory_base
 from pindb.database.currency import Currency
 from pindb.database.pin import Pin
 from pindb.models.acquisition_type import AcquisitionType

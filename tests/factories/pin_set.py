@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import factory
-import tests.factories.base as _factory_base
 
+import tests.factories.base as _factory_base
 from pindb.database.pin_set import PinSet
 from tests.factories.base import BaseFactory
 

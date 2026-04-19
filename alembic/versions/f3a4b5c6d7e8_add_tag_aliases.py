@@ -10,6 +10,7 @@ Add tag_aliases table for storing alternate names for tags.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "f3a4b5c6d7e8"

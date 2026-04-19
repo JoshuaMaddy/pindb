@@ -10,6 +10,7 @@ NOTE: Image files are NOT copied by this script — copy them manually:
 """
 
 import sys
+
 from sqlalchemy import create_engine, text
 
 SRC = "postgresql+psycopg://postgres:Pa$$i$cool1@localhost/postgres"

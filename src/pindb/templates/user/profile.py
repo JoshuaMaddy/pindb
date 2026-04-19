@@ -9,7 +9,6 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
-from pindb.templates.user.pin_list_pages import unique_pins
 from pindb.templates.components.card import card
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
@@ -19,6 +18,7 @@ from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.pin_preview_card import pin_preview_card
 from pindb.templates.components.thumbnail_grid import thumbnail_grid
+from pindb.templates.user.pin_list_pages import unique_pins
 
 
 def user_profile_page(

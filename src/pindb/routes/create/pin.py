@@ -6,6 +6,8 @@ from fastapi import Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from pindb.database import Artist, Shop, session_maker
 from pindb.database.currency import Currency
@@ -26,8 +28,6 @@ from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.search.update import update_pin
 from pindb.templates.create_and_edit.pin import pin_form
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 

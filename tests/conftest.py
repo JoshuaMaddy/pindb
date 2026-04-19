@@ -39,9 +39,8 @@ os.makedirs(os.environ.get("IMAGE_DIRECTORY", "/tmp/pindb_test_images"), exist_o
 #
 # Fix: use importlib.import_module() which looks up sys.modules["pindb.search.X"]
 # directly, bypassing the shadowed attribute.
-from pindb import app  # noqa: E402  — this triggers all transitive imports
-
 import pindb.database as _pindb_db  # noqa: E402  — safe; no attribute shadowing
+from pindb import app  # noqa: E402  — this triggers all transitive imports
 
 # Must use importlib to avoid the pindb.search attribute-shadowing issue described above.
 _search_update = importlib.import_module("pindb.search.update")

@@ -16,11 +16,10 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from pindb.database.joins import pins_artists
+from pindb.database.joins import pin_set_memberships, pins_artists
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
 from pindb.database.tag import TagCategory
-from pindb.database.joins import pin_set_memberships
 from tests.factories.artist import ArtistFactory
 from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PinSetFactory

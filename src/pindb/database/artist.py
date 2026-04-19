@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
+    Session,
     mapped_column,
     object_session,
     relationship,
@@ -14,9 +15,9 @@ from sqlalchemy.orm import (
 
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
-from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import artists_links, pins_artists
 from pindb.database.link import Link
+from pindb.database.pending_mixin import PendingMixin
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
@@ -24,10 +25,15 @@ if TYPE_CHECKING:
 
 class ArtistAlias(MappedAsDataclass, Base):
     __tablename__ = "artist_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "artist_id", "alias", name="uq_artist_aliases_artist_id_alias"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     artist_id: Mapped[int] = mapped_column(ForeignKey("artists.id"), init=False)
-    alias: Mapped[str] = mapped_column(unique=True)
+    alias: Mapped[str] = mapped_column()
 
     def __rich_repr__(self) -> Result:
         yield "id", self.id
@@ -94,3 +100,21 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             yield "number_of_pins", len(self.pins)
             yield "aliases", self.aliases, []
             yield "links", self.links, set()
+
+
+def replace_artist_aliases(
+    artist: Artist, aliases: Iterable[str], session: Session
+) -> None:
+    """Replace persisted aliases for ``artist`` (see ``replace_tag_aliases``)."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in aliases:
+        a = raw.strip()
+        if not a or a in seen:
+            continue
+        seen.add(a)
+        cleaned.append(a)
+    for existing in list(artist.aliases):
+        session.delete(existing)
+    session.flush()
+    artist.aliases = [ArtistAlias(alias=a) for a in cleaned]

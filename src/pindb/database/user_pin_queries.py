@@ -14,7 +14,6 @@ from pindb.database.pin import Pin
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 
-
 # ---------------------------------------------------------------------------
 # Favorites
 # ---------------------------------------------------------------------------

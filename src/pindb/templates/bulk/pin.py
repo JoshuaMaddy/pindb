@@ -21,8 +21,8 @@ from htpy import (
 from markupsafe import Markup
 
 from pindb.database.currency import Currency
-from pindb.models import AcquisitionType, FundingType
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
+from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 
 with open(

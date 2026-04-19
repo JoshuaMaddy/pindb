@@ -1,7 +1,6 @@
+import nh3
 from markdown_it import MarkdownIt
 from markupsafe import Markup
-
-import nh3
 
 _md = MarkdownIt()
 

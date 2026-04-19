@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import factory
-import tests.factories.base as _factory_base
 
+import tests.factories.base as _factory_base
 from pindb.database.tag import Tag, TagAlias, TagCategory
 from tests.factories.base import BaseFactory
 

@@ -2,20 +2,13 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
-
-# Load pindb config for the database URL
-from pindb.config import CONFIGURATION
-
-# Import Base and all models so they register with Base.metadata.
-# Import individual model modules directly to avoid the side effects
-# (engine creation, seeding) in pindb.database.__init__.
-from pindb.database.base import Base
 import pindb.database.artist  # noqa: F401
+import pindb.database.change_log  # noqa: F401
 import pindb.database.currency  # noqa: F401
 import pindb.database.grade  # noqa: F401
 import pindb.database.joins  # noqa: F401
 import pindb.database.link  # noqa: F401
+import pindb.database.pending_edit  # noqa: F401
 import pindb.database.pin  # noqa: F401
 import pindb.database.pin_set  # noqa: F401
 import pindb.database.session  # noqa: F401
@@ -25,8 +18,15 @@ import pindb.database.user  # noqa: F401
 import pindb.database.user_auth_provider  # noqa: F401
 import pindb.database.user_owned_pin  # noqa: F401
 import pindb.database.user_wanted_pin  # noqa: F401
-import pindb.database.change_log  # noqa: F401
-import pindb.database.pending_edit  # noqa: F401
+from alembic import context
+
+# Load pindb config for the database URL
+from pindb.config import CONFIGURATION
+
+# Import Base and all models so they register with Base.metadata.
+# Import individual model modules directly to avoid the side effects
+# (engine creation, seeding) in pindb.database.__init__.
+from pindb.database.base import Base
 
 config = context.config
 

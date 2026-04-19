@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey
 from rich.repr import Result
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -14,9 +14,9 @@ from sqlalchemy.orm import (
 
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
-from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import pin_set_memberships, pin_sets_links
 from pindb.database.link import Link
+from pindb.database.pending_mixin import PendingMixin
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin

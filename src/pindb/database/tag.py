@@ -4,7 +4,17 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import Enum as SQLAlchemyEnum, ForeignKey, Index, delete, insert, select
+from sqlalchemy import (
+    Enum as SQLAlchemyEnum,
+)
+from sqlalchemy import (
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    delete,
+    insert,
+    select,
+)
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -35,10 +45,13 @@ class TagCategory(str, Enum):
 
 class TagAlias(MappedAsDataclass, Base):
     __tablename__ = "tag_aliases"
+    __table_args__ = (
+        UniqueConstraint("tag_id", "alias", name="uq_tag_aliases_tag_id_alias"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id"), init=False)
-    alias: Mapped[str] = mapped_column(unique=True)
+    alias: Mapped[str] = mapped_column()
 
     def __rich_repr__(self) -> Result:
         yield "id", self.id
@@ -49,6 +62,28 @@ class TagAlias(MappedAsDataclass, Base):
 def normalize_tag_name(name: str) -> str:
     """Normalize to e621 form: lowercase, spaces → underscores."""
     return name.strip().lower().replace(" ", "_")
+
+
+def replace_tag_aliases(tag: Tag, aliases: Iterable[str], session: Session) -> None:
+    """Replace persisted aliases for ``tag``.
+
+    ``(tag_id, alias)`` is unique. Assigning ``tag.aliases = [...]`` with new
+    instances can flush INSERTs before DELETEs on the old rows, causing a
+    duplicate-key error when the alias strings are unchanged. Delete and flush
+    first, then attach replacements.
+    """
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in aliases:
+        n = normalize_tag_name(raw)
+        if not n or n in seen:
+            continue
+        seen.add(n)
+        normalized.append(n)
+    for existing in list(tag.aliases):
+        session.delete(existing)
+    session.flush()
+    tag.aliases = [TagAlias(alias=n) for n in normalized]
 
 
 class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):

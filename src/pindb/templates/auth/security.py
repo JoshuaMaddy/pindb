@@ -24,7 +24,6 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.error_message import error_message
 
-
 _PROVIDER_LABELS = {
     OAuthProvider.google: "Google",
     OAuthProvider.discord: "Discord",

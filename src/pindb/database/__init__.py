@@ -9,14 +9,14 @@ from sqlalchemy.orm.session import Session, sessionmaker
 from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist, ArtistAlias
 from pindb.database.audit_mixin import AuditMixin
-from pindb.database.pending_mixin import PendingMixin
 from pindb.database.base import Base
-from pindb.database.entity_type import EntityType
 from pindb.database.change_log import ChangeLog
-from pindb.database.pending_edit import PendingEdit
 from pindb.database.currency import Currency
+from pindb.database.entity_type import EntityType
 from pindb.database.grade import Grade
 from pindb.database.link import Link
+from pindb.database.pending_edit import PendingEdit
+from pindb.database.pending_mixin import PendingMixin
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.session import UserSession

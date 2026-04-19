@@ -10,10 +10,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pindb.auth import EditorUser
-from pindb.log import user_logger
-
-LOGGER = user_logger("pindb.routes.bulk.pin")
-
 from pindb.database import (
     Artist,
     PinSet,
@@ -28,11 +24,14 @@ from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.tag import apply_pin_tags, normalize_tag_name
 from pindb.file_handler import save_image
+from pindb.log import user_logger
 from pindb.model_utils import parse_magnitude_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.search.update import TAGS_INDEX
 from pindb.templates.bulk.pin import bulk_pin_page
+
+LOGGER = user_logger("pindb.routes.bulk.pin")
 
 _NameOnly = TypeVar("_NameOnly", Artist, Tag, Shop, PinSet)
 

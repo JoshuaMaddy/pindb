@@ -34,10 +34,10 @@ from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
-from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.page_heading import page_heading
+from pindb.templates.list.base import TABLE_LIST_SCROLL
 
 
 @dataclass

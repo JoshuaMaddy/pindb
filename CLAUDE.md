@@ -8,6 +8,7 @@ PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **h
 ## After Every Python Change
 Always run both linters before considering a task done:
 ```bash
+uvx ruff check --select I --fix .
 uvx ruff format .
 uvx ty check
 ```
@@ -336,7 +337,7 @@ Pending items appear in create/edit form selection lists with a `(P) ` name pref
 - **UserOwnedPin** — owned pins per-grade with quantity and tradeable quantity.
 - **UserWantedPin** — wanted pins per-grade.
 - **Artist, Shop, Tag, Grade, Currency, Link** — supporting entities.
-- **Tag** — hierarchical (self-referential `parent_id`); `TagCategory` includes `material` for finish/material (not a separate entity table).
+- **Tag** — hierarchical (self-referential `parent_id`); `TagCategory` includes `material` for finish/material (not a separate entity table). Aliases on tags (`tag_aliases`), shops (`shop_aliases`), and artists (`artist_aliases`) are unique per `(entity_id, alias)`; the same alias string may appear on different entities.
 
 ## Deployment (Docker)
 The `app` service uses `env_file: .env` so variables from the project `.env` (e.g. `SECRET_KEY`, OAuth) are passed into the container. Values under `environment:` in `docker-compose.yaml` override the same keys from `.env` — so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).

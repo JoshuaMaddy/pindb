@@ -8,7 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
-/dev
+# Pokemon tag pipeline: keep CSV + generated JSON local; scripts in dev/ are tracked.
+/dev/*
+!/dev/export_pokemon_tags.py
+!/dev/tag_format.py
 *.sqlite
 
 # Node

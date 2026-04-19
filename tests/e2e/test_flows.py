@@ -18,7 +18,6 @@ from playwright.sync_api import expect
 
 from tests.e2e._pages import set_markdown_field, submit_content_form
 
-
 # ---------------------------------------------------------------------------
 # 1. Auth: signup + login + logout round-trip.
 # ---------------------------------------------------------------------------

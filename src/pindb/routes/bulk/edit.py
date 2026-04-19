@@ -24,18 +24,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import AdminUser, EditorUser
-from pindb.log import user_logger
-from pindb.model_utils import MagnitudeParseError
 from pindb.database import session_maker
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_edit_utils import (
     compute_patch,
-    get_effective_snapshot,
     get_edit_chain,
+    get_effective_snapshot,
     get_head_edit,
 )
 from pindb.database.pin import Pin
 from pindb.database.tag import Tag, apply_pin_tags
+from pindb.log import user_logger
+from pindb.model_utils import MagnitudeParseError
 from pindb.routes.bulk._helpers import (
     BULK_SCALAR_FIELDS,
     BulkEditSource,

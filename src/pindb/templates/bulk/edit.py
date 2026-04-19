@@ -29,9 +29,9 @@ from htpy import (
 from markupsafe import Markup
 
 from pindb.database.tag import Tag
+from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
-from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.routes.bulk._helpers import TagMode
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div

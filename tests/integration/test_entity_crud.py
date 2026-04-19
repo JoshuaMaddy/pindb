@@ -3,6 +3,8 @@ artist, tag). Pin CRUD is covered separately in `test_pin_crud.py`."""
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from sqlalchemy import select
 
@@ -62,6 +64,29 @@ class TestShopCrud:
         assert refreshed.name == "After"
         assert refreshed.description == "updated"
 
+    def test_two_shops_may_share_same_alias_string(self, db_session, admin_user):
+        s1 = cast(
+            Shop,
+            ShopFactory(
+                name="Alias Shop One",
+                approved=True,
+                created_by=admin_user,
+                aliases=["Shared"],
+            ),
+        )
+        s2 = cast(
+            Shop,
+            ShopFactory(
+                name="Alias Shop Two",
+                approved=True,
+                created_by=admin_user,
+                aliases=["Shared"],
+            ),
+        )
+        db_session.flush()
+        assert {a.alias for a in s1.aliases} == {"Shared"}
+        assert {a.alias for a in s2.aliases} == {"Shared"}
+
 
 @pytest.mark.integration
 class TestArtistCrud:
@@ -94,6 +119,29 @@ class TestArtistCrud:
         refreshed = _refetch(db_session, Artist, artist_id)
         assert refreshed is not None
         assert refreshed.name == "Vincent van Gogh"
+
+    def test_two_artists_may_share_same_alias_string(self, db_session, admin_user):
+        a1 = cast(
+            Artist,
+            ArtistFactory(
+                name="Artist Alias One",
+                approved=True,
+                created_by=admin_user,
+                aliases=["Shared"],
+            ),
+        )
+        a2 = cast(
+            Artist,
+            ArtistFactory(
+                name="Artist Alias Two",
+                approved=True,
+                created_by=admin_user,
+                aliases=["Shared"],
+            ),
+        )
+        db_session.flush()
+        assert {x.alias for x in a1.aliases} == {"Shared"}
+        assert {x.alias for x in a2.aliases} == {"Shared"}
 
 
 @pytest.mark.integration

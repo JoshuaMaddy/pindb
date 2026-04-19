@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div, fragment, i, p, span, code
+from htpy import Element, code, div, fragment, i, p, span
 
 from pindb.database import User
 from pindb.database.pin import Pin
@@ -23,7 +23,6 @@ from pindb.templates.components.tag_branding import (
     CATEGORY_ICONS,
     category_badge,
 )
-
 
 _RELATION_CAP = 5
 

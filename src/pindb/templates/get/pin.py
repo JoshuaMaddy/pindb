@@ -15,6 +15,7 @@ from htpy import (
     td,
     tr,
 )
+
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User

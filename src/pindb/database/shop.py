@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey, Index
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
+    Session,
     mapped_column,
     object_session,
     relationship,
@@ -14,9 +15,9 @@ from sqlalchemy.orm import (
 
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
-from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import pins_shops, shops_links
 from pindb.database.link import Link
+from pindb.database.pending_mixin import PendingMixin
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
@@ -24,10 +25,13 @@ if TYPE_CHECKING:
 
 class ShopAlias(MappedAsDataclass, Base):
     __tablename__ = "shop_aliases"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "alias", name="uq_shop_aliases_shop_id_alias"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), init=False)
-    alias: Mapped[str] = mapped_column(unique=True)
+    alias: Mapped[str] = mapped_column()
 
     def __rich_repr__(self) -> Result:
         yield "id", self.id
@@ -108,3 +112,19 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             yield "number_of_pins", len(self.pins)
             yield "aliases", self.aliases, []
             yield "links", self.links, set()
+
+
+def replace_shop_aliases(shop: Shop, aliases: Iterable[str], session: Session) -> None:
+    """Replace persisted aliases for ``shop`` (see ``replace_tag_aliases``)."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in aliases:
+        a = raw.strip()
+        if not a or a in seen:
+            continue
+        seen.add(a)
+        cleaned.append(a)
+    for existing in list(shop.aliases):
+        session.delete(existing)
+    session.flush()
+    shop.aliases = [ShopAlias(alias=a) for a in cleaned]

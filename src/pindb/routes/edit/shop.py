@@ -8,12 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Shop, ShopAlias, session_maker
+from pindb.database import Shop, session_maker
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
     get_edit_chain,
     get_effective_snapshot,
 )
+from pindb.database.shop import replace_shop_aliases
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
@@ -115,7 +116,7 @@ def post_edit_shop(
 
         replace_links(entity=shop, urls=links, session=session)
 
-        shop.aliases = [ShopAlias(alias=alias) for alias in aliases if alias.strip()]
+        replace_shop_aliases(shop=shop, aliases=aliases, session=session)
 
         session.flush()
         shop_id: int = shop.id

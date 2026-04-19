@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import factory
-import tests.factories.base as _factory_base
 
-from pindb.database.artist import Artist
+import tests.factories.base as _factory_base
+from pindb.database.artist import Artist, ArtistAlias
 from tests.factories.base import BaseFactory
 
 
@@ -28,6 +28,7 @@ class ArtistFactory(BaseFactory):
     def _create(cls, model_class, *args, **kwargs):
         approved = kwargs.pop("approved", True)
         created_by = kwargs.pop("created_by", None)
+        aliases: list[str] = kwargs.pop("aliases", []) or []
         artist = super()._create(model_class, *args, **kwargs)
         session = _factory_base._current_session
         if created_by is not None:
@@ -39,5 +40,7 @@ class ArtistFactory(BaseFactory):
         else:
             artist.approved_at = None
             artist.approved_by_id = None
+        if aliases:
+            artist.aliases = [ArtistAlias(alias=a) for a in aliases]
         session.flush()
         return artist

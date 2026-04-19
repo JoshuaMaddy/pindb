@@ -17,7 +17,6 @@ from sqlalchemy.orm import (
 
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
-from pindb.database.pending_mixin import PendingMixin
 from pindb.database.joins import (
     pin_set_memberships,
     pins_artists,
@@ -26,6 +25,7 @@ from pindb.database.joins import (
     pins_shops,
     pins_tags,
 )
+from pindb.database.pending_mixin import PendingMixin
 from pindb.models import AcquisitionType, FundingType
 
 if TYPE_CHECKING:

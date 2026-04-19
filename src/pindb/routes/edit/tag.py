@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Tag, TagAlias, TagCategory, session_maker
+from pindb.database import Tag, TagCategory, session_maker
 from pindb.database.joins import pins_tags
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
@@ -18,6 +18,7 @@ from pindb.database.pending_edit_utils import (
 from pindb.database.tag import (
     _cascade_remove_implied,
     normalize_tag_name,
+    replace_tag_aliases,
     resolve_implications,
 )
 from pindb.log import user_logger
@@ -162,11 +163,7 @@ def post_edit_tag(
         if removed_ids:
             _cascade_remove_implied(tag.id, removed_ids, session)
 
-        tag.aliases = [
-            TagAlias(alias=normalize_tag_name(alias))
-            for alias in aliases
-            if alias.strip()
-        ]
+        replace_tag_aliases(tag=tag, aliases=aliases, session=session)
 
         session.flush()
         tag_id: int = tag.id

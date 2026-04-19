@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 
+from pindb.model_utils import MagnitudeParseError
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
-from pindb.model_utils import MagnitudeParseError
 from pindb.routes.bulk._helpers import (
     BULK_SCALAR_FIELDS,
     TagMode,

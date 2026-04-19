@@ -976,7 +976,7 @@ wheels = [
 
 [[package]]
 name = "pindb"
-version = "0.1.2b0"
+version = "0.1.3b0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

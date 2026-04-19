@@ -1,4 +1,5 @@
 from typing import Sequence
+
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter

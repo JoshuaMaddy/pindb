@@ -3,8 +3,8 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, UniqueConstraint
 from rich.repr import Result
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
 from pindb.database.audit_mixin import AuditMixin

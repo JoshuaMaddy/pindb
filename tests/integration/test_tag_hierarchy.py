@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from sqlalchemy import select
 
@@ -10,6 +12,7 @@ from pindb.database.joins import pins_tags
 from pindb.database.tag import (
     apply_pin_tags,
     normalize_tag_name,
+    replace_tag_aliases,
     resolve_implications,
 )
 from tests.factories.pin import PinFactory
@@ -45,6 +48,51 @@ class TestTagAliases:
         refreshed = db_session.get(Tag, tag.id)  # ty:ignore[unresolved-attribute]
         assert refreshed is not None
         assert {a.alias for a in refreshed.aliases} == {"synonym", "nickname"}
+
+    def test_replace_tag_aliases_keeps_same_strings_without_conflict(
+        self, db_session, admin_user
+    ):
+        """Regression: re-saving unchanged aliases must not hit uq_tag_aliases_tag_id_alias."""
+        tag = cast(
+            Tag,
+            TagFactory(
+                name="jigglypuff_alias_test",
+                approved=True,
+                created_by=admin_user,
+                aliases=["pippi", "piepi"],
+            ),
+        )
+        db_session.flush()
+        replace_tag_aliases(
+            tag=tag,
+            aliases=["pippi", "piepi", "ピッピ"],
+            session=db_session,
+        )
+        db_session.flush()
+        assert {a.alias for a in tag.aliases} == {"pippi", "piepi", "ピッピ"}
+
+    def test_two_tags_may_use_the_same_alias_string(self, db_session, admin_user):
+        t1 = cast(
+            Tag,
+            TagFactory(
+                name="eevee_a",
+                approved=True,
+                created_by=admin_user,
+                aliases=["goupix"],
+            ),
+        )
+        t2 = cast(
+            Tag,
+            TagFactory(
+                name="flareon_b",
+                approved=True,
+                created_by=admin_user,
+                aliases=["goupix"],
+            ),
+        )
+        db_session.flush()
+        assert {a.alias for a in t1.aliases} == {"goupix"}
+        assert {a.alias for a in t2.aliases} == {"goupix"}
 
 
 @pytest.mark.integration

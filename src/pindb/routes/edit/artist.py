@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Artist, ArtistAlias, session_maker
+from pindb.database import Artist, session_maker
+from pindb.database.artist import replace_artist_aliases
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
     get_edit_chain,
@@ -113,9 +114,7 @@ def post_edit_artist(
 
         replace_links(entity=artist, urls=links, session=session)
 
-        artist.aliases = [
-            ArtistAlias(alias=alias) for alias in aliases if alias.strip()
-        ]
+        replace_artist_aliases(artist=artist, aliases=aliases, session=session)
 
         session.flush()
         artist_id: int = artist.id

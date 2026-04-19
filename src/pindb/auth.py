@@ -6,6 +6,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response
+
 from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.database import UserSession
 from pindb.database import session_maker as db_session_maker

@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
+from sqlalchemy import select
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
 from pindb.database import PinSet, User, session_maker
@@ -25,7 +26,6 @@ from pindb.database.user_pin_queries import (
 from pindb.routes.user.lists import router as lists_router
 from pindb.routes.user.sets import router as sets_router
 from pindb.templates.user.profile import VALID_THEME_VALUES, user_profile_page
-from sqlalchemy import select
 
 router = APIRouter(prefix="/user", tags=["user"])
 

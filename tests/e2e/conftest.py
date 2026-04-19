@@ -29,8 +29,8 @@ import tempfile
 import time
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
-
 from typing import Any
+
 import httpx
 import pytest
 

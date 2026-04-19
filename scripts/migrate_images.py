@@ -17,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pindb.config import CONFIGURATION
 from pindb.file_handler import (
+    THUMBNAIL_SUFFIX,
     FilesystemBackend,
     R2Backend,
-    THUMBNAIL_SUFFIX,
     _make_thumbnail_bytes,
 )
 

@@ -30,13 +30,12 @@ from pindb.database import Artist, Shop, Tag
 from pindb.database.currency import Currency
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
+from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
-
-from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 
 with open(
     file=Path(__file__).parent.parent / "js/pin_creation.js",

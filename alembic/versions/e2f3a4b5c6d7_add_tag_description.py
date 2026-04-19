@@ -10,6 +10,7 @@ Add nullable description column to tags table.
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "e2f3a4b5c6d7"
