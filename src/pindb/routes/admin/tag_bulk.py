@@ -8,7 +8,7 @@ from json import JSONDecodeError
 from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import literal, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
@@ -41,6 +41,16 @@ class TagUpsertNode(BaseModel):
 
 class BulkTagUpsertBody(BaseModel):
     tags: list[TagUpsertNode]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_shorthand(cls, data: object) -> object:
+        """Accept `{...}` (single node) or `[...]` (list of nodes) as shorthand for `{"tags": [...]}`."""
+        if isinstance(data, list):
+            return {"tags": data}
+        if isinstance(data, dict) and "tags" not in data and "name" in data:
+            return {"tags": [data]}
+        return data
 
 
 class BulkTagUpsertResult(BaseModel):
