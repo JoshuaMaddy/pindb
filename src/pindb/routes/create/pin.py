@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated, Sequence
 from uuid import UUID
 
-from fastapi import Form, HTTPException, Request, UploadFile
+from fastapi import Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from pydantic import BeforeValidator
@@ -15,7 +15,7 @@ from pindb.database.grade import Grade
 from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
-from pindb.database.tag import apply_pin_tags
+from pindb.database.tag import Tag, apply_pin_tags
 from pindb.file_handler import save_image
 from pindb.log import user_logger
 from pindb.model_utils import (
@@ -35,7 +35,10 @@ LOGGER = user_logger("pindb.routes.create.pin")
 
 
 @router.get(path="/pin")
-def get_create_pin(request: Request) -> HTMLResponse:
+def get_create_pin(
+    request: Request,
+    duplicate_from: int | None = Query(default=None),
+) -> HTMLResponse:
     with session_maker() as session:
         currencies: Sequence[Currency] = session.scalars(
             statement=select(Currency)
@@ -45,16 +48,46 @@ def get_create_pin(request: Request) -> HTMLResponse:
             request.url_for("get_entity_options", entity_type="placeholder")
         ).removesuffix("/placeholder")
 
+        duplicate_source: Pin | None = None
+        prefill_shops: list[Shop] = []
+        prefill_tags: list[Tag] = []
+        prefill_pin_sets: list[PinSet] = []
+        prefill_artists: list[Artist] = []
+        if duplicate_from is not None:
+            duplicate_source = session.scalar(
+                select(Pin)
+                .where(Pin.id == duplicate_from)
+                .options(
+                    selectinload(Pin.shops),
+                    selectinload(Pin.explicit_tags),
+                    selectinload(Pin.artists),
+                    selectinload(Pin.sets),
+                    selectinload(Pin.links),
+                    selectinload(Pin.grades),
+                    selectinload(Pin.currency),
+                )
+            )
+            if duplicate_source is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Pin {duplicate_from} not found to duplicate.",
+                )
+            prefill_shops = list(duplicate_source.shops)
+            prefill_tags = list(duplicate_source.explicit_tags)
+            prefill_pin_sets = list(duplicate_source.sets)
+            prefill_artists = list(duplicate_source.artists)
+
         return HTMLResponse(
             content=pin_form(
                 post_url=request.url_for("post_create_pin"),
-                shops=[],
-                pin_sets=[],
-                tags=[],
+                shops=prefill_shops,
+                pin_sets=prefill_pin_sets,
+                tags=prefill_tags,
                 currencies=currencies,
-                artists=[],
+                artists=prefill_artists,
                 options_base_url=options_base_url,
                 request=request,
+                duplicate_source=duplicate_source,
             )
         )
 

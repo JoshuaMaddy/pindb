@@ -249,6 +249,17 @@ def pin_page(
                                 href=str(request.url_for("get_edit_pin", id=pin.id)),
                             ),
                             user
+                            and (user.is_admin or user.is_editor)
+                            and icon_button(
+                                icon="copy",
+                                title="Duplicate pin (prefills a new pin form, minus images)",
+                                href=str(
+                                    request.url_for(
+                                        "get_create_pin"
+                                    ).include_query_params(duplicate_from=pin.id)
+                                ),
+                            ),
+                            user
                             and user.is_admin
                             and confirm_modal(
                                 trigger=icon_button(

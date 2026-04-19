@@ -24,6 +24,22 @@ class TestAdminPanel:
 
 
 @pytest.mark.integration
+class TestAdminBulkTagsPage:
+    def test_unauthenticated_returns_401(self, client):
+        response = client.get("/admin/tags/bulk")
+        assert response.status_code == 401
+
+    def test_non_admin_returns_403(self, auth_client):
+        response = auth_client.get("/admin/tags/bulk")
+        assert response.status_code == 403
+
+    def test_admin_returns_200(self, admin_client):
+        response = admin_client.get("/admin/tags/bulk")
+        assert response.status_code == 200
+        assert "Bulk tags" in response.text
+
+
+@pytest.mark.integration
 class TestAdminSearchSync:
     def test_unauthenticated_returns_401(self, client):
         response = client.post("/admin/search/sync")

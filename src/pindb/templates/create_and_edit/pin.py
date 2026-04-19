@@ -55,7 +55,22 @@ def pin_form(
     options_base_url: str,
     request: Request,
     pin: Pin | None = None,
+    duplicate_source: Pin | None = None,
 ) -> Element:
+    """Render the pin create/edit form.
+
+    `pin`              — when present, the form is an edit form for that pin.
+    `duplicate_source` — when present (and `pin` is None), prefill values from
+                         this pin to seed a new pin. Images are NOT copied;
+                         the user must upload fresh images.
+    """
+    if pin is not None and duplicate_source is not None:
+        message = "pin_form: pass either `pin` or `duplicate_source`, not both."
+        raise ValueError(message)
+
+    # Source for non-image field values (name, shops, grades, etc.).
+    prefill: Pin | None = pin if pin is not None else duplicate_source
+
     return html_base(
         title="Create Pin" if not pin else "Edit Pin",
         body_content=centered_div(
@@ -69,6 +84,8 @@ def pin_form(
                     icon="circle-star" if not pin else "pencil",
                     text="Create a Pin" if not pin else "Edit a Pin",
                 ),
+                duplicate_source is not None
+                and _duplicate_notice(source_name=duplicate_source.name),
                 _pending_notice(request=request, pin=pin),
                 hr,
                 form(
@@ -87,13 +104,13 @@ def pin_form(
                         __required_fields(
                             shops=shops,
                             tags=tags,
-                            pin=pin,
+                            pin=prefill,
                             currencies=currencies,
                             request=request,
                         ),
                         hr(class_="col-span-full"),
                         __optional_fields(
-                            pin=pin,
+                            pin=prefill,
                             pin_sets=pin_sets,
                             artists=artists,
                         ),
@@ -109,6 +126,15 @@ def pin_form(
         script_content=SCRIPT_CONTENT,
         request=request,
     )
+
+
+def _duplicate_notice(source_name: str) -> Element:
+    return div(
+        class_="rounded bg-blue-900 border border-blue-600 text-blue-200 px-4 py-2 text-sm my-2"
+    )[
+        i(data_lucide="copy", class_="inline-block w-4 h-4 mr-1"),
+        f'Duplicating "{source_name}". Fields are prefilled — upload new images and submit to create the new pin.',
+    ]
 
 
 def _pending_notice(request: Request, pin: Pin | None) -> Element | str:

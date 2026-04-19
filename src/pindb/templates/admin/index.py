@@ -21,6 +21,8 @@ def admin_panel_page(request: Request, pending_count: int = 0) -> Element:
                 hr,
                 _users_section(request),
                 hr,
+                _tags_bulk_section(request),
+                hr,
                 _search_section(),
             ],
             flex=True,
@@ -71,6 +73,26 @@ def _users_section(request: Request) -> Element:
         )[
             i(data_lucide="user-cog", class_="inline-block w-4 h-4 mr-1"),
             "Manage Users",
+        ],
+    ]
+
+
+def _tags_bulk_section(request: Request) -> Element:
+    return div(class_="flex flex-col gap-2")[
+        page_heading(
+            icon="tags",
+            text="Bulk tags",
+            level=2,
+        ),
+        p(class_="text-pin-base-300 text-sm")[
+            "Paste or upload JSON to merge or create tag trees (aliases and implications)."
+        ],
+        a(
+            href=str(request.url_for("get_admin_bulk_tags")),
+            class_="btn btn-primary w-fit",
+        )[
+            i(data_lucide="tags", class_="inline-block w-4 h-4 mr-1"),
+            "Bulk tags…",
         ],
     ]
 

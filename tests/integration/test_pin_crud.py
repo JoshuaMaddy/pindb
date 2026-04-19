@@ -63,6 +63,56 @@ class TestCreatePinAuthEnforcement:
 
 
 @pytest.mark.integration
+class TestDuplicatePin:
+    """`/create/pin?duplicate_from=<id>` prefills the form from an existing pin."""
+
+    def test_duplicate_from_unknown_pin_returns_404(self, editor_client):
+        response = editor_client.get("/create/pin?duplicate_from=999999")
+        assert response.status_code == 404
+
+    def test_duplicate_prefills_name_and_shop(self, editor_client, db_session):
+        shop = ShopFactory(name="Duplicator Shop")
+        source = PinFactory(name="Source Pin To Duplicate", shops={shop})
+        response = editor_client.get(
+            f"/create/pin?duplicate_from={source.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        body = response.text
+        assert "Create a Pin" in body
+        assert "Duplicating" in body
+        assert "Source Pin To Duplicate" in body
+        assert "Duplicator Shop" in body
+
+    def test_duplicate_requires_editor(self, auth_client, db_session):
+        source = PinFactory()
+        response = auth_client.get(
+            f"/create/pin?duplicate_from={source.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 403
+
+    def test_pin_page_shows_duplicate_link_to_editor(self, editor_client, db_session):
+        pin = PinFactory(name="Has Duplicate Button")
+        response = editor_client.get(
+            f"/get/pin/{pin.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert (
+            f"/create/pin?duplicate_from={pin.id}"  # ty:ignore[unresolved-attribute]
+            in response.text
+        )
+
+    def test_pin_page_hides_duplicate_link_from_regular_user(
+        self, auth_client, db_session
+    ):
+        pin = PinFactory(name="No Duplicate Button")
+        response = auth_client.get(
+            f"/get/pin/{pin.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert "duplicate_from" not in response.text
+
+
+@pytest.mark.integration
 class TestDeletePinAuthEnforcement:
     """`POST /delete/pin/{id}` is admin-only and returns a 303 redirect on success."""
 

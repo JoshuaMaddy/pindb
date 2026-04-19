@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException
-from fastapi.responses import JSONResponse
+import json
+from json import JSONDecodeError
+
+from fastapi import File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import literal, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 
 from pindb.database import Tag, TagCategory, session_maker
-from pindb.database.joins import pins_tags
+from pindb.database.joins import pins_tags, tag_implications
 from pindb.database.tag import (
+    TagAlias,
     normalize_tag_name,
-    replace_tag_aliases,
     resolve_implications,
 )
 from pindb.log import user_logger
 from pindb.search.update import update_tags
+from pindb.templates.admin.bulk_tags import bulk_tags_page
 
 LOGGER = user_logger("pindb.routes.admin.tag_bulk")
 
@@ -83,24 +87,71 @@ def _merge_tag_fields(
     tag: Tag,
     node: TagUpsertNode,
 ) -> None:
-    if tag.description is None and node.description:
+    """Fill empty/default scalar fields. Conflicting non-default values are kept and logged.
+
+    Bulk import is intentionally non-destructive: existing values win. A future
+    re-import that wants to overwrite must use the per-tag edit form.
+    """
+    if node.description and tag.description is None:
         tag.description = node.description
-    if tag.category == TagCategory.general and node.category != TagCategory.general:
+    elif (
+        node.description
+        and tag.description is not None
+        and node.description.strip() != tag.description.strip()
+    ):
+        LOGGER.warning(
+            "bulk-upsert: keeping existing description for tag id=%d name=%r "
+            "(payload differs); use the tag editor to overwrite.",
+            tag.id,
+            tag.name,
+        )
+
+    if node.category != TagCategory.general and tag.category == TagCategory.general:
         tag.category = node.category
+    elif (
+        node.category != TagCategory.general
+        and tag.category != TagCategory.general
+        and node.category != tag.category
+    ):
+        LOGGER.warning(
+            "bulk-upsert: keeping existing category=%s for tag id=%d name=%r "
+            "(payload had category=%s); use the tag editor to overwrite.",
+            tag.category.value,
+            tag.id,
+            tag.name,
+            node.category.value,
+        )
 
 
-def _merged_alias_strings(*, tag: Tag, node: TagUpsertNode, name_key: str) -> list[str]:
-    existing: list[str] = [alias_row.alias for alias_row in tag.aliases]
-    combined: list[str] = list(existing) + list(node.aliases)
-    result: list[str] = []
+def _add_new_aliases(*, tag: Tag, node: TagUpsertNode, session: Session) -> int:
+    """Insert any aliases from the payload that aren't already on the tag.
+
+    Add-only. Returns the number of aliases inserted. Avoids the delete+reinsert
+    churn (and ChangeLog noise) of ``replace_tag_aliases`` when nothing changed.
+    Filters out aliases equal to the tag's own normalized name.
+    """
+    name_key = tag.name
+    existing_normalized: set[str] = {
+        normalize_tag_name(alias_row.alias) for alias_row in tag.aliases
+    }
+    to_add: list[str] = []
     seen: set[str] = set()
-    for raw in combined:
+    for raw in node.aliases:
         normalized = normalize_tag_name(raw)
-        if not normalized or normalized == name_key or normalized in seen:
+        if (
+            not normalized
+            or normalized == name_key
+            or normalized in existing_normalized
+            or normalized in seen
+        ):
             continue
         seen.add(normalized)
-        result.append(raw.strip())
-    return result
+        to_add.append(normalized)
+    for normalized in to_add:
+        tag.aliases.append(TagAlias(alias=normalized))
+    if to_add:
+        session.flush()
+    return len(to_add)
 
 
 def _upsert_tag_node(
@@ -153,6 +204,8 @@ def _upsert_tag_node(
         else:
             _merge_tag_fields(tag=tag, node=node)
 
+        # Implications are union-only on bulk import (non-destructive merge).
+        # To remove an implication, use the per-tag edit form.
         old_implication_ids: set[int] = {implied.id for implied in tag.implications}
         merged_implied: set[Tag] = set(tag.implications) | set(implied_tags)
         tag.implications = merged_implied
@@ -169,19 +222,18 @@ def _upsert_tag_node(
                 session=session,
             )
 
-        merged_aliases = _merged_alias_strings(tag=tag, node=node, name_key=name_key)
-        replace_tag_aliases(tag=tag, aliases=merged_aliases, session=session)
-
-        session.flush()
+        added_alias_count = _add_new_aliases(tag=tag, node=node, session=session)
 
         action = "created" if created else "merged"
         LOGGER.info(
-            "%s tag id=%d name=%r implications=%d aliases=%d",
+            "%s tag id=%d name=%r implications=+%d (total %d) aliases=+%d (total %d)",
             action,
             tag.id,
             name_key,
+            len(newly_added_ids),
             len(merged_implied),
-            len(merged_aliases),
+            added_alias_count,
+            len(tag.aliases),
         )
         touched.add(tag.id)
         return tag
@@ -189,13 +241,56 @@ def _upsert_tag_node(
         visiting.discard(name_key)
 
 
+def _check_no_cycles(touched_root_ids: list[int], session: Session) -> None:
+    """Run the BFS implication closure from each root; raises 400 on revisit.
+
+    Catches cycles created by mixing payload edges with pre-existing DB edges
+    (the in-payload-only ``visiting`` check inside ``_upsert_tag_node`` cannot
+    see those). ``resolve_implications`` itself is cycle-safe at runtime, so we
+    re-implement the walk here to actively detect a back-edge.
+    """
+    if not touched_root_ids:
+        return
+    roots = session.scalars(select(Tag).where(Tag.id.in_(touched_root_ids))).all()
+    for root in roots:
+        seen: set[int] = {root.id}
+        stack: list[int] = [root.id]
+        while stack:
+            current_id = stack.pop()
+            child_ids = session.scalars(
+                select(tag_implications.c.implied_tag_id).where(
+                    tag_implications.c.tag_id == current_id
+                )
+            ).all()
+            for child_id in child_ids:
+                if child_id == root.id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Cycle detected in tag implications: "
+                            f"{root.name!r} is reachable from itself via "
+                            f"existing edges."
+                        ),
+                    )
+                if child_id in seen:
+                    continue
+                seen.add(child_id)
+                stack.append(child_id)
+
+
 def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
     """Apply upserts in one transaction; refresh Meilisearch for touched tags."""
+    if not body.tags:
+        raise HTTPException(
+            status_code=400,
+            detail="No tags supplied; payload must contain at least one tag.",
+        )
+
     touched: set[int] = set()
     root_ids: list[int] = []
     with session_maker.begin() as session:
-        visiting: set[str] = set()
         for root in body.tags:
+            visiting: set[str] = set()
             tag = _upsert_tag_node(
                 session=session,
                 node=root,
@@ -203,20 +298,132 @@ def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
                 touched=touched,
             )
             root_ids.append(tag.id)
-        unique_sorted = sorted(touched)
+        _check_no_cycles(touched_root_ids=root_ids, session=session)
+
+    unique_sorted = sorted(touched)
 
     tags_to_index: list[Tag] = []
-    with session_maker() as session:
-        for tag_id in unique_sorted:
-            indexed = session.scalar(
-                select(Tag).where(Tag.id == tag_id).options(selectinload(Tag.aliases))
+    if unique_sorted:
+        with session_maker() as session:
+            tags_to_index = list(
+                session.scalars(
+                    select(Tag)
+                    .where(Tag.id.in_(unique_sorted))
+                    .options(selectinload(Tag.aliases))
+                ).all()
             )
-            if indexed is not None:
-                tags_to_index.append(indexed)
     if tags_to_index:
-        update_tags(tags_to_index)
+        try:
+            update_tags(tags_to_index)
+        except Exception:
+            LOGGER.warning(
+                "bulk-upsert: Meilisearch update failed for %d tag(s); "
+                "the periodic resync job will reconcile.",
+                len(tags_to_index),
+                exc_info=True,
+            )
 
     return BulkTagUpsertResult(root_tag_ids=root_ids, touched_tag_ids=unique_sorted)
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    """Render a pydantic ValidationError as a compact, user-readable string."""
+    lines: list[str] = []
+    for err in exc.errors():
+        loc = ".".join(str(part) for part in err.get("loc", ()))
+        msg = err.get("msg", "invalid value")
+        lines.append(f"{loc or '<root>'}: {msg}")
+    return "\n".join(lines)
+
+
+@router.get("/tags/bulk")
+def get_admin_bulk_tags(request: Request) -> HTMLResponse:
+    return HTMLResponse(content=str(bulk_tags_page(request=request)))
+
+
+@router.post("/tags/bulk")
+async def post_admin_bulk_tags(
+    request: Request,
+    json_text: str = Form(default=""),
+    file: UploadFile | None = File(default=None),
+) -> HTMLResponse:
+    text_present = bool(json_text.strip())
+    file_present = file is not None and bool((file.filename or "").strip())
+
+    if text_present and file_present:
+        return HTMLResponse(
+            content=str(
+                bulk_tags_page(
+                    request=request,
+                    error_message=(
+                        "Provide either pasted JSON or a file upload — not both."
+                    ),
+                )
+            ),
+            status_code=400,
+        )
+
+    raw_bytes: bytes | None = None
+    if file_present and file is not None:
+        raw_bytes = await file.read()
+    elif text_present:
+        raw_bytes = json_text.encode("utf-8")
+    if raw_bytes is None or not raw_bytes.strip():
+        return HTMLResponse(
+            content=str(
+                bulk_tags_page(
+                    request=request,
+                    error_message="Paste JSON in the text field or choose a JSON file.",
+                )
+            ),
+            status_code=400,
+        )
+    try:
+        data = json.loads(raw_bytes.decode("utf-8"))
+    except JSONDecodeError as exc:
+        return HTMLResponse(
+            content=str(
+                bulk_tags_page(
+                    request=request,
+                    error_message=f"Invalid JSON: {exc}",
+                )
+            ),
+            status_code=400,
+        )
+    try:
+        body = BulkTagUpsertBody.model_validate(data)
+    except ValidationError as exc:
+        return HTMLResponse(
+            content=str(
+                bulk_tags_page(
+                    request=request,
+                    error_message=(
+                        "Invalid payload:\n" + _format_validation_error(exc)
+                    ),
+                )
+            ),
+            status_code=400,
+        )
+    try:
+        result = run_bulk_tag_upsert(body)
+    except HTTPException as exc:
+        return HTMLResponse(
+            content=str(
+                bulk_tags_page(
+                    request=request,
+                    error_message=str(exc.detail),
+                )
+            ),
+            status_code=exc.status_code,
+        )
+    return HTMLResponse(
+        content=str(
+            bulk_tags_page(
+                request=request,
+                result=result.model_dump(mode="json"),
+            )
+        )
+    )
 
 
 @router.post("/tags/bulk-upsert")
@@ -228,4 +435,4 @@ def post_admin_tags_bulk_upsert(body: BulkTagUpsertBody) -> JSONResponse:
     cascade as the tag edit form. Admin-only.
     """
     result = run_bulk_tag_upsert(body)
-    return JSONResponse(content=result.model_dump())
+    return JSONResponse(content=result.model_dump(mode="json"))

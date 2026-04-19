@@ -311,7 +311,8 @@ Pending items appear in create/edit form selection lists with a `(P) ` name pref
 
 ### Admin management
 - `POST /admin/users/{id}/promote-editor` / `demote-editor` — grant/revoke editor role
-- `POST /admin/tags/bulk-upsert` — JSON body `{ "tags": [ { "name", "category", "description", "aliases", "implications": [ … ] } ] }`; creates or merges tags (new aliases and implications; fills empty description / default category); new implications propagate to pins like the tag edit form (`resolve_implications` + `pins_tags` insert)
+- `GET /admin/tags/bulk` — form to paste or upload JSON for bulk tag upsert; `POST /admin/tags/bulk` processes the form
+- `POST /admin/tags/bulk-upsert` — same payload as JSON body (API); creates or merges tags (new aliases and implications; fills empty description / default category); new implications propagate to pins like the tag edit form (`resolve_implications` + `pins_tags` insert)
 - Admin panel shows pending count badge; links to `/admin/pending`
 
 ## Account Erasure (GDPR)
