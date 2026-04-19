@@ -1,12 +1,12 @@
 # PinDB — Claude Code Guide
 
-> **Maintainability note:** Keep this file up to date. If you make a change that affects the architecture, tech stack, environment variables, auth system, deployment, or project structure, update the relevant section of CLAUDE.md in the same commit.
+> **Maintainability note:** Keep this file current. Changes affecting architecture, tech stack, auth, deployment, or structure → update relevant section in the same commit. Only non-obvious things.
 
 ## Project Overview
-PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session-based auth with password login and OAuth (Google, Discord).
+PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password login + OAuth (Google, Discord).
 
 ## After Every Python Change
-Always run both linters before considering a task done:
+Run before task done:
 ```bash
 uvx ruff check --select I --fix .
 uvx ruff format .
@@ -15,89 +15,12 @@ uvx ty check
 
 ## Tech Stack
 - **Backend:** Python 3.13+, FastAPI, SQLAlchemy 2.0+, Pydantic Settings, APScheduler
-- **Auth:** Argon2 password hashing, session tokens (DB-backed), Google OIDC, Discord OAuth
-- **Frontend:** htpy (HTML generation), HTMX, Tailwind CSS 4, Alpine.js, Tom Select, Lucide icons
-- **Database:** PostgreSQL 17 (primary), Meilisearch (search index)
-- **Migrations:** Alembic (active — run on container start, not on app startup)
-- **Tooling:** UV (package manager), Ruff (format/lint), ty (type check)
-- **CSS build:** Node.js **20+** (Tailwind v4’s `@tailwindcss/oxide` native addon requires it). From repo root: `npm ci` (or `npm install`), then `npm run css:build` or `npm run css:watch`. Do not use Node 18 — optional platform packages won’t install and the CLI fails with “Cannot find native binding”.
-
-## Project Structure
-```
-src/pindb/
-├── __init__.py              # FastAPI app instance
-├── config.py                # Env config (Pydantic Settings) — see env vars table below
-├── auth.py                  # Auth helpers: hashing, session cookies, FastAPI Depends; sets audit ContextVar in middleware
-├── audit_events.py          # SQLAlchemy session events: auto-sets audit fields, records ChangeLog patches, soft-delete filter
-├── lifespan.py              # App startup/shutdown (logging, Meili setup, scheduler, admin bootstrap)
-├── log.py                   # Rich logger setup
-├── file_handler.py          # Image upload/storage + WebP thumbnail generation
-├── utils.py                 # URL parsing, currency formatting (Babel)
-├── model_utils.py           # Pydantic validators (magnitude parsing, empty→None)
-├── database/
-│   ├── __init__.py          # Engine, sessionmaker, model exports, currency seeding; calls register_audit_events()
-│   ├── base.py              # DeclarativeBase with Alembic naming convention
-│   ├── audit_mixin.py       # AuditMixin: created_at/by, updated_at/by, deleted_at/by (all init=False)
-│   ├── pending_mixin.py     # PendingMixin: approved_at/by, rejected_at/by + PendingAuditEntity Protocol
-│   ├── change_log.py        # ChangeLog model: linear patch history for all AuditMixin entities
-│   ├── pin.py               # Pin model (central entity)
-│   ├── pin_set.py           # PinSet model (global curator sets + personal user sets)
-│   ├── user.py              # User model (auth, favorites, personal sets)
-│   ├── session.py           # UserSession model (token-based sessions)
-│   ├── user_auth_provider.py# OAuth provider linkage (Google/Discord)
-│   ├── artist.py, shop.py, tag.py, grade.py, currency.py, link.py
-│   └── joins.py             # All many-to-many association tables
-├── models/                  # Pydantic enums (NOT SQLAlchemy models)
-│   ├── acquisition_type.py  # AcquisitionType: single / blind_box / set
-│   └── funding_type.py      # FundingType: self / crowdfunded / sponsored
-├── search/
-│   ├── search.py            # Meilisearch query function
-│   └── update.py            # Index setup, single/batch/full sync, delete
-├── routes/
-│   ├── __init__.py          # Router registration
-│   ├── admin/               # Admin routes: panel, users, search sync, tag bulk-upsert (`__init__.py` composes routers)
-│   ├── approve.py           # Pending approval queue (GET/POST /admin/pending/…) — admin only
-│   ├── _guards.py           # assert_editor_can_edit() — ownership check for edit routes
-│   ├── delete.py            # Soft delete (POST /delete/{entity}/{id}) — sets deleted_at/deleted_by_id
-│   ├── search.py            # Pin search (GET/POST /search/pin)
-│   ├── auth/router.py       # Login, signup, logout, Google/Discord OAuth
-│   ├── user/router.py       # Profiles, favorites, personal sets
-│   ├── create/              # Create entities (editor or admin; new items enter pending state)
-│   ├── edit/                # Edit entities (admin any; editor own-pending only)
-│   ├── get/                 # Detail pages for all entities + image serving
-│   ├── list/                # List pages for all entities
-│   └── bulk/                # Bulk pin create from JSON (admin only)
-├── templates/               # htpy HTML (mirrors routes/ structure)
-│   ├── base.py              # html_base() wrapper (navbar, breadcrumbs, full page)
-│   ├── components/          # navbar, breadcrumbs, pin grid/cards, modals, buttons
-│   ├── auth/                # login_page(), signup_page()
-│   ├── create_and_edit/     # Forms for create/edit (pin, artist, shop, tag, pin_set, user_pin_sets)
-│   ├── get/                 # Detail templates (pin, artist, shop, tag, pin_set)
-│   ├── list/                # List templates (artists, shops, tags, pin_sets)
-│   ├── user/                # user_profile_page()
-│   ├── admin/               # admin_panel_page(), admin_users_page(), pending_page()
-│   ├── search/              # search_pin_page()
-│   ├── bulk/                # bulk_pin_page()
-│   └── homepage.py
-└── static/                  # CSS (Tailwind compiled), JS, favicon
-
-alembic/                     # Database migrations
-├── env.py                   # Loads pindb.config, imports all models
-└── versions/                # Migration scripts (4 migrations)
-
-scripts/
-├── README.md                # CSV import format docs (grades encoding, column format)
-├── import_csv.py            # Bulk CSV import script
-├── dump_db.py               # Postgres dump/load (pg_dump/pg_restore); --via-docker by default; POSTGRES_* fallback URL for --no-via-docker
-├── migrate_images.py        # Migrate images between filesystem and R2 backends
-├── dev.sh                   # Bash: docker compose up + fastapi dev
-└── dev.ps1                  # PowerShell: same as above
-
-docker-compose.yaml          # Production: app + postgres 17 + meilisearch
-docker-compose.dev.yaml      # Dev: postgres + meilisearch only (no app container, exposed ports)
-Dockerfile                   # Python 3.13-slim, UV, multi-stage
-docker-entrypoint.sh         # Runs alembic upgrade head, then starts uvicorn
-```
+- **Auth:** Argon2, DB-backed session tokens, Google OIDC, Discord OAuth
+- **Frontend:** htpy, HTMX, Tailwind CSS 4, Alpine.js, Tom Select, Lucide icons
+- **Database:** PostgreSQL 17, Meilisearch
+- **Migrations:** Alembic (runs on container start, not app startup)
+- **Tooling:** UV, Ruff, ty
+- **CSS build:** Node.js **20+** required (Tailwind v4's `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
 
 ## Running Locally
 ```bash
@@ -107,87 +30,66 @@ alembic upgrade head
 fastapi dev ./src/pindb/ --host 0.0.0.0
 ```
 
-Or use the convenience scripts: `bash scripts/dev.sh` / `scripts/dev.ps1`
+Or: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
-## Environment Variables (`.env`, not committed)
+## Project Layout (non-obvious hotspots)
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `image_backend` | No | `filesystem` | `filesystem` or `r2` |
-| `image_directory` | If `filesystem` | — | Path to uploaded pin images |
-| `r2_account_id` | If `r2` | — | Cloudflare account ID |
-| `r2_bucket` | If `r2` | — | R2 bucket name |
-| `r2_access_key_id` | If `r2` | — | R2 API token key ID |
-| `r2_secret_access_key` | If `r2` | — | R2 API token secret |
-| `r2_public_url` | No | None | Public CDN base URL for R2 (enables redirect instead of proxy) |
-| `database_connection` | Yes | — | PostgreSQL connection string |
-| `meilisearch_key` | Yes | — | Meilisearch master key |
-| `meilisearch_url` | No | `http://127.0.0.1:7700` | Meilisearch URL |
-| `meilisearch_index` | No | `pins` | Meilisearch index name |
-| `search_sync_interval_minutes` | No | `5` | Background sync interval |
-| `secret_key` | Yes | — | Session middleware secret |
-| `base_url` | No | `http://localhost:8000` | App base URL (for OAuth redirects) |
-| `google_client_id` | No | None | Google OAuth client ID |
-| `google_client_secret` | No | None | Google OAuth client secret |
-| `discord_client_id` | No | None | Discord OAuth client ID |
-| `discord_client_secret` | No | None | Discord OAuth client secret |
-| `meta_client_id` | No | None | Meta (Facebook Login) OAuth client ID |
-| `meta_client_secret` | No | None | Meta (Facebook Login) OAuth client secret |
-| `password_min_length` | No | `12` | Minimum password length enforced on signup / password change |
-| `password_min_zxcvbn_score` | No | `3` | Minimum zxcvbn strength score (0–4) |
-| `allow_test_oauth_provider` | No | `False` | Enables `/auth/_test-oauth/*` for e2e tests — must be `False` in prod |
-| `contact_email` | Yes | — | Contact email shown in footer, privacy policy, ToS, and DMCA notices |
-| `log_file` | No | `pindb.log` | Path for rotating file logs |
-| `log_file_max_bytes` | No | `209715200` (200 MiB) | Rotate log file when it reaches this size |
-| `log_file_backup_count` | No | `7` | Rotated log files to keep (size-based rotation; ~one week of history at typical volume) |
+Standard layout: `src/pindb/{database,routes,templates,search,models}/`. Names mirror each other — route `routes/get/pin.py` → template `templates/get/pin.py`. Environment config is Pydantic Settings in `config.py` (source of truth for env vars).
+
+Key files where behaviour isn't obvious from the name:
+- `audit_events.py` — session-level SQLAlchemy events (before_flush, after_flush, do_orm_execute). Soft-delete + pending filters live here.
+- `auth.py` — FastAPI Depends (`CurrentUser`, `AuthenticatedUser`, `EditorUser`, `AdminUser`) + middleware that threads user into audit ContextVars.
+- `routes/_guards.py` — `assert_editor_can_edit()` ownership check.
+- `database/joins.py` — all many-to-many association tables (excluded from audit).
+- `database/erasure.py` — GDPR account deletion entry point.
+- `lifespan.py` — startup: logging, Meili setup, scheduler, admin bootstrap (`_ensure_admins` hardcodes `["josh"]`).
+- `scripts/dump_db.py` — `--via-docker` by default; `POSTGRES_*` env fallback for `--no-via-docker`.
 
 ## Audit & History System
 
-All core entities inherit `AuditMixin` (`database/audit_mixin.py`), which adds:
-- `created_at`, `created_by_id` — set automatically on first INSERT
-- `updated_at`, `updated_by_id` — set automatically on every UPDATE
-- `deleted_at`, `deleted_by_id` — set on soft delete instead of `session.delete()`
+Core entities inherit `AuditMixin` (`database/audit_mixin.py`): `created_at/by`, `updated_at/by`, `deleted_at/by`. All fields `init=False` to avoid dataclass field-ordering conflicts — declare as `class Foo(PendingMixin, AuditMixin, MappedAsDataclass, Base)`.
 
-**How it works:** `audit_events.py` registers three SQLAlchemy session-level events:
-1. `before_flush` — sets audit timestamps/user_ids; captures diff for ChangeLog
-2. `after_flush` — writes ChangeLog entries with JSON patches (`{"field": {"old": v, "new": v}}`)
-3. `do_orm_execute` — auto-filters soft-deleted rows from all SELECT queries via `with_loader_criteria`
+**How it works** (`audit_events.py`, three SQLAlchemy session events):
+1. `before_flush` — sets audit timestamps/user_ids; captures diff for ChangeLog; auto-approves `PendingMixin` entities when creator is admin.
+2. `after_flush` — writes `ChangeLog` row with JSON patch `{"field": {"old": v, "new": v}}`.
+3. `do_orm_execute` — filters soft-deleted + unapproved rows from SELECTs via `with_loader_criteria`.
 
-**Current user** is threaded from `attach_user_middleware` → `set_audit_user()` + `set_audit_user_flags()` → ContextVars → event handlers. No route changes required. Three ContextVars: `_audit_user_id`, `_audit_user_is_admin`, `_audit_user_is_editor`.
+**Current user** threaded from `attach_user_middleware` → `set_audit_user()` / `set_audit_user_flags()` → ContextVars (`_audit_user_id`, `_audit_user_is_admin`, `_audit_user_is_editor`) → event handlers. No route changes required.
 
-**Soft deletes:** `routes/delete.py` sets `entity.deleted_at`/`entity.deleted_by_id` instead of `session.delete()`. Soft-deleted entities are invisible to all queries by default. Pass `.execution_options(include_deleted=True)` to bypass (e.g. admin views).
+**Soft deletes:** `routes/delete.py` sets `deleted_at`/`deleted_by_id`; never `session.delete()`. Bypass filter with `.execution_options(include_deleted=True)`.
 
-**ChangeLog table** (`database/change_log.py`): `entity_type` (table name), `entity_id`, `operation` (create/update/delete), `changed_by_id`, `changed_at`, `patch` (JSONB). Does NOT inherit `AuditMixin` (no audit of the audit log).
+**Pending filter** (same `_filter_deleted`):
+| Viewer | Sees |
+|---|---|
+| Guest / regular user | `approved_at IS NOT NULL` and `rejected_at IS NULL` |
+| Editor | Approved + pending (`rejected_at IS NULL`) |
+| Admin | Same as editor; `.execution_options(include_pending=True)` for approval views |
 
-**AuditMixin + MappedAsDataclass**: All mixin fields use `init=False` — they're never in `__init__`, avoiding dataclass field-ordering conflicts. Declare models as `class Foo(PendingMixin, AuditMixin, MappedAsDataclass, Base)` for editor-creatable entities, or `class Foo(AuditMixin, MappedAsDataclass, Base)` for others.
+Pending items appear in form selection lists with `(P) ` name prefix.
 
-**Excluded from audit**: `UserSession` (ephemeral), all join tables in `joins.py`.
-
-**Pending filter**: `_filter_deleted` also applies a `PendingMixin` visibility filter. Regular users/guests see only `approved_at IS NOT NULL`. Editors/admins see pending items too (`rejected_at IS NULL`). Pass `.execution_options(include_pending=True)` to bypass (admin approval views).
+**Excluded from audit:** `UserSession` (ephemeral), all join tables, `ChangeLog` itself.
 
 ## Architecture Conventions
 
-### Core Pattern
-- **Routes return HTML**, not JSON — HTMX-driven, not a REST API.
-- **Templates use htpy** — Python functions returning `htpy.Element`, not Jinja2.
-- **Database access** uses `with session_maker() as session:` (read) or `with session_maker.begin() as session:` (write — auto-commits on success, auto-rollbacks on exception).
-- New entities: model in `database/`, router in `routes/`, template in `templates/`.
-- Many-to-many association tables go in `database/joins.py`.
+### Core
+- Routes return HTML, not JSON. HTMX-driven.
+- Templates are htpy Python functions returning `htpy.Element`, not Jinja2.
+- DB access: `with session_maker() as session:` (read) or `with session_maker.begin() as session:` (write — auto-commits, auto-rollbacks).
+- New entity: model in `database/`, router in `routes/`, template in `templates/`. M2M tables in `database/joins.py`.
+- Do **not** use `Base.metadata.create_all()` — write an Alembic migration. Run `uv run alembic upgrade head`.
 
-### Database Sessions & Eager Loading
+### Sessions & Eager Loading (load-bearing)
 
-Two patterns for rendering templates:
+Two patterns:
 
-**1. Render inside session (preferred for read routes)**
-Put `return HTMLResponse(...)` inside the `with session_maker() as db:` block. Session stays open during `str(template(...))`, so lazy relationships work.
+**1. Render inside session (preferred for reads)** — session stays open during `str(template(...))`, lazy relationships work:
 ```python
 with session_maker() as db:
     artist = db.get(Artist, id)
     return HTMLResponse(content=artist_page(request=request, artist=artist))
 ```
 
-**2. Render outside session (required when write precedes read)**
-Write block must close first (e.g. HTMX fragment handlers). Open second read session, use `selectinload` for every relationship the template touches.
+**2. Render outside session (required when write precedes read)** — write block must close first; use `selectinload` for every relationship the template touches:
 ```python
 with session_maker.begin() as db:
     db.execute(...)   # write
@@ -197,165 +99,92 @@ with session_maker() as db:
 return HTMLResponse(content=str(template(pin=pin)))
 ```
 
-**Always `selectinload` on list queries** — even inside open session. Prevents N+1: `artist.pins` in a loop = one query per artist without it.
+**Always `selectinload` on list queries** — prevents N+1 (`artist.pins` in a loop = one query per artist otherwise).
 
-**Columns survive session close; relationships don't.** `pin.name`/`pin.id` safe after close. `pin.shops`/`pin.artists` → `DetachedInstanceError`.
-
-### Authentication
-- Cookie `session=<token>` → `UserSession` row → `User`. Sessions last 30 days. Argon2 hashing.
-- FastAPI Depends:
-  - `CurrentUser` → `User | None`
-  - `AuthenticatedUser` → `User` (401 if not logged in)
-  - `EditorUser` → `User` (403 if not editor or admin)
-  - `AdminUser` → `User` (403 if not admin)
-- Startup: `lifespan._ensure_admins()` grants admin to hardcoded usernames (default: `["josh"]`).
-- OAuth: Google (OIDC) and Discord, both in `routes/auth/router.py`. Authlib stores OAuth state in Starlette `SessionMiddleware` using cookie `pindb_starlette_session` (not `session`, which is reserved for the login token).
-
-### Global vs Personal PinSets
-- `PinSet.owner_id = NULL` → global/curator set (admin-editable only)
-- `PinSet.owner_id = {user_id}` → personal set (user-editable)
-- Sets can be promoted personal → global by admin.
+**Columns survive session close; relationships don't.** `pin.name`/`pin.id` safe; `pin.shops` → `DetachedInstanceError`.
 
 ### HTMX
 - Routes check `request.headers.get("HX-Request")` to return fragments vs full pages.
 - `RedirectResponse(..., status_code=303)` for form-to-redirect.
-- Personal set editor uses HTMX search + Alpine.js drag-reorder.
+- Authlib stores OAuth state in Starlette `SessionMiddleware` using cookie `pindb_starlette_session` (not `session`, which is the login token).
 
 ### Images
-- Pins store `front_image_guid` (required) and `back_image_guid` (optional) as UUIDs.
-- Files stored by UUID key; thumbnails at `{uuid}.thumbnail` (256px WebP). Thumbnails generated eagerly at ingest.
-- Two backends (mutually exclusive): `filesystem` (local dir) or `r2` (Cloudflare R2 via S3-compatible API).
-- R2 serving: redirects to `r2_public_url/{key}` if set; otherwise proxies bytes. Filesystem serving: `FileResponse`.
-- 20 MB upload limit enforced in `file_handler.save_image()`.
-- EXIF / ICC / XMP metadata stripped on ingest (`_strip_metadata`) — prevents GPS and device leaks.
+- Pin has `front_image_guid` (required), `back_image_guid` (optional) — UUIDs.
+- Thumbnails at `{uuid}.thumbnail` (256px WebP), generated eagerly at ingest.
+- Two backends (mutually exclusive): `filesystem` or `r2` (Cloudflare R2).
+- R2 with `r2_public_url` set → redirects; else proxies bytes. Filesystem → `FileResponse`.
+- 20 MB upload limit; EXIF/ICC/XMP stripped on ingest (`_strip_metadata`) to prevent GPS/device leaks.
 - Migration: `uv run python scripts/migrate_images.py --direction fs-to-r2|r2-to-fs`
-- Route: `GET /get/image/{uuid}?thumbnail=true`
 
 ### Search (Meilisearch)
-- `Pin.document()` returns dict with `id`, `name`, `shops`, `tags`, `artists`, `description` (and optional fields when present).
+- `Pin.document()` returns the indexed dict.
 - Searchable attributes configured on startup.
-- Background APScheduler job syncs every N minutes (configurable).
-- Manual sync via admin panel (`POST /admin/search/sync`).
+- APScheduler syncs every N minutes (`search_sync_interval_minutes`, default 5). Manual: `POST /admin/search/sync`.
 
-### Migrations
-- Alembic active. Do **not** use `Base.metadata.create_all()` — write a migration.
-- Run: `alembic upgrade head`
-- Auto-runs in Docker via `docker-entrypoint.sh`.
+### Global vs Personal PinSets
+- `PinSet.owner_id = NULL` → global/curator set (admin-editable).
+- `PinSet.owner_id = {user_id}` → personal set (user-editable).
+- Admin can promote personal → global.
 
-### User Pin Lists (Collection, Wants, Trades, Favorites)
-Four pin list types: paginated full-list page (`GET /user/{username}/{list}`) + preview strip on profile.
+## Editor Role & Pending Approval
 
-| Section | URL segment | Data source | Description |
-|---|---|---|---|
-| Favorites | `favorites` | `user_favorite_pins` join table | Pins the user has liked/favorited |
-| Collection | `collection` | `UserOwnedPin` | Pins the user owns; per-grade rows with `quantity` and `tradeable_quantity` |
-| Want List | `wants` | `UserWantedPin` | Pins the user wants; per-grade rows |
-| Trades | `trades` | `UserOwnedPin` filtered by `tradeable_quantity > 0` | Subset of collection available for trade |
+Editors (`User.is_editor = True`) can create `Pin`, `Shop`, `Artist`, `Tag`, `PinSet`, but submissions enter **pending** state. Admins have implicit editor privileges; their creations auto-approve (via `before_flush`, no route code needed).
 
-**Profile preview:** Each section shows up to 10 pins in a horizontal row (`h-44` flex strip) + `>` see-all card. Counts in section heading.
+`PendingMixin` (`database/pending_mixin.py`) adds `approved_at/by_id`, `rejected_at/by_id`, properties `is_pending`/`is_approved`/`is_rejected`. Use the `PendingAuditEntity` Protocol as the type hint for functions needing both mixins' fields.
 
-**Full list pages** (`routes/user/router.py`): Paginated (24/page, distinct pins). Grid/table toggle via `?view=grid|table`. Public.
+Edit permissions (`routes/_guards.py::assert_editor_can_edit`): admins always allowed; editors only on their own `is_pending` entries (403 otherwise).
 
-**Table columns:**
-- Favorites: thumbnail, name, shops (links), artists (links)
-- Collection: thumbnail, name, shops, artists, grade, qty, tradeable qty
-- Wants: thumbnail, name, shops, artists, grade
-- Trades: thumbnail, name, shops, artists, grade, tradeable qty
+Approval queue at `/admin/pending` (`routes/approve.py`):
+- Approving a Pin cascades to pending shops/artists/tags on *that* pin — but does NOT bulk-approve other pins referencing those entities.
+- Rejection sets `rejected_at` (editor can still see/fix).
 
-**Key models:**
-- `UserOwnedPin` — `user_id`, `pin_id`, `grade_id` (nullable), `quantity`, `tradeable_quantity`. Unique on `(user_id, pin_id, grade_id)`.
-- `UserWantedPin` — `user_id`, `pin_id`, `grade_id` (nullable). Unique on `(user_id, pin_id, grade_id)`.
+## User Pin Lists
 
-Routes for add/remove/update owned and wanted pins: `routes/user/collection.py` (prefix `/user/pins`).
+Four list types, each with a paginated full page (`GET /user/{username}/{list}`) and a 10-item preview strip on the profile.
 
-## Editor Role & Pending Approval System
+| Section | URL | Data |
+|---|---|---|
+| Favorites | `favorites` | `user_favorite_pins` join table |
+| Collection | `collection` | `UserOwnedPin` (per-grade; `quantity`, `tradeable_quantity`) |
+| Want List | `wants` | `UserWantedPin` (per-grade) |
+| Trades | `trades` | `UserOwnedPin` filtered by `tradeable_quantity > 0` |
 
-Editors (`User.is_editor = True`) can create all entity types, but their submissions enter a **pending** state requiring admin approval before becoming publicly visible. Admins have implicit editor privileges; their creations auto-approve.
+Full pages paginated 24/page, distinct pins, grid/table toggle via `?view=grid|table`, public.
 
-### PendingMixin (`database/pending_mixin.py`)
-Applied to: `Pin`, `Shop`, `Artist`, `Tag`, `PinSet`. Adds:
-- `approved_at`, `approved_by_id` — set on approval (NULL = pending)
-- `rejected_at`, `rejected_by_id` — set on rejection
-- Properties: `is_pending`, `is_approved`, `is_rejected`
+Add/remove/update routes: `routes/user/collection.py` (prefix `/user/pins`).
 
-MRO: `class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base)`
-
-`PendingAuditEntity` Protocol (same file) — use as the type hint wherever a function needs fields from both `PendingMixin` and `AuditMixin`.
-
-### Visibility rules (enforced in `audit_events._filter_deleted`)
-| Viewer | Sees |
-|---|---|
-| Guest / regular user | Approved items only (`approved_at IS NOT NULL`, `rejected_at IS NULL`) |
-| Editor | Approved + pending (`rejected_at IS NULL`) |
-| Admin | Same as editor by default; use `include_pending=True` for approval views |
-
-Pending items appear in create/edit form selection lists with a `(P) ` name prefix.
-
-### Auto-approve on admin create
-`_before_flush` in `audit_events.py` sets `approved_at`/`approved_by_id` immediately when an admin creates a `PendingMixin` entity. No extra route code needed.
-
-### Edit permissions (`routes/_guards.py`)
-`assert_editor_can_edit(entity, current_user)`:
-- Admins: always allowed
-- Editors: only their own `is_pending` entries (403 otherwise)
-
-### Approval queue (`routes/approve.py`, prefix `/admin/pending`)
-| Route | Action |
-|---|---|
-| `GET /admin/pending` | Queue page — lists all pending entities by type |
-| `POST /admin/pending/approve/{type}/{id}` | Approve; cascades to pending deps of a Pin |
-| `POST /admin/pending/reject/{type}/{id}` | Mark `rejected_at` (editor can still see/fix) |
-| `POST /admin/pending/delete/{type}/{id}` | Soft-delete the pending entry |
-
-**Cascade rule**: approving a Pin also approves any pending shops/artists/tags on that pin — but does NOT bulk-approve other pins that reference those entities.
-
-### Admin management
-- `POST /admin/users/{id}/promote-editor` / `demote-editor` — grant/revoke editor role
-- `GET /admin/tags/bulk` — form to paste or upload JSON for bulk tag upsert; `POST /admin/tags/bulk` processes the form
-- `POST /admin/tags/bulk-upsert` — same payload as JSON body (API); creates or merges tags (new aliases and implications; fills empty description / default category); new implications propagate to pins like the tag edit form (`resolve_implications` + `pins_tags` insert)
-- Admin panel shows pending count badge; links to `/admin/pending`
+`UserOwnedPin` + `UserWantedPin` both unique on `(user_id, pin_id, grade_id)` (grade_id nullable).
 
 ## Account Erasure (GDPR)
-- `database/erasure.py::erase_user_account(session, user_id)` — single entry point for deleting an account and anonymising every audit-log reference to it.
-- Uses raw bulk UPDATE/DELETE (bypasses ORM audit events) so old user_id values don't leak back into `change_log.patch`.
-- Steps: (1) NULL every AuditMixin FK (`created_by_id`, `updated_by_id`, `deleted_by_id`) to this user across all inheriting tables; (2) NULL PendingMixin `approved_by_id`, `rejected_by_id`; (3) NULL `change_log.changed_by_id` and `pending_edits.{created,approved,rejected}_by_id`; (4) hard-DELETE personal PinSets owned by this user (with their memberships / favorites-of / links); (5) DELETE favorites / sessions / OAuth providers / owned & wanted pins; (6) DELETE the user row.
-- Self-service: `POST /user/me/delete-account` (profile Settings: modal; must type username to enable submit). Clears session cookie and redirects home.
-- Admin route: `POST /admin/users/{user_id}/delete-account` (button in `/admin/users`, JS confirm). Admins cannot delete their own account via admin UI (use self-service or another admin).
-- No schema migration needed — all existing user-FK columns are already nullable with default ON DELETE behaviour.
+
+Entry point: `database/erasure.py::erase_user_account(session, user_id)`.
+
+**Why it uses raw bulk UPDATE/DELETE** (bypassing the ORM audit events): otherwise the old `user_id` would leak back into `change_log.patch` via the audit diff. The erasure itself must NOT be audited against the user being erased.
+
+- Self-service: `POST /user/me/delete-account` (profile Settings modal; must type username to enable submit).
+- Admin: `POST /admin/users/{user_id}/delete-account`. Admins cannot delete their own account via admin UI (use self-service or another admin).
+- All user-FK columns already nullable with ON DELETE behaviour — no schema migration needed.
 
 ## Legal Pages & Footer
-- `routes/legal.py` serves `/about`, `/privacy`, `/terms` (all public, no auth).
-- Templates live in `templates/legal/` (`about.py`, `privacy.py`, `terms.py`). Shared container + "not legal advice" banner in `_shared.py`.
-- Footer component `templates/components/footer.py` rendered by `html_base()` on every full page (not on HTMX fragments). Shows version from `pindb.__version__` (via `importlib.metadata`) and `CONFIGURATION.contact_email`.
-- Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.flex-grow.min-h-screen` pushes footer below the fold on tall viewports and pins it to viewport bottom on short pages.
-- Copyright notice uses project name only ("PinDB"), no person named.
+- `routes/legal.py` serves `/about`, `/privacy`, `/terms` (public). Templates in `templates/legal/`, shared "not legal advice" banner in `_shared.py`.
+- `templates/components/footer.py` rendered by `html_base()` on every full page (not HTMX fragments). Shows version from `pindb.__version__` via `importlib.metadata` and `CONFIGURATION.contact_email`.
+- Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.flex-grow.min-h-screen`.
+- Copyright: project name only ("PinDB"), no person named.
 
-## Key Entities
-- **Pin** — central model. Has grades, shops, artists, sets, tags (including material-style tags via `TagCategory.material`), links, images, currency, acquisition/funding type.
-- **PinSet** — ordered pin collection. Global (admin) or personal (user). `owner_id` FK.
-- **User** — unique username, optional email/password (OAuth users may have no password), `is_admin`, `is_editor`.
-- **UserSession** — token (PK), user_id, expires_at.
-- **UserAuthProvider** — links User to Google/Discord accounts.
-- **UserOwnedPin** — owned pins per-grade with quantity and tradeable quantity.
-- **UserWantedPin** — wanted pins per-grade.
-- **Artist, Shop, Tag, Grade, Currency, Link** — supporting entities.
-- **Tag** — hierarchical (self-referential `parent_id`); `TagCategory` includes `material` for finish/material (not a separate entity table). Aliases on tags (`tag_aliases`), shops (`shop_aliases`), and artists (`artist_aliases`) are unique per `(entity_id, alias)`; the same alias string may appear on different entities.
+## Key Entities (non-obvious)
+- **Pin** — central. Material/finish lives on `Tag` via `TagCategory.material` (no separate entity table).
+- **PinSet** — ordered, `owner_id` NULL = global else personal.
+- **Tag** — hierarchical via self-referential `parent_id`. Aliases on `tag_aliases`/`shop_aliases`/`artist_aliases` unique per `(entity_id, alias)` — the same alias string may appear on different entities.
 
 ## Deployment (Docker)
-The `app` service uses `env_file: .env` so variables from the project `.env` (e.g. `SECRET_KEY`, OAuth) are passed into the container. Values under `environment:` in `docker-compose.yaml` override the same keys from `.env` — so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
+`app` service uses `env_file: .env`. Values under `environment:` in `docker-compose.yaml` override `.env` keys so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
 
 ```bash
-# Production
-docker compose up -d
-
-# Dev (services only, run app locally)
-docker compose -f docker-compose.dev.yaml up -d
+docker compose up -d                              # Production
+docker compose -f docker-compose.dev.yaml up -d   # Dev services only
 ```
 
-Startup sequence (via `docker-entrypoint.sh`):
-1. Wait for Postgres health check.
-2. `alembic upgrade head`
-3. `uvicorn pindb:app --host 0.0.0.0 --port 8000`
+Startup via `docker-entrypoint.sh`: wait for Postgres → `alembic upgrade head` → `uvicorn pindb:app --host 0.0.0.0 --port 8000`.
 
 ## Bulk Import
 CSV import via `scripts/import_csv.py`. See `scripts/README.md` for column format and grade encoding.
