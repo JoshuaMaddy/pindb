@@ -22,6 +22,8 @@ from pindb.lifespan import lifespan  # noqa: E402
 from pindb.routes import (  # noqa: E402
     admin,
     approve,
+    auth,
+    bulk,
     create,
     delete,
     edit,
@@ -29,13 +31,10 @@ from pindb.routes import (  # noqa: E402
     legal,
     list,
     search,
+    user,
 )
-from pindb.routes.auth import router as auth_router  # noqa: E402
-from pindb.routes.auth._test_oauth import router as test_oauth_router  # noqa: E402
-from pindb.routes.bulk import router as bulk_router  # noqa: E402
-from pindb.routes.user import router as user_router  # noqa: E402
-from pindb.routes.user.collection import router as collection_router  # noqa: E402
-from pindb.routes.user.security import router as security_router  # noqa: E402
+from pindb.routes.auth import _test_oauth  # noqa: E402
+from pindb.routes.user import collection, security  # noqa: E402
 from pindb.templates.homepage import homepage  # noqa: E402
 
 register_audit_events()
@@ -69,17 +68,17 @@ def root(request: Request):
 
 app.include_router(admin.router)
 app.include_router(approve.router)
-app.include_router(auth_router)
+app.include_router(auth.router)
 if CONFIGURATION.allow_test_oauth_provider:
-    app.include_router(test_oauth_router)
-app.include_router(security_router)
-app.include_router(user_router)
-app.include_router(collection_router)
+    app.include_router(_test_oauth.router)
+app.include_router(security.router)
+app.include_router(user.router)
+app.include_router(collection.router)
 app.include_router(create.router)
 app.include_router(get.router)
 app.include_router(edit.router)
 app.include_router(list.router)
 app.include_router(search.router)
 app.include_router(delete.router)
-app.include_router(bulk_router)
+app.include_router(bulk.router)
 app.include_router(legal.router)

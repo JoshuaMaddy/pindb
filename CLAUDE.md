@@ -55,7 +55,7 @@ src/pindb/
 │   └── update.py            # Index setup, single/batch/full sync, delete
 ├── routes/
 │   ├── __init__.py          # Router registration
-│   ├── admin.py             # Admin panel, user management (admin/editor promote/demote), search sync
+│   ├── admin/               # Admin routes: panel, users, search sync, tag bulk-upsert (`__init__.py` composes routers)
 │   ├── approve.py           # Pending approval queue (GET/POST /admin/pending/…) — admin only
 │   ├── _guards.py           # assert_editor_can_edit() — ownership check for edit routes
 │   ├── delete.py            # Soft delete (POST /delete/{entity}/{id}) — sets deleted_at/deleted_by_id
@@ -311,6 +311,7 @@ Pending items appear in create/edit form selection lists with a `(P) ` name pref
 
 ### Admin management
 - `POST /admin/users/{id}/promote-editor` / `demote-editor` — grant/revoke editor role
+- `POST /admin/tags/bulk-upsert` — JSON body `{ "tags": [ { "name", "category", "description", "aliases", "implications": [ … ] } ] }`; creates or merges tags (new aliases and implications; fills empty description / default category); new implications propagate to pins like the tag edit form (`resolve_implications` + `pins_tags` insert)
 - Admin panel shows pending count badge; links to `/admin/pending`
 
 ## Account Erasure (GDPR)

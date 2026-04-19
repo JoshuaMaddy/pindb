@@ -1,0 +1,35 @@
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from pindb.database import Artist, Pin, PinSet, Shop, Tag
+from pindb.database.pending_edit import PendingEdit
+
+
+def count_pending(session: Session) -> int:
+    opts: dict[str, bool] = {"include_pending": True}
+    total = 0
+    for model in [Pin, Shop, Artist, Tag, PinSet]:
+        count = session.scalar(
+            select(func.count())
+            .select_from(model)
+            .where(
+                model.approved_at.is_(None),  # type: ignore[attr-defined]
+                model.rejected_at.is_(None),  # type: ignore[attr-defined]
+                model.deleted_at.is_(None),  # type: ignore[attr-defined]
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+        total += count or 0
+
+    edit_group_subq = (
+        select(PendingEdit.entity_type, PendingEdit.entity_id)
+        .where(
+            PendingEdit.approved_at.is_(None),
+            PendingEdit.rejected_at.is_(None),
+        )
+        .distinct()
+        .subquery()
+    )
+    edit_group_count = session.scalar(select(func.count()).select_from(edit_group_subq))
+    total += edit_group_count or 0
+    return total

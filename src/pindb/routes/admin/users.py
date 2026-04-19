@@ -1,66 +1,17 @@
 from typing import Sequence
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
-from pindb.auth import AdminUser, require_admin
-from pindb.database import Artist, Pin, PinSet, Shop, Tag, session_maker
+from pindb.auth import AdminUser
+from pindb.database import session_maker
 from pindb.database.erasure import erase_user_account
-from pindb.database.pending_edit import PendingEdit
 from pindb.database.user import User
-from pindb.search.update import update_all
-from pindb.templates.admin.index import admin_panel_page
 from pindb.templates.admin.users import admin_users_page
 
-router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
-
-
-def _count_pending(session: Session) -> int:
-    opts: dict[str, bool] = {"include_pending": True}
-    total = 0
-    for model in [Pin, Shop, Artist, Tag, PinSet]:
-        count = session.scalar(
-            select(func.count())
-            .select_from(model)
-            .where(
-                model.approved_at.is_(None),  # type: ignore[attr-defined]
-                model.rejected_at.is_(None),  # type: ignore[attr-defined]
-                model.deleted_at.is_(None),  # type: ignore[attr-defined]
-            )
-            .execution_options(**opts)  # type: ignore[arg-type]
-        )
-        total += count or 0
-
-    edit_group_subq = (
-        select(PendingEdit.entity_type, PendingEdit.entity_id)
-        .where(
-            PendingEdit.approved_at.is_(None),
-            PendingEdit.rejected_at.is_(None),
-        )
-        .distinct()
-        .subquery()
-    )
-    edit_group_count = session.scalar(select(func.count()).select_from(edit_group_subq))
-    total += edit_group_count or 0
-    return total
-
-
-@router.get("")
-def get_admin_panel(request: Request) -> HTMLResponse:
-    with session_maker() as session:
-        pending_count = _count_pending(session)
-    return HTMLResponse(
-        content=str(admin_panel_page(request=request, pending_count=pending_count))
-    )
-
-
-@router.post("/search/sync")
-def sync_search_index() -> HTMLResponse:
-    update_all()
-    return HTMLResponse(content="Search index sync triggered.")
+router = APIRouter()
 
 
 @router.get("/users")
