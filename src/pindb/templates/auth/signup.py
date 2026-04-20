@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/auth/signup.py`.
+"""
+
 from fastapi import Request
 from htpy import (
     Element,

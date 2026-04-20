@@ -1,3 +1,5 @@
+"""DB-backed login session rows (opaque token → user, expiry)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,6 +22,8 @@ if TYPE_CHECKING:
 
 
 class UserSession(MappedAsDataclass, Base):
+    """Server-side session record referenced by the ``session`` cookie token."""
+
     __tablename__ = "user_sessions"
 
     token: Mapped[str] = mapped_column(primary_key=True)
@@ -33,6 +37,7 @@ class UserSession(MappedAsDataclass, Base):
     user: Mapped[User] = relationship(back_populates="sessions", init=False)
 
     def __rich_repr__(self) -> Result:
+        """Rich-friendly debug fields; tolerates detached instances."""
         try:
             yield "user_id", self.user_id
             yield "expires_at", self.expires_at

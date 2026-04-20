@@ -1,9 +1,14 @@
+"""
+FastAPI routes: `routes/create/pin_set.py`.
+"""
+
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 
 from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
+from pindb.htmx_toast import redirect_or_htmx_toast
 from pindb.log import user_logger
 from pindb.search.update import update_pin_set
 
@@ -19,12 +24,12 @@ def get_create_pin_set(request: Request) -> HTMLResponse:
     return HTMLResponse(content=str(pin_set_create_page(request=request)))
 
 
-@router.post(path="/pin_set")
+@router.post(path="/pin_set", response_model=None)
 def post_create_pin_set(
     request: Request,
     name: str = Form(),
     description: str | None = Form(default=None),
-) -> RedirectResponse:
+) -> HTMLResponse | RedirectResponse:
     LOGGER.info("Creating pin_set name=%r", name)
     with session_maker.begin() as session:
         pin_set = PinSet(
@@ -38,7 +43,8 @@ def post_create_pin_set(
     update_pin_set(pin_set=pin_set)
     LOGGER.info("Created pin_set id=%d name=%r", set_id, name)
 
-    return RedirectResponse(
-        url=str(request.url_for("get_edit_set", set_id=set_id)),
-        status_code=303,
+    return redirect_or_htmx_toast(
+        request=request,
+        redirect_url=str(request.url_for("get_edit_set", set_id=set_id)),
+        message="Pin set created.",
     )

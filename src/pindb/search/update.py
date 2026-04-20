@@ -1,3 +1,5 @@
+"""Meilisearch index lifecycle: settings, bulk sync from Postgres, add/delete helpers."""
+
 import logging
 from typing import Iterable, Protocol, Sequence
 
@@ -59,6 +61,7 @@ def _create_index(
 
 
 def setup_index() -> None:
+    """Create indexes if needed and apply searchable/filterable attribute settings."""
     LOGGER.info("Configuring Meilisearch indexes.")
     _create_index(
         uid=CONFIGURATION.meilisearch_index,
@@ -224,6 +227,7 @@ def _fetch_all(
 
 
 def update_all() -> None:
+    """Reconcile every Meilisearch index with the current database rows (add + prune)."""
     LOGGER.info("Updating all search indexes.")
     with session_maker() as session:
         pins, tags, artists, shops, pin_sets = _fetch_all(session)

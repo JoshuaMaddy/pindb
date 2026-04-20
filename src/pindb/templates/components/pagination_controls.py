@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/pagination_controls.py`.
+"""
+
 import math
 from urllib.parse import urlencode
 

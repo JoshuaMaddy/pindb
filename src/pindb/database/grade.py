@@ -1,3 +1,5 @@
+"""Grade variants for a pin (name + optional MSRP) used in collection/trading."""
+
 from __future__ import annotations
 
 from rich.repr import Result
@@ -8,6 +10,8 @@ from pindb.database.base import Base
 
 
 class Grade(AuditMixin, MappedAsDataclass, Base):
+    """A named condition tier linked to pins and user inventory rows."""
+
     __tablename__ = "grades"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)

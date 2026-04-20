@@ -1,3 +1,5 @@
+"""Alembic environment: loads ORM metadata and runs migrations against ``CONFIGURATION``."""
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool

@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/edit/_pending_helpers.py`.
+"""
+
 from typing import Iterable
 
 from fastapi import Request
@@ -17,6 +21,7 @@ from pindb.database.pin import Pin
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
+from pindb.htmx_toast import hx_redirect_with_toast_headers
 
 
 def submit_pending_edit(
@@ -47,7 +52,12 @@ def submit_pending_edit(
 
     patch = compute_patch(old_snapshot, new_snapshot)
     if not patch:
-        return HTMLResponse(headers={"HX-Redirect": redirect_url})
+        return HTMLResponse(
+            headers=hx_redirect_with_toast_headers(
+                redirect_url=redirect_url,
+                message="No changes to save.",
+            )
+        )
 
     head = get_head_edit(session, entity_table, entity_id)
     session.add(
@@ -60,7 +70,12 @@ def submit_pending_edit(
         )
     )
 
-    return HTMLResponse(headers={"HX-Redirect": redirect_url + "?version=pending"})
+    return HTMLResponse(
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=redirect_url + "?version=pending",
+            message="Changes submitted for review.",
+        )
+    )
 
 
 def replace_links(

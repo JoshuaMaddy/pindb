@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/admin/pending.py`.
+"""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Sequence

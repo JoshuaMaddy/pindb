@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/auth/oauth_onboarding.py`.
+"""
+
 from fastapi import Request
 from htpy import (
     Element,

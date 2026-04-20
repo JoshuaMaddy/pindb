@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/bulk/__init__.py`.
+"""
+
 from fastapi import Depends
 from fastapi.routing import APIRouter
 

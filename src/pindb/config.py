@@ -1,3 +1,10 @@
+"""Typed application settings loaded from the environment and optional ``.env``.
+
+The module exposes a single instance, ``CONFIGURATION``, constructed at import
+time. Validation errors are printed as JSON to stderr and re-raised so
+misconfiguration fails fast at startup.
+"""
+
 import sys
 from pathlib import Path
 from typing import Literal
@@ -8,6 +15,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Configuration(BaseSettings):
+    """Pydantic settings model for PinDB (images, DB, search, auth, logging)."""
+
     model_config = SettingsConfigDict(
         extra="ignore",
         env_file=".env",
@@ -56,6 +65,7 @@ class Configuration(BaseSettings):
 
     @property
     def meili_client(self) -> meilisearch.Client:
+        """Lazily construct a singleton Meilisearch client for ``meilisearch_url``."""
         if self.__meili_client is None:
             self.__meili_client = meilisearch.Client(
                 url=self.meilisearch_url,
@@ -105,6 +115,7 @@ class Configuration(BaseSettings):
 
     @property
     def bootstrap_admin_username_list(self) -> list[str]:
+        """Split ``bootstrap_admin_usernames`` into non-empty trimmed names."""
         return [
             u.strip() for u in self.bootstrap_admin_usernames.split(",") if u.strip()
         ]

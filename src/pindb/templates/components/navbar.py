@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/navbar.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, a, button, div, form, i, nav
 

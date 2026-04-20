@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/delete.py`.
+"""
+
 from fastapi import Depends
 from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/pin_preview_card.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, a, div, i, img, span
 

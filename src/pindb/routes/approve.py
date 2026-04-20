@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/approve.py`.
+"""
+
 from datetime import datetime
 from typing import Any, cast
 from uuid import UUID

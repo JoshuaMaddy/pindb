@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/get/__init__.py`.
+"""
+
 from fastapi import Depends
 from fastapi.routing import APIRouter
 

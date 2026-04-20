@@ -1,3 +1,5 @@
+"""PinDB ASGI application: FastAPI ``app``, middleware stack, and routers."""
+
 from importlib.metadata import PackageNotFoundError, version
 
 # Resolve __version__ before any pindb.* imports so footer / legal pages

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/thumbnail_grid.py`.
+"""
+
 from random import sample
 from typing import Sequence
 

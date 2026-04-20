@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/create/shop.py`.
+"""
+
 from typing import Annotated
 
 from fastapi import Form, Request
@@ -8,7 +12,11 @@ from sqlalchemy.exc import IntegrityError
 
 from pindb.database import Shop, ShopAlias, session_maker
 from pindb.database.link import Link
-from pindb.htmx_toast import is_unique_violation, unique_constraint_response
+from pindb.htmx_toast import (
+    hx_redirect_with_toast_headers,
+    is_unique_violation,
+    unique_constraint_response,
+)
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.search.update import update_shop
@@ -74,5 +82,8 @@ def post_create_shop(
     LOGGER.info("Created shop id=%d name=%r", shop_id, name)
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_shop", id=shop_id))}
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_shop", id=shop_id)),
+            message="Shop created.",
+        )
     )

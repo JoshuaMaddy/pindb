@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/search/pin.py`.
+"""
+
 from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, a, div, form, h1, hr, i, input

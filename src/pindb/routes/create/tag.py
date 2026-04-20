@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/create/tag.py`.
+"""
+
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
@@ -6,7 +10,11 @@ from sqlalchemy.exc import IntegrityError
 
 from pindb.database import Tag, TagAlias, TagCategory, session_maker
 from pindb.database.tag import normalize_tag_name
-from pindb.htmx_toast import is_unique_violation, unique_constraint_response
+from pindb.htmx_toast import (
+    hx_redirect_with_toast_headers,
+    is_unique_violation,
+    unique_constraint_response,
+)
 from pindb.log import user_logger
 from pindb.search.update import update_tag
 from pindb.templates.create_and_edit.tag import tag_form
@@ -77,5 +85,8 @@ def post_create_tag(
     LOGGER.info("Created tag id=%d name=%r", tag_id, name)
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_tag", id=tag_id))}
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_tag", id=tag_id)),
+            message="Tag created.",
+        )
     )

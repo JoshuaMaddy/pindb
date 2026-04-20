@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/bulk/pin.py`.
+"""
+
 from datetime import date
 from typing import Sequence, TypeVar
 from uuid import UUID, uuid4

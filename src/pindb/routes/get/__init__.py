@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/__init__.py`.
+"""
+
 from fastapi.routing import APIRouter
 
 from pindb.routes.get import artist, image, options, pin, pin_set, shop, tag

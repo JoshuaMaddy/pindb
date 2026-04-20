@@ -1,3 +1,5 @@
+"""SQLAlchemy engine, ``session_maker``, ORM exports, and currency seeding."""
+
 from pathlib import Path
 
 import polars as pl
@@ -64,6 +66,10 @@ session_maker: sessionmaker[Session] = SessionMaker(
 
 
 def seed_currencies() -> None:
+    """Insert ISO currency rows from ``database/data/currencies.csv`` if missing.
+
+    Idempotent: skips rows whose primary key already exists.
+    """
     currencies_df: pl.DataFrame = pl.read_csv(
         Path(__file__).parent / "data" / "currencies.csv"
     )

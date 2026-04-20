@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/bulk/pin.py`.
+"""
+
 import json
 from pathlib import Path
 from typing import Sequence

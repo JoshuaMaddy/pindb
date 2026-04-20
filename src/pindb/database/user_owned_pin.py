@@ -1,3 +1,5 @@
+"""Per-user collection rows: quantity and tradeable counts per pin grade."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
 
 
 class UserOwnedPin(AuditMixin, MappedAsDataclass, Base):
+    """One row per (user, pin, grade) inventory line including trade stock."""
+
     __tablename__ = "user_owned_pins"
     __table_args__ = (
         UniqueConstraint(

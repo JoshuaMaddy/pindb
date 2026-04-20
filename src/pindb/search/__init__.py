@@ -1,3 +1,9 @@
+"""Package marker for ``pindb.search.*`` submodules (import via ``importlib`` if needed).
+
+Note: ``pindb.routes.search`` is mounted on the app for HTML search; this file is
+not the primary search entry point.
+"""
+
 from fastapi import Depends
 from fastapi.routing import APIRouter
 

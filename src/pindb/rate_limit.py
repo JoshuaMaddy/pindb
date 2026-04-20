@@ -29,6 +29,15 @@ _parsed_cache: dict[str, RateLimitItem] = {}
 
 
 def _parse(limit_str: str) -> RateLimitItem:
+    """Parse a limits-library limit string with process-wide memoization.
+
+    Args:
+        limit_str (str): String accepted by ``limits.parse`` (e.g. ``"5/minute"``).
+
+    Returns:
+        RateLimitItem: Parsed limit object reused for all calls with the same
+            *limit_str*.
+    """
     cached = _parsed_cache.get(limit_str)
     if cached is None:
         cached = parse(limit_str)
@@ -37,12 +46,28 @@ def _parse(limit_str: str) -> RateLimitItem:
 
 
 def _client_ip(request: Request) -> str:
+    """Best-effort client IP for rate-limit keying.
+
+    Args:
+        request (Request): Incoming request (uses ``request.client.host``).
+
+    Returns:
+        str: Remote host, or ``"unknown"`` when the client address is missing.
+    """
     client = request.client
     return client.host if client else "unknown"
 
 
 def rate_limit(limit_str: str):
-    """Build a FastAPI dependency that enforces a per-IP, per-path limit."""
+    """Build a FastAPI dependency that enforces a per-IP, per-path limit.
+
+    Args:
+        limit_str (str): Limit specification for the ``limits`` library.
+
+    Returns:
+        Callable[[Request], None]: Dependency that raises ``HTTPException(429)``
+            with ``Retry-After`` when the window is exceeded.
+    """
     limit = _parse(limit_str)
 
     def dependency(request: Request) -> None:
@@ -60,5 +85,8 @@ def rate_limit(limit_str: str):
 
 
 def reset_rate_limits() -> None:
-    """Clear all rate-limit counters. Used in test setup/teardown."""
+    """Clear all in-memory rate-limit counters.
+
+    Intended for test setup and teardown so limits do not leak across cases.
+    """
     _storage.reset()

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/page_heading.py`.
+"""
+
 from htpy import Element, div, h1, h2, i
 
 from pindb.templates.types import Content

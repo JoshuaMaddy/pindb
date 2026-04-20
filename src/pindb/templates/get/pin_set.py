@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/get/pin_set.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Request
@@ -75,6 +79,7 @@ def pin_set_page(
                                         "delete_personal_set", set_id=pin_set.id
                                     )
                                 ),
+                                htmx_post=True,
                             ),
                         ],
                     ],

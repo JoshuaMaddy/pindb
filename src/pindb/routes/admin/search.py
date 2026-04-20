@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/admin/search.py`.
+"""
+
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 

@@ -45,6 +45,7 @@ from pindb.models.funding_type import FundingType
 
 
 def snapshot_pin(pin: Pin) -> dict[str, Any]:
+    """Flatten a ``Pin`` graph into JSON-safe primitives for pending-edit diffs."""
     return {
         "name": pin.name,
         "acquisition_type": pin.acquisition_type.value,
@@ -74,6 +75,7 @@ def snapshot_pin(pin: Pin) -> dict[str, Any]:
 
 
 def snapshot_artist(artist: Artist) -> dict[str, Any]:
+    """Snapshot editable ``Artist`` columns and link URLs."""
     return {
         "name": artist.name,
         "description": artist.description,
@@ -83,6 +85,7 @@ def snapshot_artist(artist: Artist) -> dict[str, Any]:
 
 
 def snapshot_shop(shop: Shop) -> dict[str, Any]:
+    """Snapshot editable ``Shop`` columns and link URLs."""
     return {
         "name": shop.name,
         "description": shop.description,
@@ -92,6 +95,7 @@ def snapshot_shop(shop: Shop) -> dict[str, Any]:
 
 
 def snapshot_tag(tag: Tag) -> dict[str, Any]:
+    """Snapshot ``Tag`` fields, implication ids, and alias strings."""
     return {
         "name": tag.name,
         "description": tag.description,
@@ -102,6 +106,7 @@ def snapshot_tag(tag: Tag) -> dict[str, Any]:
 
 
 def snapshot_entity(entity: Pin | Artist | Shop | Tag) -> dict[str, Any]:
+    """Dispatch to entity-specific snapshot helpers."""
     if isinstance(entity, Pin):
         return snapshot_pin(entity)
     if isinstance(entity, Artist):
@@ -119,6 +124,7 @@ def snapshot_entity(entity: Pin | Artist | Shop | Tag) -> dict[str, Any]:
 
 
 def compute_patch(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    """Build a field-wise ``{key: {old, new}}`` diff between two snapshots."""
     patch: dict[str, Any] = {}
     for key in set(old) | set(new):
         old_val = old.get(key)
@@ -129,6 +135,7 @@ def compute_patch(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
 
 
 def apply_patch(snapshot: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    """Return *snapshot* with each patch field replaced by its ``new`` value."""
     result: dict[str, Any] = dict(snapshot)
     for key, change in patch.items():
         result[key] = change["new"]
@@ -185,6 +192,7 @@ def get_effective_snapshot(
 
 
 def has_pending_edits(session: Session, entity_type: str, entity_id: int) -> bool:
+    """Return whether any unapproved ``PendingEdit`` exists for the entity."""
     return get_head_edit(session, entity_type, entity_id) is not None
 
 

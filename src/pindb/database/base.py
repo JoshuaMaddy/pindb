@@ -1,8 +1,12 @@
+"""Declarative ORM base with consistent metadata naming conventions."""
+
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
+    """SQLAlchemy declarative base for all PinDB tables."""
+
     metadata = MetaData(
         # For Sqlite migrations
         naming_convention={

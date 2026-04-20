@@ -20,6 +20,7 @@ from pindb.database.user_wanted_pin import UserWantedPin
 
 
 def count_favorites(*, session: Session, user_id: int) -> int:
+    """Return how many pins the user has favorited."""
     return (
         session.scalar(
             select(func.count())
@@ -38,6 +39,7 @@ def get_favorite_pins(
     offset: int = 0,
     eager_pin_relationships: bool = False,
 ) -> list[Pin]:
+    """Return a page of favorite pins ordered by name."""
     statement = (
         select(Pin)
         .join(user_favorite_pins, Pin.id == user_favorite_pins.c.pin_id)
@@ -60,6 +62,7 @@ def get_favorite_pins(
 
 
 def count_owned(*, session: Session, user_id: int, tradeable_only: bool = False) -> int:
+    """Count distinct pins owned (optionally only those with trade stock)."""
     statement = select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
         UserOwnedPin.user_id == user_id
     )
@@ -127,6 +130,7 @@ def get_owned_entries(
 
 
 def count_wanted(*, session: Session, user_id: int) -> int:
+    """Count distinct pins on the user's want list."""
     return (
         session.scalar(
             select(func.count(func.distinct(UserWantedPin.pin_id))).where(
@@ -145,6 +149,7 @@ def get_wanted_entries(
     offset: int = 0,
     eager_pin_relationships: bool = False,
 ) -> list[UserWantedPin]:
+    """Return want-list rows for a page of distinct pins."""
     pin_ids = list(
         session.scalars(
             select(UserWantedPin.pin_id)

@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/list/__init__.py`.
+"""
+
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter

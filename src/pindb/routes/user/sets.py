@@ -16,6 +16,7 @@ from pindb.database.joins import (
     user_favorite_pin_sets,
     user_favorite_pins,
 )
+from pindb.htmx_toast import redirect_or_htmx_toast
 from pindb.search.search import search_pin
 from pindb.templates.create_and_edit.pin_set import (
     pin_card_oob,
@@ -99,7 +100,7 @@ def update_set(
     current_user: AuthenticatedUser,
     name: Annotated[str, Form()],
     description: Annotated[str | None, Form()] = None,
-) -> RedirectResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as db:
         pin_set: PinSet | None = db.get(PinSet, set_id)
         if pin_set is None:
@@ -116,7 +117,11 @@ def update_set(
             request.url_for("get_user_profile", username=current_user.username)
         )
 
-    return RedirectResponse(url=back_url, status_code=303)
+    return redirect_or_htmx_toast(
+        request=request,
+        redirect_url=back_url,
+        message="Pin set updated.",
+    )
 
 
 @router.post("/sets/{set_id}/pins/reorder", response_model=None)
@@ -154,7 +159,7 @@ def promote_set_to_global(
     request: Request,
     set_id: int,
     _current_user: AdminUser,
-) -> RedirectResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as db:
         pin_set: PinSet | None = db.get(PinSet, set_id)
         if pin_set is None:
@@ -164,9 +169,10 @@ def promote_set_to_global(
         # owner_id=None ⇒ global, visible to all
         pin_set.owner_id = None
 
-    return RedirectResponse(
-        url=str(request.url_for("get_list_pin_sets")),
-        status_code=303,
+    return redirect_or_htmx_toast(
+        request=request,
+        redirect_url=str(request.url_for("get_list_pin_sets")),
+        message="Set promoted to global.",
     )
 
 
@@ -267,7 +273,7 @@ def create_personal_set(
     current_user: AuthenticatedUser,
     name: Annotated[str, Form()],
     description: Annotated[str | None, Form()] = None,
-) -> RedirectResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as db:
         pin_set = PinSet(
             name=name.strip(),
@@ -278,9 +284,10 @@ def create_personal_set(
         db.flush()
         set_id = pin_set.id
 
-    return RedirectResponse(
-        url=str(request.url_for("get_edit_set", set_id=set_id)),
-        status_code=303,
+    return redirect_or_htmx_toast(
+        request=request,
+        redirect_url=str(request.url_for("get_edit_set", set_id=set_id)),
+        message="Set created.",
     )
 
 
@@ -289,7 +296,7 @@ def delete_personal_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
-) -> RedirectResponse:
+) -> HTMLResponse | RedirectResponse:
     with session_maker.begin() as db:
         pin_set: PinSet | None = db.get(PinSet, set_id)
         if pin_set is None:
@@ -297,9 +304,12 @@ def delete_personal_set(
         _assert_can_edit_set(pin_set, current_user)
         db.delete(pin_set)
 
-    return RedirectResponse(
-        url=str(request.url_for("get_user_profile", username=current_user.username)),
-        status_code=303,
+    return redirect_or_htmx_toast(
+        request=request,
+        redirect_url=str(
+            request.url_for("get_user_profile", username=current_user.username)
+        ),
+        message="Set deleted.",
     )
 
 

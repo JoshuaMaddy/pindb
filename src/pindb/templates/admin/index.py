@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/admin/index.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, a, button, div, form, hr, i, p, span
 

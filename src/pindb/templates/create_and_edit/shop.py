@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/create_and_edit/shop.py`.
+"""
+
 import json
 
 from fastapi import Request

@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/list/tags.py`.
+"""
+
 from typing import Annotated, Sequence
 
 from fastapi import Query, Request

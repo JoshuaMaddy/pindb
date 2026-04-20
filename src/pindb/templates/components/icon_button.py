@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/icon_button.py`.
+"""
+
 from htpy import Element, a, button, i
 
 

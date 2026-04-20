@@ -1,3 +1,5 @@
+"""Small shared helpers: time, URLs, and currency display."""
+
 from datetime import datetime, timezone
 from urllib.parse import ParseResult, urlparse
 
@@ -5,11 +7,24 @@ from babel.numbers import format_currency
 
 
 def utc_now() -> datetime:
-    """Return the current UTC time as a naive datetime (no tzinfo)."""
+    """Return the current UTC time as a naive datetime (no ``tzinfo``).
+
+    Returns:
+        datetime: Wall time in UTC with ``tzinfo`` cleared for DB columns that
+            store naive timestamps.
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def domain_from_url(url: str) -> str:
+    """Return the host / authority portion of *url*.
+
+    Args:
+        url (str): Absolute or relative URL string.
+
+    Returns:
+        str: ``netloc`` from parsing (may be empty).
+    """
     parse: ParseResult = urlparse(url)
     return parse.netloc
 
@@ -65,12 +80,18 @@ CURRENCY_DEFAULT_LOCALE: dict[str, str] = {
 def format_currency_code(
     amount: float | None, code: str, locale: str | None = None
 ) -> str:
-    """
-    Format a number as a currency value based on ISO currency code.
+    """Format *amount* as a localized currency string for an ISO currency *code*.
 
-    - `amount`:    Number to format. None returns "Unknown".
-    - `code`:      ISO currency code like "USD", "EUR", "JPY". "UNK" returns "Unknown".
-    - `locale`:    Override locale (optional). If None, a default is chosen automatically.
+    Args:
+        amount (float | None): Numeric value, or ``None`` for unknown amounts.
+        code (str): ISO 4217 code such as ``"USD"`` or ``"EUR"``. ``"UNK"``
+            yields the literal ``"Unknown"``.
+        locale (str | None): Babel locale string; when ``None``, a default is
+            picked from ``CURRENCY_DEFAULT_LOCALE`` or ``"en_US"``.
+
+    Returns:
+        str: Localized currency text, ``"Unknown"`` for missing amounts or
+            ``UNK``, or a ``"{CODE} {amount}"`` fallback when Babel raises.
     """
     if amount is None:
         return "Unknown"

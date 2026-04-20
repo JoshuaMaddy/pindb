@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/description_block.py`.
+"""
+
 from htpy import Fragment, div, fragment
 
 from pindb.markdown_utils import render_md

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/view_toggle.py`.
+"""
+
 from urllib.parse import urlencode
 
 from htpy import Element, a, div

@@ -1,3 +1,5 @@
+"""Admin-reviewable proposed edits to canonical entities (patch chains)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -67,6 +69,7 @@ class PendingEdit(MappedAsDataclass, Base):
         return self.rejected_at is not None
 
     def __rich_repr__(self) -> Result:
+        """Rich debug fields for consoles and traces."""
         try:
             yield "id", self.id
             yield "entity_type", self.entity_type

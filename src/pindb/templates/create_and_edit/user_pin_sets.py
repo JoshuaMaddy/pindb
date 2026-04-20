@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/create_and_edit/user_pin_sets.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, button, div, form, hr, input
 
@@ -32,6 +36,8 @@ def _create_form(request: Request) -> Element:
         form(
             method="post",
             action=str(request.url_for("create_personal_set")),
+            hx_post=str(request.url_for("create_personal_set")),
+            hx_swap="none",
             class_="flex flex-col gap-2",
         )[
             form_field(

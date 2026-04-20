@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/user/collection.py`.
+"""
+
 from typing import Annotated
 
 from fastapi import Form, HTTPException, Request

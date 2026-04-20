@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/htmx_search_input.py`.
+"""
+
 from htpy import VoidElement, input
 
 

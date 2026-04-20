@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/markdown_editor.py`.
+"""
+
 from htpy import Element, div, input, span
 
 

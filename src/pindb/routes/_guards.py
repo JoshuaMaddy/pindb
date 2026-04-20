@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/_guards.py`.
+"""
+
 from fastapi import HTTPException
 
 from pindb.database.pending_mixin import PendingAuditEntity

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/linked_items_row.py`.
+"""
+
 from typing import Iterable
 
 from htpy import Element, VoidElement, div, i, p

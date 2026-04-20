@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/admin/users.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import HTTPException, Request

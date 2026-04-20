@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/tag.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Query, Request

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/create_and_edit/pin_set.py`.
+"""
+
 from fastapi import Request
 from htpy import (
     Element,
@@ -76,6 +80,8 @@ def pin_set_create_page(request: Request) -> Element:
                 form(
                     method="post",
                     action=str(request.url_for("post_create_pin_set")),
+                    hx_post=str(request.url_for("post_create_pin_set")),
+                    hx_swap="none",
                     class_="flex flex-col gap-2",
                 )[
                     form_field(
@@ -151,6 +157,7 @@ def pin_set_edit_page(
                 message=f'Promote "{pin_set.name}" to a global set? It will become admin-only and visible to all users.',
                 form_action=promote_url,
                 confirm_label="Promote",
+                htmx_post=True,
             )
         )
 
@@ -196,6 +203,8 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
         form(
             method="post",
             action=str(request.url_for("update_set", set_id=pin_set.id)),
+            hx_post=str(request.url_for("update_set", set_id=pin_set.id)),
+            hx_swap="none",
             class_="flex flex-col gap-2",
         )[
             form_field(

@@ -1,3 +1,17 @@
+"""SQLAlchemy session hooks for audit timestamps, change history, and row visibility.
+
+Registers three listeners on ``Session``:
+
+* ``before_flush`` — fills ``AuditMixin`` timestamps and user ids, queues
+  ``ChangeLog`` work, and auto-approves ``PendingMixin`` rows created by admins.
+* ``after_flush`` — persists ``ChangeLog`` rows with JSON patches (or full
+  snapshots for creates).
+* ``do_orm_execute`` — applies loader criteria so soft-deleted rows and
+  pending/unapproved content are hidden unless execution options opt out.
+
+Audit user id and role flags come from ContextVars set in ``auth.attach_user_middleware``.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -43,19 +57,38 @@ _pending_audit: ContextVar[list[tuple[Any, str, dict | None]] | None] = ContextV
 
 
 def set_audit_user(user_id: int | None) -> None:
+    """Store the acting user id for the current async context (audit + ChangeLog).
+
+    Args:
+        user_id (int | None): Authenticated user primary key, or ``None`` for guests.
+    """
     _audit_user_id.set(user_id)
 
 
 def set_audit_user_flags(is_admin: bool, is_editor: bool) -> None:
+    """Store role flags used by pending-content visibility in ``_filter_deleted``.
+
+    Args:
+        is_admin (bool): Whether the current user is an admin.
+        is_editor (bool): Whether to use editor-style pending visibility. Callers
+            typically pass ``True`` here for editors **or** admins (admins see
+            pending content the same way editors do).
+    """
     _audit_user_is_admin.set(is_admin)
     _audit_user_is_editor.set(is_editor)
 
 
 def get_audit_user() -> int | None:
+    """Return the user id last set by ``set_audit_user`` for this context.
+
+    Returns:
+        int | None: Current audit user id, or ``None`` when unset.
+    """
     return _audit_user_id.get()
 
 
 def _serialize_value(val: object) -> object:
+    """Convert ORM values to JSON-friendly primitives for ``ChangeLog.patch``."""
     if val is None:
         return None
     if isinstance(val, datetime):
@@ -70,12 +103,21 @@ def _serialize_value(val: object) -> object:
 
 
 def _get_mapper(obj: AuditMixin) -> Any:
+    """Return SQLAlchemy mapper metadata for *obj* (internal helper).
+
+    Args:
+        obj (AuditMixin): ORM instance.
+
+    Returns:
+        Mapper for the instance's mapped class.
+    """
     insp: InstanceState[Any] | None = sqlalchemy.inspect(obj)  # type: ignore[assignment]
     assert insp is not None
     return insp.mapper
 
 
 def _snapshot(obj: AuditMixin) -> dict:
+    """Serialize all non-audit columns on *obj* for create operations."""
     mapper = _get_mapper(obj)
     return {
         col.key: _serialize_value(getattr(obj, col.key, None))
@@ -85,6 +127,7 @@ def _snapshot(obj: AuditMixin) -> dict:
 
 
 def _compute_patch(obj: AuditMixin) -> dict:
+    """Build a JSON-serializable ``{field: {old, new}}`` diff for dirty columns."""
     mapper = _get_mapper(obj)
     patch: dict = {}
     for col in mapper.column_attrs:
@@ -102,6 +145,7 @@ def _compute_patch(obj: AuditMixin) -> dict:
 
 
 def _before_flush(session: Session, flush_context: object, instances: object) -> None:
+    """Apply audit timestamps and queue ``ChangeLog`` entries for this flush."""
     from pindb.database.change_log import ChangeLog
 
     user_id = _audit_user_id.get()
@@ -149,6 +193,7 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
 
 
 def _after_flush(session: Session, flush_context: object) -> None:
+    """Persist ``ChangeLog`` rows for operations queued in ``_before_flush``."""
     from pindb.database.change_log import ChangeLog
 
     pending = _pending_audit.get()
@@ -171,6 +216,11 @@ def _after_flush(session: Session, flush_context: object) -> None:
 
 
 def _filter_deleted(execute_state: ORMExecuteState) -> None:
+    """Hide soft-deleted and (for most users) unapproved rows from SELECTs.
+
+    Honors ``execution_options(include_deleted=True)`` and
+    ``include_pending=True`` for admin approval views.
+    """
     if not execute_state.is_select:
         return
 
@@ -207,6 +257,7 @@ def _filter_deleted(execute_state: ORMExecuteState) -> None:
 
 
 def register_audit_events() -> None:
+    """Attach audit and visibility listeners to every ``Session`` (call once at import)."""
     event.listen(Session, "before_flush", _before_flush)
     event.listen(Session, "after_flush", _after_flush)
     event.listen(Session, "do_orm_execute", _filter_deleted)

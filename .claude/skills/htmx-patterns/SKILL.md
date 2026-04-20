@@ -63,9 +63,12 @@ h2(id="pin-list-count", hx_swap_oob="true")[f"Pins ({count})"]
 If destroying the container is unavoidable, reinitialize on `htmx:afterSettle` (fires after all OOB swaps complete):
 
 ```javascript
-document.body.addEventListener('htmx:afterSettle', function () {
-    var grid = document.getElementById('pin-list');
-    if (grid && !Sortable.get(grid)) Sortable.create(grid, { /* options */ });
+document.body.addEventListener("htmx:afterSettle", function () {
+  var grid = document.getElementById("pin-list");
+  if (grid && !Sortable.get(grid))
+    Sortable.create(grid, {
+      /* options */
+    });
 });
 ```
 

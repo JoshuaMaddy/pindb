@@ -1,3 +1,5 @@
+"""Want-list rows: desired pin optionally scoped to a specific grade."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
 
 
 class UserWantedPin(AuditMixin, MappedAsDataclass, Base):
+    """One row per (user, pin, grade) want entry."""
+
     __tablename__ = "user_wanted_pins"
     __table_args__ = (
         UniqueConstraint(

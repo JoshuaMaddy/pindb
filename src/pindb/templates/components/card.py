@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/card.py`.
+"""
+
 from fastapi.datastructures import URL
 from htpy import Element, div, i
 

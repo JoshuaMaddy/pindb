@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/error_message.py`.
+"""
+
 from htpy import Element, p
 
 

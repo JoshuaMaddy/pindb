@@ -1,3 +1,5 @@
+"""Application logging: Rich console output, rotating file handler, user prefix."""
+
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Any, MutableMapping
@@ -18,6 +20,20 @@ class _UserLoggerAdapter(logging.LoggerAdapter):
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
+        """Prefix the message with the current audit user id from ContextVar state.
+
+        Args:
+            msg (Any): Original log message.
+            kwargs (MutableMapping[str, Any]): Standard ``logging`` extras.
+
+        Returns:
+            tuple[Any, MutableMapping[str, Any]]: Message with ``[user=…]`` prefix
+                and unchanged kwargs.
+
+        Note:
+            Imports ``get_audit_user`` lazily to avoid an import cycle with
+            ``audit_events`` / ``config``.
+        """
         # Local import avoids import cycle (audit_events imports config).
         from pindb.audit_events import get_audit_user
 
@@ -26,15 +42,22 @@ class _UserLoggerAdapter(logging.LoggerAdapter):
 
 
 def user_logger(name: str) -> _UserLoggerAdapter:
-    """Return a logger that auto-prefixes records with the current user id."""
+    """Return a logger that prefixes each record with the current user id.
+
+    Args:
+        name (str): Logger name (typically ``__name__`` of the calling module).
+
+    Returns:
+        _UserLoggerAdapter: Adapter wrapping the stdlib logger *name*.
+    """
     return _UserLoggerAdapter(logging.getLogger(name), {})
 
 
 def setup_rich_logger() -> None:
-    """Cycles through uvicorn root loggers to
-    remove handler, then runs `get_logger_config()`
-    to populate the `LoggerConfig` class with Rich
-    logger parameters.
+    """Configure root logging with Rich (stderr) and a rotating log file.
+
+    Clears handlers on existing named loggers so ``uvicorn`` reconfiguration
+    picks up ``RichHandler`` plus ``RotatingFileHandler`` from ``CONFIGURATION``.
     """
     output_file_handler = RotatingFileHandler(
         filename=CONFIGURATION.log_file,

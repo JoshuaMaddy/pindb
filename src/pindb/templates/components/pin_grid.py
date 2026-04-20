@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/pin_grid.py`.
+"""
+
 from typing import Iterable
 
 from fastapi import Request

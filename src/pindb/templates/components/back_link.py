@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/back_link.py`.
+"""
+
 from htpy import Element, a, i
 
 

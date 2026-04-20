@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/get/pin.py`.
+"""
+
 from fastapi import Request
 from htpy import (
     Element,

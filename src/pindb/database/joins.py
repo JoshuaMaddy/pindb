@@ -1,3 +1,5 @@
+"""SQLAlchemy ``Table`` association objects (many-to-many, excluded from audit)."""
+
 from sqlalchemy import Column, ForeignKey, Integer, Table
 
 from pindb.database.base import Base

@@ -1,3 +1,5 @@
+"""Development CSV import: seed pins, related entities, and images from ``import.csv``."""
+
 import asyncio
 from pathlib import Path
 

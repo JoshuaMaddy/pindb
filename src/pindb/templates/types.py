@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/types.py`.
+"""
+
 from typing import Sequence
 
 from htpy import BaseElement, Fragment

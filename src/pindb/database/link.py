@@ -1,3 +1,5 @@
+"""External URL path strings attached to pins, shops, artists, and sets."""
+
 from __future__ import annotations
 
 from rich.repr import Result
@@ -8,6 +10,8 @@ from pindb.database.base import Base
 
 
 class Link(AuditMixin, MappedAsDataclass, Base):
+    """Single external hyperlink stored as a normalized path/URL string."""
+
     __tablename__ = "links"
 
     id: Mapped[int] = mapped_column(

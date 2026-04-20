@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/empty_state.py`.
+"""
+
 from htpy import Element, p
 
 

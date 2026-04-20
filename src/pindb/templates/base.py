@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/base.py`.
+"""
+
 import json
 import time
 from pathlib import Path
@@ -135,6 +139,22 @@ window.pindbNotyf = new Notyf({
     duration: 4500,
     position: { x: 'right', y: 'bottom' },
     ripple: true,
+});
+document.addEventListener('pindbToast', function (evt) {
+    var d = evt.detail;
+    if (!d || typeof d !== 'object') {
+        return;
+    }
+    var msg = d.message;
+    if (!msg) {
+        return;
+    }
+    var typ = d.type || 'success';
+    if (typ === 'success') {
+        window.pindbNotyf.success(msg);
+    } else {
+        window.pindbNotyf.error(msg);
+    }
 });
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     lucide.createIcons();

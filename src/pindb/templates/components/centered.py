@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/centered.py`.
+"""
+
 from typing import Literal
 
 from htpy import Element, div

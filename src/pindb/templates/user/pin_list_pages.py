@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/user/pin_list_pages.py`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence

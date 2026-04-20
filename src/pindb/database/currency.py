@@ -1,3 +1,5 @@
+"""ISO currency reference rows (seeded from CSV at startup)."""
+
 from __future__ import annotations
 
 from rich.repr import Result
@@ -8,6 +10,8 @@ from pindb.database.base import Base
 
 
 class Currency(AuditMixin, MappedAsDataclass, Base):
+    """Currency catalog entry (code + display name) for pin pricing."""
+
     __tablename__ = "currencies"
 
     id: Mapped[int] = mapped_column(primary_key=True)

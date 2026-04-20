@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/edit/artist.py`.
+"""
+
 from typing import Annotated
 
 from fastapi import Form, HTTPException, Request
@@ -15,6 +19,7 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
 )
+from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
@@ -120,5 +125,8 @@ def post_edit_artist(
         artist_id: int = artist.id
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_artist", id=artist_id))}
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_artist", id=artist_id)),
+            message="Artist updated.",
+        )
     )

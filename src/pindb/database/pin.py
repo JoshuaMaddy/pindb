@@ -1,3 +1,5 @@
+"""Core ``Pin`` ORM model: catalog entry, relationships, and Meilisearch ``document()``."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 
 
 def _ordered_unique_strings(strings: Iterable[str]) -> list[str]:
+    """Deduplicate strings while preserving first-seen order (search document helpers)."""
     seen: set[str] = set()
     out: list[str] = []
     for s in strings:
@@ -50,6 +53,8 @@ def _ordered_unique_strings(strings: Iterable[str]) -> list[str]:
 
 
 class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
+    """Collectible pin: images, metadata, grades, and graph to shops/artists/tags."""
+
     __tablename__ = "pins"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -136,6 +141,7 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return value.id == self.id
 
     def document(self) -> dict[str, object]:
+        """Payload indexed in Meilisearch (shops, tags, artists, description)."""
         result: dict[str, object] = {
             "id": self.id,
             "name": self.name,

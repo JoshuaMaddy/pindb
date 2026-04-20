@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/dropdown_panel.py`.
+"""
+
 from htpy import BaseElement, Element, div
 
 from pindb.templates.types import Content

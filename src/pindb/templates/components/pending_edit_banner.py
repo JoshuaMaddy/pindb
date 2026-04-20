@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/pending_edit_banner.py`.
+"""
+
 from htpy import Element, a, div, i
 
 

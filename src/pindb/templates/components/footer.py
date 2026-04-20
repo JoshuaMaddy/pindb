@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/footer.py`.
+"""
+
 from datetime import datetime
 
 from htpy import Element, a, div, p

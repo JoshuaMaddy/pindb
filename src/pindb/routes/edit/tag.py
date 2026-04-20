@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/edit/tag.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Form, HTTPException, Request
@@ -21,6 +25,7 @@ from pindb.database.tag import (
     replace_tag_aliases,
     resolve_implications,
 )
+from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes.edit._pending_helpers import submit_pending_edit
@@ -169,5 +174,8 @@ def post_edit_tag(
         tag_id: int = tag.id
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_tag", id=tag_id))}
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_tag", id=tag_id)),
+            message="Tag updated.",
+        )
     )

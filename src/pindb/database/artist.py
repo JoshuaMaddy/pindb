@@ -1,3 +1,5 @@
+"""Artist entities with optional aliases and M2M links to pins."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
 
 
 class ArtistAlias(MappedAsDataclass, Base):
+    """Alternate searchable name for an artist (unique per artist)."""
+
     __tablename__ = "artist_aliases"
     __table_args__ = (
         UniqueConstraint(
@@ -42,6 +46,8 @@ class ArtistAlias(MappedAsDataclass, Base):
 
 
 class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
+    """Creator/studio attached to pins (optional description and outbound links)."""
+
     __tablename__ = "artists"
 
     id: Mapped[int] = mapped_column(

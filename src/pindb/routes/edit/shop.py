@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/edit/shop.py`.
+"""
+
 from typing import Annotated
 
 from fastapi import Form, HTTPException, Request
@@ -15,6 +19,7 @@ from pindb.database.pending_edit_utils import (
     get_effective_snapshot,
 )
 from pindb.database.shop import replace_shop_aliases
+from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
@@ -122,5 +127,8 @@ def post_edit_shop(
         shop_id: int = shop.id
 
     return HTMLResponse(
-        headers={"HX-Redirect": str(request.url_for("get_shop", id=shop_id))}
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_shop", id=shop_id)),
+            message="Shop updated.",
+        )
     )

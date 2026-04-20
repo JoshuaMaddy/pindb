@@ -1,3 +1,5 @@
+"""Registered user accounts: credentials, OAuth links, favorites, and pin lists."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
 
 
 class User(AuditMixin, MappedAsDataclass, Base):
+    """Application user with roles, theme, and relationships to pins and sessions."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -77,6 +81,7 @@ class User(AuditMixin, MappedAsDataclass, Base):
         return self.id or 0
 
     def __rich_repr__(self) -> Result:
+        """Rich debug summary; includes related counts when session-bound."""
         try:
             yield "id", self.id
             yield "username", self.username

@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/list/artists.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Query, Request

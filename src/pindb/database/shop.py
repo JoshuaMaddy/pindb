@@ -1,3 +1,5 @@
+"""Shop entities (vendors) with optional aliases and links to pins."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
 
 
 class ShopAlias(MappedAsDataclass, Base):
+    """Alternate searchable name for a shop (unique per shop)."""
+
     __tablename__ = "shop_aliases"
     __table_args__ = (
         UniqueConstraint("shop_id", "alias", name="uq_shop_aliases_shop_id_alias"),
@@ -40,6 +44,8 @@ class ShopAlias(MappedAsDataclass, Base):
 
 
 class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
+    """A vendor/store that sells pins, linked M2M from ``Pin``."""
+
     __tablename__ = "shops"
     __table_args__ = (
         Index(

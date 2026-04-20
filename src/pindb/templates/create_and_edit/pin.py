@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/create_and_edit/pin.py`.
+"""
+
 import json
 import uuid
 from pathlib import Path
@@ -90,6 +94,8 @@ def pin_form(
                 hr,
                 form(
                     hx_post=str(post_url),
+                    hx_encoding="multipart/form-data",
+                    hx_swap="none",
                     enctype="multipart/form-data",
                     class_="grid w-full min-w-0 grid-cols-[1fr_2fr] max-sm:grid-cols-1 gap-2 [&_label]:font-semibold",
                     autocomplete="off",

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/user/profile.py`.
+"""
+
 from __future__ import annotations
 
 from fastapi import Request

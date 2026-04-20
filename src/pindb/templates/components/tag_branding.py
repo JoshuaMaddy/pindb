@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/tag_branding.py`.
+"""
+
 from htpy import Element, i, span
 
 from pindb.database.tag import TagCategory

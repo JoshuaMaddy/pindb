@@ -1,3 +1,10 @@
+"""Authentication: password hashing, session cookies, FastAPI dependencies, audit wiring.
+
+Session tokens live in the ``session`` cookie (see ``SESSION_COOKIE``). The
+middleware resolves the user without pruning expired rows on every request;
+dependencies may delete expired sessions when loading the user for protected routes.
+"""
+
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Annotated
@@ -28,6 +35,14 @@ SESSION_COOKIE = "session"
 
 
 def hash_password(plain: str) -> str:
+    """Return an Argon2 hash string suitable for storing on ``User.password_hash``.
+
+    Args:
+        plain (str): Plaintext password.
+
+    Returns:
+        str: Encoded Argon2 hash.
+    """
     return _hasher.hash(plain)
 
 
@@ -35,6 +50,15 @@ def verify_password(
     plain: str,
     hashed: str,
 ) -> bool:
+    """Check *plain* against a stored Argon2 *hashed* string.
+
+    Args:
+        plain (str): Candidate password from the client.
+        hashed (str): Previously stored hash from ``hash_password``.
+
+    Returns:
+        bool: ``True`` on success, ``False`` on mismatch.
+    """
     try:
         return _hasher.verify(hashed, plain)
     except VerifyMismatchError:
@@ -62,6 +86,12 @@ def set_session_cookie(
     response: Response,
     token: str,
 ) -> None:
+    """Set the HttpOnly login cookie to *token* (``SameSite=lax``, secure flag from config).
+
+    Args:
+        response (Response): Outgoing Starlette/FastAPI response.
+        token (str): Opaque session id stored in ``user_sessions``.
+    """
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
@@ -72,6 +102,11 @@ def set_session_cookie(
 
 
 def clear_session_cookie(response: Response) -> None:
+    """Remove the login cookie from the client.
+
+    Args:
+        response (Response): Outgoing response (typically a logout redirect).
+    """
     response.delete_cookie(key=SESSION_COOKIE)
 
 
@@ -109,6 +144,14 @@ def _resolve_user_from_token(
 
 
 def get_current_user(request: Request) -> User | None:
+    """Load the user for the ``session`` cookie, pruning expired session rows.
+
+    Args:
+        request (Request): Incoming request.
+
+    Returns:
+        User | None: Detached ``User`` when the session is valid, else ``None``.
+    """
     token: str | None = request.cookies.get(SESSION_COOKIE)
     if not token:
         return None
@@ -119,6 +162,14 @@ CurrentUser = Annotated[User | None, Depends(get_current_user)]
 
 
 def require_user(user: CurrentUser) -> User:
+    """Dependency that requires a logged-in user.
+
+    Args:
+        user (User | None): Injected current user (may be ``None`` for guests).
+
+    Raises:
+        HTTPException: 401 when ``user`` is ``None``.
+    """
     if user is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
@@ -128,6 +179,14 @@ AuthenticatedUser = Annotated[User, Depends(require_user)]
 
 
 def require_admin(user: AuthenticatedUser) -> User:
+    """Dependency that requires ``user.is_admin``.
+
+    Args:
+        user (User): Authenticated user (never ``None``).
+
+    Raises:
+        HTTPException: 403 when the user is not an admin.
+    """
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
@@ -137,6 +196,14 @@ AdminUser = Annotated[User, Depends(require_admin)]
 
 
 def require_editor(user: AuthenticatedUser) -> User:
+    """Dependency that requires editor or admin privileges.
+
+    Args:
+        user (User): Authenticated user (never ``None``).
+
+    Raises:
+        HTTPException: 403 when the user is neither editor nor admin.
+    """
     if not (user.is_editor or user.is_admin):
         raise HTTPException(status_code=403, detail="Editor access required")
     return user
@@ -154,6 +221,15 @@ async def attach_user_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
+    """Resolve ``request.state.user``, theme, and audit ContextVars for the request.
+
+    Args:
+        request (Request): Incoming ASGI request.
+        call_next (Callable): Next handler.
+
+    Returns:
+        Response: Downstream response after audit state is populated.
+    """
     token: str | None = request.cookies.get(SESSION_COOKIE)
     request.state.user = None
 

@@ -1,3 +1,5 @@
+"""Append-only history of entity creates/updates/deletes (JSON patches)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -15,6 +17,8 @@ def _utc_now() -> datetime:
 
 
 class ChangeLog(MappedAsDataclass, Base):
+    """One row per audited flush operation (written by ``audit_events``)."""
+
     __tablename__ = "change_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -28,6 +32,7 @@ class ChangeLog(MappedAsDataclass, Base):
     patch: Mapped[dict] = mapped_column(JSONB, default_factory=dict)
 
     def __rich_repr__(self) -> Result:
+        """Rich debug view; tolerates detached instances."""
         try:
             yield "id", self.id
             yield "entity_type", self.entity_type

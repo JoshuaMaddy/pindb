@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/get/artist.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Request

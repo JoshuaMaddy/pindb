@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/legal/privacy.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, a, code, div, h1, h2, li, p, ul
 

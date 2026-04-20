@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/pin_set.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Query, Request

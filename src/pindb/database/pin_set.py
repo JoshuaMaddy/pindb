@@ -1,3 +1,5 @@
+"""Ordered pin sets: global (curated) or personal (per-user owner)."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -24,6 +26,8 @@ if TYPE_CHECKING:
 
 
 class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
+    """Named collection of pins with optional owner (``None`` = global set)."""
+
     __tablename__ = "pin_sets"
 
     id: Mapped[int] = mapped_column(
@@ -69,6 +73,7 @@ class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return value.id == self.id
 
     def document(self) -> dict[str, object]:
+        """Meilisearch payload for set name and pending state."""
         return {
             "id": self.id,
             "name": self.name,

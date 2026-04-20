@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/image.py`.
+"""
+
 from uuid import UUID
 
 from fastapi import HTTPException, Response

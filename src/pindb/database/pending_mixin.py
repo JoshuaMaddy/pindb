@@ -1,3 +1,5 @@
+"""Editor-submitted entities: approval workflow and optional bulk-edit correlation."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -33,6 +35,8 @@ class PendingAuditEntity(Protocol):
 
 
 class PendingMixin(MappedAsDataclass):
+    """Columns and flags for content pending admin approval."""
+
     __abstract__ = True
 
     approved_at: Mapped[datetime | None] = mapped_column(

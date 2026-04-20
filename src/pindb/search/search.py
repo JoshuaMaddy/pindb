@@ -1,3 +1,5 @@
+"""Meilisearch query helpers and Pydantic wrappers for API responses."""
+
 from meilisearch.index import Index
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -56,6 +58,7 @@ class PinSearchResult(BaseModel):
 
 
 def search_pin(query: str, session: Session) -> list[Pin] | None:
+    """Search pins in Meilisearch and hydrate ORM rows in hit order (with shops/artists)."""
     raw: dict[str, object] = PIN_INDEX.search(query=query)  # type: ignore[assignment]
     result: PinSearchResult = PinSearchResult.from_raw(raw)
 

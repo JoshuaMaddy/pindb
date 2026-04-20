@@ -1,3 +1,9 @@
+"""Parse and validate physical dimensions (pin width/height) as text fields.
+
+Dimensions are entered as a number plus a unit (``mm``, ``cm``, ``in``, …) and
+stored or compared in millimeters elsewhere in the app.
+"""
+
 import re
 
 # Unit token (regex group 2; group 1 is the number) — keep in sync with magnitude_to_mm.
@@ -16,68 +22,111 @@ MAGNITUDE_FULLMATCH_PATTERN = r"^" + MAGNITUDE_INPUT_PATTERN + r"$"
 MAGNITUDE_PATTERN = MAGNITUDE_INPUT_PATTERN
 
 
-def magnitude_is_valid(s: str) -> bool:
-    """True if *s* is empty/whitespace-only, or a single magnitude string (number + unit)."""
-    t = s.strip()
-    if not t:
+def magnitude_is_valid(text: str) -> bool:
+    """Return whether *text* is blank or a single ``number + unit`` magnitude.
+
+    Args:
+        text (str): Raw user input.
+
+    Returns:
+        bool: ``True`` for empty/whitespace-only input or a string matching
+            ``MAGNITUDE_FULLMATCH_PATTERN``.
+    """
+    stripped = text.strip()
+    if not stripped:
         return True
-    return re.fullmatch(MAGNITUDE_FULLMATCH_PATTERN, t) is not None
+    return re.fullmatch(MAGNITUDE_FULLMATCH_PATTERN, stripped) is not None
 
 
 class MagnitudeParseError(ValueError):
-    """Non-empty dimension text did not match the accepted magnitude format."""
+    """Raised when non-blank dimension text does not match the magnitude format."""
 
 
 def parse_magnitude_mm(field_label: str, raw: str | None) -> float | None:
-    """Return width/height in millimeters, or *None* if unset/blank.
+    """Return a width/height in millimeters, or ``None`` when unset.
 
-    Raises *MagnitudeParseError* if *raw* is non-blank but not a valid magnitude string.
+    Args:
+        field_label (str): Field name used in error messages (e.g. ``"Width"``).
+        raw (str | None): Raw form value.
+
+    Returns:
+        float | None: Size in millimeters, or ``None`` when *raw* is missing
+            or blank.
+
+    Raises:
+        MagnitudeParseError: When *raw* is non-blank but not a valid magnitude.
     """
     if raw is None:
         return None
-    t = raw.strip()
-    if not t:
+    stripped = raw.strip()
+    if not stripped:
         return None
-    if not magnitude_is_valid(t):
+    if not magnitude_is_valid(stripped):
         raise MagnitudeParseError(
             f"Invalid {field_label}: use a number with a unit (mm, cm, in, …). "
             "Examples: 40mm, 1.5in, 2 cm."
         )
-    return magnitude_to_mm(t)
+    return magnitude_to_mm(stripped)
 
 
-def empty_str_to_none(v: str | None) -> str | None:
-    if v is None:
+def empty_str_to_none(value: str | None) -> str | None:
+    """Normalize empty strings to ``None`` for optional form fields.
+
+    Args:
+        value (str | None): Raw field value.
+
+    Returns:
+        str | None: ``None`` when *value* is ``None`` or ``""``, else *value*.
+    """
+    if value is None:
         return None
-    if v == "":
+    if value == "":
         return None
-    return v
+    return value
 
 
-def empty_str_list_to_none(v: list[str] | None) -> list[str] | None:
-    if v is None:
+def empty_str_list_to_none(values: list[str] | None) -> list[str] | None:
+    """Drop blank strings from a list; return ``None`` if nothing remains.
+
+    Args:
+        values (list[str] | None): List from a multi-value form field.
+
+    Returns:
+        list[str] | None: Non-empty strings, or ``None`` when *values* is
+            ``None`` or all entries are blank.
+    """
+    if values is None:
         return None
-    filtered: list[str] = [item for item in v if item != ""]
+    filtered: list[str] = [item for item in values if item != ""]
     if not filtered:
         return None
     return filtered
 
 
 def magnitude_to_mm(magnitude: str) -> float:
-    t = magnitude.strip()
-    if not t:
+    """Convert a validated magnitude string to millimeters.
+
+    Args:
+        magnitude (str): Non-blank string matching ``MAGNITUDE_FULLMATCH_PATTERN``
+            when trimmed; blank strings yield ``0``.
+
+    Returns:
+        float: Length in millimeters, or ``0`` when *magnitude* is blank or
+            parsing fails to match (should not occur after ``magnitude_is_valid``).
+    """
+    stripped = magnitude.strip()
+    if not stripped:
         return 0
-    match: re.Match[str] | None = re.fullmatch(MAGNITUDE_FULLMATCH_PATTERN, t)
+    match: re.Match[str] | None = re.fullmatch(MAGNITUDE_FULLMATCH_PATTERN, stripped)
     if not match:
         return 0
     magnitude_float = float(match.group(1))
-    unit: str = match.group(2).lower()
+    unit_token: str = match.group(2).lower()
 
-    if "inches".startswith(unit):
+    if "inches".startswith(unit_token):
         return magnitude_float * 25.4
-    elif unit in ["centimeters", "cm"]:
+    if unit_token in ["centimeters", "cm"]:
         return magnitude_float * 10
-    elif unit in ["millimeters", "mm"]:
+    if unit_token in ["millimeters", "mm"]:
         return magnitude_float
-    else:
-        return 0
+    return 0

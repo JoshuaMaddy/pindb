@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/entity_grid_card.py`.
+"""
+
 from random import sample
 from typing import Sequence
 

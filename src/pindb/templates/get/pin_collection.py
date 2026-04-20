@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/get/pin_collection.py`.
+"""
+
 from __future__ import annotations
 
 from fastapi import Request

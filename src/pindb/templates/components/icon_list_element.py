@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/icon_list_element.py`.
+"""
+
 from htpy import Element, div, i, p
 
 

@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/homepage.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, div, h1, h2
 

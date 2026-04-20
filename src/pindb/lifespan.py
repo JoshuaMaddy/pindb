@@ -1,3 +1,5 @@
+"""FastAPI lifespan: logging, seed data, Meilisearch index, scheduled search sync."""
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -15,6 +17,7 @@ LOGGER = logging.getLogger("pindb.lifespan")
 
 
 def _ensure_admins() -> None:
+    """Promote configured usernames to admin on startup when not already admin."""
     usernames = CONFIGURATION.bootstrap_admin_username_list
     if not usernames:
         return
@@ -30,6 +33,14 @@ def _ensure_admins() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Configure logging, DB seeds, search index, and background Meilisearch sync.
+
+    Args:
+        app (FastAPI): Application instance (unused but required by Starlette).
+
+    Yields:
+        None: Control after startup hooks; shuts down the APScheduler on exit.
+    """
     setup_rich_logger()
     seed_currencies()
     _ensure_admins()

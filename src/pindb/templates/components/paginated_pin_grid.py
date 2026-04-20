@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/paginated_pin_grid.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Request

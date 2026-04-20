@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/search.py`.
+"""
+
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter

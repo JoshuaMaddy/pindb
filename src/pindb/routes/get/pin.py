@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/pin.py`.
+"""
+
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter

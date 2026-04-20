@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/bread_crumb.py`.
+"""
+
 from fastapi.datastructures import URL
 from htpy import Element, a, div, i, p
 

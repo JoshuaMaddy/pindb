@@ -1,3 +1,9 @@
+"""Render user-authored Markdown to sanitized HTML for safe insertion into pages.
+
+Uses ``markdown-it-py`` for parsing and ``nh3`` for allowlisting tags and
+attributes so scripts and unsafe URLs cannot be injected.
+"""
+
 import nh3
 from markdown_it import MarkdownIt
 from markupsafe import Markup
@@ -16,7 +22,15 @@ _ALLOWED_URL_SCHEMES: frozenset[str] = frozenset({"http", "https", "mailto"})
 
 
 def render_md(text: str | None) -> Markup | None:
-    """Render markdown to sanitized HTML. Returns None for empty/None input."""
+    """Render Markdown to sanitized HTML suitable for ``Markup`` insertion.
+
+    Args:
+        text (str | None): Raw Markdown, or ``None`` / empty for absent content.
+
+    Returns:
+        Markup | None: Sanitized HTML, or ``None`` when *text* is falsy or the
+            result is whitespace-only after cleaning.
+    """
     if not text:
         return None
     raw_html = _md.render(text)

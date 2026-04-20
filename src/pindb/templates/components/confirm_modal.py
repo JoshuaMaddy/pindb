@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/confirm_modal.py`.
+"""
+
 from htpy import Element, button, div, form, i, p
 
 
@@ -9,12 +13,16 @@ def confirm_modal(
     hx_target: str | None = None,
     hx_swap: str = "outerHTML",
     confirm_label: str = "Delete",
+    *,
+    htmx_post: bool = False,
 ) -> Element:
     """Wrap *trigger* in an Alpine.js confirmation modal.
 
     Exactly one of form_action or hx_delete must be supplied:
     - form_action: fires a POST <form> when confirmed (full page redirect).
     - hx_delete:   fires an HTMX DELETE request when confirmed (partial swap).
+    - htmx_post:   with form_action, submit via HTMX (``hx-post`` / ``hx-swap: none``)
+      so the server can respond with ``HX-Redirect`` and ``HX-Trigger`` toasts.
     """
     if form_action is None and hx_delete is None:
         raise ValueError("confirm_modal requires either form_action or hx_delete")
@@ -26,7 +34,11 @@ def confirm_modal(
     )
 
     if form_action is not None:
-        confirm_btn: Element = form(method="post", action=form_action)[
+        form_attrs: dict[str, object] = {"method": "post", "action": form_action}
+        if htmx_post:
+            form_attrs["hx_post"] = form_action
+            form_attrs["hx_swap"] = "none"
+        confirm_btn: Element = form(**form_attrs)[
             button(
                 type="submit",
                 class_=confirm_btn_base_class,

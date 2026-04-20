@@ -36,6 +36,15 @@ _EXEMPT_PREFIXES: tuple[str, ...] = (
 
 
 def _origin_host(value: str | None) -> tuple[str, str, int | None] | None:
+    """Parse *value* as a URL and return ``(scheme, hostname, port)`` if valid.
+
+    Args:
+        value (str | None): ``Origin`` or ``Referer`` header value, or ``None``.
+
+    Returns:
+        tuple[str, str, int | None] | None: Parsed triple, or ``None`` when
+            *value* is missing or not a usable absolute URL.
+    """
     if not value:
         return None
     parts = urlsplit(value)
@@ -45,6 +54,13 @@ def _origin_host(value: str | None) -> tuple[str, str, int | None] | None:
 
 
 def _expected() -> tuple[str, str, int | None]:
+    """Return the configured site origin as ``(scheme, hostname, port)``.
+
+    Returns:
+        tuple[str, str, int | None]: Parsed ``CONFIGURATION.base_url``. Hostname
+            may be empty if ``base_url`` is malformed (treated as configuration
+            error at request time).
+    """
     parts = urlsplit(CONFIGURATION.base_url)
     # base_url is validated as a non-empty string; hostname may be None for
     # malformed URLs — treat that as a configuration error at request time.
@@ -52,6 +68,15 @@ def _expected() -> tuple[str, str, int | None]:
 
 
 def _matches(candidate: tuple[str, str, int | None]) -> bool:
+    """Return whether *candidate* matches the configured application origin.
+
+    Args:
+        candidate (tuple[str, str, int | None]): Parsed origin triple from a
+            request header.
+
+    Returns:
+        bool: ``True`` when *candidate* equals ``_expected()``.
+    """
     want = _expected()
     return candidate == want
 
@@ -60,6 +85,19 @@ async def csrf_origin_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
+    """Reject unsafe requests whose ``Origin``/``Referer`` do not match the site.
+
+    Args:
+        request (Request): Incoming ASGI request.
+        call_next (Callable): Next middleware or route handler.
+
+    Returns:
+        Response: Downstream response, or ``403`` plain text when the request
+            fails the CSRF check.
+
+    See Also:
+        Module docstring for safe methods, exemptions, and header fallbacks.
+    """
     if not CONFIGURATION.csrf_enforce_origin:
         return await call_next(request)
 

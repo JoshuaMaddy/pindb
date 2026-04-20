@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/admin/bulk_tags.py`.
+"""
+
 import json
 from typing import Any
 

@@ -84,6 +84,7 @@ class PolicyDescription:
     min_zxcvbn_score: int = field(default=3)
 
     def bullets(self) -> list[str]:
+        """Return human-readable bullet strings describing the active policy."""
         return [
             f"At least {self.min_length} characters.",
             "Mix at least 3 of: lowercase, uppercase, digits, symbols.",
@@ -93,6 +94,12 @@ class PolicyDescription:
 
 
 def describe_policy() -> PolicyDescription:
+    """Return the password policy limits from ``CONFIGURATION`` for UI hints.
+
+    Returns:
+        PolicyDescription: Minimum length, class count, and zxcvbn floor
+            currently in effect.
+    """
     return PolicyDescription(
         min_length=CONFIGURATION.password_min_length,
         min_character_classes=3,
@@ -131,10 +138,17 @@ def validate_password(
     username: str | None = None,
     email: str | None = None,
 ) -> None:
-    """Raise ``PasswordPolicyError`` if ``password`` fails the policy.
+    """Validate *password* against length, complexity, blocklist, and zxcvbn score.
 
-    The caller should have already trimmed surrounding whitespace if
-    desired — this function does not modify the input.
+    Args:
+        password (str): Candidate password (caller trims whitespace if desired).
+        username (str | None): Substrings from this value must not appear in
+            *password* (case-insensitive) when length ≥ 3.
+        email (str | None): Same for the email local-part before ``@``.
+
+    Raises:
+        PasswordPolicyError: When one or more rules fail; ``.rules`` lists
+            human-readable messages in check order.
     """
     rules: list[str] = []
 
@@ -175,5 +189,9 @@ def validate_password(
 
 
 def iter_blocklist() -> Iterable[str]:
-    """Expose the inline blocklist (used by unit tests)."""
+    """Yield passwords in the small inline blocklist.
+
+    Returns:
+        Iterable[str]: Iterator over ``_COMMON_PASSWORDS`` (mainly for tests).
+    """
     return iter(_COMMON_PASSWORDS)

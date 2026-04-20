@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/legal/_shared.py`.
+"""
+
 from htpy import Element, div
 
 from pindb.templates.types import Content

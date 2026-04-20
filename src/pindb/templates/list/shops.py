@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/list/shops.py`.
+"""
+
 from typing import Sequence
 
 from fastapi import Request

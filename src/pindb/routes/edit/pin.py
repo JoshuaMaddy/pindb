@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/edit/pin.py`.
+"""
+
 from datetime import date
 from typing import Annotated, Sequence
 from uuid import UUID
@@ -22,6 +26,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.pin_writes import upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
+from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import (
     MagnitudeParseError,
@@ -290,12 +295,8 @@ async def post_edit_pin(
         pin_id: int = pin.id
 
     return HTMLResponse(
-        headers={
-            "HX-Redirect": str(
-                request.url_for(
-                    "get_pin",
-                    id=pin_id,
-                )
-            )
-        }
+        headers=hx_redirect_with_toast_headers(
+            redirect_url=str(request.url_for("get_pin", id=pin_id)),
+            message="Pin updated.",
+        )
     )

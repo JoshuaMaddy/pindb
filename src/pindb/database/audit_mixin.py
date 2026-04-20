@@ -1,3 +1,5 @@
+"""Reusable audit columns: who created/updated/deleted rows and when."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -7,10 +9,13 @@ from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 
 def _utc_now() -> datetime:
+    """Return current UTC time as naive datetime for timestamp columns."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AuditMixin(MappedAsDataclass):
+    """Soft-delete and audit metadata mixed into most persisted entities."""
+
     __abstract__ = True
 
     created_at: Mapped[datetime] = mapped_column(

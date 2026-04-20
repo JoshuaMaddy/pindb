@@ -1,3 +1,5 @@
+"""OAuth account linkage (Google, Discord, Meta) to a local ``User``."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -15,12 +17,16 @@ if TYPE_CHECKING:
 
 
 class OAuthProvider(StrEnum):
+    """Supported third-party identity providers."""
+
     google = "google"
     discord = "discord"
     meta = "meta"
 
 
 class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
+    """Maps a provider-specific subject id to a PinDB user row."""
+
     __tablename__ = "user_auth_providers"
     __table_args__ = (UniqueConstraint("provider", "provider_user_id"),)
 

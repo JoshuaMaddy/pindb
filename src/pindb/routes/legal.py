@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/legal.py`.
+"""
+
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter

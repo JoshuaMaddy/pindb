@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/get/options.py`.
+"""
+
 from fastapi import Query
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter

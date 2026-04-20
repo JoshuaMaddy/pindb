@@ -1,3 +1,5 @@
+"""Maps entity kinds to ORM models and SQL table names (pending edits, search, admin)."""
+
 from enum import StrEnum, auto
 
 from pindb.database.artist import Artist
@@ -8,6 +10,8 @@ from pindb.database.tag import Tag
 
 
 class EntityType(StrEnum):
+    """Canonical entity kinds that participate in approval and bulk workflows."""
+
     pin = auto()
     shop = auto()
     artist = auto()
@@ -16,18 +20,22 @@ class EntityType(StrEnum):
 
     @property
     def model(self) -> type[Pin | Shop | Artist | Tag | PinSet]:
+        """ORM class backing this entity kind."""
         return _MODEL_MAP[self]
 
     @property
     def table_name(self) -> str:
+        """``__tablename__`` for the mapped entity."""
         return self.model.__tablename__
 
     @property
     def slug(self) -> str:
+        """URL-safe enum value (same as ``.value``)."""
         return self.value
 
     @classmethod
     def from_table_name(cls, table_name: str) -> "EntityType | None":
+        """Resolve from a SQL table name, or ``None`` if unknown."""
         return _TABLE_NAME_MAP.get(table_name)
 
 

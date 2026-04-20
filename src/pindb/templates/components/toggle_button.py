@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/toggle_button.py`.
+"""
+
 from htpy import Attribute, Element, Node, button
 
 

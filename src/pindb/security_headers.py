@@ -42,6 +42,19 @@ async def security_headers_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
+    """Attach baseline security headers to every response.
+
+    Args:
+        request (Request): Incoming ASGI request.
+        call_next (Callable): Next handler in the stack.
+
+    Returns:
+        Response: The downstream response with headers merged in (see module
+            docstring for which headers are set and when HSTS applies).
+
+    Note:
+        Uses ``setdefault`` so route handlers may override values when needed.
+    """
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")

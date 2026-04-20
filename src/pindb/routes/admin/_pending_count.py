@@ -1,3 +1,7 @@
+"""
+FastAPI routes: `routes/admin/_pending_count.py`.
+"""
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 

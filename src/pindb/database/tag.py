@@ -1,3 +1,5 @@
+"""Hierarchical tags, aliases, implications, and pin tagging helpers."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -34,6 +36,8 @@ if TYPE_CHECKING:
 
 
 class TagCategory(str, Enum):
+    """Fixed tag kinds (material, color, character, …) including ``material`` for finishes."""
+
     general = "general"
     copyright = "copyright"
     character = "character"
@@ -44,6 +48,8 @@ class TagCategory(str, Enum):
 
 
 class TagAlias(MappedAsDataclass, Base):
+    """Alternate searchable string for a tag (unique per tag)."""
+
     __tablename__ = "tag_aliases"
     __table_args__ = (
         UniqueConstraint("tag_id", "alias", name="uq_tag_aliases_tag_id_alias"),
@@ -87,6 +93,8 @@ def replace_tag_aliases(tag: Tag, aliases: Iterable[str], session: Session) -> N
 
 
 class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
+    """Faceted classification node with optional implications between tags."""
+
     __tablename__ = "tags"
     __table_args__ = (
         Index(
@@ -150,6 +158,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return value.id == self.id
 
     def document(self) -> dict[str, object]:
+        """Meilisearch document for tag name, display name, category, aliases."""
         return {
             "id": self.id,
             "name": self.name,

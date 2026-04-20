@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/components/form_field.py`.
+"""
+
 from htpy import BaseElement, Element, div, label, span
 
 

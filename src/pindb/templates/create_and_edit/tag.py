@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/create_and_edit/tag.py`.
+"""
+
 from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, form, hr, input, label, option, select, span

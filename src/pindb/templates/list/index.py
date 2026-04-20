@@ -1,3 +1,7 @@
+"""
+htpy page and fragment builders: `templates/list/index.py`.
+"""
+
 from fastapi import Request
 from htpy import Element, Fragment, div, fragment, h1, hr
 
