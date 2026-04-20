@@ -43,7 +43,12 @@ from pindb.templates.homepage import homepage  # noqa: E402
 
 register_audit_events()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 # SessionMiddleware is required by authlib for OAuth state handling.
 # Must not use the default cookie name "session" — that collides with
