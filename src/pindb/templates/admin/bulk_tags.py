@@ -31,8 +31,7 @@ def bulk_tags_page(
                 ),
                 page_heading(icon="tags", text="Bulk tags"),
                 p(class_="text-pin-base-300 text-sm max-w-2xl")[
-                    "Paste JSON or upload a .json file. The payload must be an object with a "
-                    '"tags" key: a list of tag trees (name, category, aliases, implications). '
+                    'Paste JSON or upload a .json file. The payload must be either a single Tag or an object with a "tags" key: a list of tag trees (name, category, aliases, implications). '
                     "Existing tags are merged; new implications propagate to pins like the tag editor."
                 ],
                 hr,
