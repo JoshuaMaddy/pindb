@@ -82,7 +82,8 @@ class TestPostSignup:
             },
         )
         assert response.status_code == 400
-        assert "already taken" in response.text.lower()
+        # Unified message avoids leaking whether username vs email clashed.
+        assert "aren" in response.text.lower() and "available" in response.text.lower()
 
     def test_duplicate_email_returns_400(self, client, test_user):
         response = client.post(
@@ -94,7 +95,7 @@ class TestPostSignup:
             },
         )
         assert response.status_code == 400
-        assert "already registered" in response.text.lower()
+        assert "aren" in response.text.lower() and "available" in response.text.lower()
 
 
 @pytest.mark.integration

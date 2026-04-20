@@ -13,12 +13,13 @@ from pindb.search.update import setup_index, update_all
 
 LOGGER = logging.getLogger("pindb.lifespan")
 
-_BOOTSTRAP_ADMINS = ["josh"]
-
 
 def _ensure_admins() -> None:
+    usernames = CONFIGURATION.bootstrap_admin_username_list
+    if not usernames:
+        return
     with session_maker.begin() as db:
-        for username in _BOOTSTRAP_ADMINS:
+        for username in usernames:
             user: User | None = db.scalars(
                 select(User).where(User.username == username)
             ).first()

@@ -445,6 +445,18 @@ def png_upload(png_bytes: bytes):
 
 
 @pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Clear in-memory rate-limit counters between tests so tests that
+    share an endpoint (login, signup, password-change) do not inherit
+    hits from earlier ones and trip 429 prematurely."""
+    from pindb.rate_limit import reset_rate_limits
+
+    reset_rate_limits()
+    yield
+    reset_rate_limits()
+
+
+@pytest.fixture(autouse=True)
 def _reset_audit_context():
     """Clear the audit user ContextVars before and after each test.
 

@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from random import SystemRandom
 from typing import Annotated
 
-from fastapi import Form, HTTPException, Request
+from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -32,6 +32,7 @@ from pindb.auth import (
     clear_session_cookie,
     hash_password,
     set_session_cookie,
+    verify_dummy_password,
     verify_password,
 )
 from pindb.config import CONFIGURATION
@@ -39,6 +40,7 @@ from pindb.database import UserSession, session_maker
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import PasswordPolicyError, validate_password
+from pindb.rate_limit import rate_limit
 from pindb.routes.auth._oauth import (
     OAuthIdentity,
     fetch_identity,
@@ -176,7 +178,11 @@ def get_signup(request: Request) -> HTMLResponse:
     return _render_signup(request)
 
 
-@router.post("/signup", response_model=None)
+@router.post(
+    "/signup",
+    response_model=None,
+    dependencies=[Depends(rate_limit("10/hour"))],
+)
 def post_signup(
     request: Request,
     username: Annotated[str, Form()],
@@ -193,15 +199,13 @@ def post_signup(
             status_code=400,
         )
 
+    # Unified error for both clashes to prevent user / email enumeration.
+    signup_clash = "Those sign-up details aren't available."
     with session_maker.begin() as db:
         if db.scalars(select(User).where(User.username == username)).first():
-            return _render_signup(
-                request, error="Username already taken.", status_code=400
-            )
+            return _render_signup(request, error=signup_clash, status_code=400)
         if db.scalars(select(User).where(User.email == email)).first():
-            return _render_signup(
-                request, error="Email already registered.", status_code=400
-            )
+            return _render_signup(request, error=signup_clash, status_code=400)
         user = User(
             username=username,
             email=email,
@@ -225,7 +229,11 @@ def get_login(
     return _render_login(request, error=error)
 
 
-@router.post("/login", response_model=None)
+@router.post(
+    "/login",
+    response_model=None,
+    dependencies=[Depends(rate_limit("10/minute"))],
+)
 def post_login(
     request: Request,
     username: Annotated[str, Form()],
@@ -237,6 +245,9 @@ def post_login(
         ).first()
 
     if user is None or user.hashed_password is None:
+        # Burn an Argon2 verify against a dummy hash so missing users cost
+        # roughly the same time as bad passwords — closes the timing oracle.
+        verify_dummy_password(password)
         return _render_login(
             request, error="Invalid username or password.", status_code=401
         )
@@ -279,6 +290,7 @@ def _set_link_intent(response: Response) -> None:
         max_age=_ONBOARDING_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=CONFIGURATION.session_cookie_secure,
     )
 
 
@@ -311,6 +323,7 @@ def _stash_identity(response: Response, identity: OAuthIdentity) -> None:
         max_age=_ONBOARDING_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=CONFIGURATION.session_cookie_secure,
     )
 
 
@@ -492,32 +505,35 @@ def _login_flash(
 # Per-provider routes ---------------------------------------------------------
 
 
-@router.get("/google", response_model=None)
+_oauth_deps = [Depends(rate_limit("30/minute"))]
+
+
+@router.get("/google", response_model=None, dependencies=_oauth_deps)
 async def google_login(request: Request, link: int = 0) -> Response:
     return await _oauth_authorize(OAuthProvider.google, request, bool(link))
 
 
-@router.get("/google/callback", response_model=None)
+@router.get("/google/callback", response_model=None, dependencies=_oauth_deps)
 async def google_callback(request: Request, current_user: CurrentUser) -> Response:
     return await _oauth_callback(OAuthProvider.google, request, current_user)
 
 
-@router.get("/discord", response_model=None)
+@router.get("/discord", response_model=None, dependencies=_oauth_deps)
 async def discord_login(request: Request, link: int = 0) -> Response:
     return await _oauth_authorize(OAuthProvider.discord, request, bool(link))
 
 
-@router.get("/discord/callback", response_model=None)
+@router.get("/discord/callback", response_model=None, dependencies=_oauth_deps)
 async def discord_callback(request: Request, current_user: CurrentUser) -> Response:
     return await _oauth_callback(OAuthProvider.discord, request, current_user)
 
 
-@router.get("/meta", response_model=None)
+@router.get("/meta", response_model=None, dependencies=_oauth_deps)
 async def meta_login(request: Request, link: int = 0) -> Response:
     return await _oauth_authorize(OAuthProvider.meta, request, bool(link))
 
 
-@router.get("/meta/callback", response_model=None)
+@router.get("/meta/callback", response_model=None, dependencies=_oauth_deps)
 async def meta_callback(request: Request, current_user: CurrentUser) -> Response:
     return await _oauth_callback(OAuthProvider.meta, request, current_user)
 

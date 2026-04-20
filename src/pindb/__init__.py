@@ -18,6 +18,7 @@ from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
 from pindb.config import CONFIGURATION  # noqa: E402
+from pindb.csrf import csrf_origin_middleware  # noqa: E402
 from pindb.lifespan import lifespan  # noqa: E402
 from pindb.routes import (  # noqa: E402
     admin,
@@ -35,6 +36,7 @@ from pindb.routes import (  # noqa: E402
 )
 from pindb.routes.auth import _test_oauth  # noqa: E402
 from pindb.routes.user import collection, security  # noqa: E402
+from pindb.security_headers import security_headers_middleware  # noqa: E402
 from pindb.templates.homepage import homepage  # noqa: E402
 
 register_audit_events()
@@ -49,10 +51,18 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=CONFIGURATION.secret_key,
     session_cookie="pindb_starlette_session",
+    https_only=CONFIGURATION.session_cookie_secure,
 )
 
 # Attach current user to request.state on every request
 app.add_middleware(BaseHTTPMiddleware, dispatch=attach_user_middleware)
+
+# CSRF via Origin/Referer check on unsafe methods. Exempts OAuth
+# callbacks where the Origin legitimately comes from the provider.
+app.add_middleware(BaseHTTPMiddleware, dispatch=csrf_origin_middleware)
+
+# Baseline security response headers (HSTS, CSP report-only, XFO, etc).
+app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
 
 app.mount(
     path="/static",

@@ -14,16 +14,23 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Form, HTTPException, Request
+from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from pindb.auth import AuthenticatedUser, hash_password, verify_password
+from pindb.auth import (
+    SESSION_COOKIE,
+    AuthenticatedUser,
+    hash_password,
+    verify_password,
+)
 from pindb.database import session_maker
+from pindb.database.session import UserSession
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import PasswordPolicyError, validate_password
+from pindb.rate_limit import rate_limit
 from pindb.routes.auth._oauth import provider_enabled
 from pindb.templates.auth.security import security_page
 
@@ -68,7 +75,11 @@ def get_security(
     )
 
 
-@router.post("/password", response_model=None)
+@router.post(
+    "/password",
+    response_model=None,
+    dependencies=[Depends(rate_limit("5/minute"))],
+)
 def post_change_password(
     request: Request,
     current_user: AuthenticatedUser,
@@ -106,11 +117,18 @@ def post_change_password(
             password_errors=exc.rules,
         )
 
+    current_token = request.cookies.get(SESSION_COOKIE)
     with session_maker.begin() as db:
         user = db.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         user.hashed_password = hash_password(new_password)
+        # Revoke every sibling session. The caller's current session is
+        # kept so they do not get logged out of the active device.
+        stmt = delete(UserSession).where(UserSession.user_id == current_user.id)
+        if current_token is not None:
+            stmt = stmt.where(UserSession.token != current_token)
+        db.execute(stmt)
 
     return RedirectResponse(
         url="/user/me/security?success=Password+updated", status_code=303

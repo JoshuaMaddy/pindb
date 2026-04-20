@@ -8,11 +8,16 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from pindb.audit_events import set_audit_user, set_audit_user_flags
+from pindb.config import CONFIGURATION
 from pindb.database import UserSession
 from pindb.database import session_maker as db_session_maker
 from pindb.database.user import User
 
 _hasher = PasswordHasher()
+
+# Argon2 hash of a throwaway password, verified against when no user row
+# exists to normalize login response times (see verify_password).
+_DUMMY_HASH = _hasher.hash("pindb-timing-oracle-dummy-password")
 
 SESSION_COOKIE = "session"
 
@@ -36,6 +41,18 @@ def verify_password(
         return False
 
 
+def verify_dummy_password(plain: str) -> None:
+    """Run an Argon2 verify against a throwaway hash and discard the result.
+
+    Call from login when no user row matches so that the total time
+    spent per request does not leak whether the username exists.
+    """
+    try:
+        _hasher.verify(_DUMMY_HASH, plain)
+    except VerifyMismatchError:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Session cookie helpers
 # ---------------------------------------------------------------------------
@@ -50,7 +67,7 @@ def set_session_cookie(
         value=token,
         httponly=True,
         samesite="lax",
-        secure=False,  # set True in production behind HTTPS
+        secure=CONFIGURATION.session_cookie_secure,
     )
 
 

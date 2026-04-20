@@ -15,6 +15,12 @@ MAX_IMAGE_BYTES = 20 * 1024 * 1024
 THUMBNAIL_SUFFIX = ".thumbnail"
 _THUMBNAIL_DIM = 256
 
+# Clamp PIL's decompression-bomb guard below the default (~89 MP). A
+# 20 MB JPEG/PNG can still decode into gigabytes of RAM at the default
+# ceiling; 24 MP covers every sane real-world photo and rejects the rest
+# as a DecompressionBombError before allocation.
+Image.MAX_IMAGE_PIXELS = 24_000_000
+
 
 def _make_thumbnail_bytes(data: bytes) -> bytes:
     image = Image.open(io.BytesIO(data))
@@ -136,6 +142,29 @@ def load_image(key: str) -> bytes | None:
     return get_backend().load(key)
 
 
+def sniff_image_mime(data: bytes) -> str:
+    """Return an ``image/*`` MIME type by magic-byte sniffing.
+
+    Originals are stored without an extension and without metadata, so
+    we cannot rely on the filesystem or the upload's Content-Type.
+    Returns ``application/octet-stream`` for unrecognised bytes so the
+    browser does not try to render an unexpected format as an image.
+    """
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if data[:4] == b"\x00\x00\x00\x0c" and data[4:8] == b"jP  ":
+        return "image/jp2"
+    if data.startswith(b"BM"):
+        return "image/bmp"
+    return "application/octet-stream"
+
+
 def ensure_thumbnail(guid_str: str) -> bool:
     """Backfill thumbnail for legacy filesystem images that predate eager generation."""
     key = f"{guid_str}{THUMBNAIL_SUFFIX}"
@@ -155,10 +184,16 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
     data = await file.read() if isinstance(file, UploadFile) else file.read_bytes()
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image exceeds 20 MB limit")
-    stripped = _strip_metadata(data)
+    try:
+        stripped = _strip_metadata(data)
+        thumbnail = _make_thumbnail_bytes(stripped)
+    except Image.DecompressionBombError as exc:
+        raise HTTPException(
+            status_code=413, detail="Image dimensions too large."
+        ) from exc
     file_uuid = uuid.uuid4()
     key = str(file_uuid)
     backend = get_backend()
     backend.save(key, stripped)
-    backend.save(f"{key}{THUMBNAIL_SUFFIX}", _make_thumbnail_bytes(stripped))
+    backend.save(f"{key}{THUMBNAIL_SUFFIX}", thumbnail)
     return file_uuid

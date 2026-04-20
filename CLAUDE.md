@@ -42,7 +42,7 @@ Key files where behaviour isn't obvious from the name:
 - `routes/_guards.py` — `assert_editor_can_edit()` ownership check.
 - `database/joins.py` — all many-to-many association tables (excluded from audit).
 - `database/erasure.py` — GDPR account deletion entry point.
-- `lifespan.py` — startup: logging, Meili setup, scheduler, admin bootstrap (`_ensure_admins` hardcodes `["josh"]`).
+- `lifespan.py` — startup: logging, Meili setup, scheduler, admin bootstrap (`_ensure_admins` reads `BOOTSTRAP_ADMIN_USERNAMES`, comma-separated; empty by default).
 - `scripts/dump_db.py` — `--via-docker` by default; `POSTGRES_*` env fallback for `--no-via-docker`.
 
 ## Audit & History System

@@ -67,6 +67,13 @@ class Configuration(BaseSettings):
     # Auth
     secret_key: str
     base_url: str = Field(default="http://localhost:8000")
+    # Session cookie Secure flag. Default True (production). Flip to False
+    # in .env for local dev over plain HTTP.
+    session_cookie_secure: bool = Field(default=True)
+    # CSRF: reject unsafe-method requests whose Origin/Referer does not
+    # match base_url. Disable only for pytest's TestClient, which does
+    # not attach Origin headers.
+    csrf_enforce_origin: bool = Field(default=True)
 
     # Legal / contact — shown in footer, privacy policy, ToS, DMCA notice
     contact_email: str
@@ -90,6 +97,17 @@ class Configuration(BaseSettings):
     # Test-only OAuth provider — enables /auth/_test-oauth endpoints
     # used by the e2e suite. MUST stay False in production.
     allow_test_oauth_provider: bool = Field(default=False)
+
+    # Comma-separated usernames to auto-promote to admin on startup.
+    # Empty by default — promote your first admin via SQL or a seeded
+    # migration. Kept as a string so ``.env`` stays ergonomic.
+    bootstrap_admin_usernames: str = Field(default="")
+
+    @property
+    def bootstrap_admin_username_list(self) -> list[str]:
+        return [
+            u.strip() for u in self.bootstrap_admin_usernames.split(",") if u.strip()
+        ]
 
     # Logging
     logging_date_format: str = Field(default="%d %b %Y | %H:%M:%S")

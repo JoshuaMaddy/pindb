@@ -21,6 +21,15 @@ RUN uv sync --no-dev --frozen
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
+# Create an unprivileged user and hand over the app tree. The entrypoint
+# writes the alembic revision cache and the rotating log file, so the
+# user needs write access to /app.
+RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin pindb \
+ && mkdir -p /app/images /app/logs \
+ && chown -R pindb:pindb /app
+
+USER pindb
+
 EXPOSE 8000
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

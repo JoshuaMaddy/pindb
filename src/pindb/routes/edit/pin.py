@@ -105,6 +105,11 @@ async def post_edit_pin(
     current_user: EditorUser,
     front_image: UploadFile | None = Form(default=None),
     name: str = Form(),
+    description: Annotated[
+        str | None,
+        Form(),
+        BeforeValidator(func=empty_str_to_none),
+    ] = None,
     acquisition_type: AcquisitionType = Form(),
     grade_names: list[str] = Form(),
     grade_prices: list[str] = Form(),
@@ -196,6 +201,7 @@ async def post_edit_pin(
                 entity_id=id,
                 field_updates={
                     "name": name,
+                    "description": description,
                     "acquisition_type": acquisition_type.value,
                     "limited_edition": limited_edition,
                     "number_produced": number_produced,
@@ -244,6 +250,7 @@ async def post_edit_pin(
         currency: Currency = session.get_one(entity=Currency, ident=currency_id)
 
         pin.name = name
+        pin.description = description
         pin.acquisition_type = acquisition_type
         pin.currency = currency
         if front_image_guid:

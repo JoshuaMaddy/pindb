@@ -23,9 +23,9 @@ dependencies = [
     "psycopg[binary]>=3.2.10",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
+    "limits>=3.13.0",
     "sqlalchemy>=2.0.43",
     "zxcvbn>=4.5.0",
-    "bs4>=0.0.2",
 ]
 
 [dependency-groups]
@@ -53,6 +53,8 @@ env = [
     "MEILISEARCH_URL=http://localhost:7700",
     "SECRET_KEY=test-secret-key-for-pytest-only",
     "IMAGE_DIRECTORY=/tmp/pindb_test_images",
+    "SESSION_COOKIE_SECURE=false",
+    "CSRF_ENFORCE_ORIGIN=false",
 ]
 markers = [
     "unit: fast tests, no I/O (DB or network)",
