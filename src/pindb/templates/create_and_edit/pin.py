@@ -489,26 +489,34 @@ def __pin_sets_ids_input(
 
 def __limited_edition_input(pin: Pin | None) -> list[Element | VoidElement]:
     selected_classes = "bg-pin-main border-accent text-accent grow"
+    yes_selected = pin is not None and pin.limited_edition is True
+    no_selected = pin is not None and pin.limited_edition is False
+    le_input_kwargs: dict[str, object] = {
+        "name": "limited_edition",
+        "id": "limited_edition",
+        "type": "checkbox",
+        "class_": "self-start",
+        "hidden": True,
+    }
+    # Unchecked checkboxes are omitted from POST; when Yes/No is known we keep the
+    # box checked so `true` / `false` is submitted (see pin_creation.js).
+    if pin is not None and pin.limited_edition is not None:
+        le_input_kwargs["checked"] = True
+        le_input_kwargs["value"] = "true" if pin.limited_edition else "false"
+
     return [
         label(for_="limited_edition")["Limited Edition"],
         div(class_="flex w-full min-w-0 flex-col gap-2")[
-            input(
-                name="limited_edition",
-                id="limited_edition",
-                type="checkbox",
-                class_="self-start",
-                hidden=True,
-                checked=pin.limited_edition if pin and pin.limited_edition else None,
-            ),
+            input(**le_input_kwargs),
             div(class_="flex w-full min-w-0 gap-2")[
                 button(
                     id="limited_edition_yes",
-                    class_=selected_classes if pin and pin.limited_edition else "grow",
+                    class_=selected_classes if yes_selected else "grow",
                     type="button",
                 )["Yes"],
                 button(
                     id="limited_edition_no",
-                    class_="grow" if pin and pin.limited_edition else selected_classes,
+                    class_=selected_classes if no_selected else "grow",
                     type="button",
                 )["No"],
             ],

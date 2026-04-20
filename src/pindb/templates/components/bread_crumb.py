@@ -29,9 +29,6 @@ def bread_crumb(entries: list[BreadCrumbLink | str] | None) -> Element | None:
     if len(elements) > 1:
         elements: list[Element] = elements[:-1]
 
-    return div(
-        class_=(
-            "max-w-[80%] max-md:max-w-[90%] mx-auto px-10 "
-            "flex flex-wrap items-center gap-x-1 gap-y-0.5"
-        )
-    )[elements]
+    return div(class_="w-full flex flex-wrap items-center gap-x-1 gap-y-0.5 mx-auto")[
+        elements
+    ]

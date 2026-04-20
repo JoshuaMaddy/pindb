@@ -191,14 +191,16 @@ window.addEventListener("load", function () {
 
     limitedEditionYes.addEventListener("click", (e) => {
       e.preventDefault();
-      limitedEditionCheckbox.value = true;
+      limitedEditionCheckbox.checked = true;
+      limitedEditionCheckbox.value = "true";
       limitedEditionYes.classList.add(...limitedEditionSelected);
       limitedEditionNo.classList.remove(...limitedEditionSelected);
     });
 
     limitedEditionNo.addEventListener("click", (e) => {
       e.preventDefault();
-      limitedEditionCheckbox.value = false;
+      limitedEditionCheckbox.checked = true;
+      limitedEditionCheckbox.value = "false";
       limitedEditionNo.classList.add(...limitedEditionSelected);
       limitedEditionYes.classList.remove(...limitedEditionSelected);
     });
