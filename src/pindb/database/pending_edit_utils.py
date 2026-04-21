@@ -305,8 +305,9 @@ def _apply_pin_snapshot_in_memory(
             .execution_options(include_pending=True)
         ).all()
     )
+    resolved_tags = resolve_implications(explicit_tag_objs, session)
     attributes.set_committed_value(pin, "explicit_tags", explicit_tag_objs)
-    attributes.set_committed_value(pin, "tags", explicit_tag_objs)
+    attributes.set_committed_value(pin, "tags", set(resolved_tags.keys()))
     pin.artists = set(
         session.scalars(
             select(Artist)
