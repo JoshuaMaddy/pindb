@@ -27,10 +27,11 @@ from pindb.config import CONFIGURATION
 _CSP = (
     "default-src 'self'; "
     "img-src 'self' data: https:; "
-    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net "
+    "https://static.cloudflareinsights.com; "
     "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
     "font-src 'self' data: https://cdn.jsdelivr.net; "
-    "connect-src 'self'; "
+    "connect-src 'self' https://cloudflareinsights.com; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "
     "object-src 'none'; "

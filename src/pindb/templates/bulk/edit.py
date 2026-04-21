@@ -149,6 +149,8 @@ def _tag_section(
                 class_="multi-select",
                 data_entity_type="tag",
                 hx_get=preview_url,
+                # Defensive: if this form ever uses hx_swap="none", inherited swap would drop preview HTML.
+                hx_swap="innerHTML",
                 hx_trigger="load, change",
                 hx_include="[name='tag_ids']",
                 hx_target="#implication-preview",

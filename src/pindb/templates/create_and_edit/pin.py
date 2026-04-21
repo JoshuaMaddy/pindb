@@ -239,7 +239,7 @@ def __back_image_input(pin: Pin | None) -> list[Element | VoidElement]:
             data_input_id="back_image",
             id="back_image_preview",
             style=f"background-image: url(/get/image/{pin.back_image_guid})"
-            if pin
+            if pin and pin.back_image_guid
             else False,
         )[
             fragment[
@@ -428,6 +428,8 @@ def __tag_ids_input(
             class_="multi-select w-full min-w-0",
             data_entity_type="tag",
             hx_get=preview_url,
+            # Override form hx_swap="none" — inherited swap would discard preview HTML.
+            hx_swap="innerHTML",
             hx_trigger="load, change",
             hx_include="[name='tag_ids']",
             hx_target="#implication-preview",
