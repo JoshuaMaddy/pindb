@@ -168,6 +168,17 @@ def tag_page(
                             href=str(request.url_for("get_edit_tag", id=tag.id)),
                         ),
                         user
+                        and (user.is_admin or user.is_editor)
+                        and icon_button(
+                            icon="copy",
+                            title="Duplicate tag (prefills a new tag form)",
+                            href=str(
+                                request.url_for("get_create_tag").include_query_params(
+                                    duplicate_from=tag.id
+                                )
+                            ),
+                        ),
+                        user
                         and user.is_admin
                         and confirm_modal(
                             trigger=icon_button(

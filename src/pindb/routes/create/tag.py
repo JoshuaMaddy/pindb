@@ -2,11 +2,12 @@
 FastAPI routes: `routes/create/tag.py`.
 """
 
-from fastapi import Form, Request
+from fastapi import Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from pindb.database import Tag, TagAlias, TagCategory, session_maker
 from pindb.database.tag import normalize_tag_name
@@ -25,13 +26,31 @@ LOGGER = user_logger("pindb.routes.create.tag")
 
 
 @router.get(path="/tag")
-def get_create_tag(request: Request) -> HTMLResponse:
+def get_create_tag(
+    request: Request,
+    duplicate_from: int | None = Query(default=None),
+) -> HTMLResponse:
+    duplicate_source: Tag | None = None
+    if duplicate_from is not None:
+        with session_maker() as session:
+            duplicate_source = session.scalar(
+                select(Tag)
+                .where(Tag.id == duplicate_from)
+                .options(selectinload(Tag.implications), selectinload(Tag.aliases))
+            )
+        if duplicate_source is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Tag {duplicate_from} not found to duplicate.",
+            )
+
     return HTMLResponse(
         content=str(
             tag_form(
                 post_url=request.url_for("post_create_tag"),
                 request=request,
                 options_url=str(request.url_for("get_tag_options")),
+                duplicate_source=duplicate_source,
             )
         )
     )

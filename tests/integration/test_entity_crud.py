@@ -214,3 +214,69 @@ class TestTagCrud:
         assert response.status_code == 200
         assert "pindb-toast-signal" in response.text
         assert "That name or alias is already in use." in response.text
+
+
+@pytest.mark.integration
+class TestDuplicateTag:
+    """`/create/tag?duplicate_from=<id>` prefills the form from an existing tag."""
+
+    def test_duplicate_from_unknown_tag_returns_404(self, editor_client):
+        response = editor_client.get("/create/tag?duplicate_from=999999")
+        assert response.status_code == 404
+
+    def test_duplicate_prefills_name_aliases_category_and_implications(
+        self, editor_client, db_session, admin_user
+    ):
+        parent = TagFactory(name="parent_for_dup", approved=True, created_by=admin_user)
+        source = TagFactory(
+            name="source_tag_dup",
+            approved=True,
+            created_by=admin_user,
+            aliases=["alias_one"],
+            category=TagCategory.color,
+        )
+        source.implications.add(parent)
+        db_session.flush()
+
+        response = editor_client.get(
+            f"/create/tag?duplicate_from={source.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        body = response.text
+        assert "Create a Tag" in body
+        assert "Duplicating" in body
+        assert "Source Tag Dup" in body
+        assert "alias_one" in body
+        assert TagCategory.color.value in body
+        # Implication options use canonical tag.name (underscores), not display_name.
+        assert "parent_for_dup" in body
+
+    def test_duplicate_requires_editor(self, auth_client, db_session, admin_user):
+        source = TagFactory(approved=True, created_by=admin_user)
+        response = auth_client.get(
+            f"/create/tag?duplicate_from={source.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 403
+
+    def test_tag_page_shows_duplicate_link_to_editor(
+        self, editor_client, db_session, admin_user
+    ):
+        tag = TagFactory(name="has_dup_btn", approved=True, created_by=admin_user)
+        response = editor_client.get(
+            f"/get/tag/{tag.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert (
+            f"/create/tag?duplicate_from={tag.id}"  # ty:ignore[unresolved-attribute]
+            in response.text
+        )
+
+    def test_tag_page_hides_duplicate_link_from_regular_user(
+        self, auth_client, db_session, admin_user
+    ):
+        tag = TagFactory(name="no_dup_btn", approved=True, created_by=admin_user)
+        response = auth_client.get(
+            f"/get/tag/{tag.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert "duplicate_from" not in response.text

@@ -4,7 +4,7 @@ htpy page and fragment builders: `templates/create_and_edit/tag.py`.
 
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, form, hr, input, label, option, select, span
+from htpy import Element, div, form, hr, i, input, label, option, select, span
 from markupsafe import Markup
 
 from pindb.database.tag import Tag, TagCategory
@@ -61,14 +61,34 @@ document.querySelectorAll("select.alias-select").forEach(function(el) {
 """
 
 
+def _duplicate_notice(source_display_name: str) -> Element:
+    return div(
+        class_="rounded bg-blue-900 border border-blue-600 text-blue-200 px-4 py-2 text-sm my-2"
+    )[
+        i(data_lucide="copy", class_="inline-block w-4 h-4 mr-1"),
+        f'Duplicating "{source_display_name}". Fields are prefilled — change the name if needed and submit to create the new tag.',
+    ]
+
+
 def tag_form(
     post_url: URL | str,
     request: Request,
     options_url: str,
     tag: Tag | None = None,
+    duplicate_source: Tag | None = None,
 ) -> Element:
-    selected_implications: list[Tag] = list(tag.implications) if tag else []
-    current_aliases: list[str] = [a.alias for a in tag.aliases] if tag else []
+    """Render the tag create/edit form.
+
+    ``tag`` — when present, edit that tag. ``duplicate_source`` — when present
+    (and ``tag`` is None), prefill a new tag from this row.
+    """
+    if tag is not None and duplicate_source is not None:
+        message = "tag_form: pass either `tag` or `duplicate_source`, not both."
+        raise ValueError(message)
+
+    prefill: Tag | None = tag if tag is not None else duplicate_source
+    selected_implications: list[Tag] = list(prefill.implications) if prefill else []
+    current_aliases: list[str] = [a.alias for a in prefill.aliases] if prefill else []
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
         body_content=centered_div(
@@ -76,6 +96,10 @@ def tag_form(
                 page_heading(
                     icon="tag" if not tag else "pencil",
                     text="Create a Tag" if not tag else "Edit a Tag",
+                ),
+                duplicate_source is not None
+                and _duplicate_notice(
+                    source_display_name=duplicate_source.display_name,
                 ),
                 hr,
                 form(
@@ -91,13 +115,13 @@ def tag_form(
                         id="name",
                         required=True,
                         autocomplete="off",
-                        value=tag.display_name if tag else None,
+                        value=prefill.display_name if prefill else None,
                     ),
                     label(for_="md-editor-description")["Description"],
                     markdown_editor(
                         field_id="description",
                         name="description",
-                        value=tag.description if tag else None,
+                        value=prefill.description if prefill else None,
                     ),
                     label(for_="category")["Category"],
                     select(name="category", id="category", class_="single-select")[
@@ -105,7 +129,9 @@ def tag_form(
                             option(
                                 value=cat.value,
                                 selected=cat
-                                == (tag.category if tag else TagCategory.general),
+                                == (
+                                    prefill.category if prefill else TagCategory.general
+                                ),
                                 data_icon=CATEGORY_ICONS[cat],
                                 data_color=CATEGORY_COLORS[cat],
                                 data_category=cat.value,
