@@ -15,8 +15,10 @@ from sqlalchemy import (
     UniqueConstraint,
     delete,
     insert,
+    literal,
     select,
 )
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -26,6 +28,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database._aliases import replace_aliases
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import pins_tags, tag_implications
@@ -71,25 +74,14 @@ def normalize_tag_name(name: str) -> str:
 
 
 def replace_tag_aliases(tag: Tag, aliases: Iterable[str], session: Session) -> None:
-    """Replace persisted aliases for ``tag``.
-
-    ``(tag_id, alias)`` is unique. Assigning ``tag.aliases = [...]`` with new
-    instances can flush INSERTs before DELETEs on the old rows, causing a
-    duplicate-key error when the alias strings are unchanged. Delete and flush
-    first, then attach replacements.
-    """
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for raw in aliases:
-        n = normalize_tag_name(raw)
-        if not n or n in seen:
-            continue
-        seen.add(n)
-        normalized.append(n)
-    for existing in list(tag.aliases):
-        session.delete(existing)
-    session.flush()
-    tag.aliases = [TagAlias(alias=n) for n in normalized]
+    """Replace persisted aliases for ``tag`` (normalized to e621 form)."""
+    replace_aliases(
+        owner=tag,
+        alias_cls=TagAlias,
+        raw_aliases=aliases,
+        session=session,
+        normalizer=normalize_tag_name,
+    )
 
 
 class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
@@ -230,6 +222,45 @@ def apply_pin_tags(
                 tag_id=tag.id,
                 implied_by_tag_id=source.id if source else None,
             )
+        )
+
+
+def cascade_new_implications_to_pins(
+    *,
+    tag: Tag,
+    newly_added_ids: set[int],
+    implied_tags: Iterable[Tag],
+    session: Session,
+) -> None:
+    """Insert implied pins_tags rows for ``tag``'s newly added implications.
+
+    Walks the transitive closure from each newly added child and inserts a
+    pins_tags row per (pin, implied_tag) pair, recording the direct source as
+    ``implied_by_tag_id``. ``ON CONFLICT DO NOTHING`` keeps existing rows.
+    """
+    if not newly_added_ids:
+        return
+    newly_added_tags: list[Tag] = [
+        implied_tag for implied_tag in implied_tags if implied_tag.id in newly_added_ids
+    ]
+    all_new_implied: dict[Tag, Tag | None] = resolve_implications(
+        initial=newly_added_tags,
+        session=session,
+    )
+    for implied_tag, source_tag in all_new_implied.items():
+        session.execute(
+            pg_insert(pins_tags)
+            .from_select(
+                ["pin_id", "tag_id", "implied_by_tag_id"],
+                select(
+                    pins_tags.c.pin_id,
+                    literal(implied_tag.id).label("tag_id"),
+                    literal(source_tag.id if source_tag else None).label(
+                        "implied_by_tag_id"
+                    ),
+                ).where(pins_tags.c.tag_id == tag.id),
+            )
+            .on_conflict_do_nothing()
         )
 
 

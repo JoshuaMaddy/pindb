@@ -2,14 +2,12 @@
 FastAPI routes: `routes/create/pin.py`.
 """
 
-from datetime import date
-from typing import Annotated, Sequence
+from typing import Sequence
 from uuid import UUID
 
-from fastapi import Form, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -23,14 +21,11 @@ from pindb.database.tag import Tag, apply_pin_tags
 from pindb.file_handler import save_image
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
-from pindb.model_utils import (
-    MagnitudeParseError,
-    empty_str_list_to_none,
-    empty_str_to_none,
-    parse_magnitude_mm,
+from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
+from pindb.routes._pin_shared import (
+    PinFormParams,
+    load_pin_relations,
 )
-from pindb.models.acquisition_type import AcquisitionType
-from pindb.models.funding_type import FundingType
 from pindb.search.update import update_pin
 from pindb.templates.create_and_edit.pin import pin_form
 
@@ -101,60 +96,19 @@ def get_create_pin(
 async def post_create_pin(
     request: Request,
     front_image: UploadFile = Form(),
-    name: str = Form(),
-    description: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    acquisition_type: AcquisitionType = Form(),
-    grade_names: list[str] = Form(),
-    grade_prices: list[str] = Form(),
-    currency_id: int = Form(default=999),
-    shop_ids: list[int] = Form(default_factory=list),
-    tag_ids: list[int] = Form(default_factory=list),
-    pin_sets_ids: list[int] = Form(default_factory=list),
-    artist_ids: list[int] = Form(default_factory=list),
-    number_produced: Annotated[
-        int | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    limited_edition: bool | None = Form(default=None),
-    release_date: Annotated[
-        date | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    end_date: Annotated[
-        date | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    funding_type: FundingType | None = Form(default=None),
-    posts: int = Form(default=1),
-    width: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    height: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    links: Annotated[
-        list[str] | None,
-        Form(),
-        BeforeValidator(func=empty_str_list_to_none),
-    ] = None,
+    fields: PinFormParams = Depends(),
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
-    LOGGER.info("Creating pin name=%r shops=%s artists=%s", name, shop_ids, artist_ids)
+    LOGGER.info(
+        "Creating pin name=%r shops=%s artists=%s",
+        fields.name,
+        fields.shop_ids,
+        fields.artist_ids,
+    )
 
     try:
-        width_mm = parse_magnitude_mm(field_label="Width", raw=width)
-        height_mm = parse_magnitude_mm(field_label="Height", raw=height)
+        width_mm = parse_magnitude_mm(field_label="Width", raw=fields.width)
+        height_mm = parse_magnitude_mm(field_label="Height", raw=fields.height)
     except MagnitudeParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -162,51 +116,42 @@ async def post_create_pin(
     front_image_guid: UUID = await save_image(file=front_image)
 
     if back_image:
-        back_image_guid: UUID = await save_image(file=back_image)
+        back_image_guid = await save_image(file=back_image)
 
     with session_maker.begin() as session:
-        pin_shops: set[Shop] = set(
-            session.scalars(
-                statement=select(Shop).where(Shop.id.in_(other=shop_ids))
-            ).all()
+        pin_shops, pin_sets, pin_artists = load_pin_relations(
+            session=session,
+            shop_ids=fields.shop_ids,
+            pin_sets_ids=fields.pin_sets_ids,
+            artist_ids=fields.artist_ids,
         )
-        pin_sets: set[PinSet] = set(
-            session.scalars(
-                statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
-            ).all()
-        )
-        pin_artists: set[Artist] = set(
-            session.scalars(
-                statement=select(Artist).where(Artist.id.in_(other=artist_ids))
-            ).all()
-        )
-        currency: Currency = session.get_one(entity=Currency, ident=currency_id)
+        currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
         new_links: set[Link] = (
-            {Link(path=link) for link in links} if links else set[Link]()
+            {Link(path=link) for link in fields.links} if fields.links else set[Link]()
         )
         new_grades: set[Grade] = {
             Grade(name=grade_name, price=float(p) if (p := price_str.strip()) else None)
-            for grade_name, price_str in zip(grade_names, grade_prices)
+            for grade_name, price_str in zip(fields.grade_names, fields.grade_prices)
             if grade_name.strip()
         }
 
         new_pin = Pin(
-            name=name,
-            acquisition_type=acquisition_type,
+            name=fields.name,
+            acquisition_type=fields.acquisition_type,
             front_image_guid=front_image_guid,
             grades=new_grades,
             currency=currency,
             shops=pin_shops,
-            limited_edition=limited_edition,
-            number_produced=number_produced,
-            release_date=release_date,
-            end_date=end_date,
-            funding_type=funding_type,
-            posts=posts,
+            limited_edition=fields.limited_edition,
+            number_produced=fields.number_produced,
+            release_date=fields.release_date,
+            end_date=fields.end_date,
+            funding_type=fields.funding_type,
+            posts=fields.posts,
             width=width_mm,
             height=height_mm,
             back_image_guid=back_image_guid,
-            description=description,
+            description=fields.description,
             artists=pin_artists,
             sets=pin_sets,
             links=new_links,
@@ -214,7 +159,7 @@ async def post_create_pin(
 
         session.add(instance=new_pin)
         session.flush()
-        apply_pin_tags(new_pin.id, tag_ids, session)
+        apply_pin_tags(new_pin.id, fields.tag_ids, session)
         pin_id: int = new_pin.id
 
     with session_maker() as session:
@@ -230,7 +175,7 @@ async def post_create_pin(
     if created_pin is not None:
         update_pin(pin=created_pin)
 
-    LOGGER.info("Created pin id=%d name=%r", pin_id, name)
+    LOGGER.info("Created pin id=%d name=%r", pin_id, fields.name)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

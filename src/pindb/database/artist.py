@@ -15,6 +15,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database._aliases import replace_aliases
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import artists_links, pins_artists
@@ -112,15 +113,9 @@ def replace_artist_aliases(
     artist: Artist, aliases: Iterable[str], session: Session
 ) -> None:
     """Replace persisted aliases for ``artist`` (see ``replace_tag_aliases``)."""
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for raw in aliases:
-        a = raw.strip()
-        if not a or a in seen:
-            continue
-        seen.add(a)
-        cleaned.append(a)
-    for existing in list(artist.aliases):
-        session.delete(existing)
-    session.flush()
-    artist.aliases = [ArtistAlias(alias=a) for a in cleaned]
+    replace_aliases(
+        owner=artist,
+        alias_cls=ArtistAlias,
+        raw_aliases=aliases,
+        session=session,
+    )

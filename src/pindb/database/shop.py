@@ -15,6 +15,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from pindb.database._aliases import replace_aliases
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import pins_shops, shops_links
@@ -122,15 +123,9 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
 def replace_shop_aliases(shop: Shop, aliases: Iterable[str], session: Session) -> None:
     """Replace persisted aliases for ``shop`` (see ``replace_tag_aliases``)."""
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for raw in aliases:
-        a = raw.strip()
-        if not a or a in seen:
-            continue
-        seen.add(a)
-        cleaned.append(a)
-    for existing in list(shop.aliases):
-        session.delete(existing)
-    session.flush()
-    shop.aliases = [ShopAlias(alias=a) for a in cleaned]
+    replace_aliases(
+        owner=shop,
+        alias_cls=ShopAlias,
+        raw_aliases=aliases,
+        session=session,
+    )

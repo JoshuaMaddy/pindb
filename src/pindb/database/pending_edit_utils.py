@@ -13,14 +13,12 @@ from datetime import date
 from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import literal, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
 from pindb.database.artist import Artist
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
-from pindb.database.joins import pins_tags
 from pindb.database.link import Link
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
@@ -33,6 +31,7 @@ from pindb.database.tag import (
     TagCategory,
     _cascade_remove_implied,
     apply_pin_tags,
+    cascade_new_implications_to_pins,
     replace_tag_aliases,
     resolve_implications,
 )
@@ -497,30 +496,12 @@ def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) 
 
     session.flush()  # persist tag_implications changes before cascading
 
-    if newly_added_ids:
-        newly_added_tags: list[Tag] = [
-            implied_tag
-            for implied_tag in implied_tags
-            if implied_tag.id in newly_added_ids
-        ]
-        all_new_implied: dict[Tag, Tag | None] = resolve_implications(
-            initial=newly_added_tags, session=session
-        )
-        for implied_tag, source_tag in all_new_implied.items():
-            session.execute(
-                pg_insert(pins_tags)
-                .from_select(
-                    ["pin_id", "tag_id", "implied_by_tag_id"],
-                    select(
-                        pins_tags.c.pin_id,
-                        literal(implied_tag.id).label("tag_id"),
-                        literal(source_tag.id if source_tag else None).label(
-                            "implied_by_tag_id"
-                        ),
-                    ).where(pins_tags.c.tag_id == tag.id),
-                )
-                .on_conflict_do_nothing()
-            )
+    cascade_new_implications_to_pins(
+        tag=tag,
+        newly_added_ids=newly_added_ids,
+        implied_tags=implied_tags,
+        session=session,
+    )
 
     if removed_ids:
         _cascade_remove_implied(tag.id, removed_ids, session)

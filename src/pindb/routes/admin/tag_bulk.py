@@ -9,16 +9,15 @@ from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field, ValidationError, model_validator
-from sqlalchemy import literal, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from pindb.database import Tag, TagCategory, session_maker
-from pindb.database.joins import pins_tags, tag_implications
+from pindb.database.joins import tag_implications
 from pindb.database.tag import (
     TagAlias,
+    cascade_new_implications_to_pins,
     normalize_tag_name,
-    resolve_implications,
 )
 from pindb.log import user_logger
 from pindb.search.update import update_tags
@@ -56,40 +55,6 @@ class BulkTagUpsertBody(BaseModel):
 class BulkTagUpsertResult(BaseModel):
     root_tag_ids: list[int]
     touched_tag_ids: list[int]
-
-
-def _cascade_new_implications_to_pins(
-    *,
-    tag: Tag,
-    newly_added_ids: set[int],
-    implied_tags: list[Tag],
-    session: Session,
-) -> None:
-    """Mirror ``post_edit_tag`` / pending approval: new implications propagate to pins."""
-    if not newly_added_ids:
-        return
-    newly_added_tags: list[Tag] = [
-        implied_tag for implied_tag in implied_tags if implied_tag.id in newly_added_ids
-    ]
-    all_new_implied: dict[Tag, Tag | None] = resolve_implications(
-        initial=newly_added_tags,
-        session=session,
-    )
-    for implied_tag, source_tag in all_new_implied.items():
-        session.execute(
-            pg_insert(pins_tags)
-            .from_select(
-                ["pin_id", "tag_id", "implied_by_tag_id"],
-                select(
-                    pins_tags.c.pin_id,
-                    literal(implied_tag.id).label("tag_id"),
-                    literal(source_tag.id if source_tag else None).label(
-                        "implied_by_tag_id"
-                    ),
-                ).where(pins_tags.c.tag_id == tag.id),
-            )
-            .on_conflict_do_nothing()
-        )
 
 
 def _merge_tag_fields(
@@ -225,10 +190,10 @@ def _upsert_tag_node(
         session.flush()
 
         if newly_added_ids:
-            _cascade_new_implications_to_pins(
+            cascade_new_implications_to_pins(
                 tag=tag,
                 newly_added_ids=newly_added_ids,
-                implied_tags=list(merged_implied),
+                implied_tags=merged_implied,
                 session=session,
             )
 

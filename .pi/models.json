@@ -1,0 +1,30 @@
+{
+  "providers": {
+    "novita": {
+      "baseUrl": "https://api.novita.ai/openai/v1",
+      "api": "openai-completions",
+      "apiKey": "NOVITA_API_KEY",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+        {
+          "id": "minimax/minimax-m2.7",
+          "name": "MiniMax M2.7 (Novita serverless)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 204800,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.06,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}

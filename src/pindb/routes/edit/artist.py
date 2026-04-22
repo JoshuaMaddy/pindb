@@ -23,7 +23,10 @@ from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
-from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
+from pindb.routes.edit._pending_helpers import (
+    apply_simple_aliased_direct_edit,
+    submit_simple_aliased_pending_edit,
+)
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
@@ -97,29 +100,30 @@ def post_edit_artist(
 
         if needs_pending_edit(artist, current_user):
             LOGGER.info("Submitting pending edit for artist id=%d name=%r", id, name)
-            return submit_pending_edit(
+            return submit_simple_aliased_pending_edit(
                 session=session,
                 entity=artist,
                 entity_table="artists",
                 entity_id=id,
-                field_updates={
-                    "name": name,
-                    "description": description,
-                    "links": sorted(links or []),
-                    "aliases": sorted(alias for alias in aliases if alias.strip()),
-                },
+                name=name,
+                description=description,
+                links=links,
+                aliases=aliases,
                 current_user=current_user,
                 request=request,
                 redirect_route="get_artist",
             )
 
         LOGGER.info("Editing artist id=%d name=%r", id, name)
-        artist.name = name
-        artist.description = description
-
-        replace_links(entity=artist, urls=links, session=session)
-
-        replace_artist_aliases(artist=artist, aliases=aliases, session=session)
+        apply_simple_aliased_direct_edit(
+            entity=artist,
+            name=name,
+            description=description,
+            links=links,
+            aliases=aliases,
+            replace_aliases_fn=replace_artist_aliases,
+            session=session,
+        )
 
         session.flush()
         artist_id: int = artist.id

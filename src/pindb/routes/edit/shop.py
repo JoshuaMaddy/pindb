@@ -23,7 +23,10 @@ from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
-from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
+from pindb.routes.edit._pending_helpers import (
+    apply_simple_aliased_direct_edit,
+    submit_simple_aliased_pending_edit,
+)
 from pindb.templates.create_and_edit.shop import shop_form
 
 router = APIRouter()
@@ -99,29 +102,30 @@ def post_edit_shop(
 
         if needs_pending_edit(shop, current_user):
             LOGGER.info("Submitting pending edit for shop id=%d name=%r", id, name)
-            return submit_pending_edit(
+            return submit_simple_aliased_pending_edit(
                 session=session,
                 entity=shop,
                 entity_table="shops",
                 entity_id=id,
-                field_updates={
-                    "name": name,
-                    "description": description,
-                    "links": sorted(links or []),
-                    "aliases": sorted(alias for alias in aliases if alias.strip()),
-                },
+                name=name,
+                description=description,
+                links=links,
+                aliases=aliases,
                 current_user=current_user,
                 request=request,
                 redirect_route="get_shop",
             )
 
         LOGGER.info("Editing shop id=%d name=%r", id, name)
-        shop.name = name
-        shop.description = description
-
-        replace_links(entity=shop, urls=links, session=session)
-
-        replace_shop_aliases(shop=shop, aliases=aliases, session=session)
+        apply_simple_aliased_direct_edit(
+            entity=shop,
+            name=name,
+            description=description,
+            links=links,
+            aliases=aliases,
+            replace_aliases_fn=replace_shop_aliases,
+            session=session,
+        )
 
         session.flush()
         shop_id: int = shop.id

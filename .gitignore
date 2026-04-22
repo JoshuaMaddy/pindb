@@ -18,6 +18,9 @@ wheels/
 node_modules
 main.css
 
+# Pi coding agent (project-local sessions from .pi/settings.json)
+.pi/sessions/
+
 # Dev
 .env
 

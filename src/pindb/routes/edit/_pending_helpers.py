@@ -2,7 +2,7 @@
 FastAPI routes: `routes/edit/_pending_helpers.py`.
 """
 
-from typing import Iterable
+from typing import Any, Callable, Iterable
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
@@ -94,3 +94,52 @@ def replace_links(
 
     new_links: set[Link] = {Link(url) for url in (urls or [])}
     setattr(entity, "links", new_links)
+
+
+def submit_simple_aliased_pending_edit(
+    *,
+    session: Session,
+    entity: Artist | Shop,
+    entity_table: str,
+    entity_id: int,
+    name: str,
+    description: str | None,
+    links: list[str] | None,
+    aliases: list[str],
+    current_user: User,
+    request: Request,
+    redirect_route: str,
+) -> HTMLResponse:
+    """Pending-edit submission for entities with name/description/links/aliases."""
+    return submit_pending_edit(
+        session=session,
+        entity=entity,
+        entity_table=entity_table,
+        entity_id=entity_id,
+        field_updates={
+            "name": name,
+            "description": description,
+            "links": sorted(links or []),
+            "aliases": sorted(alias for alias in aliases if alias.strip()),
+        },
+        current_user=current_user,
+        request=request,
+        redirect_route=redirect_route,
+    )
+
+
+def apply_simple_aliased_direct_edit(
+    *,
+    entity: Artist | Shop,
+    name: str,
+    description: str | None,
+    links: list[str] | None,
+    aliases: list[str],
+    replace_aliases_fn: Callable[[Any, Iterable[str], Session], None],
+    session: Session,
+) -> None:
+    """In-place write for name/description/links/aliases (admin path)."""
+    entity.name = name
+    entity.description = description
+    replace_links(entity=entity, urls=links, session=session)
+    replace_aliases_fn(entity, aliases, session)

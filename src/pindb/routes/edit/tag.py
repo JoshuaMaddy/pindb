@@ -7,13 +7,11 @@ from typing import Sequence
 from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from sqlalchemy import literal, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
 from pindb.database import Tag, TagCategory, session_maker
-from pindb.database.joins import pins_tags
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
     get_edit_chain,
@@ -21,9 +19,9 @@ from pindb.database.pending_edit_utils import (
 )
 from pindb.database.tag import (
     _cascade_remove_implied,
+    cascade_new_implications_to_pins,
     normalize_tag_name,
     replace_tag_aliases,
-    resolve_implications,
 )
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
@@ -138,32 +136,12 @@ def post_edit_tag(
 
         session.flush()  # write tag_implications changes before cascading
 
-        if newly_added_ids:
-            newly_added_tags: list[Tag] = [
-                implied_tag
-                for implied_tag in implied_tags
-                if implied_tag.id in newly_added_ids
-            ]
-            all_new_implied: dict[Tag, Tag | None] = resolve_implications(
-                initial=newly_added_tags,
-                session=session,
-            )
-
-            for implied_tag, source_tag in all_new_implied.items():
-                session.execute(
-                    pg_insert(pins_tags)
-                    .from_select(
-                        ["pin_id", "tag_id", "implied_by_tag_id"],
-                        select(
-                            pins_tags.c.pin_id,
-                            literal(implied_tag.id).label("tag_id"),
-                            literal(source_tag.id if source_tag else None).label(
-                                "implied_by_tag_id"
-                            ),
-                        ).where(pins_tags.c.tag_id == tag.id),
-                    )
-                    .on_conflict_do_nothing()
-                )
+        cascade_new_implications_to_pins(
+            tag=tag,
+            newly_added_ids=newly_added_ids,
+            implied_tags=implied_tags,
+            session=session,
+        )
 
         if removed_ids:
             _cascade_remove_implied(tag.id, removed_ids, session)

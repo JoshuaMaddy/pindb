@@ -2,14 +2,12 @@
 FastAPI routes: `routes/edit/pin.py`.
 """
 
-from datetime import date
-from typing import Annotated, Sequence
+from typing import Sequence
 from uuid import UUID
 
-from fastapi import Form, HTTPException, Request, UploadFile
+from fastapi import Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -22,21 +20,18 @@ from pindb.database.pending_edit_utils import (
     get_effective_snapshot,
 )
 from pindb.database.pin import Pin
-from pindb.database.pin_set import PinSet
 from pindb.database.pin_writes import upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
-from pindb.model_utils import (
-    MagnitudeParseError,
-    empty_str_list_to_none,
-    empty_str_to_none,
-    parse_magnitude_mm,
-)
-from pindb.models.acquisition_type import AcquisitionType
-from pindb.models.funding_type import FundingType
+from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._pin_shared import (
+    PinFormParams,
+    load_pin_relations,
+    parse_grade_dicts,
+)
 from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.templates.create_and_edit.pin import pin_form
 
@@ -109,58 +104,12 @@ async def post_edit_pin(
     id: int,
     current_user: EditorUser,
     front_image: UploadFile | None = Form(default=None),
-    name: str = Form(),
-    description: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    acquisition_type: AcquisitionType = Form(),
-    grade_names: list[str] = Form(),
-    grade_prices: list[str] = Form(),
-    currency_id: int = Form(default=999),
-    shop_ids: list[int] = Form(default_factory=list),
-    tag_ids: list[int] = Form(default_factory=list),
-    pin_sets_ids: list[int] = Form(default_factory=list),
-    artist_ids: list[int] = Form(default_factory=list),
-    number_produced: Annotated[
-        int | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    limited_edition: bool | None = Form(default=None),
-    release_date: Annotated[
-        date | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    end_date: Annotated[
-        date | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    funding_type: FundingType | None = Form(default=None),
-    posts: int = Form(default=1),
-    width: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    height: Annotated[
-        str | None,
-        Form(),
-        BeforeValidator(func=empty_str_to_none),
-    ] = None,
-    links: Annotated[
-        list[str] | None,
-        Form(),
-        BeforeValidator(func=empty_str_list_to_none),
-    ] = None,
+    fields: PinFormParams = Depends(),
     back_image: UploadFile | None = Form(default=None),
 ) -> HTMLResponse:
     try:
-        width_mm = parse_magnitude_mm(field_label="Width", raw=width)
-        height_mm = parse_magnitude_mm(field_label="Height", raw=height)
+        width_mm = parse_magnitude_mm(field_label="Width", raw=fields.width)
+        height_mm = parse_magnitude_mm(field_label="Height", raw=fields.height)
     except MagnitudeParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -182,21 +131,13 @@ async def post_edit_pin(
         assert_editor_can_edit(pin, current_user)
 
         if needs_pending_edit(pin, current_user):
-            LOGGER.info("Submitting pending edit for pin id=%d name=%r", id, name)
+            LOGGER.info(
+                "Submitting pending edit for pin id=%d name=%r", id, fields.name
+            )
             chain = get_edit_chain(session, "pins", id)
             old_snapshot: dict[str, object] = get_effective_snapshot(pin, chain)
 
-            grades_list: list[dict[str, object]] = []
-            for grade_name, price_str in zip(grade_names, grade_prices):
-                if not grade_name.strip():
-                    continue
-                stripped_price = price_str.strip()
-                grades_list.append(
-                    {
-                        "name": grade_name,
-                        "price": float(stripped_price) if stripped_price else None,
-                    }
-                )
+            grades_list = parse_grade_dicts(fields.grade_names, fields.grade_prices)
             grades_list.sort(key=lambda grade: grade["name"])  # type: ignore[arg-type, return-value]
 
             return submit_pending_edit(
@@ -205,29 +146,35 @@ async def post_edit_pin(
                 entity_table="pins",
                 entity_id=id,
                 field_updates={
-                    "name": name,
-                    "description": description,
-                    "acquisition_type": acquisition_type.value,
-                    "limited_edition": limited_edition,
-                    "number_produced": number_produced,
-                    "release_date": release_date.isoformat() if release_date else None,
-                    "end_date": end_date.isoformat() if end_date else None,
-                    "funding_type": funding_type.value if funding_type else None,
-                    "posts": posts,
+                    "name": fields.name,
+                    "description": fields.description,
+                    "acquisition_type": fields.acquisition_type.value,
+                    "limited_edition": fields.limited_edition,
+                    "number_produced": fields.number_produced,
+                    "release_date": fields.release_date.isoformat()
+                    if fields.release_date
+                    else None,
+                    "end_date": fields.end_date.isoformat()
+                    if fields.end_date
+                    else None,
+                    "funding_type": fields.funding_type.value
+                    if fields.funding_type
+                    else None,
+                    "posts": fields.posts,
                     "width": width_mm,
                     "height": height_mm,
-                    "currency_id": currency_id,
+                    "currency_id": fields.currency_id,
                     "front_image_guid": str(front_image_guid)
                     if front_image_guid
                     else old_snapshot["front_image_guid"],
                     "back_image_guid": str(back_image_guid)
                     if back_image_guid
                     else old_snapshot["back_image_guid"],
-                    "shop_ids": sorted(shop_ids),
-                    "tag_ids": sorted(tag_ids),
-                    "artist_ids": sorted(artist_ids),
-                    "pin_set_ids": sorted(pin_sets_ids),
-                    "links": sorted(links or []),
+                    "shop_ids": sorted(fields.shop_ids),
+                    "tag_ids": sorted(fields.tag_ids),
+                    "artist_ids": sorted(fields.artist_ids),
+                    "pin_set_ids": sorted(fields.pin_sets_ids),
+                    "links": sorted(fields.links or []),
                     "grades": grades_list,
                 },
                 current_user=current_user,
@@ -236,61 +183,44 @@ async def post_edit_pin(
             )
 
         # Direct edit — admin, or editor on their own pending-new entry.
-        LOGGER.info("Editing pin id=%d name=%r", id, name)
-        pin_shops: set[Shop] = set(
-            session.scalars(
-                statement=select(Shop).where(Shop.id.in_(other=shop_ids))
-            ).all()
+        LOGGER.info("Editing pin id=%d name=%r", id, fields.name)
+        pin_shops, pin_sets, pin_artists = load_pin_relations(
+            session=session,
+            shop_ids=fields.shop_ids,
+            pin_sets_ids=fields.pin_sets_ids,
+            artist_ids=fields.artist_ids,
         )
-        pin_sets: set[PinSet] = set(
-            session.scalars(
-                statement=select(PinSet).where(PinSet.id.in_(other=pin_sets_ids))
-            ).all()
-        )
-        pin_artists: set[Artist] = set(
-            session.scalars(
-                statement=select(Artist).where(Artist.id.in_(other=artist_ids))
-            ).all()
-        )
-        currency: Currency = session.get_one(entity=Currency, ident=currency_id)
+        currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
 
-        pin.name = name
-        pin.description = description
-        pin.acquisition_type = acquisition_type
+        pin.name = fields.name
+        pin.description = fields.description
+        pin.acquisition_type = fields.acquisition_type
         pin.currency = currency
         if front_image_guid:
             pin.front_image_guid = front_image_guid
         pin.shops = pin_shops
         pin.sets = pin_sets
         pin.artists = pin_artists
-        pin.limited_edition = limited_edition
-        pin.number_produced = number_produced
-        pin.release_date = release_date
-        pin.end_date = end_date
-        pin.funding_type = funding_type
-        pin.posts = posts
+        pin.limited_edition = fields.limited_edition
+        pin.number_produced = fields.number_produced
+        pin.release_date = fields.release_date
+        pin.end_date = fields.end_date
+        pin.funding_type = fields.funding_type
+        pin.posts = fields.posts
         pin.width = width_mm
         pin.height = height_mm
         if back_image_guid:
             pin.back_image_guid = back_image_guid
 
-        replace_links(entity=pin, urls=links, session=session)
+        replace_links(entity=pin, urls=fields.links, session=session)
 
-        parsed_grades: list[dict[str, object]] = []
-        for grade_name, price_str in zip(grade_names, grade_prices):
-            if not grade_name.strip():
-                continue
-            stripped_price = price_str.strip()
-            parsed_grades.append(
-                {
-                    "name": grade_name,
-                    "price": float(stripped_price) if stripped_price else None,
-                }
-            )
+        upsert_grades(
+            pin=pin,
+            grades=parse_grade_dicts(fields.grade_names, fields.grade_prices),
+            session=session,
+        )
 
-        upsert_grades(pin=pin, grades=parsed_grades, session=session)
-
-        apply_pin_tags(pin.id, tag_ids, session)
+        apply_pin_tags(pin.id, fields.tag_ids, session)
         session.flush()
         pin_id: int = pin.id
 
