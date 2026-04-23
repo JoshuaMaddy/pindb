@@ -569,27 +569,47 @@ def _http_setup_users(live_server):
     )
 
 
-def _admin_http_client(live_server: str) -> httpx.Client:
-    """Logged-in admin httpx client, freshly minted for the current test."""
+@pytest.fixture(scope="session")
+def admin_http_client(
+    live_server, _http_setup_users
+) -> Generator[httpx.Client, None, None]:
+    """One logged-in admin httpx client per worker (avoids burning /auth/login rate limits)."""
     client = httpx.Client(base_url=live_server, follow_redirects=False)
-    client.post(
+    login = client.post(
         "/auth/login",
         data={"username": "e2e_admin_pw", "password": _E2E_ADMIN_PASSWORD},
     )
-    return client
+    assert login.status_code == 303, (
+        f"e2e admin HTTP login failed: {login.status_code} {login.text[:500]!r}"
+    )
+    try:
+        yield client
+    finally:
+        client.close()
 
 
-def _editor_http_client(live_server: str) -> httpx.Client:
+@pytest.fixture(scope="session")
+def editor_http_client(
+    live_server, _http_setup_users
+) -> Generator[httpx.Client, None, None]:
+    """One logged-in editor httpx client per worker."""
     client = httpx.Client(base_url=live_server, follow_redirects=False)
-    client.post(
+    login = client.post(
         "/auth/login",
         data={"username": "e2e_editor_pw", "password": _E2E_EDITOR_PASSWORD},
     )
-    return client
+    assert login.status_code == 303, (
+        f"e2e editor HTTP login failed: {login.status_code} {login.text[:500]!r}"
+    )
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 def _create_entity_http(
-    live_server: str,
+    admin_client: httpx.Client,
+    editor_client: httpx.Client,
     db_handle: Callable[..., list[tuple]],
     *,
     endpoint: str,
@@ -598,19 +618,12 @@ def _create_entity_http(
     extra_form: dict[str, str] | None = None,
     approved: bool,
 ) -> dict[str, Any]:
-    client = (
-        _admin_http_client(live_server)
-        if approved
-        else _editor_http_client(live_server)
+    http = admin_client if approved else editor_client
+    data = {"name": name, **(extra_form or {})}
+    response = http.post(endpoint, data=data, headers={"HX-Request": "true"})
+    assert response.status_code == 200, (
+        f"{endpoint} failed: {response.status_code} {response.text[:300]}"
     )
-    try:
-        data = {"name": name, **(extra_form or {})}
-        response = client.post(endpoint, data=data, headers={"HX-Request": "true"})
-        assert response.status_code == 200, (
-            f"{endpoint} failed: {response.status_code} {response.text[:300]}"
-        )
-    finally:
-        client.close()
 
     rows = db_handle(
         f"SELECT id, name, approved_at IS NOT NULL FROM {table} WHERE name = %s",
@@ -623,7 +636,7 @@ def _create_entity_http(
 
 @pytest.fixture
 def make_shop(
-    live_server, db_handle, _http_setup_users
+    admin_http_client, editor_http_client, db_handle
 ) -> Callable[..., dict[str, Any]]:
     def _make(
         name: str,
@@ -632,7 +645,8 @@ def make_shop(
         approved: bool = True,
     ) -> dict[str, Any]:
         return _create_entity_http(
-            live_server,
+            admin_http_client,
+            editor_http_client,
             db_handle,
             endpoint="/create/shop",
             table="shops",
@@ -646,7 +660,7 @@ def make_shop(
 
 @pytest.fixture
 def make_artist(
-    live_server, db_handle, _http_setup_users
+    admin_http_client, editor_http_client, db_handle
 ) -> Callable[..., dict[str, Any]]:
     def _make(
         name: str,
@@ -655,7 +669,8 @@ def make_artist(
         approved: bool = True,
     ) -> dict[str, Any]:
         return _create_entity_http(
-            live_server,
+            admin_http_client,
+            editor_http_client,
             db_handle,
             endpoint="/create/artist",
             table="artists",
@@ -669,11 +684,12 @@ def make_artist(
 
 @pytest.fixture
 def make_tag(
-    live_server, db_handle, _http_setup_users
+    admin_http_client, editor_http_client, db_handle
 ) -> Callable[..., dict[str, Any]]:
     def _make(name: str, *, approved: bool = True) -> dict[str, Any]:
         return _create_entity_http(
-            live_server,
+            admin_http_client,
+            editor_http_client,
             db_handle,
             endpoint="/create/tag",
             table="tags",

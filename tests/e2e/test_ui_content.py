@@ -306,11 +306,15 @@ class TestThemeSwitcher:
             "class", re.compile(r"\bmocha\b")
         )
 
-        # Pick a different theme — radios are visually hidden but still clickable.
+        # Pick a different theme — radios are visually hidden. ``check(force=True)``
+        # does not always dispatch ``change``, which HTMX listens for; fire it explicitly.
         target = page.locator("input[name='theme'][value='dracula']").first
         expect(target).to_have_count(1)
-        target.check(force=True)
-        # Wait for the HTMX request to settle.
+        with page.expect_response(
+            lambda r: r.request.method == "POST" and "/user/me/settings" in r.url
+        ):
+            target.check(force=True)
+            target.dispatch_event("change")
         page.wait_for_load_state("load")
 
         expect(page.locator("html")).to_have_attribute(
