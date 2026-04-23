@@ -1,7 +1,5 @@
 """Shared FastAPI Form param class and helpers for create/edit pin routes."""
 
-from __future__ import annotations
-
 from datetime import date
 from typing import Annotated
 

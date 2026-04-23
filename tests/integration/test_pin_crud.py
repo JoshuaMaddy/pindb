@@ -61,6 +61,27 @@ class TestCreatePinAuthEnforcement:
         response = auth_client.post("/create/pin", data={})
         assert response.status_code == 403
 
+    def test_editor_post_builds_form_validator(self, editor_client):
+        """Guards against ForwardRef regressions on enum Form params.
+
+        `from __future__ import annotations` in `_pin_shared.py` turns enum
+        annotations into ForwardRefs that FastAPI cannot resolve, raising
+        `PydanticUserError` at request time. Posting any valid-enum value as
+        editor builds and exercises the Form validator; crashes surface as 5xx.
+        """
+        response = editor_client.post(
+            "/create/pin",
+            data={
+                "name": "FormValidatorProbe",
+                "acquisition_type": "single",
+                "grade_names": "standard",
+                "grade_prices": "",
+                "currency_id": "999",
+                "posts": "1",
+            },
+        )
+        assert response.status_code < 500, response.text[:500]
+
 
 @pytest.mark.integration
 class TestDuplicatePin:

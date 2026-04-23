@@ -43,9 +43,10 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-# e2e tests require Playwright browsers + Meilisearch container and are skipped
-# by default. Opt in via `pytest -m e2e` (or override with a custom -m expr).
-addopts = ["--import-mode=importlib", "-m", "not e2e"]
+# e2e tests require Playwright browsers + Docker (Postgres + Meilisearch
+# testcontainers). Skip them locally with `pytest -m "not e2e"` if the host
+# lacks those; CI runs the full suite.
+addopts = ["--import-mode=importlib"]
 pythonpath = "src"
 testpaths = ["tests"]
 env = [
