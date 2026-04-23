@@ -57,6 +57,7 @@ env = [
     "IMAGE_DIRECTORY=/tmp/pindb_test_images",
     "SESSION_COOKIE_SECURE=false",
     "CSRF_ENFORCE_ORIGIN=false",
+    "CONTACT_EMAIL=test@example.com",
 ]
 markers = [
     "unit: fast tests, no I/O (DB or network)",
