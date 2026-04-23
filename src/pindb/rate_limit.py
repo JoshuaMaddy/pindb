@@ -23,6 +23,8 @@ from limits import RateLimitItem, parse
 from limits.storage import MemoryStorage
 from limits.strategies import MovingWindowRateLimiter
 
+from pindb.config import CONFIGURATION
+
 _storage = MemoryStorage()
 _limiter = MovingWindowRateLimiter(_storage)
 _parsed_cache: dict[str, RateLimitItem] = {}
@@ -71,6 +73,8 @@ def rate_limit(limit_str: str):
     limit = _parse(limit_str)
 
     def dependency(request: Request) -> None:
+        if not CONFIGURATION.rate_limit_enabled:
+            return
         key = f"{request.url.path}:{_client_ip(request)}"
         if not _limiter.hit(limit, key):
             stats = _limiter.get_window_stats(limit, key)

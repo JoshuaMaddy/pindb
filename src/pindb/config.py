@@ -108,6 +108,11 @@ class Configuration(BaseSettings):
     # used by the e2e suite. MUST stay False in production.
     allow_test_oauth_provider: bool = Field(default=False)
 
+    # Toggle the per-IP rate limiter on sensitive auth endpoints. Disable only
+    # for the e2e suite, where all traffic shares 127.0.0.1 and hits the
+    # signup/login windows almost immediately. MUST stay True in production.
+    rate_limit_enabled: bool = Field(default=True)
+
     # Comma-separated usernames to auto-promote to admin on startup.
     # Empty by default — promote your first admin via SQL or a seeded
     # migration. Kept as a string so ``.env`` stays ergonomic.

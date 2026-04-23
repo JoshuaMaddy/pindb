@@ -110,7 +110,11 @@ class TestAuthErrorMessages:
             page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
             page.click("button[type='submit']")
             page.wait_for_load_state("load")
-            expect(page.get_by_text("Username already taken.")).to_be_visible()
+            # Handler returns a unified clash message to avoid user/email
+            # enumeration — not a specific "Username already taken." text.
+            expect(
+                page.get_by_text("Those sign-up details aren't available.")
+            ).to_be_visible()
         finally:
             context.close()
 

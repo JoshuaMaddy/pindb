@@ -211,6 +211,10 @@ def live_server(
         "SESSION_COOKIE_SECURE": "false",
         "CSRF_ENFORCE_ORIGIN": "false",
         "CONTACT_EMAIL": "e2e@example.test",
+        # Disable per-IP rate limits: all e2e traffic shares 127.0.0.1 so the
+        # signup (10/hour) and login (10/minute) windows close almost
+        # immediately, cascading into bogus 401s on downstream requests.
+        "RATE_LIMIT_ENABLED": "false",
     }
 
     # Fixtures and helpers use os.environ["DATABASE_CONNECTION"] for direct
