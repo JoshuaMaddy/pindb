@@ -204,6 +204,13 @@ def live_server(
         "BASE_URL": base_url,
         "SEARCH_SYNC_INTERVAL_MINUTES": "60",
         "ALLOW_TEST_OAUTH_PROVIDER": "true",
+        # Explicit — pytest-env propagation through the subprocess env is
+        # unreliable (CI env differed from local). The e2e suite talks to
+        # uvicorn over http://127.0.0.1, so Secure session cookies are dropped
+        # by httpx + Playwright and every authed request returns 401.
+        "SESSION_COOKIE_SECURE": "false",
+        "CSRF_ENFORCE_ORIGIN": "false",
+        "CONTACT_EMAIL": "e2e@example.test",
     }
 
     # Fixtures and helpers use os.environ["DATABASE_CONNECTION"] for direct

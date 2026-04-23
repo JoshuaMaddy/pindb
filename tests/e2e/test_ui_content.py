@@ -48,8 +48,10 @@ class TestNavbar:
     ):
         page = admin_browser_context.new_page()
         page.goto(f"{live_server}/")
-        expect(page.locator("nav a[href='/create']")).to_be_visible()
-        expect(page.locator("nav a[href='/admin']")).to_be_visible()
+        # Staff nav renders its links twice (desktop + mobile panel); `.first`
+        # pins to the visible desktop copy.
+        expect(page.locator("nav a[href='/create']").first).to_be_visible()
+        expect(page.locator("nav a[href='/admin']").first).to_be_visible()
         expect(page.locator("form[action='/auth/logout']")).to_be_visible()
         # Username link points at the admin's profile.
         expect(page.locator("nav a[href*='/user/']").first).to_be_visible()
@@ -59,7 +61,7 @@ class TestNavbar:
     ):
         page = editor_browser_context.new_page()
         page.goto(f"{live_server}/")
-        expect(page.locator("nav a[href='/create']")).to_be_visible()
+        expect(page.locator("nav a[href='/create']").first).to_be_visible()
         # Non-admin editor: no Admin link.
         expect(page.locator("nav a[href='/admin']")).to_have_count(0)
 
