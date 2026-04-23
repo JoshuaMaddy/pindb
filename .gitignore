@@ -17,6 +17,7 @@ wheels/
 # Node
 node_modules
 main.css
+src/pindb/static/vendor/
 
 # Pi coding agent (project-local sessions from .pi/settings.json)
 .pi/sessions/

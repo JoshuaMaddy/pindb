@@ -3,7 +3,7 @@
 > **Maintainability note:** Keep this file current. Changes affecting architecture, tech stack, auth, deployment, or structure → update relevant section in the same commit. Only non-obvious things.
 
 ## Project Overview
-PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password login + OAuth (Google, Discord).
+PinDB: FastAPI app for cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST API), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password login + OAuth (Google, Discord, Meta).
 
 ## After Every Python Change
 Run before task done:
@@ -15,7 +15,7 @@ uvx ty check
 
 ## Tech Stack
 - **Backend:** Python 3.13+, FastAPI, SQLAlchemy 2.0+, Pydantic Settings, APScheduler
-- **Auth:** Argon2, DB-backed session tokens, Google OIDC, Discord OAuth
+- **Auth:** Argon2, DB-backed session tokens, Google OIDC, Discord OAuth, Meta OAuth
 - **Frontend:** htpy, HTMX, Tailwind CSS 4, Alpine.js, Tom Select, Lucide icons
 - **Database:** PostgreSQL 17, Meilisearch
 - **Migrations:** Alembic (runs on container start, not app startup)

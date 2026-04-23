@@ -1,13 +1,22 @@
 {
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0 <23"
   },
   "scripts": {
     "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
-    "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify"
+    "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify",
+    "vendor:build": "node scripts/vendor.mjs",
+    "build": "npm run css:build && npm run vendor:build"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.13",
-    "tailwindcss": "^4.1.13"
+    "alpinejs": "3.15.3",
+    "htmx.org": "2.0.6",
+    "lucide": "^0.454.0",
+    "marked": "^9.1.6",
+    "notyf": "3.10.0",
+    "overtype": "^1.1.6",
+    "tailwindcss": "^4.1.13",
+    "tom-select": "2.4.3"
   }
 }

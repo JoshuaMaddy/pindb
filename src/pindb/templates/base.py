@@ -67,39 +67,28 @@ def html_base(
             meta(charset="UTF-8"),
             meta(name="viewport", content="width=device-width, initial-scale=1.0"),
             link(rel="icon", href="/static/favicon.png"),
-            # HTMX
-            script(src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js"),
-            script(src="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.js"),
-            script(
-                src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"
-            ),
-            # Tom Select
+            script(src=f"/static/vendor/htmx.min.js?v={_STARTUP_TIME}"),
+            script(src=f"/static/vendor/notyf.min.js?v={_STARTUP_TIME}"),
+            script(src=f"/static/vendor/tom-select.complete.min.js?v={_STARTUP_TIME}"),
             link(
                 rel="stylesheet",
-                href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.default.min.css",
+                href=f"/static/vendor/tom-select.default.min.css?v={_STARTUP_TIME}",
             ),
-            # Notyf (toasts)
             link(
                 rel="stylesheet",
-                href="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.css",
+                href=f"/static/vendor/notyf.min.css?v={_STARTUP_TIME}",
             ),
-            # Custom styles
             link(
                 rel="stylesheet",
                 href=f"/static/main.css?v={_STARTUP_TIME}",
             ),
             title_el[title + " | PinDB"],
-            # Alpine
             script(
-                src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.3/dist/cdn.min.js",
+                src=f"/static/vendor/alpine.min.js?v={_STARTUP_TIME}",
                 defer=True,
             ),
-            # Overtype markdown editor
-            script(
-                src="https://cdn.jsdelivr.net/npm/overtype@latest/dist/overtype.min.js"
-            ),
-            # marked (client-side markdown preview)
-            script(src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"),
+            script(src=f"/static/vendor/overtype.min.js?v={_STARTUP_TIME}"),
+            script(src=f"/static/vendor/marked.min.js?v={_STARTUP_TIME}"),
         ],
         body(class_="min-h-screen flex flex-col")[
             navbar(request=request),
@@ -111,7 +100,7 @@ def html_base(
                 aria_live="polite",
             ),
         ],
-        script(src="https://unpkg.com/lucide@latest"),
+        script(src=f"/static/vendor/lucide.min.js?v={_STARTUP_TIME}"),
         script["lucide.createIcons();"],
         script[
             Markup(
