@@ -235,7 +235,7 @@ class TestDuplicateTag:
             aliases=["alias_one"],
             category=TagCategory.color,
         )
-        source.implications.add(parent)
+        source.implications.add(parent)  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
         response = editor_client.get(
