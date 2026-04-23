@@ -16,7 +16,7 @@ const FILES = [
   ["tom-select/dist/css/tom-select.default.min.css", "tom-select.default.min.css"],
   ["alpinejs/dist/cdn.min.js", "alpine.min.js"],
   ["overtype/dist/overtype.min.js", "overtype.min.js"],
-  ["marked/marked.min.js", "marked.min.js"],
+  ["marked/lib/marked.umd.js", "marked.min.js"],
   ["lucide/dist/umd/lucide.min.js", "lucide.min.js"],
 ];
 

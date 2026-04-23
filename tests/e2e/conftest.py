@@ -216,6 +216,8 @@ def live_server(
         # immediately, cascading into bogus 401s on downstream requests.
         "RATE_LIMIT_ENABLED": "false",
     }
+    show_server_logs = os.environ.get("E2E_SHOW_SERVER_LOGS", "0") == "1"
+    uvicorn_log_level = os.environ.get("E2E_UVICORN_LOG_LEVEL", "warning")
 
     # Fixtures and helpers use os.environ["DATABASE_CONNECTION"] for direct
     # psycopg access; pytest-env still has the integration placeholder unless
@@ -242,12 +244,12 @@ def live_server(
                 "--port",
                 str(port),
                 "--log-level",
-                "warning",
+                uvicorn_log_level,
             ],
             env=env,
             cwd=str(_REPO_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stdout=None if show_server_logs else subprocess.PIPE,
+            stderr=None if show_server_logs else subprocess.STDOUT,
         )
         try:
             _wait_for_http(f"{base_url}/", timeout=60)
