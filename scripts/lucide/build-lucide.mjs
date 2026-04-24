@@ -91,7 +91,8 @@ async function parseTagBranding(icons) {
 }
 
 function isAcceptableKebab(t) {
-  if (t.length < 2) {
+  // Length 1 is valid — Lucide ships single-letter icons (e.g. "x" for close).
+  if (t.length < 1) {
     return false;
   }
   if (/^\d+$/.test(t)) {
