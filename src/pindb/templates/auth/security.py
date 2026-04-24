@@ -20,6 +20,7 @@ from htpy import (
     p,
     ul,
 )
+from titlecase import titlecase
 
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
@@ -44,7 +45,7 @@ def _provider_section(
     linked_by_provider = {link.provider: link for link in linked_providers}
     rows: list[Element] = []
     for provider in enabled_providers:
-        label_text = _PROVIDER_LABELS.get(provider, provider.value.title())
+        label_text = _PROVIDER_LABELS.get(provider, titlecase(provider.value))
         link = linked_by_provider.get(provider)
         if link is not None:
             detail_parts: list[str] = []

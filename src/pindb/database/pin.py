@@ -21,6 +21,8 @@ from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import (
     pin_set_memberships,
+    pin_unauthorized_copies,
+    pin_variants,
     pins_artists,
     pins_grades,
     pins_links,
@@ -130,6 +132,20 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         secondary=pins_links,
         default_factory=set,
     )
+    variants: Mapped[set[Pin]] = relationship(
+        "Pin",
+        secondary=pin_variants,
+        primaryjoin=lambda: Pin.id == pin_variants.c.pin_id,
+        secondaryjoin=lambda: Pin.id == pin_variants.c.variant_pin_id,
+        default_factory=set,
+    )
+    unauthorized_copies: Mapped[set[Pin]] = relationship(
+        "Pin",
+        secondary=pin_unauthorized_copies,
+        primaryjoin=lambda: Pin.id == pin_unauthorized_copies.c.pin_id,
+        secondaryjoin=lambda: Pin.id == pin_unauthorized_copies.c.copy_pin_id,
+        default_factory=set,
+    )
 
     def __hash__(self) -> int:
         return hash(self.name) + (self.id or 0)
@@ -149,6 +165,7 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         result: dict[str, object] = {
             "id": self.id,
             "name": self.name,
+            "front_image_guid": str(self.front_image_guid),
             "shops": _ordered_unique_strings(shop.name for shop in self.shops),
             "shop_aliases": _ordered_unique_strings(
                 al.alias for shop in self.shops for al in shop.aliases

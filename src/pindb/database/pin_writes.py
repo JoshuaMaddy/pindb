@@ -47,3 +47,34 @@ def upsert_grades(
         session.delete(removed_grade)
 
     pin.grades = next_grades
+
+
+def sync_symmetric_pin_links(
+    *,
+    pin: Pin,
+    variants: set[Pin],
+    unauthorized_copies: set[Pin],
+) -> None:
+    """Replace ``pin``'s variant / copy sets and mirror the counterpart side.
+
+    Each symmetric pair is stored as two rows (A→B and B→A) so ordinary
+    relationships work without ``or_`` primaryjoins. This helper keeps both
+    directions in lock-step: adds mirror rows for newcomers, drops mirror
+    rows for removals. Self-refs are filtered defensively.
+
+    Must run inside the caller's write session while ``pin`` is attached.
+    """
+    _sync_one_side(pin=pin, attr="variants", target=variants)
+    _sync_one_side(pin=pin, attr="unauthorized_copies", target=unauthorized_copies)
+
+
+def _sync_one_side(*, pin: Pin, attr: str, target: set[Pin]) -> None:
+    current: set[Pin] = set(getattr(pin, attr))
+    clean_target = {p for p in target if p.id != pin.id}
+    added = clean_target - current
+    removed = current - clean_target
+    setattr(pin, attr, clean_target)
+    for other in added:
+        getattr(other, attr).add(pin)
+    for other in removed:
+        getattr(other, attr).discard(pin)

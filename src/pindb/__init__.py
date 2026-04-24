@@ -13,7 +13,6 @@ from pathlib import Path  # noqa: E402
 
 from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
-from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 
@@ -21,6 +20,7 @@ from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
 from pindb.config import CONFIGURATION  # noqa: E402
 from pindb.csrf import csrf_origin_middleware  # noqa: E402
+from pindb.http_caching import CacheBustedStaticFiles  # noqa: E402
 from pindb.lifespan import lifespan  # noqa: E402
 from pindb.routes import (  # noqa: E402
     admin,
@@ -73,7 +73,9 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
 
 app.mount(
     path="/static",
-    app=StaticFiles(directory=Path(__file__).parent / "static"),
+    app=CacheBustedStaticFiles(
+        directory=Path(__file__).parent / "static",
+    ),
     name="static",
 )
 

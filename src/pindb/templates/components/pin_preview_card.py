@@ -6,6 +6,7 @@ from fastapi import Request
 from htpy import Element, a, div, i, img, span
 
 from pindb.database.pin import Pin
+from pindb.templates.pin_image_alt import pin_front_image_alt
 
 
 def pin_preview_card(
@@ -48,6 +49,7 @@ def pin_preview_card(
                         guid=pin.front_image_guid,
                     ).include_query_params(thumbnail=True)
                 ),
+                alt=pin_front_image_alt(pin),
                 class_="object-cover h-full",
             )
         ],

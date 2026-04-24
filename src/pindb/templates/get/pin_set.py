@@ -6,6 +6,7 @@ from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, fragment
+from titlecase import titlecase
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -48,9 +49,9 @@ def pin_set_page(
                 ),
                 page_heading(
                     icon="layout-grid",
-                    text=("(P) " + pin_set.name.title())
+                    text=("(P) " + titlecase(pin_set.name))
                     if pin_set.is_pending
-                    else pin_set.name.title(),
+                    else titlecase(pin_set.name),
                     extras=[
                         (user is not None and (user.is_admin or user.is_editor))
                         and icon_button(

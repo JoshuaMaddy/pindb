@@ -20,7 +20,7 @@ from pindb.database.pending_edit_utils import (
     get_effective_snapshot,
 )
 from pindb.database.pin import Pin
-from pindb.database.pin_writes import upsert_grades
+from pindb.database.pin_writes import sync_symmetric_pin_links, upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
 from pindb.htmx_toast import hx_redirect_with_toast_headers
@@ -29,6 +29,7 @@ from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes._pin_shared import (
     PinFormParams,
+    load_pin_links,
     load_pin_relations,
     parse_grade_dicts,
 )
@@ -49,6 +50,8 @@ _PIN_SELECTINLOADS = (
     selectinload(Pin.links),
     selectinload(Pin.grades),
     selectinload(Pin.currency),
+    selectinload(Pin.variants),
+    selectinload(Pin.unauthorized_copies),
 )
 
 
@@ -92,6 +95,8 @@ def get_edit_pin(
                 pin=pin,
                 currencies=currencies,
                 artists=list(pin.artists),
+                variant_pins=list(pin.variants),
+                unauthorized_copy_pins=list(pin.unauthorized_copies),
                 options_base_url=options_base_url,
                 request=request,
             )
@@ -174,6 +179,12 @@ async def post_edit_pin(
                     "tag_ids": sorted(fields.tag_ids),
                     "artist_ids": sorted(fields.artist_ids),
                     "pin_set_ids": sorted(fields.pin_sets_ids),
+                    "variant_pin_ids": sorted(
+                        pid for pid in fields.variant_pin_ids if pid != id
+                    ),
+                    "unauthorized_copy_pin_ids": sorted(
+                        pid for pid in fields.unauthorized_copy_pin_ids if pid != id
+                    ),
                     "links": sorted(fields.links or []),
                     "grades": grades_list,
                 },
@@ -189,6 +200,12 @@ async def post_edit_pin(
             shop_ids=fields.shop_ids,
             pin_sets_ids=fields.pin_sets_ids,
             artist_ids=fields.artist_ids,
+        )
+        variant_pins, unauthorized_copy_pins = load_pin_links(
+            session=session,
+            self_pin_id=id,
+            variant_pin_ids=fields.variant_pin_ids,
+            unauthorized_copy_pin_ids=fields.unauthorized_copy_pin_ids,
         )
         currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
 
@@ -221,6 +238,11 @@ async def post_edit_pin(
         )
 
         apply_pin_tags(pin.id, fields.tag_ids, session)
+        sync_symmetric_pin_links(
+            pin=pin,
+            variants=variant_pins,
+            unauthorized_copies=unauthorized_copy_pins,
+        )
         session.flush()
         pin_id: int = pin.id
 

@@ -14,6 +14,7 @@ from htpy import (
     label,
     p,
 )
+from titlecase import titlecase
 
 from pindb.database.user_auth_provider import OAuthProvider
 from pindb.templates.base import html_base
@@ -35,7 +36,7 @@ def oauth_onboarding_page(
     email: str | None,
     error: str | None = None,
 ) -> Element:
-    provider_label = _PROVIDER_LABELS.get(provider, provider.value.title())
+    provider_label = _PROVIDER_LABELS.get(provider, titlecase(provider.value))
 
     return html_base(
         title="Choose Username",

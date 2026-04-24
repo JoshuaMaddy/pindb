@@ -18,6 +18,7 @@
     "stdlib",
     "subgrid",
     "tabindex",
+    "titlecase",
     "userinfo"
   ],
   "python.analysis.typeCheckingMode": "strict",

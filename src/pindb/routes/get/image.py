@@ -16,6 +16,7 @@ from pindb.file_handler import (
     load_image,
     sniff_image_mime,
 )
+from pindb.http_caching import IMAGE_CACHE_CONTROL
 
 router = APIRouter()
 
@@ -35,7 +36,11 @@ async def get_image(
 
     pub_url = image_public_url(key)
     if pub_url:
-        return RedirectResponse(url=pub_url, status_code=302)
+        return RedirectResponse(
+            url=pub_url,
+            status_code=302,
+            headers={"Cache-Control": IMAGE_CACHE_CONTROL},
+        )
 
     path = image_file_path(key)
     if path is None and thumbnail:
@@ -44,10 +49,18 @@ async def get_image(
         path = image_file_path(key)
     if path is not None:
         media_type = "image/webp" if thumbnail else _original_mime_from_path(path)
-        return FileResponse(path=path, media_type=media_type)
+        return FileResponse(
+            path=path,
+            media_type=media_type,
+            headers={"Cache-Control": IMAGE_CACHE_CONTROL},
+        )
 
     data = load_image(key)
     if data is None:
         raise HTTPException(status_code=404, detail="Image not found")
     media_type = "image/webp" if thumbnail else sniff_image_mime(data[:16])
-    return Response(content=data, media_type=media_type)
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": IMAGE_CACHE_CONTROL},
+    )

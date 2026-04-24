@@ -1,23 +1,31 @@
 #!/usr/bin/env node
 // Copy pinned JS/CSS vendor assets from node_modules into src/pindb/static/vendor/.
-// Runs on every build (dev + Docker). Output directory is gitignored.
+// Lucide is *not* copied: run `node scripts/lucide/build-lucide.mjs` (see `npm run build`).
+// Output directory is gitignored.
 
 import { cp, mkdir, rm, access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-const ROOT = resolve(new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+const ROOT = resolve(
+  new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
+);
 const VENDOR = resolve(ROOT, "src/pindb/static/vendor");
 
 const FILES = [
   ["htmx.org/dist/htmx.min.js", "htmx.min.js"],
   ["notyf/notyf.min.js", "notyf.min.js"],
   ["notyf/notyf.min.css", "notyf.min.css"],
-  ["tom-select/dist/js/tom-select.complete.min.js", "tom-select.complete.min.js"],
-  ["tom-select/dist/css/tom-select.default.min.css", "tom-select.default.min.css"],
+  [
+    "tom-select/dist/js/tom-select.complete.min.js",
+    "tom-select.complete.min.js",
+  ],
+  [
+    "tom-select/dist/css/tom-select.default.min.css",
+    "tom-select.default.min.css",
+  ],
   ["alpinejs/dist/cdn.min.js", "alpine.min.js"],
   ["overtype/dist/overtype.min.js", "overtype.min.js"],
   ["marked/lib/marked.umd.js", "marked.min.js"],
-  ["lucide/dist/umd/lucide.min.js", "lucide.min.js"],
 ];
 
 async function exists(p) {

@@ -191,5 +191,7 @@ def search_entity_options(
         }
         if "category" in hit:
             item["category"] = str(hit["category"])
+        if "front_image_guid" in hit:
+            item["thumbnail"] = f"/get/image/{hit['front_image_guid']}?thumbnail=true"
         results.append(item)
     return results

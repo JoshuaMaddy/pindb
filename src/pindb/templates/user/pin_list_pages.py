@@ -39,6 +39,7 @@ from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.pill_link import pill_link
 from pindb.templates.components.pin_grid import pin_grid
 from pindb.templates.list.base import TABLE_LIST_SCROLL
+from pindb.templates.pin_image_alt import pin_front_image_alt
 
 PAGE_SIZE: int = 24
 
@@ -159,6 +160,7 @@ def _thumbnail(request: Request, pin: Pin) -> VoidElement:
                 "get_image", guid=pin.front_image_guid
             ).include_query_params(thumbnail=True)
         ),
+        alt=pin_front_image_alt(pin),
         class_="w-12 h-12 object-contain rounded",
     )
 

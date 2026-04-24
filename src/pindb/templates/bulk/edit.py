@@ -27,6 +27,7 @@ from htpy import (
     span,
 )
 from markupsafe import Markup
+from titlecase import titlecase
 
 from pindb.database.tag import Tag
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
@@ -192,7 +193,7 @@ def _scalar_section() -> Fragment:
                 widget=_enum_select(
                     name="acquisition_type_value",
                     values=[
-                        (m.value, m.value.replace("_", " ").title())
+                        (m.value, titlecase(m.value.replace("_", " ")))
                         for m in AcquisitionType
                     ],
                 ),
@@ -204,7 +205,7 @@ def _scalar_section() -> Fragment:
                     name="funding_type_value",
                     values=[("", "— none —")]
                     + [
-                        (m.value, m.value.replace("_", " ").title())
+                        (m.value, titlecase(m.value.replace("_", " ")))
                         for m in FundingType
                     ],
                 ),

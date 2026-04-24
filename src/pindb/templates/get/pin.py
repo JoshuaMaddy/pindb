@@ -19,6 +19,7 @@ from htpy import (
     td,
     tr,
 )
+from titlecase import titlecase
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -42,6 +43,7 @@ from pindb.templates.components.tag_branding import (
     CATEGORY_ICONS,
 )
 from pindb.templates.components.toggle_button import toggle_button
+from pindb.templates.pin_image_alt import pin_back_image_alt, pin_front_image_alt
 from pindb.utils import domain_from_url, format_currency_code
 
 _IMG_CAROUSEL_HEIGHT: str = (
@@ -140,11 +142,14 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
 
     main_slides: list[Element] = []
     thumb_slides: list[Element] = []
-    for idx, (label, full_url, thumb_url) in enumerate(slides):
+    for idx, (_label, full_url, thumb_url) in enumerate(slides):
+        slide_alt: str = (
+            pin_front_image_alt(pin) if idx == 0 else pin_back_image_alt(pin)
+        )
         main_slides.append(
             div(class_="swiper-slide flex items-center justify-center bg-pin-base-500")[
                 img(
-                    alt=f"{label} — {pin.name}",
+                    alt=slide_alt,
                     class_=_IMG_CAROUSEL_HEIGHT,
                     loading="eager" if idx == 0 else "lazy",
                     src=full_url,
@@ -156,7 +161,7 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
                 class_="swiper-slide !box-border overflow-hidden rounded border border-pin-base-400"
             )[
                 img(
-                    alt=f"{label} thumbnail",
+                    alt=slide_alt,
                     class_="h-full w-full object-cover",
                     loading="lazy",
                     src=thumb_url,
@@ -337,6 +342,8 @@ def __pin_details(
             __number_produced(pin=pin),
             __funding(pin=pin),
             __tags(pin=pin, request=request),
+            __variants(pin=pin, request=request),
+            __unauthorized_copies(pin=pin, request=request),
         ],
     ]
 
@@ -504,6 +511,44 @@ def __links(pin: Pin) -> Element | None:
     )
 
 
+def __variants(
+    pin: Pin,
+    request: Request,
+) -> Element | None:
+    if not pin.variants:
+        return None
+    return linked_items_row(
+        icon="copy",
+        label="Variants",
+        items=[
+            pill_link(
+                href=str(request.url_for("get_pin", id=variant.id)),
+                text=("(P) " + variant.name) if variant.is_pending else variant.name,
+            )
+            for variant in sorted(pin.variants, key=lambda v: v.name)
+        ],
+    )
+
+
+def __unauthorized_copies(
+    pin: Pin,
+    request: Request,
+) -> Element | None:
+    if not pin.unauthorized_copies:
+        return None
+    return linked_items_row(
+        icon="triangle-alert",
+        label="Unauthorized Copies",
+        items=[
+            pill_link(
+                href=str(request.url_for("get_pin", id=copy.id)),
+                text=("(P) " + copy.name) if copy.is_pending else copy.name,
+            )
+            for copy in sorted(pin.unauthorized_copies, key=lambda c: c.name)
+        ],
+    )
+
+
 def __acquisition(pin: Pin) -> Element:
     return icon_list_item(
         icon="package",
@@ -559,7 +604,9 @@ def __pin_sets(
         items=[
             pill_link(
                 href=str(request.url_for("get_pin_set", id=ps.id)),
-                text=("(P) " + ps.name.title()) if ps.is_pending else ps.name.title(),
+                text=("(P) " + titlecase(ps.name))
+                if ps.is_pending
+                else titlecase(ps.name),
             )
             for ps in visible_pin_sets
         ],
@@ -670,5 +717,5 @@ def __funding(pin: Pin) -> Element | None:
     return icon_list_item(
         icon="hand-coins",
         name="Funding",
-        value=pin.funding_type.title(),
+        value=titlecase(pin.funding_type),
     )

@@ -26,6 +26,7 @@ dependencies = [
     "limits>=3.13.0",
     "sqlalchemy>=2.0.43",
     "zxcvbn>=4.5.0",
+    "titlecase>=2.4.1",
 ]
 
 [dependency-groups]

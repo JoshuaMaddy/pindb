@@ -28,6 +28,7 @@ from htpy import (
     thead,
     tr,
 )
+from titlecase import titlecase
 
 from pindb.database.artist import Artist
 from pindb.database.entity_type import EntityType
@@ -398,7 +399,7 @@ def _edit_group_row(
         td(class_="py-2 pr-6")[
             a(href=pending_view_url)[name],
             span(class_="block text-xs text-pin-base-400")[
-                f"{slug.replace('_', ' ').title()}"
+                f"{titlecase(slug.replace('_', ' '))}"
             ],
         ],
         td(class_="py-2 pr-6")[str(len(chain))],

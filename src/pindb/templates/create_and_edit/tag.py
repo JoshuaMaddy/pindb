@@ -6,6 +6,7 @@ from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import Element, div, form, hr, i, input, label, option, select, span
 from markupsafe import Markup
+from titlecase import titlecase
 
 from pindb.database.tag import Tag, TagCategory
 from pindb.templates.base import html_base
@@ -135,7 +136,7 @@ def tag_form(
                                 data_icon=CATEGORY_ICONS[cat],
                                 data_color=CATEGORY_COLORS[cat],
                                 data_category=cat.value,
-                            )[cat.value.title()]
+                            )[titlecase(cat.value)]
                             for cat in TagCategory
                         ]
                     ],

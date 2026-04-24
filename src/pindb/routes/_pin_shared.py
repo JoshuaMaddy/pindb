@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pindb.database.artist import Artist
+from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.model_utils import (
@@ -43,6 +44,8 @@ class PinFormParams:
         tag_ids: list[int] = Form(default_factory=list),
         pin_sets_ids: list[int] = Form(default_factory=list),
         artist_ids: list[int] = Form(default_factory=list),
+        variant_pin_ids: list[int] = Form(default_factory=list),
+        unauthorized_copy_pin_ids: list[int] = Form(default_factory=list),
         number_produced: Annotated[
             int | None,
             Form(),
@@ -87,6 +90,8 @@ class PinFormParams:
         self.tag_ids = tag_ids
         self.pin_sets_ids = pin_sets_ids
         self.artist_ids = artist_ids
+        self.variant_pin_ids = variant_pin_ids
+        self.unauthorized_copy_pin_ids = unauthorized_copy_pin_ids
         self.number_produced = number_produced
         self.limited_edition = limited_edition
         self.release_date = release_date
@@ -116,6 +121,34 @@ def load_pin_relations(
         session.scalars(select(Artist).where(Artist.id.in_(artist_ids))).all()
     )
     return pin_shops, pin_sets, pin_artists
+
+
+def load_pin_links(
+    *,
+    session: Session,
+    self_pin_id: int | None,
+    variant_pin_ids: list[int],
+    unauthorized_copy_pin_ids: list[int],
+) -> tuple[set[Pin], set[Pin]]:
+    """Resolve variant / unauthorized-copy id lists to ``Pin`` sets.
+
+    Filters out ``self_pin_id`` defensively so the symmetric mirror helper
+    never tries to insert a self-reference (the DB check constraint would
+    otherwise reject it at commit time).
+    """
+    variant_ids = [pid for pid in variant_pin_ids if pid != self_pin_id]
+    copy_ids = [pid for pid in unauthorized_copy_pin_ids if pid != self_pin_id]
+    variants: set[Pin] = (
+        set(session.scalars(select(Pin).where(Pin.id.in_(variant_ids))).all())
+        if variant_ids
+        else set()
+    )
+    copies: set[Pin] = (
+        set(session.scalars(select(Pin).where(Pin.id.in_(copy_ids))).all())
+        if copy_ids
+        else set()
+    )
+    return variants, copies
 
 
 def parse_grade_dicts(

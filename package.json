@@ -5,7 +5,8 @@
   "scripts": {
     "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
     "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify",
-    "vendor:build": "node scripts/vendor.mjs",
+    "css:contrast": "node scripts/check-theme-contrast.mjs",
+    "vendor:build": "node scripts/vendor.mjs && node scripts/lucide/build-lucide.mjs",
     "build": "npm run css:build && npm run vendor:build"
   },
   "dependencies": {
@@ -18,5 +19,8 @@
     "overtype": "^2.3.5",
     "tailwindcss": "^4.2.4",
     "tom-select": "^2.6.0"
+  },
+  "devDependencies": {
+    "rolldown": "^1.0.0-rc.17"
   }
 }

@@ -27,6 +27,7 @@ from sqlalchemy.orm import (
     object_session,
     relationship,
 )
+from titlecase import titlecase
 
 from pindb.database._aliases import replace_aliases
 from pindb.database.audit_mixin import AuditMixin
@@ -139,7 +140,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
     @property
     def display_name(self) -> str:
-        return self.name.replace("_", " ").title()
+        return titlecase(self.name.replace("_", " "))
 
     def __hash__(self) -> int:
         return hash(self.name) + (self.id or 0)

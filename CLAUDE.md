@@ -21,6 +21,7 @@ uvx ty check
 - **Migrations:** Alembic (runs on container start, not app startup)
 - **Tooling:** UV, Ruff, ty
 - **CSS build:** Node.js **20+** required (Tailwind v4's `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
+- **Lucide (JS):** `npm run build` / `vendor:build` runs `scripts/lucide/build-lucide.mjs` (Rolldown) to tree-shake `lucide` from an auto-generated icon list. Add a literal in templates or an entry in `EXTRA_KEBAB` in that script for new dynamic names.
 
 ## Running Locally
 ```bash
@@ -178,6 +179,12 @@ Entry point: `database/erasure.py::erase_user_account(session, user_id)`.
 
 ## Deployment (Docker)
 `app` service uses `env_file: .env`. Values under `environment:` in `docker-compose.yaml` override `.env` keys so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
+
+The production image is multi-stage: a Node asset stage copies `scripts/` and runs
+`npm run build` (`css:build` + `vendor:build` + Rolldown Lucide) and copies the
+generated `main.css` plus vendored frontend assets into the Python runtime image.
+Fresh CI checkouts won't have those generated files unless they either run the
+frontend build or build the Docker image.
 
 ```bash
 docker compose up -d                              # Production

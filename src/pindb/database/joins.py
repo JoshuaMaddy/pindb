@@ -1,6 +1,6 @@
 """SQLAlchemy ``Table`` association objects (many-to-many, excluded from audit)."""
 
-from sqlalchemy import Column, ForeignKey, Integer, Table
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, Table
 
 from pindb.database.base import Base
 
@@ -88,4 +88,20 @@ tag_implications = Table(
     Base.metadata,
     Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
     Column("implied_tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
+pin_variants = Table(
+    "pin_variants",
+    Base.metadata,
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Column("variant_pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    CheckConstraint("pin_id <> variant_pin_id", name="pin_variants_no_self"),
+)
+
+pin_unauthorized_copies = Table(
+    "pin_unauthorized_copies",
+    Base.metadata,
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Column("copy_pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    CheckConstraint("pin_id <> copy_pin_id", name="pin_unauthorized_copies_no_self"),
 )

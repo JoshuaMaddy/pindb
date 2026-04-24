@@ -23,6 +23,7 @@ from htpy import (
     tr,
 )
 from markupsafe import Markup
+from titlecase import titlecase
 
 from pindb.database.currency import Currency
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
@@ -52,10 +53,11 @@ def bulk_pin_page(
         "optionsBaseUrl": options_base_url,
         "currencies": [{"value": c.id, "text": c.code} for c in currencies],
         "acquisitionTypes": [
-            {"value": a, "text": a.replace("_", " ").title()} for a in AcquisitionType
+            {"value": a, "text": titlecase(a.replace("_", " "))}
+            for a in AcquisitionType
         ],
         "fundingTypes": [
-            {"value": f, "text": f.replace("_", " ").title()} for f in FundingType
+            {"value": f, "text": titlecase(f.replace("_", " "))} for f in FundingType
         ],
         "defaultCurrencyId": 999,
         "magnitudeInputPattern": MAGNITUDE_INPUT_PATTERN,

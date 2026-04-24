@@ -30,6 +30,7 @@ src/pindb/static/vendor/
 
 # Temp dirs
 scripts/images
+scripts/lucide/.cache/
 scripts/*.csv
 
 # Backups

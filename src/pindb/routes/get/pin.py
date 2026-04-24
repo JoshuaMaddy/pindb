@@ -36,6 +36,8 @@ def get_pin(
                 selectinload(Pin.links),
                 selectinload(Pin.grades),
                 selectinload(Pin.currency),
+                selectinload(Pin.variants),
+                selectinload(Pin.unauthorized_copies),
             )
         )
 

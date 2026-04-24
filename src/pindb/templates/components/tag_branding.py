@@ -3,6 +3,7 @@ htpy page and fragment builders: `templates/components/tag_branding.py`.
 """
 
 from htpy import Element, i, span
+from titlecase import titlecase
 
 from pindb.database.tag import TagCategory
 
@@ -42,5 +43,5 @@ def category_badge(category: TagCategory) -> Element:
     icon_name = CATEGORY_ICONS.get(category, "tag")
     return span(
         class_=f"p-1.5 rounded text-xs font-medium border {color}",
-        title=category.value.title(),
+        title=titlecase(category.value),
     )[i(data_lucide=icon_name, class_=f"w-4 h-4 {color}"),]

@@ -67,9 +67,18 @@ def html_base(
             meta(charset="UTF-8"),
             meta(name="viewport", content="width=device-width, initial-scale=1.0"),
             link(rel="icon", href="/static/favicon.png"),
-            script(src=f"/static/vendor/htmx.min.js?v={_STARTUP_TIME}"),
-            script(src=f"/static/vendor/notyf.min.js?v={_STARTUP_TIME}"),
-            script(src=f"/static/vendor/tom-select.complete.min.js?v={_STARTUP_TIME}"),
+            script(
+                src=f"/static/vendor/htmx.min.js?v={_STARTUP_TIME}",
+                defer=True,
+            ),
+            script(
+                src=f"/static/vendor/notyf.min.js?v={_STARTUP_TIME}",
+                defer=True,
+            ),
+            script(
+                src=f"/static/vendor/tom-select.complete.min.js?v={_STARTUP_TIME}",
+                defer=True,
+            ),
             link(
                 rel="stylesheet",
                 href=f"/static/vendor/tom-select.default.min.css?v={_STARTUP_TIME}",
@@ -87,8 +96,14 @@ def html_base(
                 src=f"/static/vendor/alpine.min.js?v={_STARTUP_TIME}",
                 defer=True,
             ),
-            script(src=f"/static/vendor/overtype.min.js?v={_STARTUP_TIME}"),
-            script(src=f"/static/vendor/marked.min.js?v={_STARTUP_TIME}"),
+            script(
+                src=f"/static/vendor/overtype.min.js?v={_STARTUP_TIME}",
+                defer=True,
+            ),
+            script(
+                src=f"/static/vendor/marked.min.js?v={_STARTUP_TIME}",
+                defer=True,
+            ),
         ],
         body(class_="min-h-screen flex flex-col")[
             navbar(request=request),
@@ -100,74 +115,88 @@ def html_base(
                 aria_live="polite",
             ),
         ],
-        script(src=f"/static/vendor/lucide.min.js?v={_STARTUP_TIME}"),
-        script["lucide.createIcons();"],
+        script(
+            src=f"/static/vendor/lucide.min.js?v={_STARTUP_TIME}",
+            defer=True,
+        ),
         script[
             Markup(
                 object="""
-var element = document.getElementById('back-link');
-if (element != null) {
-    var storageKey = 'pin_back:' + window.location.pathname;
-    var params = new URLSearchParams(window.location.search);
-    var backUrl = params.get('back');
-    if (backUrl) {
-        sessionStorage.setItem(storageKey, backUrl);
-        element.setAttribute('href', backUrl);
-    } else {
-        var stored = sessionStorage.getItem(storageKey);
-        if (stored) {
-            element.setAttribute('href', stored);
+(function () {
+  function pindbAfterVendorScripts() {
+    var element = document.getElementById('back-link');
+    if (element != null) {
+        var storageKey = 'pin_back:' + window.location.pathname;
+        var params = new URLSearchParams(window.location.search);
+        var backUrl = params.get('back');
+        if (backUrl) {
+            sessionStorage.setItem(storageKey, backUrl);
+            element.setAttribute('href', backUrl);
         } else {
-            element.setAttribute('href', document.referrer || '#');
-            element.onclick = function() { history.back(); return false; };
+            var stored = sessionStorage.getItem(storageKey);
+            if (stored) {
+                element.setAttribute('href', stored);
+            } else {
+                element.setAttribute('href', document.referrer || '#');
+                element.onclick = function() { history.back(); return false; };
+            }
         }
     }
-}
-window.pindbNotyf = new Notyf({
-    dismissible: true,
-    duration: 4500,
-    position: { x: 'right', y: 'bottom' },
-    ripple: true,
-});
-document.addEventListener('pindbToast', function (evt) {
-    var d = evt.detail;
-    if (!d || typeof d !== 'object') {
-        return;
-    }
-    var msg = d.message;
-    if (!msg) {
-        return;
-    }
-    var typ = d.type || 'success';
-    if (typ === 'success') {
-        window.pindbNotyf.success(msg);
-    } else {
-        window.pindbNotyf.error(msg);
-    }
-});
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-    lucide.createIcons();
-    var target = evt.detail.target;
-    if (!target || target.id !== 'pindb-toast-host') {
-        return;
-    }
-    var sig = target.querySelector('#pindb-toast-signal');
-    if (!sig) {
-        return;
-    }
-    var msg = sig.dataset.pindbMessage;
-    if (!msg) {
+    window.pindbNotyf = new Notyf({
+        dismissible: true,
+        duration: 4500,
+        position: { x: 'right', y: 'bottom' },
+        ripple: true,
+    });
+    document.addEventListener('pindbToast', function (evt) {
+        var d = evt.detail;
+        if (!d || typeof d !== 'object') {
+            return;
+        }
+        var msg = d.message;
+        if (!msg) {
+            return;
+        }
+        var typ = d.type || 'success';
+        if (typ === 'success') {
+            window.pindbNotyf.success(msg);
+        } else {
+            window.pindbNotyf.error(msg);
+        }
+    });
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        lucide.createIcons();
+        var target = evt.detail.target;
+        if (!target || target.id !== 'pindb-toast-host') {
+            return;
+        }
+        var sig = target.querySelector('#pindb-toast-signal');
+        if (!sig) {
+            return;
+        }
+        var msg = sig.dataset.pindbMessage;
+        if (!msg) {
+            target.innerHTML = '';
+            return;
+        }
+        var typ = sig.dataset.pindbType || 'error';
+        if (typ === 'success') {
+            window.pindbNotyf.success(msg);
+        } else {
+            window.pindbNotyf.error(msg);
+        }
         target.innerHTML = '';
-        return;
+    });
+    if (window.lucide) {
+        lucide.createIcons();
     }
-    var typ = sig.dataset.pindbType || 'error';
-    if (typ === 'success') {
-        window.pindbNotyf.success(msg);
-    } else {
-        window.pindbNotyf.error(msg);
-    }
-    target.innerHTML = '';
-});
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', pindbAfterVendorScripts);
+  } else {
+    pindbAfterVendorScripts();
+  }
+})();
 """
             )
         ],

@@ -17,6 +17,7 @@ from pindb.database.grade import Grade
 from pindb.database.link import Link
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
+from pindb.database.pin_writes import sync_symmetric_pin_links
 from pindb.database.tag import Tag, apply_pin_tags
 from pindb.file_handler import save_image
 from pindb.htmx_toast import hx_redirect_with_toast_headers
@@ -24,6 +25,7 @@ from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._pin_shared import (
     PinFormParams,
+    load_pin_links,
     load_pin_relations,
 )
 from pindb.search.update import update_pin
@@ -53,6 +55,8 @@ def get_create_pin(
         prefill_tags: list[Tag] = []
         prefill_pin_sets: list[PinSet] = []
         prefill_artists: list[Artist] = []
+        prefill_variants: list[Pin] = []
+        prefill_copies: list[Pin] = []
         if duplicate_from is not None:
             duplicate_source = session.scalar(
                 select(Pin)
@@ -65,6 +69,8 @@ def get_create_pin(
                     selectinload(Pin.links),
                     selectinload(Pin.grades),
                     selectinload(Pin.currency),
+                    selectinload(Pin.variants),
+                    selectinload(Pin.unauthorized_copies),
                 )
             )
             if duplicate_source is None:
@@ -76,6 +82,8 @@ def get_create_pin(
             prefill_tags = list(duplicate_source.explicit_tags)
             prefill_pin_sets = list(duplicate_source.sets)
             prefill_artists = list(duplicate_source.artists)
+            prefill_variants = list(duplicate_source.variants)
+            prefill_copies = list(duplicate_source.unauthorized_copies)
 
         return HTMLResponse(
             content=pin_form(
@@ -85,6 +93,8 @@ def get_create_pin(
                 tags=prefill_tags,
                 currencies=currencies,
                 artists=prefill_artists,
+                variant_pins=prefill_variants,
+                unauthorized_copy_pins=prefill_copies,
                 options_base_url=options_base_url,
                 request=request,
                 duplicate_source=duplicate_source,
@@ -125,6 +135,12 @@ async def post_create_pin(
             pin_sets_ids=fields.pin_sets_ids,
             artist_ids=fields.artist_ids,
         )
+        variant_pins, unauthorized_copy_pins = load_pin_links(
+            session=session,
+            self_pin_id=None,
+            variant_pin_ids=fields.variant_pin_ids,
+            unauthorized_copy_pin_ids=fields.unauthorized_copy_pin_ids,
+        )
         currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
         new_links: set[Link] = (
             {Link(path=link) for link in fields.links} if fields.links else set[Link]()
@@ -160,6 +176,11 @@ async def post_create_pin(
         session.add(instance=new_pin)
         session.flush()
         apply_pin_tags(new_pin.id, fields.tag_ids, session)
+        sync_symmetric_pin_links(
+            pin=new_pin,
+            variants=variant_pins,
+            unauthorized_copies=unauthorized_copy_pins,
+        )
         pin_id: int = new_pin.id
 
     with session_maker() as session:

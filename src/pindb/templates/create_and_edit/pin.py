@@ -29,6 +29,7 @@ from htpy import (
     span,
 )
 from markupsafe import Markup
+from titlecase import titlecase
 
 from pindb.database import Artist, Shop, Tag
 from pindb.database.currency import Currency
@@ -56,6 +57,8 @@ def pin_form(
     tags: Sequence[Tag],
     pin_sets: Sequence[PinSet],
     artists: Sequence[Artist],
+    variant_pins: Sequence[Pin],
+    unauthorized_copy_pins: Sequence[Pin],
     options_base_url: str,
     request: Request,
     pin: Pin | None = None,
@@ -119,6 +122,8 @@ def pin_form(
                             pin=prefill,
                             pin_sets=pin_sets,
                             artists=artists,
+                            variant_pins=variant_pins,
+                            unauthorized_copy_pins=unauthorized_copy_pins,
                         ),
                         input(
                             type="submit",
@@ -184,6 +189,8 @@ def __required_fields(
 def __optional_fields(
     artists: Sequence[Artist],
     pin_sets: Sequence[PinSet],
+    variant_pins: Sequence[Pin],
+    unauthorized_copy_pins: Sequence[Pin],
     pin: Pin | None = None,
 ) -> Fragment:
     return fragment[
@@ -191,6 +198,10 @@ def __optional_fields(
         # Images
         __artist_ids_input(pin=pin, artists=artists),
         __pin_sets_ids_input(pin=pin, pin_sets=pin_sets),
+        __variant_pins_input(pin=pin, variant_pins=variant_pins),
+        __unauthorized_copy_pins_input(
+            pin=pin, unauthorized_copy_pins=unauthorized_copy_pins
+        ),
         # Production
         __limited_edition_input(pin=pin),
         __number_produced_input(pin=pin),
@@ -349,7 +360,7 @@ def __acquisition_input(pin: Pin | None) -> list[Element | VoidElement]:
                 option(
                     value=acquisition_type,
                     selected=acquisition_type == pin.acquisition_type if pin else False,
-                )[acquisition_type.replace("_", " ").title()]
+                )[titlecase(acquisition_type.replace("_", " "))]
                 for acquisition_type in AcquisitionType
             ]
         ],
@@ -495,6 +506,46 @@ def __pin_sets_ids_input(
     ]
 
 
+def _pin_option(pin_obj: Pin) -> Element:
+    return option(
+        value=str(pin_obj.id),
+        selected=True,
+        data_thumbnail=f"/get/image/{pin_obj.front_image_guid}?thumbnail=true",
+    )["(P) " + pin_obj.name if pin_obj.is_pending else pin_obj.name]
+
+
+def __variant_pins_input(
+    pin: Pin | None,
+    variant_pins: Sequence[Pin],
+) -> list[Element | VoidElement]:
+    return [
+        label(for_="variant_pin_ids")["Variants"],
+        select(
+            name="variant_pin_ids",
+            id="variant_pin_ids",
+            multiple=True,
+            class_="multi-select w-full min-w-0",
+            data_entity_type="pin",
+        )[[_pin_option(variant) for variant in variant_pins]],
+    ]
+
+
+def __unauthorized_copy_pins_input(
+    pin: Pin | None,
+    unauthorized_copy_pins: Sequence[Pin],
+) -> list[Element | VoidElement]:
+    return [
+        label(for_="unauthorized_copy_pin_ids")["Unauthorized Copies"],
+        select(
+            name="unauthorized_copy_pin_ids",
+            id="unauthorized_copy_pin_ids",
+            multiple=True,
+            class_="multi-select w-full min-w-0",
+            data_entity_type="pin",
+        )[[_pin_option(copy) for copy in unauthorized_copy_pins]],
+    ]
+
+
 def __limited_edition_input(pin: Pin | None) -> list[Element | VoidElement]:
     selected_classes = "bg-pin-main border-accent text-accent grow"
     yes_selected = pin is not None and pin.limited_edition is True
@@ -574,7 +625,7 @@ def __funding_input(pin: Pin | None) -> list[Element | VoidElement]:
                 option(
                     value=funding_type,
                     selected=funding_type == pin.funding_type if pin else False,
-                )[funding_type.replace("_", " ").title()]
+                )[titlecase(funding_type.replace("_", " "))]
                 for funding_type in FundingType
             ]
         ],

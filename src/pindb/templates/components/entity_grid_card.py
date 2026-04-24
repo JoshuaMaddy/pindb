@@ -51,9 +51,10 @@ def entity_grid_card(
         class_="no-underline text-pin-base-text rounded-xl overflow-clip bg-pin-main "
         "border border-pin-base-350 hover:scale-[102%] hover:border-accent flex flex-col",
     )[
-        div(class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2")[
-            *images
-        ],
+        div(
+            class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2",
+            aria_hidden="true",
+        )[*images],
         div(class_="p-2 text-sm font-medium flex items-center justify-between gap-1")[
             div[
                 name,

@@ -1,4 +1,3 @@
-# Stage 1: build frontend assets (Tailwind CSS + vendored JS).
 FROM node:22-alpine AS assets
 
 WORKDIR /build
@@ -7,7 +6,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY src/ ./src/
-COPY scripts/vendor.mjs ./scripts/
+COPY scripts/ ./scripts/
 RUN npm run build
 
 # Stage 2: Python runtime.

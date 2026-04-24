@@ -9,6 +9,7 @@ from fastapi.routing import APIRouter
 from pindb.database.entity_type import EntityType
 from pindb.search.search import (
     ARTISTS_INDEX,
+    PIN_INDEX,
     PIN_SETS_INDEX,
     SHOPS_INDEX,
     TAGS_INDEX,
@@ -23,6 +24,7 @@ _ALLOWED_ENTITY_TYPES: frozenset[EntityType] = frozenset(
         EntityType.tag,
         EntityType.artist,
         EntityType.pin_set,
+        EntityType.pin,
     }
 )
 
@@ -31,6 +33,7 @@ _INDEX_MAP = {
     EntityType.tag: TAGS_INDEX,
     EntityType.artist: ARTISTS_INDEX,
     EntityType.pin_set: PIN_SETS_INDEX,
+    EntityType.pin: PIN_INDEX,
 }
 
 

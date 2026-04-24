@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from titlecase import titlecase
 
 from pindb.auth import AdminUser, EditorUser
 from pindb.database import session_maker
@@ -92,7 +93,7 @@ def get_bulk_edit_entity(
             content=str(
                 bulk_edit_page(
                     post_url=post_url,
-                    source_label=f"{source_type.value.replace('_', ' ').title()}: {source_name}",
+                    source_label=f"{titlecase(source_type.value.replace('_', ' '))}: {source_name}",
                     source_description=(
                         f"Apply changes to every pin in this "
                         f"{source_type.value.replace('_', ' ')}."

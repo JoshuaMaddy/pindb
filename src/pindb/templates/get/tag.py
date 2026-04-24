@@ -6,6 +6,7 @@ from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, code, div, fragment, i, p, span
+from titlecase import titlecase
 
 from pindb.database import User
 from pindb.database.pin import Pin
@@ -91,7 +92,7 @@ def tag_implication_preview(resolved: set[Tag], selected: set[Tag]) -> Element:
         extra = "opacity-60 ring-1 ring-inset ring-white/20" if implied else ""
         return span(
             class_=f"inline-flex items-center gap-1 p-1.5 rounded text-xs {color} {extra}",
-            title=tag.category.value.title(),
+            title=titlecase(tag.category.value),
         )[
             i(data_lucide=icon_name, class_=f"w-4 h-4 shrink-0 {color}"),
             tag.display_name,

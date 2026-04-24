@@ -23,7 +23,7 @@ from pindb.database.link import Link
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
-from pindb.database.pin_writes import upsert_grades
+from pindb.database.pin_writes import sync_symmetric_pin_links, upsert_grades
 from pindb.database.shop import Shop
 from pindb.database.tag import (
     Tag,
@@ -65,6 +65,10 @@ def snapshot_pin(pin: Pin) -> dict[str, Any]:
         "tag_ids": sorted(tag.id for tag in pin.explicit_tags),
         "artist_ids": sorted(artist.id for artist in pin.artists),
         "pin_set_ids": sorted(pin_set.id for pin_set in pin.sets),
+        "variant_pin_ids": sorted(variant.id for variant in pin.variants),
+        "unauthorized_copy_pin_ids": sorted(
+            copy.id for copy in pin.unauthorized_copies
+        ),
         "links": sorted(link.path for link in pin.links),
         "grades": sorted(
             [{"name": grade.name, "price": grade.price} for grade in pin.grades],
@@ -325,6 +329,33 @@ def _apply_pin_snapshot_in_memory(
     else:
         pin.sets = set()
 
+    variant_ids = snapshot.get("variant_pin_ids") or []
+    copy_ids = snapshot.get("unauthorized_copy_pin_ids") or []
+    pin_variants_set: set[Pin] = (
+        set(
+            session.scalars(
+                select(Pin)
+                .where(Pin.id.in_(variant_ids))
+                .execution_options(include_pending=True)
+            ).all()
+        )
+        if variant_ids
+        else set()
+    )
+    pin_copies_set: set[Pin] = (
+        set(
+            session.scalars(
+                select(Pin)
+                .where(Pin.id.in_(copy_ids))
+                .execution_options(include_pending=True)
+            ).all()
+        )
+        if copy_ids
+        else set()
+    )
+    attributes.set_committed_value(pin, "variants", pin_variants_set)
+    attributes.set_committed_value(pin, "unauthorized_copies", pin_copies_set)
+
     pin.links = {Link(path=path) for path in snapshot["links"]}
     pin.grades = {
         Grade(name=grade["name"], price=grade.get("price"))
@@ -451,6 +482,36 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
         )
     else:
         pin.sets = set()
+
+    variant_ids = snapshot.get("variant_pin_ids") or []
+    copy_ids = snapshot.get("unauthorized_copy_pin_ids") or []
+    approved_variants: set[Pin] = (
+        set(
+            session.scalars(
+                select(Pin)
+                .where(Pin.id.in_(variant_ids))
+                .execution_options(include_pending=True)
+            ).all()
+        )
+        if variant_ids
+        else set()
+    )
+    approved_copies: set[Pin] = (
+        set(
+            session.scalars(
+                select(Pin)
+                .where(Pin.id.in_(copy_ids))
+                .execution_options(include_pending=True)
+            ).all()
+        )
+        if copy_ids
+        else set()
+    )
+    sync_symmetric_pin_links(
+        pin=pin,
+        variants=approved_variants,
+        unauthorized_copies=approved_copies,
+    )
 
     _replace_links(pin, snapshot["links"], session)
     upsert_grades(pin=pin, grades=snapshot["grades"], session=session)

@@ -41,5 +41,6 @@ def thumbnail_grid(
         elements.append(div(class_="bg-black opacity-20"))
 
     return div(
-        class_="grid grid-cols-2 grid-rows-2 size-15 gap-0.5 overflow-clip rounded-sm"
+        class_="grid grid-cols-2 grid-rows-2 size-15 gap-0.5 overflow-clip rounded-sm",
+        aria_hidden="true",
     )[*elements]

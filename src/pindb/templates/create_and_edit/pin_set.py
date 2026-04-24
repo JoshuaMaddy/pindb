@@ -31,6 +31,7 @@ from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.toggle_button import toggle_button
+from pindb.templates.pin_image_alt import pin_front_image_alt
 
 # Dynamically loads SortableJS then initializes the draggable pin grid.
 _SORTABLE_INIT = """
@@ -313,7 +314,7 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
         )[
             img(
                 src=image_url,
-                alt=pin.name,
+                alt=pin_front_image_alt(pin),
                 class_="w-full aspect-square object-contain bg-pin-base-500",
             )
         ],
@@ -408,7 +409,7 @@ def search_result_row(
                 i(data_lucide=icon, class_="inline-block shrink-0"),
                 img(
                     src=thumbnail_url,
-                    alt=pin.name,
+                    alt=pin_front_image_alt(pin),
                     class_="w-10 h-10 object-contain rounded bg-pin-base-500 shrink-0",
                 ),
                 div(class_="flex flex-col gap-0.5 flex-1 min-w-0")[
