@@ -578,7 +578,12 @@ def __grades(pin: Pin) -> Element | None:
                             ],
                         ]
                         for grade in sorted(
-                            pin.grades, key=lambda grade: grade.price, reverse=True
+                            pin.grades,
+                            key=lambda g: (
+                                g.price is None,
+                                -(g.price if g.price is not None else 0.0),
+                                g.name,
+                            ),
                         )
                     ]
                 ],
