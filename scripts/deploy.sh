@@ -23,7 +23,7 @@ echo "==> Running migrations"
 docker compose --profile migrate run --rm migrate
 
 echo "==> Starting $NEXT alongside $ACTIVE"
-docker compose --profile "$NEXT" up -d "app_$NEXT"
+docker compose --profile "$NEXT" up -d --remove-orphans "app_$NEXT"
 
 echo "==> Waiting for $NEXT to be healthy"
 CONTAINER="${PROJECT}-app_${NEXT}-1"

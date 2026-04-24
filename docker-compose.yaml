@@ -1,3 +1,12 @@
+# Shared environment for any service that imports `pindb` (Configuration validates
+# on import — every imported service needs the full app env, not just DB URL).
+x-app-env: &app_env
+  database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
+  meilisearch_url: http://meilisearch:7700
+  meilisearch_key: ${MEILISEARCH_KEY}
+  image_directory: /app/images
+  log_file: /app/logs/pindb.log
+
 services:
   postgres:
     image: postgres:17
@@ -34,7 +43,7 @@ services:
     env_file:
       - .env
     environment:
-      database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
+      <<: *app_env
     entrypoint: ["uv", "run", "alembic", "upgrade", "head"]
     restart: "no"
     depends_on:
@@ -48,11 +57,7 @@ services:
       - .env
     restart: unless-stopped
     environment:
-      database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
-      meilisearch_url: http://meilisearch:7700
-      meilisearch_key: ${MEILISEARCH_KEY}
-      image_directory: /app/images
-      log_file: /app/logs/pindb.log
+      <<: *app_env
       ENABLE_SCHEDULER: "false"
     volumes:
       - ./images:/app/images
@@ -61,7 +66,7 @@ services:
       postgres:
         condition: service_healthy
       meilisearch:
-        condition: service_started
+        condition: service_healthy
     stop_grace_period: 30s
 
   app_green:
@@ -74,11 +79,7 @@ services:
       - .env
     restart: unless-stopped
     environment:
-      database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
-      meilisearch_url: http://meilisearch:7700
-      meilisearch_key: ${MEILISEARCH_KEY}
-      image_directory: /app/images
-      log_file: /app/logs/pindb.log
+      <<: *app_env
       ENABLE_SCHEDULER: "true"
     volumes:
       - ./images:/app/images
@@ -87,7 +88,7 @@ services:
       postgres:
         condition: service_healthy
       meilisearch:
-        condition: service_started
+        condition: service_healthy
 
   proxy:
     image: caddy:2-alpine

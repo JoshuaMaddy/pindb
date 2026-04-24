@@ -57,7 +57,7 @@ docker compose stop app 2>/dev/null || true
 docker compose rm -f app 2>/dev/null || true
 
 echo "==> Starting infra (postgres + meilisearch)"
-docker compose up -d postgres meilisearch
+docker compose up -d --remove-orphans postgres meilisearch
 
 echo "==> Waiting for postgres + meilisearch to be healthy"
 for svc in postgres meilisearch; do
