@@ -1,3 +1,14 @@
+# Global options: trust private-range proxies (NPM lives on the docker bridge,
+# always a private IP). Without this, Caddy overwrites X-Forwarded-Proto with
+# its own listener scheme (http) and uvicorn renders http:// URLs into pages
+# served via NPM's https://, breaking HTMX with mixed-content errors
+# (htmx:invalidPath).
+{
+    servers {
+        trusted_proxies static private_ranges
+    }
+}
+
 :80 {
     reverse_proxy app_blue:8000 app_green:8000 {
         lb_policy       round_robin
