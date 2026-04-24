@@ -1,6 +1,7 @@
 """FastAPI lifespan: logging, seed data, Meilisearch index, scheduled search sync."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -46,13 +47,18 @@ async def lifespan(app: FastAPI):
     _ensure_admins()
     setup_index()
     update_all()
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        func=update_all,
-        trigger="interval",
-        minutes=CONFIGURATION.search_sync_interval_minutes,
-    )
-    scheduler.start()
+    # Only the dedicated scheduler container runs the recurring sync to avoid
+    # duplicate jobs when multiple web replicas are up during a blue/green swap.
+    scheduler: BackgroundScheduler | None = None
+    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(
+            func=update_all,
+            trigger="interval",
+            minutes=CONFIGURATION.search_sync_interval_minutes,
+        )
+        scheduler.start()
 
     yield
-    scheduler.shutdown()
+    if scheduler is not None:
+        scheduler.shutdown()

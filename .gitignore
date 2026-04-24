@@ -36,3 +36,6 @@ scripts/*.csv
 # Backups
 /backups
 *.dump
+
+# Blue/green deploy state — host-local source of truth for which color is live
+.deploy-active-color

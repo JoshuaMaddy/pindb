@@ -178,7 +178,8 @@ Entry point: `database/erasure.py::erase_user_account(session, user_id)`.
 - **Tag** — hierarchical via self-referential `parent_id`. Aliases on `tag_aliases`/`shop_aliases`/`artist_aliases` unique per `(entity_id, alias)` — the same alias string may appear on different entities.
 
 ## Deployment (Docker)
-`app` service uses `env_file: .env`. Values under `environment:` in `docker-compose.yaml` override `.env` keys so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
+
+App services use `env_file: .env`. Values under `environment:` in `docker-compose.yaml` override `.env` keys so DB URL, Meilisearch URL/key, and `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
 
 The production image is multi-stage: a Node asset stage copies `scripts/` and runs
 `npm run build` (`css:build` + `vendor:build` + Rolldown Lucide) and copies the
@@ -186,12 +187,70 @@ generated `main.css` plus vendored frontend assets into the Python runtime image
 Fresh CI checkouts won't have those generated files unless they either run the
 frontend build or build the Docker image.
 
-```bash
-docker compose up -d                              # Production
-docker compose -f docker-compose.dev.yaml up -d   # Dev services only
+### Architecture (zero-downtime blue/green)
+
+```
+NPM (separate stack) -> host:8000 -> proxy (Caddy) -> app_blue:8000  (one of
+                                                  └─ app_green:8000   the two)
+                                                  scheduler (1 replica, no HTTP)
 ```
 
-Startup via `docker-entrypoint.sh`: wait for Postgres → `alembic upgrade head` → `uvicorn pindb:app --host 0.0.0.0 --port 8000`.
+- `app_blue` / `app_green` — identical web service under compose `profiles: ["blue"]` / `["green"]`. Only one runs normally; both up briefly during a deploy swap. Neither publishes a host port.
+- `proxy` — Caddy. Binds host `:8000` (the port NPM already targets). Lists both colors as upstreams with active `/healthz` checks; routes only to healthy ones automatically.
+- `scheduler` — single replica, no uvicorn. Owns APScheduler + recurring Meili sync, gated by `ENABLE_SCHEDULER=true`. Web containers set `ENABLE_SCHEDULER=false` so duplicate jobs never fire when both colors are up.
+- `migrate` — one-shot service under `profiles: ["migrate"]`. Runs `alembic upgrade head` once per deploy; the app entrypoint no longer migrates.
+
+`/healthz` (`src/pindb/routes/health.py`) is a public no-DB liveness probe; both Caddy's load-balancer healthcheck and Docker's `HEALTHCHECK` use it.
+
+### Daily deploy
+
+```bash
+./scripts/deploy.sh
+```
+
+Builds → migrates → starts the idle color → waits for healthy → stops the old color → restarts scheduler. Aborts without killing the live color if the new one fails its healthcheck. State (which color is live) is in `.deploy-active-color` — gitignored, host-local, default `blue`.
+
+### Bootstrap (first time only — has ~5–15s of NPM 502s)
+
+```bash
+./scripts/bootstrap.sh
+```
+
+Validates `.env`, builds, releases host:8000 from any legacy single-`app` container, brings up postgres + meili (waits for healthy), runs migrations, starts the active color (default `blue`), then `scheduler` + `proxy`. Idempotent — safe to re-run.
+
+### Restart hardening
+
+All long-lived services use `restart: unless-stopped`. The Docker daemon restarts every container that was running before shutdown when it boots, so a host reboot brings the stack back automatically — no extra wiring required.
+
+Two prerequisites:
+- Docker daemon must start on boot: `sudo systemctl enable docker` (bootstrap warns if not enabled).
+- Containers must have been running (not manually `stop`'d) before reboot.
+
+For belt-and-suspenders / explicit systemctl control, install the optional unit:
+
+```bash
+sudo cp scripts/pindb.service /etc/systemd/system/pindb.service
+sudo sed -i "s|@WORKDIR@|$(pwd)|; s|@USER@|$(whoami)|" /etc/systemd/system/pindb.service
+sudo systemctl daemon-reload && sudo systemctl enable --now pindb.service
+```
+
+The unit calls `scripts/start.sh`, which reads `.deploy-active-color` and runs `compose up -d` for postgres, meili, the active color, scheduler, and proxy. Useful after `docker compose down` or container pruning.
+
+### Dev services
+
+```bash
+docker compose -f docker-compose.dev.yaml up -d   # Postgres + Meili only
+```
+
+### Migration discipline (load-bearing)
+
+During a swap, old + new app containers run against the same DB simultaneously for ~10–30s. Alembic revisions must be both forward- AND backward-compatible:
+
+- **Safe:** add nullable column, add table, add index `CONCURRENTLY`, backfill data, add enum value.
+- **Unsafe same-release:** `DROP COLUMN` still read by old code, `ALTER COLUMN ... NOT NULL` on a column old code leaves NULL, rename column/table, incompatible type change, remove enum value.
+- **Split unsafe changes across two deploys:** (1) add new col nullable, dual-write. (2) backfill, flip reads. (3) drop old col.
+
+Container startup: `docker-entrypoint.sh` is now just `uvicorn pindb:app --host 0.0.0.0 --port 8000 --proxy-headers`. Migrations belong in `compose run --rm migrate`, never the entrypoint (would race during blue/green overlap).
 
 ## Bulk Import
 CSV import via `scripts/import_csv.py`. See `scripts/README.md` for column format and grade encoding.

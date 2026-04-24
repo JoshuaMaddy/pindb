@@ -31,6 +31,7 @@ from pindb.routes import (  # noqa: E402
     delete,
     edit,
     get,
+    health,
     legal,
     list,
     search,
@@ -85,6 +86,7 @@ def root(request: Request):
     return HTMLResponse(content=str(homepage(request=request)))
 
 
+app.include_router(health.router)
 app.include_router(admin.router)
 app.include_router(approve.router)
 app.include_router(auth.router)

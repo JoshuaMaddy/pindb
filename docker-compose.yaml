@@ -21,22 +21,65 @@ services:
       MEILI_MASTER_KEY: ${MEILISEARCH_KEY}
     volumes:
       - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
-  app:
+  migrate:
     build: .
-    # Load host .env into the container. Compose only uses .env for ${VAR} substitution in
-    # this file unless we pass it here; explicit `environment` below still overrides duplicates.
+    profiles: ["migrate"]
+    env_file:
+      - .env
+    environment:
+      database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
+    entrypoint: ["uv", "run", "alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app_blue: &app_base
+    build: .
+    profiles: ["blue"]
     env_file:
       - .env
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     environment:
       database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
       meilisearch_url: http://meilisearch:7700
       meilisearch_key: ${MEILISEARCH_KEY}
       image_directory: /app/images
       log_file: /app/logs/pindb.log
+      ENABLE_SCHEDULER: "false"
+    volumes:
+      - ./images:/app/images
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    stop_grace_period: 30s
+
+  app_green:
+    <<: *app_base
+    profiles: ["green"]
+
+  scheduler:
+    build: .
+    env_file:
+      - .env
+    restart: unless-stopped
+    environment:
+      database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
+      meilisearch_url: http://meilisearch:7700
+      meilisearch_key: ${MEILISEARCH_KEY}
+      image_directory: /app/images
+      log_file: /app/logs/pindb.log
+      ENABLE_SCHEDULER: "true"
     volumes:
       - ./images:/app/images
       - ./logs:/app/logs
@@ -46,6 +89,26 @@ services:
       meilisearch:
         condition: service_started
 
+  proxy:
+    image: caddy:2-alpine
+    container_name: pindb_proxy
+    restart: unless-stopped
+    # Takes over the port the old single `app` used to bind. NPM keeps pointing at host:8000.
+    ports:
+      - "8000:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
 volumes:
   postgres_data:
   meili_data:
+  caddy_data:
+  caddy_config:

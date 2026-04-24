@@ -1,0 +1,28 @@
+; Optional systemd unit for PinDB. Belt-and-suspenders on top of Docker's own
+; restart: unless-stopped policy — useful if you want to manage the stack via
+; systemctl, or if you ever `docker compose down` and need it to come back on
+; the next boot.
+;
+; Install:
+;   sudo cp scripts/pindb.service /etc/systemd/system/pindb.service
+;   sudo sed -i "s|@WORKDIR@|$(pwd)|; s|@USER@|$(whoami)|" /etc/systemd/system/pindb.service
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now pindb.service
+
+[Unit]
+Description=PinDB stack (blue/green via docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=@WORKDIR@
+User=@USER@
+ExecStart=/usr/bin/env bash scripts/start.sh
+ExecStop=/usr/bin/env docker compose stop
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
