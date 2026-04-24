@@ -114,6 +114,35 @@ def _fast_playwright_defaults() -> None:
     _expect.set_options(timeout=_DEFAULT_EXPECT_TIMEOUT_MS)
 
 
+@pytest.fixture(autouse=True)
+def _close_pages_opened_during_test(browser) -> Iterator[None]:
+    """Close any pages opened during a test so session-scoped contexts don't leak.
+
+    Session-scoped browser contexts (admin/editor/etc.) are shared across many
+    tests; tests call ``context.new_page()`` freely but almost never
+    ``page.close()``. Over a full session this accumulates dozens of open
+    chromium pages, which degrades both the browser (slow navigations) and the
+    live uvicorn server (long-idle HTMX connections). The cumulative slowdown
+    was the root cause of the ``test_pending_chain`` / ``test_pending_cascade``
+    failures that pushed those tests out of CI.
+
+    This autouse fixture snapshots each context's ``pages`` list before the
+    test runs and closes any pages added during the test afterwards.
+    """
+    snapshots: dict[int, set[int]] = {
+        id(ctx): {id(page) for page in ctx.pages} for ctx in browser.contexts
+    }
+    yield
+    for ctx in browser.contexts:
+        before = snapshots.get(id(ctx), set())
+        for page in list(ctx.pages):
+            if id(page) not in before:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _patch_browser_new_context(browser):
     """Wrap ``browser.new_context`` so every context gets fast-fail timeouts.
@@ -233,6 +262,10 @@ def live_server(
             cwd=str(_REPO_ROOT),
         )
 
+        # Discard, don't capture — a PIPE that nobody drains fills its
+        # ~64KB buffer and then blocks uvicorn on every log write, which
+        # shows up downstream as random httpx.ReadTimeout /
+        # expect_navigation timeouts in long test runs.
         proc = subprocess.Popen(
             [
                 sys.executable,
@@ -248,8 +281,8 @@ def live_server(
             ],
             env=env,
             cwd=str(_REPO_ROOT),
-            stdout=None if show_server_logs else subprocess.PIPE,
-            stderr=None if show_server_logs else subprocess.STDOUT,
+            stdout=None if show_server_logs else subprocess.DEVNULL,
+            stderr=None if show_server_logs else subprocess.DEVNULL,
         )
         try:
             _wait_for_http(f"{base_url}/", timeout=60)
@@ -282,7 +315,7 @@ _E2E_REGULAR_PASSWORD = "E2e-Regular-Secret-9!"
 
 def _signup(base_url: str, username: str, password: str) -> httpx.Client:
     client = httpx.Client(base_url=base_url, follow_redirects=False)
-    client.post(
+    signup = client.post(
         "/auth/signup",
         data={
             "username": username,
@@ -290,8 +323,19 @@ def _signup(base_url: str, username: str, password: str) -> httpx.Client:
             "email": f"{username}@x.test",
         },
     )
-    # Login in case signup didn't set the cookie (some flows redirect only).
-    client.post("/auth/login", data={"username": username, "password": password})
+    # 303 = first-time success, 200/400 = re-signup rejected (username taken);
+    # anything else (401 CSRF break, 500 server error) would silently produce a
+    # logged-out client that later fails with confusing 401s.
+    assert signup.status_code in (200, 303, 400), (
+        f"signup of {username!r} returned {signup.status_code}: {signup.text[:300]!r}"
+    )
+    # Login in case signup didn't set the cookie (re-signup path).
+    login = client.post(
+        "/auth/login", data={"username": username, "password": password}
+    )
+    assert login.status_code in (200, 303), (
+        f"login of {username!r} returned {login.status_code}: {login.text[:300]!r}"
+    )
     return client
 
 
@@ -474,54 +518,63 @@ def _pg_dsn() -> str:
     return pg_url.replace("+psycopg", "")
 
 
-@pytest.fixture
-def db_handle() -> Iterator[Callable[..., list[tuple]]]:
-    """Tiny SQL execute helper.
+@pytest.fixture(scope="session")
+def _e2e_pg_conn(live_server):
+    """One shared psycopg connection per xdist worker.
 
-    Returns a callable: `db_handle(sql, params=())` → list of result tuples.
-    Connection is opened lazily and closed at fixture teardown.
+    `db_handle` and `_truncate_e2e_state` previously opened a fresh connection
+    on every test. With ~50 tests × N workers the handshake churn was about
+    20-50 ms per test. Sharing one connection (each test owns a distinct
+    cursor; autocommit is handled per call) removes that overhead.
     """
     import psycopg
 
     conn = psycopg.connect(_pg_dsn())
-
-    def _exec(sql: str, params: tuple[object, ...] = ()) -> list[tuple]:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)  # ty: ignore[invalid-argument-type]
-            try:
-                rows = cur.fetchall()
-            except psycopg.ProgrammingError:
-                rows = []
-        conn.commit()
-        return rows
-
     try:
-        yield _exec
+        yield conn
     finally:
         conn.close()
 
 
+@pytest.fixture
+def db_handle(_e2e_pg_conn) -> Callable[..., list[tuple]]:
+    """Tiny SQL execute helper.
+
+    Returns a callable: `db_handle(sql, params=())` → list of result tuples.
+    """
+    import psycopg
+
+    def _exec(sql: str, params: tuple[object, ...] = ()) -> list[tuple]:
+        with _e2e_pg_conn.cursor() as cur:
+            cur.execute(sql, params)
+            try:
+                rows = cur.fetchall()
+            except psycopg.ProgrammingError:
+                rows = []
+        _e2e_pg_conn.commit()
+        return rows
+
+    return _exec
+
+
 @pytest.fixture(autouse=True)
-def _truncate_e2e_state(live_server) -> Iterator[None]:
+def _truncate_e2e_state(_e2e_pg_conn) -> Iterator[None]:
     """Wipe entity rows after each e2e test for true isolation.
 
     Users + sessions are preserved so pre-authenticated browser contexts
     and httpx clients keep working across tests.
     """
-    import psycopg
-
     yield
 
     from psycopg import sql as pgsql
 
-    with psycopg.connect(_pg_dsn()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                pgsql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
-                    pgsql.SQL(", ").join(pgsql.Identifier(t) for t in _TRUNCATE_TABLES)
-                )
+    with _e2e_pg_conn.cursor() as cur:
+        cur.execute(
+            pgsql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
+                pgsql.SQL(", ").join(pgsql.Identifier(t) for t in _TRUNCATE_TABLES)
             )
-        conn.commit()
+        )
+    _e2e_pg_conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -541,13 +594,17 @@ def _ensure_http_user(
     import psycopg
 
     with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        client.post(
+        signup = client.post(
             "/auth/signup",
             data={
                 "username": username,
                 "password": password,
                 "email": f"{username}@x.test",
             },
+        )
+        assert signup.status_code in (200, 303, 400), (
+            f"signup of {username!r} returned {signup.status_code}: "
+            f"{signup.text[:300]!r}"
         )
 
     pg_url = os.environ.get("DATABASE_CONNECTION", "")
@@ -588,6 +645,18 @@ def admin_http_client(
         yield client
     finally:
         client.close()
+
+
+@pytest.fixture(scope="session")
+def anon_http_client(live_server) -> Generator[httpx.Client, None, None]:
+    """Unauthenticated httpx client bound to the live server.
+
+    Used by the httpx-based ``test_ui_content`` assertions (navbar
+    visibility, page titles, auth guards) that only need the rendered HTML
+    and don't exercise client-side scripts.
+    """
+    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
+        yield client
 
 
 @pytest.fixture(scope="session")
@@ -699,6 +768,76 @@ def make_tag(
             extra_form={"category": "general"},
             approved=approved,
         )
+
+    return _make
+
+
+def _tiny_png() -> bytes:
+    """Smallest valid PNG Pillow will open (1x1 black pixel).
+
+    Inlined here so ``make_pin`` doesn't cross the
+    ``tests/e2e/test_pin_creation.py`` import boundary.
+    """
+    import struct
+    import zlib
+
+    sig = b"\x89PNG\r\n\x1a\n"
+
+    def chunk(typ: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + typ
+            + data
+            + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    idat = zlib.compress(b"\x00\x00\x00\x00")
+    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+
+
+@pytest.fixture
+def make_pin(
+    admin_http_client, editor_http_client, db_handle, make_shop
+) -> Callable[..., dict[str, Any]]:
+    """Create an approved pin via HTTP with a real (1x1) PNG attached."""
+    import io
+
+    def _make(
+        name: str = "SeedPin",
+        *,
+        shop_name: str | None = None,
+        approved: bool = True,
+    ) -> dict[str, Any]:
+        http = admin_http_client if approved else editor_http_client
+        shop = make_shop(shop_name or f"{name}Shop", approved=True)
+
+        files = {
+            "front_image": ("front.png", io.BytesIO(_tiny_png()), "image/png"),
+        }
+        data: dict[str, str | list[str]] = {
+            "name": name,
+            "acquisition_type": "single",
+            "grade_names": "standard",
+            "grade_prices": "",
+            # 999 = "Unknown" currency sentinel seeded in alembic migration
+            # d1e2f3a4b5c6_unknown_defaults.
+            "currency_id": "999",
+            "posts": "1",
+            "shop_ids": [str(shop["id"])],
+        }
+        response = http.post("/create/pin", data=data, files=files)
+        assert response.status_code == 200, (
+            f"/create/pin failed: {response.status_code} {response.text[:300]}"
+        )
+
+        rows = db_handle(
+            "SELECT id, name, approved_at IS NOT NULL FROM pins WHERE name = %s",
+            (name,),
+        )
+        assert rows, f"pin {name!r} not found after create"
+        pin_id, pin_name, is_approved = rows[0]
+        return {"id": pin_id, "name": pin_name, "approved": is_approved}
 
     return _make
 

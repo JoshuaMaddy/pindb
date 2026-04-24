@@ -249,11 +249,9 @@ class TestCreatePinFormSurface:
             "accept", "image/png, image/jpeg, image/jpg, image/webp"
         )
 
-    def test_anonymous_create_pin_is_forbidden(self, anon_browser_context, live_server):
-        page = anon_browser_context.new_page()
-        response = page.goto(f"{live_server}/create/pin")
-        assert response is not None
-        assert response.status in (401, 403)
+    def test_anonymous_create_pin_is_forbidden(self, anon_http_client):
+        response = anon_http_client.get("/create/pin")
+        assert response.status_code in (401, 403)
 
 
 # ---------------------------------------------------------------------------

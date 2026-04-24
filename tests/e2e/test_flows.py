@@ -23,31 +23,27 @@ from tests.e2e._pages import set_markdown_field, submit_content_form
 # ---------------------------------------------------------------------------
 
 
-def test_signup_login_logout_flow(browser, live_server):
-    context = browser.new_context(base_url=live_server)
-    try:
-        page = context.new_page()
+def test_signup_login_logout_flow(anon_browser_context, live_server):
+    page = anon_browser_context.new_page()
 
-        page.goto(f"{live_server}/auth/signup")
-        page.fill("input[name='username']", "e2e_flow_user")
-        page.fill("input[name='email']", "flow@example.test")
-        page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
-        page.click("button[type='submit']")
-        page.wait_for_load_state("load")
+    page.goto(f"{live_server}/auth/signup")
+    page.fill("input[name='username']", "e2e_flow_user")
+    page.fill("input[name='email']", "flow@example.test")
+    page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
+    page.click("button[type='submit']")
+    page.wait_for_load_state("load")
 
-        # Now log out (POST via the navbar form) then log back in.
-        page.locator("form[action='/auth/logout'] button[type='submit']").click()
-        page.wait_for_load_state("load")
-        page.goto(f"{live_server}/auth/login")
-        page.fill("input[name='username']", "e2e_flow_user")
-        page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
-        page.click("button[type='submit']")
-        page.wait_for_load_state("load")
+    # Now log out (POST via the navbar form) then log back in.
+    page.locator("form[action='/auth/logout'] button[type='submit']").click()
+    page.wait_for_load_state("load")
+    page.goto(f"{live_server}/auth/login")
+    page.fill("input[name='username']", "e2e_flow_user")
+    page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
+    page.click("button[type='submit']")
+    page.wait_for_load_state("load")
 
-        page.goto(f"{live_server}/user/me")
-        expect(page).to_have_url(f"{live_server}/user/e2e_flow_user", ignore_case=True)
-    finally:
-        context.close()
+    page.goto(f"{live_server}/user/me")
+    expect(page).to_have_url(f"{live_server}/user/e2e_flow_user", ignore_case=True)
 
 
 # ---------------------------------------------------------------------------
@@ -112,47 +108,29 @@ def test_editor_pending_edit_approved_by_admin(
 
 
 @pytest.mark.slow
-def test_collection_add_and_remove(admin_browser_context, browser, live_server):
-    # Admin creates a pin (via the admin browser context).
-    # Creating a full Pin requires an image, which is heavier than a shop.
-    # Happy path: create the pin via the create-pin form if the page offers a
-    # placeholder image upload; otherwise this test is a smoke test of the
-    # collection UI using whatever pins already exist.
+def test_collection_add_and_remove(make_pin, anon_browser_context, live_server):
+    # Seed an approved pin via HTTP so this test never silently skips.
+    pin = make_pin("CollectionSeedPin")
 
-    # Fresh regular user.
-    context = browser.new_context(base_url=live_server)
-    try:
-        page = context.new_page()
-        page.goto(f"{live_server}/auth/signup")
-        page.fill("input[name='username']", "e2e_collector")
-        page.fill("input[name='email']", "collector@example.test")
-        page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
-        page.click("button[type='submit']")
-        page.wait_for_load_state("load")
+    page = anon_browser_context.new_page()
+    page.goto(f"{live_server}/auth/signup")
+    page.fill("input[name='username']", "e2e_collector")
+    page.fill("input[name='email']", "collector@example.test")
+    page.fill("input[name='password']", "Quartz-Nimbus-Plover-42!")
+    page.click("button[type='submit']")
+    page.wait_for_load_state("load")
 
-        # Browse pins; if there are any, add the first to collection.
-        page.goto(f"{live_server}/")
-        # Find a link to a pin detail page.
-        first_pin_link = page.locator("a[href*='/get/pin/']").first
-        if first_pin_link.count() == 0:
-            pytest.skip("no pins available in DB — seed data needed")
+    # Add the pin to the user's collection via the HTTP endpoint — the
+    # Alpine-driven `owned_panel` widget is covered by integration tests.
+    add = page.request.post(
+        f"{live_server}/user/pins/{pin['id']}/owned",
+        form={"quantity": "1"},
+    )
+    assert add.ok, f"add-to-collection POST failed: {add.status} {add.text()[:200]}"
 
-        first_pin_link.click()
-        page.wait_for_load_state("load")
-
-        # Try to find and click an "add to collection" control — may be a
-        # form, button, or HTMX-wrapped element.
-        add_button = page.get_by_role("button", name="Add to collection")
-        if add_button.count() == 0:
-            pytest.skip("add-to-collection control not present on pin page")
-        add_button.first.click()
-        page.wait_for_load_state("load")
-
-        # Confirm by visiting the collection page.
-        page.goto(f"{live_server}/user/me/collection")
-        expect(page).to_have_url(f"{live_server}/user/e2e_collector/collection")
-    finally:
-        context.close()
+    # The collection page must now list the seeded pin.
+    page.goto(f"{live_server}/user/e2e_collector/collection")
+    expect(page.locator("body")).to_contain_text("CollectionSeedPin")
 
 
 # ---------------------------------------------------------------------------

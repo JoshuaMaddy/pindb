@@ -141,23 +141,30 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return value.id == self.id
 
     def document(self) -> dict[str, object]:
-        """Payload indexed in Meilisearch (shops, tags, artists, description)."""
+        """Payload indexed in Meilisearch.
+
+        Names and aliases live in separate fields so Meilisearch ranks exact
+        name hits above alias hits (searchable attribute order = weight).
+        """
         result: dict[str, object] = {
             "id": self.id,
             "name": self.name,
-            "shops": _ordered_unique_strings(
-                s
-                for shop in self.shops
-                for s in (shop.name, *(al.alias for al in shop.aliases))
+            "shops": _ordered_unique_strings(shop.name for shop in self.shops),
+            "shop_aliases": _ordered_unique_strings(
+                al.alias for shop in self.shops for al in shop.aliases
             ),
         }
         if self.tags:
             result["tags"] = [tag.name for tag in self.tags]
+            result["tag_aliases"] = _ordered_unique_strings(
+                al.alias for tag in self.tags for al in tag.aliases
+            )
         if self.artists:
             result["artists"] = _ordered_unique_strings(
-                s
-                for artist in self.artists
-                for s in (artist.name, *(al.alias for al in artist.aliases))
+                artist.name for artist in self.artists
+            )
+            result["artist_aliases"] = _ordered_unique_strings(
+                al.alias for artist in self.artists for al in artist.aliases
             )
         if self.description:
             result["description"] = self.description

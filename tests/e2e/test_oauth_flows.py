@@ -16,7 +16,7 @@ from playwright.sync_api import expect
 @pytest.mark.e2e
 class TestOAuthOnboarding:
     def test_first_time_oauth_signup_flows_through_onboarding(
-        self, browser, live_server, register_test_oauth_identity
+        self, anon_browser_context, live_server, register_test_oauth_identity
     ):
         identity_id = f"e2e-{uuid.uuid4().hex[:8]}"
         register_test_oauth_identity(
@@ -26,21 +26,16 @@ class TestOAuthOnboarding:
             username_hint=f"user_{identity_id}",
         )
 
-        context = browser.new_context(base_url=live_server)
-        try:
-            page = context.new_page()
-            page.goto(f"{live_server}/auth/_test-oauth/start?identity_id={identity_id}")
-            # Expect the onboarding page.
-            expect(page).to_have_url(f"{live_server}/auth/oauth/onboarding")
-            expect(page.locator("h1")).to_contain_text("Finish signing up")
+        page = anon_browser_context.new_page()
+        page.goto(f"{live_server}/auth/_test-oauth/start?identity_id={identity_id}")
+        expect(page).to_have_url(f"{live_server}/auth/oauth/onboarding")
+        expect(page.locator("h1")).to_contain_text("Finish signing up")
 
-            username_input = page.locator("input[name='username']")
-            expect(username_input).to_have_value(f"user_{identity_id}")
-            page.click("button[type='submit']")
-            page.wait_for_load_state("load")
-            expect(page).to_have_url(f"{live_server}/")
-        finally:
-            context.close()
+        username_input = page.locator("input[name='username']")
+        expect(username_input).to_have_value(f"user_{identity_id}")
+        page.click("button[type='submit']")
+        page.wait_for_load_state("load")
+        expect(page).to_have_url(f"{live_server}/")
 
     def test_returning_oauth_user_skips_onboarding(
         self, browser, live_server, register_test_oauth_identity, db_handle

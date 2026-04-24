@@ -168,7 +168,7 @@ async def post_create_pin(
             .where(Pin.id == pin_id)
             .options(
                 selectinload(Pin.shops).selectinload(Shop.aliases),
-                selectinload(Pin.tags),
+                selectinload(Pin.tags).selectinload(Tag.aliases),
                 selectinload(Pin.artists).selectinload(Artist.aliases),
             )
         )

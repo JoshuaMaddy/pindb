@@ -32,4 +32,4 @@ jobs:
           python-version: "3.13"
       - run: uv sync --all-groups
       - run: uv run playwright install --with-deps chromium
-      - run: uv run pytest -n auto --dist loadfile --ignore tests/e2e/test_pending_chain.py --ignore tests/e2e/test_concurrent.py --deselect tests/e2e/test_flows.py::test_pending_cascade_on_pin_approval
+      - run: uv run pytest -n auto --dist loadfile

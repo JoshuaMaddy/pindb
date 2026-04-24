@@ -65,7 +65,16 @@ def setup_index() -> None:
     LOGGER.info("Configuring Meilisearch indexes.")
     _create_index(
         uid=CONFIGURATION.meilisearch_index,
-        searchable=["name", "tags", "artists", "shops", "description"],
+        searchable=[
+            "name",
+            "tags",
+            "artists",
+            "shops",
+            "tag_aliases",
+            "artist_aliases",
+            "shop_aliases",
+            "description",
+        ],
     )
     _create_index(
         uid="tags",
@@ -215,7 +224,7 @@ def _fetch_all(
         session.scalars(
             select(Pin).options(
                 selectinload(Pin.shops).selectinload(Shop.aliases),
-                selectinload(Pin.tags),
+                selectinload(Pin.tags).selectinload(Tag.aliases),
                 selectinload(Pin.artists).selectinload(Artist.aliases),
             )
         ).all(),
