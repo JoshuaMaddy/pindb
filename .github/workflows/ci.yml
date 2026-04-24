@@ -32,4 +32,23 @@ jobs:
           python-version: "3.13"
       - run: uv sync --all-groups
       - run: uv run playwright install --with-deps chromium
-      - run: uv run pytest -n auto --dist loadfile
+      - name: Run tests with Playwright diagnostics
+        env:
+          E2E_SHOW_SERVER_LOGS: "1"
+          E2E_UVICORN_LOG_LEVEL: info
+        run: >
+          uv run pytest
+          -n 2
+          --dist loadfile
+          --output test-results
+          --tracing retain-on-failure
+          --video retain-on-failure
+          --screenshot only-on-failure
+          --junitxml=test-results/junit.xml
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: test-results
+          if-no-files-found: ignore
