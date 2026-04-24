@@ -219,6 +219,47 @@ Lower confidence / still unverified:
   - uploads the `test-results` artifact unconditionally
 - For diagnosis, xdist parallelism was temporarily reduced from `-n auto` to `-n 2` to lower worker-pressure noise and make failures easier to correlate.
 
+## Artifact-Based Root Cause
+
+- Examined GitHub run `24873363564` and job `72824508409`.
+- The earliest failing test is still `TestPendingQueueContent::test_editor_submission_appears_in_admin_queue_with_metadata`, but the important signal is in the captured server logs before the assertions.
+- The app repeatedly returned `404` for frontend assets under `/static`, including:
+  - `/static/vendor/htmx.min.js`
+  - `/static/vendor/alpine.min.js`
+  - `/static/vendor/overtype.min.js`
+  - `/static/vendor/notyf.min.js`
+  - `/static/vendor/notyf.min.css`
+  - `/static/vendor/tom-select.complete.min.js`
+  - `/static/vendor/tom-select.default.min.css`
+  - `/static/vendor/marked.min.js`
+  - `/static/vendor/lucide.min.js`
+  - `/static/main.css`
+- This explains the failure pattern:
+  - HTMX never loads, so create/edit form submissions do not perform the expected HTMX redirect flow.
+  - Alpine/Tom Select/Overtype behavior is missing.
+  - Theme-switch HTMX POST never fires.
+  - The downstream tests then fail as "shop not found", "pending edit missing", or "button/link missing".
+
+## Why It Passed Locally
+
+- The missing files exist locally in this workspace.
+- Verified locally:
+  - `src/pindb/static/main.css` exists
+  - `src/pindb/static/vendor/htmx.min.js` exists
+  - `src/pindb/static/vendor/alpine.min.js` exists
+- But these are generated assets and are gitignored:
+  - `src/pindb/static/vendor/`
+  - `src/pindb/static/main.css`
+- So a fresh GitHub checkout does not have them unless CI builds them first.
+
+## Fix Applied
+
+- Updated `.github/workflows/ci.yml` to build frontend assets before running tests:
+  - install Node 20
+  - run `npm ci`
+  - run `npm run build`
+- This should make the same static assets available in CI that already exist locally.
+
 ## Working Conclusion
 
 - No product-code fix is justified yet from this log alone.
