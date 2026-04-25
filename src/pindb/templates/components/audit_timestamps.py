@@ -17,12 +17,14 @@ def _local_time(dt: datetime) -> Fragment:
     ]
 
 
-def audit_timestamps(created_at: datetime, updated_at: datetime | None) -> Fragment:
+def audit_timestamps(
+    created_at: datetime | None, updated_at: datetime | None
+) -> Fragment:
     """Subtle one-line row showing created/updated timestamps, localized client-side."""
     return fragment[
         span(class_="text-xs text-pin-base-300")[
-            "Added ",
-            _local_time(created_at),
+            created_at and "Added ",
+            created_at and _local_time(created_at),
             updated_at and " · Updated ",
             updated_at and _local_time(updated_at),
         ]
