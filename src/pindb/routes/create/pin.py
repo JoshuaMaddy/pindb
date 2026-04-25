@@ -20,7 +20,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.pin_writes import sync_symmetric_pin_links
 from pindb.database.tag import Tag, apply_pin_tags
 from pindb.file_handler import save_image
-from pindb.htmx_toast import hx_redirect_with_toast_headers
+from pindb.htmx_toast import htmx_error_toast, hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._pin_shared import (
@@ -116,10 +116,17 @@ async def post_create_pin(
         fields.artist_ids,
     )
 
+    if not front_image.filename:
+        if request.headers.get("HX-Request"):
+            return htmx_error_toast(message="Front image is required.")
+        raise HTTPException(status_code=400, detail="Front image is required.")
+
     try:
         width_mm = parse_magnitude_mm(field_label="Width", raw=fields.width)
         height_mm = parse_magnitude_mm(field_label="Height", raw=fields.height)
     except MagnitudeParseError as exc:
+        if request.headers.get("HX-Request"):
+            return htmx_error_toast(message=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     back_image_guid: UUID | None = None

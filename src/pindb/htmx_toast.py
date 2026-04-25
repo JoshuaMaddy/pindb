@@ -76,6 +76,20 @@ def hx_redirect_with_toast_headers(
     }
 
 
+def htmx_error_toast(
+    *,
+    message: str,
+    toast_type: str = "error",
+) -> HTMLResponse:
+    """Empty-body 200 response that fires ``pindbToast`` on the client."""
+    return HTMLResponse(
+        content="",
+        headers={
+            "HX-Trigger": hx_trigger_toast_json(message=message, toast_type=toast_type)
+        },
+    )
+
+
 def redirect_or_htmx_toast(
     request: Request,
     *,

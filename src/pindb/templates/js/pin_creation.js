@@ -66,9 +66,11 @@ window.addEventListener("load", function () {
     if (entityType && _PIN_FORM_REF) {
       const opts = {
         load: (query, callback) => {
-          fetch(
-            `${_PIN_FORM_REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`
-          )
+          let url = `${_PIN_FORM_REF.optionsBaseUrl}/${entityType}?q=${encodeURIComponent(query)}`;
+          if (entityType === "pin" && _PIN_FORM_REF.excludePinId != null) {
+            url += `&exclude=${encodeURIComponent(_PIN_FORM_REF.excludePinId)}`;
+          }
+          fetch(url)
             .then((res) => res.json())
             .then(callback)
             .catch(() => callback());

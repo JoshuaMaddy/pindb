@@ -23,7 +23,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_writes import sync_symmetric_pin_links, upsert_grades
 from pindb.database.tag import apply_pin_tags
 from pindb.file_handler import save_image
-from pindb.htmx_toast import hx_redirect_with_toast_headers
+from pindb.htmx_toast import htmx_error_toast, hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
@@ -116,6 +116,8 @@ async def post_edit_pin(
         width_mm = parse_magnitude_mm(field_label="Width", raw=fields.width)
         height_mm = parse_magnitude_mm(field_label="Height", raw=fields.height)
     except MagnitudeParseError as exc:
+        if request.headers.get("HX-Request"):
+            return htmx_error_toast(message=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     back_image_guid: UUID | None = None

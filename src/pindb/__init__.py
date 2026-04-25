@@ -12,7 +12,11 @@ except PackageNotFoundError:
 from pathlib import Path  # noqa: E402
 
 from fastapi import FastAPI, Request  # noqa: E402
-from fastapi.responses import HTMLResponse  # noqa: E402
+from fastapi.exception_handlers import (  # noqa: E402
+    request_validation_exception_handler,
+)
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+from fastapi.responses import HTMLResponse, Response  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 
@@ -20,6 +24,7 @@ from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
 from pindb.config import CONFIGURATION  # noqa: E402
 from pindb.csrf import csrf_origin_middleware  # noqa: E402
+from pindb.htmx_toast import htmx_error_toast  # noqa: E402
 from pindb.http_caching import CacheBustedStaticFiles  # noqa: E402
 from pindb.lifespan import lifespan  # noqa: E402
 from pindb.routes import (  # noqa: E402
@@ -79,6 +84,53 @@ app.mount(
     ),
     name="static",
 )
+
+
+_FIELD_LABELS: dict[str, str] = {
+    "name": "Name",
+    "acquisition_type": "Acquisition type",
+    "grade_names": "Grade name",
+    "grade_prices": "Grade price",
+    "front_image": "Front image",
+    "back_image": "Back image",
+    "currency_id": "Currency",
+    "shop_ids": "Shop",
+    "tag_ids": "Tag",
+    "artist_ids": "Artist",
+}
+
+
+def _humanize_field(raw: str) -> str:
+    return _FIELD_LABELS.get(raw, raw.replace("_", " ").capitalize())
+
+
+def _format_validation_message(exc: RequestValidationError) -> str:
+    errors = exc.errors()
+    missing = [
+        str(err["loc"][-1])
+        for err in errors
+        if err.get("type") == "missing" and err.get("loc")
+    ]
+    if missing:
+        labels = [_humanize_field(name) for name in missing]
+        if len(labels) == 1:
+            return f"{labels[0]} is required."
+        return "Missing required fields: " + ", ".join(labels) + "."
+    if errors:
+        first = errors[0]
+        loc = first.get("loc") or ("",)
+        field = _humanize_field(str(loc[-1]))
+        return f"{field}: {first.get('msg', 'invalid value')}"
+    return "Invalid form submission."
+
+
+@app.exception_handler(RequestValidationError)
+async def _htmx_validation_handler(
+    request: Request, exc: RequestValidationError
+) -> Response:
+    if request.headers.get("HX-Request"):
+        return htmx_error_toast(message=_format_validation_message(exc))
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.get(path="/")

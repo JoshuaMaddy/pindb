@@ -84,7 +84,7 @@ def pin_form(
             content=[
                 script[
                     Markup(
-                        f"window.PIN_FORM_REF = {json.dumps({'optionsBaseUrl': options_base_url})};"
+                        f"window.PIN_FORM_REF = {json.dumps({'optionsBaseUrl': options_base_url, 'excludePinId': pin.id if pin is not None else None})};"
                     )
                 ],
                 page_heading(
