@@ -57,7 +57,11 @@ def _pending_section(request: Request, pending_count: int) -> Element:
             href="/admin/pending",
             class_="btn btn-primary w-fit",
         )[
-            i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
+            i(
+                data_lucide="clock",
+                class_="inline-block w-4 h-4 mr-1",
+                aria_hidden="true",
+            ),
             "Review Pending",
         ],
     ]
@@ -75,7 +79,11 @@ def _users_section(request: Request) -> Element:
             href=str(request.url_for("get_admin_users")),
             class_="btn btn-primary w-fit",
         )[
-            i(data_lucide="user-cog", class_="inline-block w-4 h-4 mr-1"),
+            i(
+                data_lucide="user-cog",
+                class_="inline-block w-4 h-4 mr-1",
+                aria_hidden="true",
+            ),
             "Manage Users",
         ],
     ]
@@ -95,7 +103,11 @@ def _tags_bulk_section(request: Request) -> Element:
             href=str(request.url_for("get_admin_bulk_tags")),
             class_="btn btn-primary w-fit",
         )[
-            i(data_lucide="tags", class_="inline-block w-4 h-4 mr-1"),
+            i(
+                data_lucide="tags",
+                class_="inline-block w-4 h-4 mr-1",
+                aria_hidden="true",
+            ),
             "Bulk tags…",
         ],
     ]
@@ -122,7 +134,11 @@ def _search_section() -> Element:
                 type="submit",
                 class_="btn btn-primary",
             )[
-                i(data_lucide="refresh-cw", class_="inline-block w-4 h-4 mr-1"),
+                i(
+                    data_lucide="refresh-cw",
+                    class_="inline-block w-4 h-4 mr-1",
+                    aria_hidden="true",
+                ),
                 "Sync Search Index",
             ]
         ],

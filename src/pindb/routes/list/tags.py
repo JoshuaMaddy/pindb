@@ -15,6 +15,7 @@ from pindb.database import session_maker
 from pindb.database.tag import Tag, TagCategory
 from pindb.model_utils import empty_str_to_none
 from pindb.models.list_view import EntityListView
+from pindb.models.sort_order import SortOrder
 from pindb.search.search import search_tags
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 from pindb.templates.list.tags import tags_list, tags_list_section
@@ -33,9 +34,18 @@ def get_list_tags(
         Query(),
         BeforeValidator(empty_str_to_none),
     ] = None,
+    sort: SortOrder = Query(default=SortOrder.name),
 ) -> HTMLResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_tags"))
+
+    order_by = (
+        Tag.created_at.desc()
+        if sort == SortOrder.newest
+        else Tag.created_at.asc()
+        if sort == SortOrder.oldest
+        else Tag.name.asc()
+    )
 
     with session_maker() as session:
         if q:
@@ -49,7 +59,7 @@ def get_list_tags(
             tags: Sequence[Tag] = tags_list_result
         else:
             total_count = session.scalar(select(func.count(Tag.id))) or 0
-            stmt = select(Tag).options(selectinload(Tag.pins)).order_by(Tag.name.asc())
+            stmt = select(Tag).options(selectinload(Tag.pins)).order_by(order_by)
             if category:
                 stmt = stmt.where(Tag.category == category)
             tags = session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset)).all()
@@ -65,6 +75,7 @@ def get_list_tags(
                     base_url=base_url,
                     q=q,
                     category=category,
+                    sort=sort,
                 )
             )
         return HTMLResponse(
@@ -77,5 +88,6 @@ def get_list_tags(
                 base_url=base_url,
                 q=q,
                 category=category,
+                sort=sort,
             )
         )

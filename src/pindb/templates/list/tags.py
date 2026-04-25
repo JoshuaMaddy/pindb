@@ -9,6 +9,7 @@ from htpy import Element, div, input, option, p, select, span
 
 from pindb.database.tag import Tag, TagCategory
 from pindb.models.list_view import EntityListView
+from pindb.models.sort_order import SortOrder
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.card import card
 from pindb.templates.components.entity_grid_card import entity_grid_card
@@ -73,7 +74,7 @@ def _category_select(base_url: str, category: TagCategory | None) -> Element:
         hx_target=f"#{SECTION_ID}",
         hx_swap="outerHTML",
         hx_replace_url="true",
-        hx_include=f"#{SECTION_ID} [name='view'], [name='q']",
+        hx_include=f"#{SECTION_ID} [name='view'], #{SECTION_ID} [name='sort'], [name='q']",
         class_=(
             "bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1.5 "
             "text-pin-base-text text-sm"
@@ -107,6 +108,7 @@ def tags_list_section(
     base_url: str,
     q: str = "",
     category: TagCategory | None = None,
+    sort: SortOrder = SortOrder.name,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     items: list[Element] = (
@@ -126,6 +128,7 @@ def tags_list_section(
         total_count=total_count,
         base_url=base_url,
         view=view,
+        sort=sort,
         per_page=per_page,
         extra_params=extra or None,
         extra_hidden=[
@@ -147,6 +150,7 @@ def tags_list(
     base_url: str,
     q: str = "",
     category: TagCategory | None = None,
+    sort: SortOrder = SortOrder.name,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     return base_list(
@@ -167,6 +171,7 @@ def tags_list(
             base_url=base_url,
             q=q,
             category=category,
+            sort=sort,
             per_page=per_page,
         ),
         bread_crumb=bread_crumb(

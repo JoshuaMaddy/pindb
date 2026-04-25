@@ -104,7 +104,7 @@ def bulk_pin_page(
                         # Columns toggle (Alpine dropdown)
                         Markup(f"""<div class="relative" x-data="{{open: false}}">
                         <button type="button" @click="open = !open" class="flex items-center gap-1">
-                            <i data-lucide="columns-3"></i> Columns
+                            <i data-lucide="columns-3" aria-hidden="true"></i> Columns
                         </button>
                         <div x-show="open" @click.outside="open = false"
                              class="absolute right-0 top-full mt-1 z-50 bg-pin-main border border-pin-border rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
@@ -121,13 +121,16 @@ def bulk_pin_page(
                             id="add-row-btn",
                             type="button",
                             class_="flex items-center gap-1",
-                        )[Markup('<i data-lucide="plus"></i>'), " Add Row"],
+                        )[
+                            Markup('<i data-lucide="plus" aria-hidden="true"></i>'),
+                            " Add Row",
+                        ],
                         button(
                             id="submit-btn",
                             type="button",
                             class_="flex items-center gap-1 border-accent text-accent",
                         )[
-                            Markup('<i data-lucide="upload"></i>'),
+                            Markup('<i data-lucide="upload" aria-hidden="true"></i>'),
                             span(id="submit-label")["Submit (0)"],
                         ],
                     ],
@@ -143,7 +146,7 @@ def bulk_pin_page(
                                         class_="bulk-th bulk-sticky-left bulk-sticky-col-0 w-8"
                                     )[
                                         Markup(
-                                            '<input type="checkbox" id="select-all-rows">'
+                                            '<input type="checkbox" id="select-all-rows" aria-label="Select all rows">'
                                         )
                                     ],
                                     th(

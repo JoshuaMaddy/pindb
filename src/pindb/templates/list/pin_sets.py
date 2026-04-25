@@ -9,6 +9,7 @@ from htpy import Element, div, p, span
 
 from pindb.database.pin_set import PinSet
 from pindb.models.list_view import EntityListView
+from pindb.models.sort_order import SortOrder
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.card import card
 from pindb.templates.components.entity_grid_card import entity_grid_card
@@ -66,6 +67,7 @@ def pin_sets_list_section(
     total_count: int,
     base_url: str,
     q: str = "",
+    sort: SortOrder = SortOrder.name,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     items: list[Element] = (
@@ -73,15 +75,18 @@ def pin_sets_list_section(
         if view == EntityListView.grid
         else _detailed_items(request=request, pin_sets=pin_sets)
     )
-    extra: dict[str, str] | None = {"q": q} if q else None
+    extra: dict[str, str] = {}
+    if q:
+        extra["q"] = q
     return entity_list_section(
         items=items,
         page=page,
         total_count=total_count,
         base_url=base_url,
         view=view,
+        sort=sort,
         per_page=per_page,
-        extra_params=extra,
+        extra_params=extra or None,
     )
 
 
@@ -93,6 +98,7 @@ def pin_sets_list(
     total_count: int,
     base_url: str,
     q: str = "",
+    sort: SortOrder = SortOrder.name,
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     return base_list(
@@ -112,6 +118,7 @@ def pin_sets_list(
             total_count=total_count,
             base_url=base_url,
             q=q,
+            sort=sort,
             per_page=per_page,
         ),
         bread_crumb=bread_crumb(

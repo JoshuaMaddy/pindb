@@ -14,6 +14,7 @@ from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.models.list_view import EntityListView
+from pindb.models.sort_order import SortOrder
 from pindb.search.search import search_pin_sets
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 from pindb.templates.list.pin_sets import pin_sets_list, pin_sets_list_section
@@ -27,9 +28,18 @@ def get_list_pin_sets(
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
     q: str = Query(default=""),
+    sort: SortOrder = Query(default=SortOrder.name),
 ) -> HTMLResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_pin_sets"))
+
+    order_by = (
+        PinSet.created_at.desc()
+        if sort == SortOrder.newest
+        else PinSet.created_at.asc()
+        if sort == SortOrder.oldest
+        else PinSet.name.asc()
+    )
 
     with session_maker() as session:
         if q:
@@ -58,7 +68,7 @@ def get_list_pin_sets(
                 .outerjoin(User, PinSet.owner_id == User.id)
                 .where(PinSet.owner_id.is_(None))
                 .options(selectinload(PinSet.pins))
-                .order_by(PinSet.name.asc())
+                .order_by(order_by)
                 .limit(DEFAULT_PER_PAGE)
                 .offset(offset)
             ).all()
@@ -73,6 +83,7 @@ def get_list_pin_sets(
                     total_count=total_count,
                     base_url=base_url,
                     q=q,
+                    sort=sort,
                 )
             )
         return HTMLResponse(
@@ -84,5 +95,6 @@ def get_list_pin_sets(
                 total_count=total_count,
                 base_url=base_url,
                 q=q,
+                sort=sort,
             )
         )

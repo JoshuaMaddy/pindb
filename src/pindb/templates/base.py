@@ -197,6 +197,11 @@ def html_base(
     if (window.lucide) {
         lucide.createIcons();
     }
+    document.querySelectorAll('time[data-localtime]').forEach(function(el) {
+        var iso = el.getAttribute('datetime');
+        if (!iso) return;
+        try { el.textContent = new Date(iso).toLocaleDateString(); } catch(e) {}
+    });
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', pindbAfterVendorScripts);

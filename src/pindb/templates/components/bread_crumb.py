@@ -19,14 +19,14 @@ def bread_crumb(entries: list[BreadCrumbLink | str] | None) -> Element | None:
             elements.extend(
                 [
                     p[entry],
-                    i(data_lucide="chevron-right"),
+                    i(data_lucide="chevron-right", aria_hidden="true"),
                 ]
             )
         else:
             elements.extend(
                 [
                     a(href=str(entry[0]))[entry[1]],
-                    i(data_lucide="chevron-right"),
+                    i(data_lucide="chevron-right", aria_hidden="true"),
                 ]
             )
 

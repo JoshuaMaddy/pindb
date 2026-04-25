@@ -41,7 +41,10 @@ CATEGORY_HOVER_CLASSES: dict[TagCategory, str] = {
 def category_badge(category: TagCategory) -> Element:
     color = CATEGORY_COLORS.get(category, "bg-tag-general text-tag-general-fg")
     icon_name = CATEGORY_ICONS.get(category, "tag")
+    label = titlecase(category.value)
     return span(
         class_=f"p-1.5 rounded text-xs font-medium border {color}",
-        title=titlecase(category.value),
-    )[i(data_lucide=icon_name, class_=f"w-4 h-4 {color}"),]
+        title=label,
+        aria_label=label,
+        role="img",
+    )[i(data_lucide=icon_name, class_=f"w-4 h-4 {color}", aria_hidden="true"),]

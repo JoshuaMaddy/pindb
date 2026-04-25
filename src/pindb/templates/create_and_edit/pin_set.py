@@ -298,11 +298,12 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
     )[
         button(
             type="button",
+            aria_label="Remove pin from set",
             hx_delete=remove_url,
             hx_target=f"#pin-row-{pin.id}",
             hx_swap="outerHTML",
             class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-200 hover:text-red-300 hover:border-red-400 p-0",
-        )[i(data_lucide="x", class_="w-3 h-3")],
+        )[i(data_lucide="x", class_="w-3 h-3", aria_hidden="true")],
         a(
             href=str(
                 request.url_for("get_pin", id=pin.id).include_query_params(

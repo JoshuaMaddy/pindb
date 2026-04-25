@@ -28,17 +28,19 @@ def icon_button(
         f"bg-transparent cursor-pointer {color} {additional_class if additional_class else ''}"
     )
 
-    icon_el: Element = i(data_lucide=icon, class_="w-4 h-4")
+    icon_el: Element = i(data_lucide=icon, class_="w-4 h-4", aria_hidden="true")
 
     if href is not None:
         return a(
             href=href,
             title=title,
+            aria_label=title,
             class_=base_class,
         )[icon_el]
 
     return button(
         type="button",
         title=title,
+        aria_label=title,
         class_=base_class,
     )[icon_el]

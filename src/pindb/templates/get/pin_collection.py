@@ -163,7 +163,7 @@ def _owned_row_existing(
                  @change="tradeable_qty = Math.min(Math.max(1, parseInt($el.value) || 1), max_qty); htmx.ajax('PATCH', '{patch_url}', {{target: '#{target_id}', swap: 'outerHTML', values: {{quantity: max_qty, tradeable_quantity: tradeable_qty}}}})">
           <button type="button"
                   class="ml-auto shrink-0 text-pin-base-300 hover:text-red-200 cursor-pointer bg-transparent border-0 text-lg leading-none"
-                  title="Remove"
+                  aria-label="Remove from collection"
                   hx-delete="{delete_url}"
                   hx-target="#{target_id}"
                   hx-swap="outerHTML">×</button>
@@ -295,7 +295,11 @@ def _wanted_grade_row(
             hx_swap="outerHTML",
             class_=_ROW_BUTTON_CLASS,
         )[
-            i(data_lucide="check-square", class_="inline-block shrink-0"),
+            i(
+                data_lucide="check-square",
+                class_="inline-block shrink-0",
+                aria_hidden="true",
+            ),
             grade_name,
         ]
 
@@ -309,6 +313,6 @@ def _wanted_grade_row(
         hx_vals=grade_vals,
         class_=_ROW_BUTTON_CLASS,
     )[
-        i(data_lucide="square", class_="inline-block shrink-0"),
+        i(data_lucide="square", class_="inline-block shrink-0", aria_hidden="true"),
         grade_name,
     ]

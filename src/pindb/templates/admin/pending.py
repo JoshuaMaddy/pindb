@@ -28,6 +28,9 @@ from htpy import (
     thead,
     tr,
 )
+from htpy import (
+    time as time_el,
+)
 from titlecase import titlecase
 
 from pindb.database.artist import Artist
@@ -43,6 +46,12 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.list.base import TABLE_LIST_SCROLL
+
+
+def _local_date(dt: datetime | None) -> Element | str:
+    if dt is None:
+        return "—"
+    return time_el(datetime=dt.isoformat() + "Z", data_localtime=True)["…"]
 
 
 @dataclass
@@ -253,9 +262,8 @@ def _entity_row(
     creator: User | None = (
         creators.get(entity.created_by_id) if entity.created_by_id else None
     )
-    creator_name: str = creator.username if creator else "â€”"
+    creator_name: str = creator.username if creator else "\u2014"
     created_at: datetime | None = entity.created_at
-    created_str: str = created_at.strftime("%Y-%m-%d %H:%M") if created_at else "â€”"
 
     approve_url = f"/admin/pending/approve/{entity_type}/{entity.id}"
     reject_url = f"/admin/pending/reject/{entity_type}/{entity.id}"
@@ -280,7 +288,7 @@ def _entity_row(
             dep_note,
         ],
         td(class_="py-2 pr-6 text-pin-base-400")[creator_name],
-        td(class_="py-2 pr-6 text-pin-base-400")[created_str],
+        td(class_="py-2 pr-6 text-pin-base-400")[_local_date(created_at)],
         td(class_="py-2")[
             div(class_="flex gap-2")[
                 form(method="post", action=approve_url)[
@@ -382,13 +390,13 @@ def _edit_group_row(
     slug: str = entity_type.slug if entity_type is not None else table_name
     name: str = getattr(entity, "name", f"#{entity_id}") if entity else f"#{entity_id}"
     latest = chain[-1] if chain else None
-    latest_editor: str = "â€”"
-    latest_at: str = "â€”"
+    latest_editor: str = "\u2014"
+    latest_at: datetime | None = None
     if latest is not None:
         if latest.created_by_id and latest.created_by_id in creators:
             latest_editor = creators[latest.created_by_id].username
         if latest.created_at:
-            latest_at = latest.created_at.strftime("%Y-%m-%d %H:%M")
+            latest_at = latest.created_at
 
     approve_url = f"/admin/pending/approve-edits/{slug}/{entity_id}"
     reject_url = f"/admin/pending/reject-edits/{slug}/{entity_id}"
@@ -404,7 +412,7 @@ def _edit_group_row(
         ],
         td(class_="py-2 pr-6")[str(len(chain))],
         td(class_="py-2 pr-6 text-pin-base-400")[latest_editor],
-        td(class_="py-2 pr-6 text-pin-base-400")[latest_at],
+        td(class_="py-2 pr-6 text-pin-base-400")[_local_date(latest_at)],
         td(class_="py-2")[
             div(class_="flex gap-2")[
                 form(method="post", action=approve_url)[

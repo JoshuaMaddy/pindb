@@ -22,17 +22,21 @@ def pagination_controls(
 
     def _nav_link(
         label: str,
+        aria_label: str,
         target_page: int,
         enabled: bool,
     ) -> Element:
         if not enabled:
-            return span(class_="opacity-40 cursor-not-allowed px-2 py-1")[label]
+            return span(
+                class_="opacity-40 cursor-not-allowed px-2 py-1", aria_hidden="true"
+            )[label]
         params: dict[str, str] = {"page": str(target_page)}
         if extra_params:
             params.update(extra_params)
         href: str = f"{base_url}?{urlencode(params)}"
         return a(
             href=href,
+            aria_label=aria_label,
             hx_get=href,
             hx_target=f"#{section_id}",
             hx_swap="outerHTML",
@@ -41,7 +45,17 @@ def pagination_controls(
         )[label]
 
     return div(class_="flex items-center gap-2 text-sm mt-4")[
-        _nav_link(label="← Prev", target_page=page - 1, enabled=page > 1),
+        _nav_link(
+            label="← Prev",
+            aria_label="Previous page",
+            target_page=page - 1,
+            enabled=page > 1,
+        ),
         span(class_="text-pin-base-400")[f"Page {page} of {total_pages}"],
-        _nav_link(label="Next →", target_page=page + 1, enabled=page < total_pages),
+        _nav_link(
+            label="Next →",
+            aria_label="Next page",
+            target_page=page + 1,
+            enabled=page < total_pages,
+        ),
     ]

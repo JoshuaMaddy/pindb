@@ -15,7 +15,7 @@ def linked_items_row(
     """Flex-wrap row with an icon + bold label heading followed by inline items (links, text)."""
     return div(class_="flex flex-wrap gap-2 items-baseline")[
         p(class_="text-base font-semibold sm:text-lg")[
-            i(data_lucide=icon, class_="inline-block pr-2"),
+            i(data_lucide=icon, class_="inline-block pr-2", aria_hidden="true"),
             label,
         ],
         *items,

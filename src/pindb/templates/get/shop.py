@@ -10,6 +10,7 @@ from htpy import Element, a, br, code, div, fragment, h2
 from pindb.database import Shop, User
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
+from pindb.templates.components.audit_timestamps import audit_timestamps
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
@@ -91,6 +92,10 @@ def shop_page(
                     ],
                 ),
                 description_block(shop.description),
+                audit_timestamps(
+                    created_at=shop.created_at,
+                    updated_at=shop.updated_at,
+                ),
                 bool(shop.aliases)
                 and linked_items_row(
                     icon="arrow-left-right",

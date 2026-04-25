@@ -12,6 +12,7 @@ from pindb.database import User
 from pindb.database.pin import Pin
 from pindb.database.tag import Tag
 from pindb.templates.base import html_base
+from pindb.templates.components.audit_timestamps import audit_timestamps
 from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.confirm_modal import confirm_modal
@@ -66,6 +67,8 @@ def tag_relation_items(
             hx_get=expand_url,
             hx_target=f"#{target_id}",
             hx_swap="outerHTML",
+            role="button",
+            aria_label="Show all",
             class_="cursor-pointer text-sm text-pin-base-300 hover:text-accent px-1",
         )["…"]
         return div(id=target_id, class_="contents")[*pills[:_RELATION_CAP], expand_btn]
@@ -199,6 +202,10 @@ def tag_page(
                     ],
                 ),
                 description_block(tag.description),
+                audit_timestamps(
+                    created_at=tag.created_at,
+                    updated_at=tag.updated_at,
+                ),
                 tag.aliases
                 and linked_items_row(
                     icon="arrow-left-right",

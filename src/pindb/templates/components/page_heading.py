@@ -21,7 +21,7 @@ def page_heading(
         else h2(class_="min-w-0 break-words")[text]
     )
     title_row: Element = div(class_="flex gap-2 items-baseline min-w-0")[
-        i(data_lucide=icon, class_="shrink-0"),
+        i(data_lucide=icon, class_="shrink-0", aria_hidden="true"),
         heading_el,
     ]
     outer: str = "flex flex-col gap-2 min-w-0 sm:flex-row sm:items-baseline sm:gap-2"

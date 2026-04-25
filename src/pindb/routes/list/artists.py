@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from pindb.database import Artist, session_maker
 from pindb.models.list_view import EntityListView
+from pindb.models.sort_order import SortOrder
 from pindb.search.search import search_artists
 from pindb.templates.list.artists import artists_list, artists_list_section
 from pindb.templates.list.base import DEFAULT_PER_PAGE
@@ -25,9 +26,18 @@ def get_list_artists(
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
     q: str = Query(default=""),
+    sort: SortOrder = Query(default=SortOrder.name),
 ) -> HTMLResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_artists"))
+
+    order_by = (
+        Artist.created_at.desc()
+        if sort == SortOrder.newest
+        else Artist.created_at.asc()
+        if sort == SortOrder.oldest
+        else Artist.name.asc()
+    )
 
     with session_maker() as session:
         if q:
@@ -43,7 +53,7 @@ def get_list_artists(
             artists = session.scalars(
                 select(Artist)
                 .options(selectinload(Artist.pins))
-                .order_by(Artist.name.asc())
+                .order_by(order_by)
                 .limit(DEFAULT_PER_PAGE)
                 .offset(offset)
             ).all()
@@ -58,6 +68,7 @@ def get_list_artists(
                     total_count=total_count,
                     base_url=base_url,
                     q=q,
+                    sort=sort,
                 )
             )
         return HTMLResponse(
@@ -69,5 +80,6 @@ def get_list_artists(
                 total_count=total_count,
                 base_url=base_url,
                 q=q,
+                sort=sort,
             )
         )

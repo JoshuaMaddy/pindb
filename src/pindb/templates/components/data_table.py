@@ -176,6 +176,7 @@ def _search_input() -> VoidElement:
     return input(
         type="search",
         placeholder="Search…",
+        aria_label="Search",
         **{"x-model": "search", "@input": "page = 1"},
         class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text max-w-sm",
     )
@@ -203,6 +204,7 @@ def _pagination_controls(total_row_count: int) -> Element:
     return div(class_="flex items-center gap-2 text-sm")[
         button(
             class_="btn btn-sm",
+            aria_label="Previous page",
             **{"@click": "setPage(page - 1)", ":disabled": "page <= 1"},
         )["←"],
         span[
@@ -213,6 +215,7 @@ def _pagination_controls(total_row_count: int) -> Element:
         ],
         button(
             class_="btn btn-sm",
+            aria_label="Next page",
             **{"@click": "setPage(page + 1)", ":disabled": "page >= totalPages"},
         )["→"],
         span(class_="ml-auto text-pin-base-400")[

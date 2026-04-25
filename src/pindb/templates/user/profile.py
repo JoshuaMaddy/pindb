@@ -110,9 +110,10 @@ def user_profile_page(
 # ---------------------------------------------------------------------------
 
 
-def _see_all_card(url: str) -> Element:
+def _see_all_card(url: str, label: str) -> Element:
     return a(
         href=url,
+        aria_label=label,
         class_=(
             "absolute right-0 top-0 bottom-0 z-20 w-12"
             " flex items-center justify-center"
@@ -120,13 +121,14 @@ def _see_all_card(url: str) -> Element:
             " hover:border-accent hover:text-accent"
             " text-pin-base-300 no-underline"
         ),
-    )[i(data_lucide="chevron-right")]
+    )[i(data_lucide="chevron-right", aria_hidden="true")]
 
 
 def _pin_preview_row(
     request: Request,
     pins: list[Pin],
     see_all_url: str,
+    see_all_label: str,
 ) -> Element:
     return div(class_="relative")[
         div(
@@ -141,7 +143,7 @@ def _pin_preview_row(
                 " bg-gradient-to-r from-transparent to-[var(--color-pin-base-550)]"
             )
         ),
-        _see_all_card(url=see_all_url),
+        _see_all_card(url=see_all_url, label=see_all_label),
     ]
 
 
@@ -163,7 +165,12 @@ def __favorites_section(
             text=f"Favorites ({total})",
             level=2,
         ),
-        _pin_preview_row(request=request, pins=pins, see_all_url=see_all_url)
+        _pin_preview_row(
+            request=request,
+            pins=pins,
+            see_all_url=see_all_url,
+            see_all_label=f"See all favorites for {username}",
+        )
         if total > 0
         else empty_state("No favorited pins yet."),
     ]
@@ -256,7 +263,12 @@ def __collection_section(
             text=f"Collection ({total})",
             level=2,
         ),
-        _pin_preview_row(request=request, pins=pins, see_all_url=see_all_url)
+        _pin_preview_row(
+            request=request,
+            pins=pins,
+            see_all_url=see_all_url,
+            see_all_label=f"See all collection pins for {username}",
+        )
         if total > 0
         else empty_state("No pins in collection yet."),
     ]
@@ -276,7 +288,12 @@ def __want_list_section(
             text=f"Want List ({total})",
             level=2,
         ),
-        _pin_preview_row(request=request, pins=pins, see_all_url=see_all_url)
+        _pin_preview_row(
+            request=request,
+            pins=pins,
+            see_all_url=see_all_url,
+            see_all_label=f"See all wanted pins for {username}",
+        )
         if total > 0
         else empty_state("No pins on want list yet."),
     ]
@@ -296,7 +313,12 @@ def __tradeable_section(
             text=f"Trades ({total})",
             level=2,
         ),
-        _pin_preview_row(request=request, pins=pins, see_all_url=see_all_url)
+        _pin_preview_row(
+            request=request,
+            pins=pins,
+            see_all_url=see_all_url,
+            see_all_label=f"See all tradeable pins for {username}",
+        )
         if total > 0
         else empty_state("No pins marked as tradeable yet."),
     ]
@@ -628,8 +650,8 @@ def __settings_section(
                     trigger=button(
                         type="button",
                         class_=(
-                            "self-start text-sm text-red-300 underline "
-                            "underline-offset-2 hover:text-red-200 cursor-pointer "
+                            "self-start text-sm text-red-600 underline "
+                            "underline-offset-2 hover:text-red-500 cursor-pointer "
                             "bg-transparent border-0 p-0"
                         ),
                     )["Delete account"],

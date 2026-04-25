@@ -27,6 +27,7 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
+from pindb.templates.components.audit_timestamps import audit_timestamps
 from pindb.templates.components.back_link import back_link
 from pindb.templates.components.confirm_modal import confirm_modal
 from pindb.templates.components.description_block import description_block
@@ -344,6 +345,10 @@ def __pin_details(
             __tags(pin=pin, request=request),
             __variants(pin=pin, request=request),
             __unauthorized_copies(pin=pin, request=request),
+            audit_timestamps(
+                created_at=pin.created_at,
+                updated_at=pin.updated_at,
+            ),
         ],
     ]
 

@@ -15,6 +15,7 @@ def icon_list_item(
             i(
                 data_lucide=icon,
                 class_="inline-block pr-2",
+                aria_hidden="true",
             ),
             name,
         ],
