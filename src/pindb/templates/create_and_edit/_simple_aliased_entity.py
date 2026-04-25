@@ -18,12 +18,14 @@ from pindb.templates.components.markdown_editor import markdown_editor
 from pindb.templates.components.page_heading import page_heading
 
 _ALIAS_SCRIPT = """
-document.querySelectorAll("select.alias-select").forEach(function(el) {
-    new TomSelect(el, {
-        maxItems: null,
-        create: true,
-        persist: false,
-        plugins: ["remove_button"],
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll("select.alias-select").forEach(function(el) {
+        new TomSelect(el, {
+            maxItems: null,
+            create: true,
+            persist: false,
+            plugins: ["remove_button"],
+        });
     });
 });
 """
