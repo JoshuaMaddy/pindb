@@ -1,4 +1,4 @@
-"""`POST /user/me/settings` — updates User.theme with whitelist validation."""
+"""`POST /user/me/settings` — updates User.theme and dimension_unit with validation."""
 
 from __future__ import annotations
 
@@ -37,6 +37,42 @@ class TestUpdateUserSettings:
     def test_missing_theme_field_is_422(self, auth_client):
         response = auth_client.post("/user/me/settings", data={})
         assert response.status_code == 422
+
+    def test_valid_dimension_unit_is_persisted(
+        self, auth_client, db_session, test_user
+    ):
+        response = auth_client.post("/user/me/settings", data={"dimension_unit": "in"})
+        assert response.status_code == 204
+
+        db_session.expire_all()
+        refreshed = db_session.get(User, test_user.id)
+        assert refreshed is not None
+        assert refreshed.dimension_unit == "in"
+
+    def test_invalid_dimension_unit_rejected(self, auth_client, db_session, test_user):
+        original = test_user.dimension_unit
+        response = auth_client.post(
+            "/user/me/settings", data={"dimension_unit": "yards"}
+        )
+        assert response.status_code == 422
+
+        db_session.expire_all()
+        refreshed = db_session.get(User, test_user.id)
+        assert refreshed is not None
+        assert refreshed.dimension_unit == original
+
+    def test_partial_post_updates_only_dimension_unit(
+        self, auth_client, db_session, test_user
+    ):
+        original_theme = test_user.theme
+        response = auth_client.post("/user/me/settings", data={"dimension_unit": "in"})
+        assert response.status_code == 204
+
+        db_session.expire_all()
+        refreshed = db_session.get(User, test_user.id)
+        assert refreshed is not None
+        assert refreshed.theme == original_theme
+        assert refreshed.dimension_unit == "in"
 
 
 @pytest.mark.integration

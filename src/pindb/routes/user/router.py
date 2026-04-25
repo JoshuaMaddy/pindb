@@ -25,7 +25,11 @@ from pindb.database.user_pin_queries import (
 )
 from pindb.routes.user.lists import router as lists_router
 from pindb.routes.user.sets import router as sets_router
-from pindb.templates.user.profile import VALID_THEME_VALUES, user_profile_page
+from pindb.templates.user.profile import (
+    VALID_DIMENSION_UNITS,
+    VALID_THEME_VALUES,
+    user_profile_page,
+)
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -46,14 +50,23 @@ def get_me(current_user: AuthenticatedUser) -> RedirectResponse:
 @router.post("/me/settings", response_model=None)
 def update_user_settings(
     current_user: AuthenticatedUser,
-    theme: Annotated[str, Form()],
+    theme: Annotated[str | None, Form()] = None,
+    dimension_unit: Annotated[str | None, Form()] = None,
 ) -> Response:
-    if theme not in VALID_THEME_VALUES:
+    if theme is None and dimension_unit is None:
+        raise HTTPException(status_code=422, detail="No settings provided")
+    if theme is not None and theme not in VALID_THEME_VALUES:
         raise HTTPException(status_code=422, detail="Invalid theme")
+    if dimension_unit is not None and dimension_unit not in VALID_DIMENSION_UNITS:
+        raise HTTPException(status_code=422, detail="Invalid dimension_unit")
     with session_maker.begin() as db:
         user = db.get(User, current_user.id)
-        if user is not None:
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if theme is not None:
             user.theme = theme
+        if dimension_unit is not None:
+            user.dimension_unit = dimension_unit
     return Response(status_code=204)
 
 

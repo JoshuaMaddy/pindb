@@ -328,7 +328,10 @@ class TestThemeSwitcher:
             # Revert directly in the DB: the session-scoped regular user
             # survives across tests, so any default-theme assertion in a
             # later test would otherwise see the leaked value.
-            db_handle("UPDATE users SET theme = 'mocha' WHERE username = 'e2e_regular'")
+            db_handle(
+                "UPDATE users SET theme = 'mocha', dimension_unit = 'mm' "
+                "WHERE username = 'e2e_regular'"
+            )
 
 
 # ---------------------------------------------------------------------------

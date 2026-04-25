@@ -59,6 +59,7 @@ def privacy_page(request: Request) -> Element:
                         "Password hash (Argon2, irreversible — we never see "
                         "or store your plaintext password)",
                         "UI theme preference",
+                        "Pin dimension display preference (millimeters or inches)",
                         "Editor / administrator role flags",
                     ]
                 ),

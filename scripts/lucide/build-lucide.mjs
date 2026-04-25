@@ -26,6 +26,9 @@ const EXTRA_KEBAB = new Set([
   "info",
   "gem",
   "paint-bucket",
+  /* profile.py uses multiline data_lucide=(...) — the scanner regex misses these */
+  "sun",
+  "moon",
 ]);
 
 function toCamelCase(string) {

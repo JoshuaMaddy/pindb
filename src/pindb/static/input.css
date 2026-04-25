@@ -15,6 +15,8 @@
 @custom-variant gruvbox-light-hard (&:where(.gruvbox-light-hard, .gruvbox-light-hard *));
 @custom-variant gruvbox-light (&:where(.gruvbox-light, .gruvbox-light *));
 @custom-variant gruvbox-light-soft (&:where(.gruvbox-light-soft, .gruvbox-light-soft *));
+@custom-variant hc-dark (&:where(.hc-dark, .hc-dark *));
+@custom-variant hc-light (&:where(.hc-light, .hc-light *));
 
 @theme {
   --color-cat-rosewater: hsl(10deg, 56%, 91%);
@@ -352,6 +354,92 @@
       --color-pin-base-500: hsl(43deg, 66%, 84%); /* #f2e5bc bg-soft */
       --color-pin-base-550: hsl(43deg, 72%, 87%);
     }
+
+    /* ── High contrast dark (WCAG-oriented neutrals + yellow accent) ───── */
+    @variant hc-dark {
+      --color-cat-rosewater: hsl(51deg, 100%, 50%);
+      --color-cat-sky: hsl(51deg, 100%, 50%);
+      --color-pin-base-text: hsl(0deg, 0%, 100%);
+      --color-pin-base-100: hsl(0deg, 0%, 95%);
+      --color-pin-base-150: hsl(0deg, 0%, 88%);
+      --color-pin-base-200: hsl(0deg, 0%, 80%);
+      --color-pin-base-250: hsl(0deg, 0%, 72%);
+      --color-pin-base-300: hsl(0deg, 0%, 65%);
+      --color-pin-base-350: hsl(0deg, 0%, 45%);
+      --color-pin-base-400: hsl(0deg, 0%, 28%);
+      --color-pin-base-450: hsl(0deg, 0%, 18%);
+      --color-pin-base-500: hsl(0deg, 0%, 10%);
+      --color-pin-base-550: hsl(0deg, 0%, 0%);
+      --color-accent: hsl(51deg, 100%, 50%);
+
+      --color-tag-general: hsl(0deg, 0%, 22%);
+      --color-tag-general-fg: hsl(0deg, 0%, 100%);
+      --color-tag-general-hover: hsl(51deg, 100%, 50%);
+      --color-tag-artist: hsl(38deg, 100%, 18%);
+      --color-tag-artist-fg: hsl(48deg, 100%, 92%);
+      --color-tag-artist-hover: hsl(51deg, 100%, 50%);
+      --color-tag-copyright: hsl(355deg, 100%, 16%);
+      --color-tag-copyright-fg: hsl(355deg, 100%, 94%);
+      --color-tag-copyright-hover: hsl(51deg, 100%, 50%);
+      --color-tag-character: hsl(215deg, 100%, 18%);
+      --color-tag-character-fg: hsl(215deg, 100%, 94%);
+      --color-tag-character-hover: hsl(51deg, 100%, 50%);
+      --color-tag-species: hsl(140deg, 100%, 14%);
+      --color-tag-species-fg: hsl(140deg, 80%, 92%);
+      --color-tag-species-hover: hsl(51deg, 100%, 50%);
+      --color-tag-meta: hsl(270deg, 100%, 18%);
+      --color-tag-meta-fg: hsl(270deg, 100%, 95%);
+      --color-tag-meta-hover: hsl(51deg, 100%, 50%);
+      --color-tag-material: hsl(25deg, 100%, 16%);
+      --color-tag-material-fg: hsl(38deg, 100%, 92%);
+      --color-tag-material-hover: hsl(51deg, 100%, 50%);
+      --color-tag-color: hsl(318deg, 100%, 16%);
+      --color-tag-color-fg: hsl(318deg, 100%, 94%);
+      --color-tag-color-hover: hsl(51deg, 100%, 50%);
+    }
+
+    /* ── High contrast light (near black on white + blue accent) ───────── */
+    @variant hc-light {
+      --color-cat-rosewater: hsl(230deg, 100%, 28%);
+      --color-cat-sky: hsl(230deg, 100%, 28%);
+      --color-pin-base-text: hsl(0deg, 0%, 0%);
+      --color-pin-base-100: hsl(0deg, 0%, 12%);
+      --color-pin-base-150: hsl(0deg, 0%, 18%);
+      --color-pin-base-200: hsl(0deg, 0%, 24%);
+      --color-pin-base-250: hsl(0deg, 0%, 32%);
+      --color-pin-base-300: hsl(0deg, 0%, 40%);
+      --color-pin-base-350: hsl(0deg, 0%, 58%);
+      --color-pin-base-400: hsl(0deg, 0%, 78%);
+      --color-pin-base-450: hsl(0deg, 0%, 90%);
+      --color-pin-base-500: hsl(0deg, 0%, 98%);
+      --color-pin-base-550: hsl(0deg, 0%, 100%);
+      --color-accent: hsl(230deg, 100%, 35%);
+
+      --color-tag-general: hsl(0deg, 0%, 90%);
+      --color-tag-general-fg: hsl(0deg, 0%, 0%);
+      --color-tag-general-hover: hsl(230deg, 100%, 28%);
+      --color-tag-artist: hsl(38deg, 100%, 92%);
+      --color-tag-artist-fg: hsl(28deg, 100%, 18%);
+      --color-tag-artist-hover: hsl(230deg, 100%, 28%);
+      --color-tag-copyright: hsl(355deg, 100%, 94%);
+      --color-tag-copyright-fg: hsl(355deg, 100%, 22%);
+      --color-tag-copyright-hover: hsl(230deg, 100%, 28%);
+      --color-tag-character: hsl(215deg, 100%, 94%);
+      --color-tag-character-fg: hsl(215deg, 100%, 22%);
+      --color-tag-character-hover: hsl(230deg, 100%, 28%);
+      --color-tag-species: hsl(140deg, 70%, 90%);
+      --color-tag-species-fg: hsl(140deg, 100%, 16%);
+      --color-tag-species-hover: hsl(230deg, 100%, 28%);
+      --color-tag-meta: hsl(270deg, 100%, 95%);
+      --color-tag-meta-fg: hsl(270deg, 100%, 22%);
+      --color-tag-meta-hover: hsl(230deg, 100%, 28%);
+      --color-tag-material: hsl(38deg, 100%, 92%);
+      --color-tag-material-fg: hsl(25deg, 100%, 18%);
+      --color-tag-material-hover: hsl(230deg, 100%, 28%);
+      --color-tag-color: hsl(318deg, 100%, 94%);
+      --color-tag-color-fg: hsl(318deg, 100%, 22%);
+      --color-tag-color-hover: hsl(230deg, 100%, 28%);
+    }
   }
 
   /* Shared light-theme tag colors (latte, nord-light, all gruvbox-light variants).
@@ -386,6 +474,35 @@
     --color-tag-color: hsl(318, 70%, 90%);
     --color-tag-color-fg: hsl(318, 70%, 30%);
     --color-tag-color-hover: hsl(318, 80%, 18%);
+  }
+}
+
+/* Theme picker: solid moon + filled sun disc. Base `* { color: pin-base-text }` applies to
+   svg path/circle too, so shapes must inherit the wrapper span’s `text-amber-*` color. */
+@layer components {
+  .theme-appearance-icon {
+    color: inherit;
+  }
+
+  .theme-appearance-icon :is(path, circle) {
+    color: inherit;
+  }
+
+  .theme-appearance-moon path {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .theme-appearance-sun circle {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .theme-appearance-sun path {
+    stroke: currentColor;
+    stroke-width: 2.25px;
+    stroke-linecap: round;
+    fill: none;
   }
 }
 

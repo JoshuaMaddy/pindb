@@ -16,6 +16,24 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+MM_PER_INCH: float = 25.4
+
+
+def _format_dimension_quantity(value: float) -> str:
+    """Two decimal places, or a plain integer if *value* rounds to a whole number."""
+    rounded = round(value + 0.0, 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return f"{rounded:.2f}"
+
+
+def format_pin_dimension_mm(mm: float, unit: str) -> str:
+    """Format a pin edge length stored in millimeters for display."""
+    if unit == "in":
+        return f"{_format_dimension_quantity(mm / MM_PER_INCH)} in"
+    return f"{_format_dimension_quantity(mm)}mm"
+
+
 def domain_from_url(url: str) -> str:
     """Return the host / authority portion of *url*.
 

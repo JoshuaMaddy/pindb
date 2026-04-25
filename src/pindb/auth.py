@@ -221,7 +221,7 @@ async def attach_user_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    """Resolve ``request.state.user``, theme, and audit ContextVars for the request.
+    """Resolve ``request.state.user``, theme, units, and audit ContextVars.
 
     Args:
         request (Request): Incoming ASGI request.
@@ -238,6 +238,9 @@ async def attach_user_middleware(
 
     current_user = request.state.user
     request.state.theme = current_user.theme if current_user is not None else "mocha"
+    request.state.dimension_unit = (
+        current_user.dimension_unit if current_user is not None else "mm"
+    )
     set_audit_user(current_user.id if current_user else None)
     set_audit_user_flags(
         is_admin=current_user.is_admin if current_user else False,

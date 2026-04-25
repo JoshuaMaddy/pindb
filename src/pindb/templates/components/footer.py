@@ -15,7 +15,7 @@ def footer() -> Element:
     year: int = datetime.now().year
     email: str = CONFIGURATION.contact_email
 
-    link_cls: str = "no-underline text-pin-base-100 hover:text-accent"
+    link_cls: str = "text-pin-base-100 hover:text-accent hover:cursor-pointer"
 
     return footer_el(class_="mt-8 bg-pin-base-600 text-pin-base-100 text-sm px-5 py-6")[
         div(class_="max-w-5xl mx-auto flex flex-col gap-3")[

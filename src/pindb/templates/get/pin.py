@@ -44,7 +44,7 @@ from pindb.templates.components.tag_branding import (
 )
 from pindb.templates.components.toggle_button import toggle_button
 from pindb.templates.pin_image_alt import pin_back_image_alt, pin_front_image_alt
-from pindb.utils import domain_from_url, format_currency_code
+from pindb.utils import domain_from_url, format_currency_code, format_pin_dimension_mm
 
 _IMG_CAROUSEL_HEIGHT: str = (
     "w-full max-h-[30vh] sm:max-h-[60vh] object-contain bg-pin-base-500"
@@ -334,8 +334,8 @@ def __pin_details(
             __grades(pin=pin),
             __pin_sets(pin=pin, request=request, user_sets=user_sets),
             __posts(pin=pin),
-            __height(pin=pin),
-            __width(pin=pin),
+            __height(request=request, pin=pin),
+            __width(request=request, pin=pin),
             __release_date(pin=pin),
             __end_date(pin=pin),
             __limited_edition(pin=pin),
@@ -656,23 +656,25 @@ def __posts(pin: Pin) -> Element:
     )
 
 
-def __height(pin: Pin) -> Element | None:
+def __height(request: Request, pin: Pin) -> Element | None:
     if pin.height is None:
         return
+    unit: str = getattr(request.state, "dimension_unit", "mm")
     return icon_list_item(
         icon="move-vertical",
         name="Height",
-        value=f"{pin.height:.2f}mm",
+        value=format_pin_dimension_mm(pin.height, unit),
     )
 
 
-def __width(pin: Pin) -> Element | None:
+def __width(request: Request, pin: Pin) -> Element | None:
     if pin.width is None:
         return
+    unit: str = getattr(request.state, "dimension_unit", "mm")
     return icon_list_item(
         icon="move-horizontal",
         name="Width",
-        value=f"{pin.width:.2f}mm",
+        value=format_pin_dimension_mm(pin.width, unit),
     )
 
 

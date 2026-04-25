@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class User(AuditMixin, MappedAsDataclass, Base):
-    """Application user with roles, theme, and relationships to pins and sessions."""
+    """Application user with roles, theme, units prefs, and pin relationships."""
 
     __tablename__ = "users"
 
@@ -38,6 +38,7 @@ class User(AuditMixin, MappedAsDataclass, Base):
     is_admin: Mapped[bool] = mapped_column(default=False)
     is_editor: Mapped[bool] = mapped_column(default=False)
     theme: Mapped[str] = mapped_column(default="mocha", server_default="mocha")
+    dimension_unit: Mapped[str] = mapped_column(default="mm", server_default="mm")
 
     sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user",
@@ -89,6 +90,7 @@ class User(AuditMixin, MappedAsDataclass, Base):
             yield "is_admin", self.is_admin, False
             yield "is_editor", self.is_editor, False
             yield "theme", self.theme, "mocha"
+            yield "dimension_unit", self.dimension_unit, "mm"
             yield "created_at", self.created_at
         except Exception:
             yield "detached", True
