@@ -6,6 +6,7 @@ Create Date: 2026-04-25
 
 """
 
+from datetime import datetime
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -17,7 +18,7 @@ down_revision: Union[str, Sequence[str], None] = "b8c0d1e2f3a4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-_FALLBACK = "1999-01-01 00:00:00"
+_FALLBACK = datetime(1999, 1, 1, 0, 0, 0)
 
 _TABLES = [
     "artists",
