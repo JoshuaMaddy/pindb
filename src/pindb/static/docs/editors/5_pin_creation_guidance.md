@@ -84,7 +84,7 @@ Select all applicable tags. You only need to select explicit tags — implied ta
 
 ### Grades
 
-The condition grades available or applicable for this pin. Refer to the grading guide if you are unsure which grades to select.
+The condition grades available or applicable for this pin. If a shop sells pins at "grades", document them to the best of your ability. This includes the *original* price per grade, as well as primary currency. If there is no grade, leave the default `Normal` grade and populate price and currency if known.
 
 ### Links
 
