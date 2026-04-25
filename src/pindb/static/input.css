@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @custom-variant mocha (&:where(.mocha, .mocha *));
 @custom-variant macchiato (&:where(.macchiato, .macchiato *));
@@ -917,6 +918,72 @@
 }
 .markdown-content a {
   @apply underline text-accent;
+}
+
+/* ── Doc page: prose plugin theme overrides ───────────────────────────────── */
+.doc-content {
+  --tw-prose-body: var(--color-pin-base-100);
+  --tw-prose-headings: var(--color-pin-base-50, var(--color-pin-base-100));
+  --tw-prose-lead: var(--color-pin-base-150);
+  --tw-prose-links: var(--color-accent);
+  --tw-prose-bold: var(--color-pin-base-50, var(--color-pin-base-100));
+  --tw-prose-counters: var(--color-pin-base-200);
+  --tw-prose-bullets: var(--color-pin-base-300);
+  --tw-prose-hr: var(--color-pin-border);
+  --tw-prose-quotes: var(--color-pin-base-200);
+  --tw-prose-quote-borders: var(--color-pin-base-350);
+  --tw-prose-captions: var(--color-pin-base-300);
+  --tw-prose-kbd: var(--color-pin-base-100);
+  --tw-prose-kbd-shadows: 0 0 0;
+  --tw-prose-code: var(--color-pin-base-100);
+  --tw-prose-pre-code: var(--color-pin-base-100);
+  --tw-prose-pre-bg: var(--color-pin-base-500);
+  --tw-prose-th-borders: var(--color-pin-border);
+  --tw-prose-td-borders: var(--color-pin-base-400);
+}
+
+/* H2 accent, H3 dimmed accent */
+.doc-content h2 {
+  color: var(--color-accent) !important;
+}
+.doc-content h3 {
+  color: color-mix(in oklch, var(--color-accent) 65%, var(--color-pin-base-200)) !important;
+}
+
+/* Inline code: background chip, no prose backtick pseudo-elements */
+.doc-content :not(pre) > code::before,
+.doc-content :not(pre) > code::after {
+  content: none;
+}
+.doc-content :not(pre) > code {
+  @apply bg-pin-base-450 rounded px-1.5 py-0.5 text-[0.85em] font-mono;
+  color: var(--color-pin-base-100);
+}
+
+/* Fenced code blocks */
+.doc-content pre {
+  @apply bg-pin-base-500 border border-pin-border rounded-lg p-4 overflow-x-auto;
+}
+.doc-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875em;
+  color: var(--color-pin-base-100);
+}
+
+/* Table: uniform cell padding + header bg + zebra */
+.doc-content table {
+  @apply w-full border-collapse;
+}
+.doc-content th,
+.doc-content td {
+  @apply px-3 py-2 text-sm border border-pin-border;
+}
+.doc-content thead th {
+  @apply bg-pin-base-500 font-semibold text-left;
+}
+.doc-content tbody tr:nth-child(even) {
+  @apply bg-pin-base-500/40;
 }
 
 /* Spinner animation */

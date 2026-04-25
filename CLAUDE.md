@@ -208,7 +208,7 @@ NPM (separate stack) -> host:8000 -> proxy (Caddy) -> app_blue:8000  (one of
 ./scripts/deploy.sh
 ```
 
-Builds → migrates → starts the idle color → waits for healthy → stops the old color → restarts scheduler. Aborts without killing the live color if the new one fails its healthcheck. State (which color is live) is in `.deploy-active-color` — gitignored, host-local, default `blue`.
+Builds **app_blue, app_green, migrate, and scheduler** (each Compose service gets its own image tag — building only the app colors would leave `migrate` stale so Alembic would miss new revisions), runs migrations, starts the idle color, waits for healthy, stops the old color, restarts scheduler. Aborts without killing the live color if the new one fails its healthcheck. State (which color is live) is in `.deploy-active-color` — gitignored, host-local, default `blue`.
 
 ### Bootstrap (first time only — has ~5–15s of NPM 502s)
 

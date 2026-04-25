@@ -27,6 +27,7 @@ def footer() -> Element:
                     p(class_="text-pin-base-200")[f"v{__version__}"],
                 ],
                 div(class_="flex flex-wrap gap-x-4 gap-y-1 items-center")[
+                    a(class_=link_cls, href="/docs")["Docs"],
                     a(class_=link_cls, href="/about")["About"],
                     a(class_=link_cls, href="/privacy")["Privacy"],
                     a(class_=link_cls, href="/terms")["Terms"],

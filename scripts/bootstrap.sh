@@ -48,8 +48,8 @@ else
   echo "   Wrote $STATE_FILE = $ACTIVE"
 fi
 
-echo "==> Building image"
-docker compose --profile blue --profile green build app_blue app_green
+echo "==> Building images (app + migrate + scheduler — separate tags per service)"
+docker compose --profile blue --profile green --profile migrate build app_blue app_green migrate scheduler
 
 echo "==> Releasing host:8000 from any pre-existing single-app container"
 # These no-op if the legacy `app` service was never deployed on this host.

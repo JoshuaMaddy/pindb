@@ -16,8 +16,8 @@ if [ "$ACTIVE" = "blue" ]; then NEXT=green; else NEXT=blue; fi
 
 echo "==> Active: $ACTIVE   Next: $NEXT"
 
-echo "==> Building image"
-docker compose --profile blue --profile green build app_blue app_green
+echo "==> Building images (app + migrate + scheduler — separate tags per service)"
+docker compose --profile blue --profile green --profile migrate build app_blue app_green migrate scheduler
 
 echo "==> Running migrations"
 docker compose --profile migrate run --rm migrate
