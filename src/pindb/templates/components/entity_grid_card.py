@@ -25,6 +25,7 @@ def entity_grid_card(
     pins: Sequence[Pin] | set[Pin],
     name: str,
     badge: BaseElement | None = None,
+    allow_overflow: bool = False,
 ) -> Element:
     pin_list: list[Pin] = list(pins)
     pin_count: int = len(pin_list)
@@ -48,18 +49,18 @@ def entity_grid_card(
 
     return a(
         href=href,
-        class_="no-underline text-pin-base-text rounded-xl overflow-clip bg-pin-main "
-        "border border-pin-base-350 hover:scale-[102%] hover:border-accent flex flex-col",
+        class_=f"no-underline text-pin-base-text rounded-xl overflow-clip bg-pin-main {'max-md:overflow-visible' if allow_overflow else ''} "
+        "border border-pin-base-350 hover:scale-[102%] hover:border-accent flex flex-col relative",
     )[
         div(
             class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2",
             aria_hidden="true",
         )[*images],
         div(class_="p-2 text-sm font-medium flex items-center justify-between gap-1")[
-            div[
+            div()[
                 name,
                 span(class_="text-pin-base-300 ml-1")[f"({pin_count})"],
             ],
-            badge or "",
+            badge and badge,
         ],
     ]

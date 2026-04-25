@@ -2,6 +2,8 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from fastapi.middleware.gzip import GZipMiddleware
+
 # Resolve __version__ before any pindb.* imports so footer / legal pages
 # can pull it without a circular import.
 try:
@@ -77,6 +79,10 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=csrf_origin_middleware)
 
 # Baseline security response headers (HSTS, CSP report-only, XFO, etc).
 app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
+
+# Gzip
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=7)
+
 
 app.mount(
     path="/static",

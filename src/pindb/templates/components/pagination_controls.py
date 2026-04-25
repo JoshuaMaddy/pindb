@@ -44,7 +44,7 @@ def pagination_controls(
             class_="px-2 py-1 rounded border border-pin-base-400 hover:border-accent",
         )[label]
 
-    return div(class_="flex items-center gap-2 text-sm mt-4")[
+    return div(class_="flex items-center justify-center gap-2 text-sm mt-4 w-full")[
         _nav_link(
             label="← Prev",
             aria_label="Previous page",

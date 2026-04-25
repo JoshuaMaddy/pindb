@@ -20,6 +20,7 @@ def centered_div(
         "mx-auto",
         "my-5",
         "px-10",
+        "max-md:px-5",
         "gap-2",
     }
 
@@ -27,7 +28,7 @@ def centered_div(
         classes.update(
             {
                 "max-w-[80%]",
-                "max-md:max-w-[90%]",
+                "max-md:max-w-[95%]",
             }
         )
     elif content_width == "small":

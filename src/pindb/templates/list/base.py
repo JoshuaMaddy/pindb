@@ -53,7 +53,7 @@ def _sort_control(
         )[_SORT_LABELS[sort]]
 
     return div(class_="flex items-center gap-1")[
-        span(class_="text-sm text-pin-base-400 mr-0.5")["Sort:"],
+        span(class_="text-sm text-pin-base-300 mr-0.5")["Sort:"],
         _link(SortOrder.name),
         _link(SortOrder.newest),
         _link(SortOrder.oldest),
@@ -117,11 +117,11 @@ def entity_list_section(
         ]
 
     # extra_params from callers contains q, category — not view or sort
-    vt_extra: dict[str, str] = dict(extra_params or {})
-    vt_extra["sort"] = sort.value  # view_toggle adds "view" itself
+    view_toggle_extra: dict[str, str] = dict(extra_params or {})
+    view_toggle_extra["sort"] = sort.value  # view_toggle adds "view" itself
 
-    sc_extra: dict[str, str] = dict(extra_params or {})
-    sc_extra["view"] = view.value  # sort_control adds "sort" itself
+    source_control_extra: dict[str, str] = dict(extra_params or {})
+    source_control_extra["view"] = view.value  # sort_control adds "sort" itself
 
     pagination_extra: dict[str, str] = {"view": view.value, "sort": sort.value}
     pagination_extra.update(extra_params or {})
@@ -132,22 +132,30 @@ def entity_list_section(
         input(type="hidden", name="sort", value=sort.value),
         # Any additional hidden inputs (e.g. category for tags)
         *(extra_hidden or []),
-        div(class_="flex items-center justify-between mb-4")[
-            div(class_="flex items-center gap-3")[
-                view_toggle(
-                    base_url=base_url,
-                    current_view=view,
-                    section_id=SECTION_ID,
-                    extra_params=vt_extra,
-                ),
-                _sort_control(
-                    base_url=base_url,
-                    current_sort=sort,
-                    extra_params=sc_extra,
-                ),
+        div(class_="relative")[
+            div(class_="flex items-center justify-between overflow-x-auto")[
+                div(class_="flex items-center gap-3")[
+                    view_toggle(
+                        base_url=base_url,
+                        current_view=view,
+                        section_id=SECTION_ID,
+                        extra_params=view_toggle_extra,
+                    ),
+                    _sort_control(
+                        base_url=base_url,
+                        current_sort=sort,
+                        extra_params=source_control_extra,
+                    ),
+                ],
             ],
-            span(class_="text-sm text-pin-base-300")[f"{total_count} items"],
+            div(
+                class_=(
+                    "absolute right-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
+                    " bg-gradient-to-r from-transparent to-[var(--color-pin-base-550)]"
+                )
+            ),
         ],
+        span(class_="text-sm text-pin-base-300")[f"{total_count} items"],
         content,
         pagination_controls(
             base_url=base_url,

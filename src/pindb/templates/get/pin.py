@@ -159,7 +159,7 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
         )
         thumb_slides.append(
             div(
-                class_="swiper-slide !box-border overflow-hidden rounded border border-pin-base-400"
+                class_="swiper-slide box-border! overflow-hidden rounded border border-pin-base-400"
             )[
                 img(
                     alt=slide_alt,
@@ -178,13 +178,13 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
         div(class_="swiper-wrapper")[*main_slides],
     ]
     nav_prev: Element = div(
-        class_="pin-swiper-nav-prev swiper-button-prev absolute !left-auto !right-full top-1/2 z-10 !m-0 !-translate-y-1/2 "
+        class_="pin-swiper-nav-prev swiper-button-prev absolute left-auto! right-full! top-1/2 z-10 m-0! -translate-y-1/2! "
         + nav_btn
         + nav_hidden,
         **{"aria-label": "Previous image"},
     )
     nav_next: Element = div(
-        class_="pin-swiper-nav-next swiper-button-next absolute !left-full !right-auto top-1/2 z-10 !m-0 !-translate-y-1/2 "
+        class_="pin-swiper-nav-next swiper-button-next absolute left-full! right-auto! top-1/2 z-10 m-0! -translate-y-1/2! "
         + nav_btn
         + nav_hidden,
         **{"aria-label": "Next image"},
@@ -199,7 +199,7 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
         carousel_children.append(
             div(class_="swiper pin-swiper-thumbs w-full overflow-hidden")[
                 div(
-                    class_="swiper-wrapper !flex !w-full !items-center !justify-center",
+                    class_="swiper-wrapper flex! w-full! items-center! justify-center!",
                 )[*thumb_slides],
             ],
         )
@@ -210,7 +210,7 @@ def _pin_image_carousel(request: Request, pin: Pin) -> Fragment:
             href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css",
         ),
         div(
-            class_="relative flex w-full flex-col gap-3 min-md:gap-5 overflow-x-visible",
+            class_="relative flex w-full flex-col gap-3 md:gap-5 overflow-x-visible",
             id="pin-image-carousel",
             **{"data-slide-count": str(slide_count)},
         )[*carousel_children],
@@ -236,9 +236,9 @@ def pin_page(
         script_content=_PIN_SWIPER_INIT,
         body_content=fragment[
             div(
-                class_="mx-auto px-10 my-5 gap-2 w-full grid grid-cols-1 min-md:gap-8 min-md:grid-cols-2 min-md:max-w-[160ch]"
+                class_="mx-auto px-10 my-5 gap-2 w-full grid grid-cols-1 md:gap-8 md:grid-cols-2 md:max-w-[160ch]"
             )[
-                div(class_="min-md:col-span-2")[
+                div(class_="md:col-span-2")[
                     back_link(),
                     has_pending_chain
                     and pending_edit_banner(
@@ -288,6 +288,10 @@ def pin_page(
                             ),
                         ],
                     ),
+                    audit_timestamps(
+                        created_at=pin.created_at,
+                        updated_at=pin.updated_at,
+                    ),
                 ],
                 div(class_="w-full overflow-x-visible")[
                     _pin_image_carousel(request=request, pin=pin),
@@ -315,7 +319,7 @@ def __pin_details(
     owned_entries: list[UserOwnedPin],
     wanted_entries: list[UserWantedPin],
 ) -> Element:
-    return div(class_="min-md:ml-2")[
+    return div(class_="md:ml-2")[
         user
         and __user_actions(
             request=request,
@@ -345,10 +349,6 @@ def __pin_details(
             __tags(pin=pin, request=request),
             __variants(pin=pin, request=request),
             __unauthorized_copies(pin=pin, request=request),
-            audit_timestamps(
-                created_at=pin.created_at,
-                updated_at=pin.updated_at,
-            ),
         ],
     ]
 

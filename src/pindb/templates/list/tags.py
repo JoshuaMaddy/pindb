@@ -33,7 +33,11 @@ def _grid_items(
             href=str(request.url_for("get_tag", id=tag.id)),
             pins=tag.pins,
             name=("(P) " + tag.display_name) if tag.is_pending else tag.display_name,
-            badge=category_badge(tag.category),
+            badge=category_badge(
+                tag.category,
+                additional_classes="max-md:absolute max-md:-top-2 max-md:-right-2",
+            ),
+            allow_overflow=True,
         )
         for tag in tags
     ]
