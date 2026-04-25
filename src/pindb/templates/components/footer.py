@@ -17,7 +17,9 @@ def footer() -> Element:
 
     link_cls: str = "text-pin-base-100 hover:text-accent hover:cursor-pointer"
 
-    return footer_el(class_="mt-8 bg-pin-base-600 text-pin-base-100 text-sm px-5 py-6")[
+    return footer_el(
+        class_="mt-8 bg-pin-base-550 text-pin-base-100 text-sm px-5 py-6 relative z-[10] border-t border-pin-base-400"
+    )[
         div(class_="max-w-5xl mx-auto flex flex-col gap-3")[
             div(
                 class_="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4"

@@ -14,7 +14,11 @@ from pindb.templates.components.centered import centered_div
 def search_pin_input(
     post_url: URL | str,
     hx_target: str = "#results",
+    initial_query: str | None = None,
 ) -> Element:
+    trigger: str = (
+        "load, input changed delay:1s" if initial_query else "input changed delay:1s"
+    )
     return form(
         hx_post=str(post_url),
         hx_target=hx_target,
@@ -25,9 +29,10 @@ def search_pin_input(
                 type="text",
                 name="search",
                 id="search",
+                value=initial_query or None,
                 hx_post=str(post_url),
                 hx_target=hx_target,
-                hx_trigger="input changed delay:1s",
+                hx_trigger=trigger,
                 placeholder="Search for a pin",
                 class_="bg-none border-0 bg-transparent focus:outline-0 w-full text-lg text-center",
             ),
@@ -38,6 +43,7 @@ def search_pin_input(
 def search_pin_page(
     post_url: URL | str,
     request: Request | None = None,
+    initial_query: str | None = None,
 ) -> Element:
     user: User | None = (
         getattr(getattr(request, "state", None), "user", None) if request else None
@@ -66,7 +72,7 @@ def search_pin_page(
                     header_extras,
                 ],
                 hr,
-                search_pin_input(post_url=post_url),
+                search_pin_input(post_url=post_url, initial_query=initial_query),
                 div("#results", class_="mt-4"),
             ],
         ),

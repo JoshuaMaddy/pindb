@@ -50,7 +50,7 @@ def navbar(
 
     if not is_staff:
         return nav(
-            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-pin-base-500"
+            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-pin-base-500 relative z-[10]"
         )[
             a(class_="no-underline text-accent font-bold shrink-0", href="/")["PinDB"],
             a(class_=_LINK, href="/list")["List"],
@@ -59,7 +59,7 @@ def navbar(
         ]
 
     assert user is not None
-    return nav(class_="px-2 py-1 bg-pin-base-500")[
+    return nav(class_="px-2 py-1 bg-pin-base-500 relative z-[10]")[
         div(
             class_="flex flex-col gap-2 sm:gap-0 w-full",
             x_data="{ open: false }",
@@ -73,20 +73,20 @@ def navbar(
                     class_="no-underline text-accent font-bold shrink-0",
                     href="/",
                 )["PinDB"],
+                button(
+                    type="button",
+                    class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-100 hover:bg-pin-base-450 shrink-0",
+                    aria_controls="staff-nav-panel",
+                    **{
+                        "@click": "open = !open",
+                        ":aria-expanded": "open",
+                        "aria-label": "Toggle navigation",
+                    },
+                )[i(data_lucide="menu", class_="w-5 h-5")],
                 div(
                     class_="hidden sm:flex flex-1 flex-wrap items-center gap-x-4 gap-y-1 min-w-0"
                 )[*_staff_nav_link_items(user)],
                 div(class_="flex items-center gap-2 shrink-0 ml-auto")[
-                    button(
-                        type="button",
-                        class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-100 hover:bg-pin-base-450",
-                        aria_controls="staff-nav-panel",
-                        **{
-                            "@click": "open = !open",
-                            ":aria-expanded": "open",
-                            "aria-label": "Toggle navigation",
-                        },
-                    )[i(data_lucide="menu", class_="w-5 h-5")],
                     _auth_block(user, ml_auto=False),
                 ],
             ],

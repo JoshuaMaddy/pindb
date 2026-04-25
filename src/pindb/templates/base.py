@@ -64,6 +64,7 @@ _STARTUP_TIME = int(time.time())
 def html_base(
     body_content: Content,
     script_content: BaseElement | str | None = None,
+    head_content: Content = None,
     bread_crumb_links: list[BreadCrumbLink | str] | None = None,
     title: str = "Document",
     request: Request | None = None,
@@ -99,6 +100,7 @@ def html_base(
                 href=f"/static/main.css?v={_STARTUP_TIME}",
             ),
             title_el[title + " | PinDB"],
+            head_content,
             script(
                 src=f"/static/vendor/alpine.min.js?v={_STARTUP_TIME}",
                 defer=True,
@@ -114,7 +116,7 @@ def html_base(
         ],
         body(class_="min-h-screen flex flex-col")[
             navbar(request=request),
-            main_el(class_="min-h-screen")[body_content,],
+            main_el(class_="min-h-screen relative z-[5]")[body_content,],
             footer(),
             div(
                 id="pindb-toast-host",

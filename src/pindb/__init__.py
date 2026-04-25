@@ -19,6 +19,8 @@ from fastapi.exception_handlers import (  # noqa: E402
 )
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.responses import HTMLResponse, Response  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
+from sqlalchemy.orm import selectinload  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 
@@ -26,6 +28,8 @@ from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
 from pindb.config import CONFIGURATION  # noqa: E402
 from pindb.csrf import csrf_origin_middleware  # noqa: E402
+from pindb.database import session_maker  # noqa: E402
+from pindb.database.pin import Pin  # noqa: E402
 from pindb.htmx_toast import htmx_error_toast  # noqa: E402
 from pindb.http_caching import CacheBustedStaticFiles  # noqa: E402
 from pindb.lifespan import lifespan  # noqa: E402
@@ -142,7 +146,21 @@ async def _htmx_validation_handler(
 
 @app.get(path="/")
 def root(request: Request):
-    return HTMLResponse(content=str(homepage(request=request)))
+    with session_maker() as db:
+        pins = [
+            pin
+            for pin in db.scalars(
+                select(Pin)
+                .where(Pin.front_image_guid.is_not(None))
+                .order_by(func.random())
+                .limit(60)
+                .options(
+                    selectinload(Pin.shops),
+                    selectinload(Pin.artists),
+                )
+            )
+        ]
+        return HTMLResponse(content=str(homepage(request=request, pins=pins)))
 
 
 app.include_router(health.router)

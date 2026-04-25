@@ -18,11 +18,13 @@ router = APIRouter(prefix="/search")
 @router.get(path="/pin")
 def get_search_pin(
     request: Request,
+    q: str | None = None,
 ) -> HTMLResponse:
     return HTMLResponse(
         content=search_pin_page(
             post_url=request.url_for("post_search_pin"),
             request=request,
+            initial_query=q,
         )
     )
 

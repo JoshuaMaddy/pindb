@@ -1,0 +1,226 @@
+/* Homepage redesign: masonry background, cursor glow, centered overlay. */
+
+/* ---------- Masonry background ---------- */
+
+#pindb-masonry-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+  padding: 0 5rem;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 14%,
+    black 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 14%,
+    black 86%,
+    transparent 100%
+  );
+}
+
+.masonry-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.masonry-col-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Animation duration is set per-column via JS (proportional to column
+     height) so pixels-per-second is constant across columns. The
+     keyframes go from -50% to 0 so duplicated content scrolls downward. */
+  animation-name: masonry-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* Pause animation on hover of any pin in the column. */
+.masonry-col:hover .masonry-col-inner {
+  animation-play-state: paused;
+}
+
+@keyframes masonry-scroll {
+  0% {
+    transform: translateY(-50%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Pin cards in masonry ---------- */
+
+.masonry-pin-card {
+  display: block;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 0.55;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-pin-base-450);
+  transition:
+    opacity 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.35s ease,
+    transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.masonry-pin-card:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  box-shadow:
+    0 0 60px 4px color-mix(in srgb, var(--color-accent) 14%, transparent),
+    0 0 120px 24px color-mix(in srgb, var(--color-accent) 7%, transparent);
+  z-index: 2;
+}
+
+.masonry-pin-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Reserve a square footprint before the image decodes so layout is
+     stable and the per-column duration calc gets a correct height on
+     first run. Once the image loads it fills this box via object-fit. */
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--color-pin-base-500);
+}
+
+.masonry-pin-info {
+  padding: 6px 8px 8px;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  color: var(--color-pin-base-text);
+}
+
+.masonry-pin-name {
+  font-weight: 500;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.masonry-pin-meta {
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--color-pin-base-300);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Cursor radial glow ---------- */
+
+#pindb-cursor-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    700px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    color-mix(in srgb, var(--color-accent) 9%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 4%, transparent) 25%,
+    transparent 60%
+  );
+}
+
+/* ---------- Center overlay ---------- */
+
+#homepage-center {
+  position: relative;
+  z-index: 10;
+  min-height: calc(100vh - 6rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  /* Let pin hover/clicks pass through outside the central card. */
+  pointer-events: none;
+}
+
+#homepage-card {
+  pointer-events: auto;
+}
+
+/* The central column. No surrounding panel — soft drop-shadow filter
+   on the whole block sits behind every solid child element. */
+#homepage-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  filter:
+    drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 48px rgba(0, 0, 0, 0.55));
+}
+
+#homepage-card > h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-pin-base-text);
+  letter-spacing: -0.01em;
+}
+
+#homepage-card > h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: var(--color-pin-base-100);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1100px) {
+  .masonry-col:nth-child(7) {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .masonry-col:nth-child(6),
+  .masonry-col:nth-child(7) {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .masonry-col:nth-child(4),
+  .masonry-col:nth-child(5),
+  .masonry-col:nth-child(6),
+  .masonry-col:nth-child(7) {
+    display: none;
+  }
+  #homepage-card > h1 {
+    font-size: 2rem;
+  }
+  #homepage-card > h2 {
+    font-size: 1.05rem;
+  }
+}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .masonry-col-inner {
+    animation: none;
+  }
+}
