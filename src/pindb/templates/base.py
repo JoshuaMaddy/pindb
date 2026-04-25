@@ -50,6 +50,13 @@ with open(
 ) as _fp:
     _MARKDOWN_EDITOR_SCRIPT: str = _fp.read()
 
+with open(
+    file=Path(__file__).parent / "js/form_validate.js",
+    mode="r",
+    encoding="utf-8",
+) as _fp:
+    _FORM_VALIDATE_SCRIPT: str = _fp.read()
+
 
 _STARTUP_TIME = int(time.time())
 
@@ -204,5 +211,6 @@ def html_base(
         script[Markup(object=_TAG_SELECT_SCRIPT)],
         script[Markup(object=_FORM_PERSIST_SCRIPT)],
         script[Markup(object=_MARKDOWN_EDITOR_SCRIPT)],
+        script[Markup(object=_FORM_VALIDATE_SCRIPT)],
         script_content and script[Markup(object=script_content)],
     ]
