@@ -36,6 +36,7 @@ from pindb.templates.components.bread_crumb import bread_crumb
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.empty_state import empty_state
 from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.pagination_controls import pagination_controls
 from pindb.templates.components.pill_link import pill_link
 from pindb.templates.components.pin_grid import pin_grid
 from pindb.templates.list.base import TABLE_LIST_SCROLL
@@ -78,8 +79,6 @@ def _list_shell(
     current_url: str,
     content: Element,
 ) -> Element:
-    total_pages: int = max(1, -(-total // PAGE_SIZE))
-
     grid_url: str = f"{current_url}?view=grid&page=1"
     table_url: str = f"{current_url}?view=table&page=1"
 
@@ -93,24 +92,13 @@ def _list_shell(
         )["Table"],
     ]
 
-    prev_url: str = f"{current_url}?view={view}&page={page - 1}" if page > 1 else ""
-    next_url: str = (
-        f"{current_url}?view={view}&page={page + 1}" if page < total_pages else ""
+    pagination: Element | None = pagination_controls(
+        base_url=current_url,
+        page=page,
+        total_count=total,
+        per_page=PAGE_SIZE,
+        extra_params={"view": view},
     )
-
-    pagination: Element = div(
-        class_="flex gap-4 items-center justify-center py-4 text-sm"
-    )[
-        a(href=prev_url, class_="text-accent no-underline hover:underline")
-        if prev_url
-        else span(class_="text-pin-base-400")["←"],
-        span(class_="text-pin-base-300")[
-            f"Page {page} of {total_pages} ({total} pins)"
-        ],
-        a(href=next_url, class_="text-accent no-underline hover:underline")
-        if next_url
-        else span(class_="text-pin-base-400")["→"],
-    ]
 
     return html_base(
         title=title,

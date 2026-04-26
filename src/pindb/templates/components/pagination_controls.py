@@ -12,7 +12,7 @@ def pagination_controls(
     base_url: str,
     page: int,
     total_count: int,
-    section_id: str,
+    section_id: str | None = None,
     per_page: int = 100,
     extra_params: dict[str, str] | None = None,
 ) -> Element | None:
@@ -34,13 +34,19 @@ def pagination_controls(
         if extra_params:
             params.update(extra_params)
         href: str = f"{base_url}?{urlencode(params)}"
+        if section_id is not None:
+            return a(
+                href=href,
+                aria_label=aria_label,
+                hx_get=href,
+                hx_target=f"#{section_id}",
+                hx_swap="outerHTML",
+                hx_push_url="true",
+                class_="px-2 py-1 rounded border border-pin-base-400 hover:border-accent",
+            )[label]
         return a(
             href=href,
             aria_label=aria_label,
-            hx_get=href,
-            hx_target=f"#{section_id}",
-            hx_swap="outerHTML",
-            hx_push_url="true",
             class_="px-2 py-1 rounded border border-pin-base-400 hover:border-accent",
         )[label]
 
