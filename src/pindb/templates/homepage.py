@@ -30,7 +30,7 @@ def _masonry_pin_card(request: Request, pin: Pin) -> Element:
     shop_text: str | None = shops[0].name if shops else None
     artist_text: str | None = artists[0].name if artists else None
     return a(
-        class_="masonry-pin-card",
+        class_="masonry-pin-card pin-3d-card",
         href=str(request.url_for("get_pin", id=pin.id)),
         tabindex="-1",
         aria_hidden="true",

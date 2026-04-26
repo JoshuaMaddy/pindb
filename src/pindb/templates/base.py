@@ -199,6 +199,24 @@ def html_base(
     if (window.lucide) {
         lucide.createIcons();
     }
+    document.addEventListener('mousemove', function(evt) {
+        var card = evt.target.closest && evt.target.closest('.pin-3d-card');
+        if (!card) return;
+        var r = card.getBoundingClientRect();
+        var x = (evt.clientX - r.left) / r.width;
+        var y = (evt.clientY - r.top) / r.height;
+        card.style.setProperty('--gx', (x * 100).toFixed(2) + '%');
+        card.style.setProperty('--gy', (y * 100).toFixed(2) + '%');
+        card.style.setProperty('--rx', ((0.5 - y) * 5).toFixed(2) + 'deg');
+        card.style.setProperty('--ry', ((x - 0.5) * 5).toFixed(2) + 'deg');
+    }, { passive: true });
+    document.addEventListener('mouseout', function(evt) {
+        var card = evt.target.closest && evt.target.closest('.pin-3d-card');
+        if (!card) return;
+        if (evt.relatedTarget && card.contains(evt.relatedTarget)) return;
+        card.style.removeProperty('--rx');
+        card.style.removeProperty('--ry');
+    });
     document.querySelectorAll('time[data-localtime]').forEach(function(el) {
         var iso = el.getAttribute('datetime');
         if (!iso) return;

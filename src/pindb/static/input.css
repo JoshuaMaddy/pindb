@@ -64,6 +64,12 @@
   --color-tag-color: hsl(318, 48%, 24%);
   --color-tag-color-fg: hsl(318, 70%, 78%);
   --color-tag-color-hover: hsl(318, 85%, 90%);
+  --color-tag-archetype: hsl(175, 48%, 22%);
+  --color-tag-archetype-fg: hsl(175, 70%, 76%);
+  --color-tag-archetype-hover: hsl(175, 85%, 88%);
+  --color-tag-company: hsl(50, 50%, 24%);
+  --color-tag-company-fg: hsl(50, 80%, 76%);
+  --color-tag-company-hover: hsl(50, 90%, 88%);
 }
 
 @layer theme {
@@ -109,6 +115,12 @@
       --color-tag-color: hsl(318, 46%, 23%);
       --color-tag-color-fg: hsl(318, 68%, 77%);
       --color-tag-color-hover: hsl(318, 83%, 89%);
+      --color-tag-archetype: hsl(175, 46%, 21%);
+      --color-tag-archetype-fg: hsl(175, 68%, 75%);
+      --color-tag-archetype-hover: hsl(175, 83%, 87%);
+      --color-tag-company: hsl(50, 48%, 23%);
+      --color-tag-company-fg: hsl(50, 78%, 75%);
+      --color-tag-company-hover: hsl(50, 88%, 87%);
     }
 
     @variant frappe {
@@ -151,6 +163,12 @@
       --color-tag-color: hsl(318, 44%, 26%);
       --color-tag-color-fg: hsl(318, 66%, 80%);
       --color-tag-color-hover: hsl(318, 81%, 91%);
+      --color-tag-archetype: hsl(175, 44%, 24%);
+      --color-tag-archetype-fg: hsl(175, 66%, 78%);
+      --color-tag-archetype-hover: hsl(175, 81%, 89%);
+      --color-tag-company: hsl(50, 46%, 26%);
+      --color-tag-company-fg: hsl(50, 76%, 78%);
+      --color-tag-company-hover: hsl(50, 86%, 89%);
     }
 
     @variant latte {
@@ -397,6 +415,12 @@
       --color-tag-color: hsl(318deg, 100%, 16%);
       --color-tag-color-fg: hsl(318deg, 100%, 94%);
       --color-tag-color-hover: hsl(51deg, 100%, 50%);
+      --color-tag-archetype: hsl(175deg, 100%, 14%);
+      --color-tag-archetype-fg: hsl(175deg, 100%, 94%);
+      --color-tag-archetype-hover: hsl(51deg, 100%, 50%);
+      --color-tag-company: hsl(50deg, 100%, 16%);
+      --color-tag-company-fg: hsl(50deg, 100%, 94%);
+      --color-tag-company-hover: hsl(51deg, 100%, 50%);
     }
 
     /* ── High contrast light (near black on white + blue accent) ───────── */
@@ -440,6 +464,12 @@
       --color-tag-color: hsl(318deg, 100%, 94%);
       --color-tag-color-fg: hsl(318deg, 100%, 22%);
       --color-tag-color-hover: hsl(230deg, 100%, 28%);
+      --color-tag-archetype: hsl(175deg, 100%, 92%);
+      --color-tag-archetype-fg: hsl(175deg, 100%, 18%);
+      --color-tag-archetype-hover: hsl(230deg, 100%, 28%);
+      --color-tag-company: hsl(50deg, 100%, 88%);
+      --color-tag-company-fg: hsl(40deg, 100%, 20%);
+      --color-tag-company-hover: hsl(230deg, 100%, 28%);
     }
   }
 
@@ -475,6 +505,12 @@
     --color-tag-color: hsl(318, 70%, 90%);
     --color-tag-color-fg: hsl(318, 70%, 30%);
     --color-tag-color-hover: hsl(318, 80%, 18%);
+    --color-tag-archetype: hsl(175, 60%, 86%);
+    --color-tag-archetype-fg: hsl(175, 70%, 24%);
+    --color-tag-archetype-hover: hsl(175, 80%, 14%);
+    --color-tag-company: hsl(50, 70%, 86%);
+    --color-tag-company-fg: hsl(40, 70%, 26%);
+    --color-tag-company-hover: hsl(40, 80%, 16%);
   }
 }
 
@@ -692,6 +728,12 @@
 .ts-wrapper.multi .ts-control [data-value][data-category="color"] {
   @apply bg-tag-color text-tag-color-fg fill-tag-color-fg stroke-tag-color-fg border-tag-color-fg;
 }
+.ts-wrapper.multi .ts-control [data-value][data-category="archetype"] {
+  @apply bg-tag-archetype text-tag-archetype-fg stroke-tag-archetype-fg border-tag-archetype-fg;
+}
+.ts-wrapper.multi .ts-control [data-value][data-category="company"] {
+  @apply bg-tag-company text-tag-company-fg stroke-tag-company-fg border-tag-company-fg;
+}
 
 /** Tag category single-select (Category field) — fix item layout and color the whole control box **/
 
@@ -721,6 +763,12 @@
 }
 .ts-wrapper.single[data-selected-category="color"] .ts-control {
   @apply bg-tag-color text-tag-color-fg border-tag-color-fg;
+}
+.ts-wrapper.single[data-selected-category="archetype"] .ts-control {
+  @apply bg-tag-archetype text-tag-archetype-fg border-tag-archetype-fg;
+}
+.ts-wrapper.single[data-selected-category="company"] .ts-control {
+  @apply bg-tag-company text-tag-company-fg border-tag-company-fg;
 }
 
 /** Bulk Import Table **/
@@ -984,6 +1032,59 @@
 }
 .doc-content tbody tr:nth-child(even) {
   @apply bg-pin-base-500/40;
+}
+
+/* ── Pin grid card: subtle 3D tilt + edge glint ──────────────────────────── */
+/* JS (in base.py) sets --rx, --ry (tilt) and --gx, --gy (cursor pos) on hover. */
+.pin-3d-card {
+  transform: perspective(900px)
+    rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 140ms ease-out, border-color 150ms ease-out;
+  will-change: transform;
+}
+
+.pin-3d-card:hover {
+  transform: perspective(900px)
+    rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg))
+    scale(1.02);
+}
+
+/* Glint: radial near cursor, masked to a thin ring so it only shows on edges. */
+.pin-3d-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: radial-gradient(
+    140px circle at var(--gx, 50%) var(--gy, 50%),
+    rgba(255, 255, 255, 0.75),
+    rgba(255, 255, 255, 0) 60%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.pin-3d-card:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-3d-card,
+  .pin-3d-card:hover {
+    transform: none;
+    transition: border-color 150ms ease-out;
+  }
+  .pin-3d-card::before { display: none; }
 }
 
 /* Spinner animation */

@@ -32,7 +32,7 @@ def pin_preview_card(
         else None
     )
     return div(
-        class_="grid grid-rows-subgrid row-span-3 gap-0 rounded-lg overflow-clip bg-pin-base-450 border border-pin-base-400 hover:scale-[102%] hover:border-accent"
+        class_="pin-3d-card relative grid grid-rows-subgrid row-span-3 gap-0 rounded-lg overflow-clip bg-pin-base-450 border border-pin-base-400 hover:border-accent"
     )[
         a(
             href=str(

@@ -25,12 +25,18 @@ Every tag has a category. Choose the one that most accurately describes what the
 | Category      | Use for                                                                                  |
 |---------------|------------------------------------------------------------------------------------------|
 | **General**   | Anything that doesn't fit a more specific category. Themes, styles, objects, adjectives. |
-| **Character** | A specific named character (fictional or real).                                          |
+| **Character** | A specific named character (fictional or real) — `Pikachu`, `Mario`, `Mickey Mouse`.    |
+| **Archetype** | A non-distinct, non-copyrightable character type — `Wizard`, `Knight`, `Princess`.       |
 | **Copyright** | A franchise, series, brand, or IP. Characters typically belong to a copyright.           |
+| **Company**   | An organisation that owns or publishes a copyright — `Nintendo`, `Disney`, `Sega`.       |
 | **Species**   | A type of creature or being — cat, dragon, robot, etc.                                   |
 | **Material**  | The physical material or finish of the pin — hard enamel, soft enamel, glitter, etc.     |
 | **Color**     | A dominant color or color scheme of the pin.                                             |
 | **Meta**      | Additional information scoped to specific tags, like Pokemon Generation.                 |
+
+**Character vs. Archetype.** A *Character* is a specific, named, usually copyrighted entity (`Link`). An *Archetype* is the generic role or trope that character fits (`Knight`). Use both where applicable — `Link` (Character) implies `Knight` (Archetype) implies `The Legend of Zelda` (Copyright) implies `Nintendo` (Company).
+
+**Copyright vs. Company.** *Copyright* is the work itself (`Pokemon (Series)`); *Company* is the organisation behind it (`Nintendo`, `The Pokemon Company`). A copyright typically implies its company.
 
 When in doubt, use **General**. Admins can recategorize if needed.
 
