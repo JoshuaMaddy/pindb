@@ -13,11 +13,19 @@ bypasses Authlib entirely and is implemented in
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from authlib.integrations.starlette_client import OAuth, StarletteOAuth2App
+from authlib.deprecate import AuthlibDeprecationWarning
+
+with warnings.catch_warnings():
+    # Authlib 1.7 emits AuthlibDeprecationWarning from its own internals
+    # (authlib._joserfc_helpers imports authlib.jose). Fix lands in 2.0.
+    warnings.simplefilter("ignore", AuthlibDeprecationWarning)
+    from authlib.integrations.starlette_client import OAuth, StarletteOAuth2App
+
 from fastapi import Request
 
 from pindb.config import CONFIGURATION
