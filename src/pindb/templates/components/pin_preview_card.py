@@ -50,7 +50,7 @@ def pin_preview_card(
                     ).include_query_params(thumbnail=True)
                 ),
                 alt=pin_front_image_alt(pin),
-                class_="object-cover h-full",
+                class_="object-cover aspect-square w-full",
             )
         ],
         a(
