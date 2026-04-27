@@ -1,5 +1,7 @@
 # Shared environment for any service that imports `pindb` (Configuration validates
 # on import — every imported service needs the full app env, not just DB URL).
+x-app-image: &app_image ghcr.io/joshuamaddy/pindb:${IMAGE_TAG:-latest}
+
 x-app-env: &app_env
   database_connection: postgresql+psycopg://pindb:${POSTGRES_PASSWORD}@postgres/pindb
   meilisearch_url: http://meilisearch:7700
@@ -38,7 +40,7 @@ services:
       start_period: 10s
 
   migrate:
-    build: .
+    image: *app_image
     profiles: ["migrate"]
     env_file:
       - .env
@@ -51,7 +53,7 @@ services:
         condition: service_healthy
 
   app_blue: &app_base
-    build: .
+    image: *app_image
     profiles: ["blue"]
     env_file:
       - .env
@@ -74,7 +76,7 @@ services:
     profiles: ["green"]
 
   scheduler:
-    build: .
+    image: *app_image
     env_file:
       - .env
     restart: unless-stopped
