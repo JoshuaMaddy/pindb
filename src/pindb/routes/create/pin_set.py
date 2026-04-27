@@ -5,6 +5,7 @@ FastAPI routes: `routes/create/pin_set.py`.
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 
 from pindb.database import session_maker
 from pindb.database.pin_set import PinSet
@@ -18,10 +19,10 @@ LOGGER = user_logger("pindb.routes.create.pin_set")
 
 
 @router.get(path="/pin_set")
-def get_create_pin_set(request: Request) -> HTMLResponse:
+def get_create_pin_set(request: Request) -> HtpyResponse:
     from pindb.templates.create_and_edit.pin_set import pin_set_create_page
 
-    return HTMLResponse(content=str(pin_set_create_page(request=request)))
+    return HtpyResponse(pin_set_create_page(request=request))
 
 
 @router.post(path="/pin_set", response_model=None)

@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -39,7 +40,7 @@ def get_edit_artist(
     request: Request,
     id: int,
     current_user: EditorUser,
-) -> HTMLResponse:
+) -> HtpyResponse:
     with session_maker() as session:
         artist: Artist | None = session.scalar(
             select(Artist)
@@ -59,8 +60,8 @@ def get_edit_artist(
                 with session.no_autoflush:
                     apply_snapshot_in_memory(artist, effective, session)
 
-        return HTMLResponse(
-            content=artist_form(
+        return HtpyResponse(
+            artist_form(
                 post_url=request.url_for("post_edit_artist", id=id),
                 artist=artist,
                 request=request,

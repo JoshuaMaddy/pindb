@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -60,7 +61,7 @@ def get_edit_pin(
     request: Request,
     id: int,
     current_user: EditorUser,
-) -> HTMLResponse:
+) -> HtpyResponse:
     with session_maker() as session:
         pin: Pin | None = session.scalar(
             select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
@@ -86,8 +87,8 @@ def get_edit_pin(
             request.url_for("get_entity_options", entity_type="placeholder")
         ).removesuffix("/placeholder")
 
-        return HTMLResponse(
-            content=pin_form(
+        return HtpyResponse(
+            pin_form(
                 post_url=request.url_for("post_edit_pin", id=id),
                 shops=list(pin.shops),
                 tags=list(pin.explicit_tags),

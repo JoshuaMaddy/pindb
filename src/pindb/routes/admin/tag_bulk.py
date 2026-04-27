@@ -6,8 +6,9 @@ import json
 from json import JSONDecodeError
 
 from fastapi import File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -312,8 +313,8 @@ def _format_validation_error(exc: ValidationError) -> str:
 
 
 @router.get("/tags/bulk")
-def get_admin_bulk_tags(request: Request) -> HTMLResponse:
-    return HTMLResponse(content=str(bulk_tags_page(request=request)))
+def get_admin_bulk_tags(request: Request) -> HtpyResponse:
+    return HtpyResponse(bulk_tags_page(request=request))
 
 
 @router.post("/tags/bulk")
@@ -321,19 +322,17 @@ async def post_admin_bulk_tags(
     request: Request,
     json_text: str = Form(default=""),
     file: UploadFile | None = File(default=None),
-) -> HTMLResponse:
+) -> HtpyResponse:
     text_present = bool(json_text.strip())
     file_present = file is not None and bool((file.filename or "").strip())
 
     if text_present and file_present:
-        return HTMLResponse(
-            content=str(
-                bulk_tags_page(
-                    request=request,
-                    error_message=(
-                        "Provide either pasted JSON or a file upload — not both."
-                    ),
-                )
+        return HtpyResponse(
+            bulk_tags_page(
+                request=request,
+                error_message=(
+                    "Provide either pasted JSON or a file upload — not both."
+                ),
             ),
             status_code=400,
         )
@@ -344,59 +343,47 @@ async def post_admin_bulk_tags(
     elif text_present:
         raw_bytes = json_text.encode("utf-8")
     if raw_bytes is None or not raw_bytes.strip():
-        return HTMLResponse(
-            content=str(
-                bulk_tags_page(
-                    request=request,
-                    error_message="Paste JSON in the text field or choose a JSON file.",
-                )
+        return HtpyResponse(
+            bulk_tags_page(
+                request=request,
+                error_message="Paste JSON in the text field or choose a JSON file.",
             ),
             status_code=400,
         )
     try:
         data = json.loads(raw_bytes.decode("utf-8"))
     except JSONDecodeError as exc:
-        return HTMLResponse(
-            content=str(
-                bulk_tags_page(
-                    request=request,
-                    error_message=f"Invalid JSON: {exc}",
-                )
+        return HtpyResponse(
+            bulk_tags_page(
+                request=request,
+                error_message=f"Invalid JSON: {exc}",
             ),
             status_code=400,
         )
     try:
         body = BulkTagUpsertBody.model_validate(data)
     except ValidationError as exc:
-        return HTMLResponse(
-            content=str(
-                bulk_tags_page(
-                    request=request,
-                    error_message=(
-                        "Invalid payload:\n" + _format_validation_error(exc)
-                    ),
-                )
+        return HtpyResponse(
+            bulk_tags_page(
+                request=request,
+                error_message=("Invalid payload:\n" + _format_validation_error(exc)),
             ),
             status_code=400,
         )
     try:
         result = run_bulk_tag_upsert(body)
     except HTTPException as exc:
-        return HTMLResponse(
-            content=str(
-                bulk_tags_page(
-                    request=request,
-                    error_message=str(exc.detail),
-                )
+        return HtpyResponse(
+            bulk_tags_page(
+                request=request,
+                error_message=str(exc.detail),
             ),
             status_code=exc.status_code,
         )
-    return HTMLResponse(
-        content=str(
-            bulk_tags_page(
-                request=request,
-                result=result.model_dump(mode="json"),
-            )
+    return HtpyResponse(
+        bulk_tags_page(
+            request=request,
+            result=result.model_dump(mode="json"),
         )
     )
 

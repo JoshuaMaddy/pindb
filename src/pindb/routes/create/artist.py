@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
@@ -28,9 +29,9 @@ LOGGER = user_logger("pindb.routes.create.artist")
 
 
 @router.get(path="/artist")
-def get_create_artist(request: Request) -> HTMLResponse:
-    return HTMLResponse(
-        content=artist_form(
+def get_create_artist(request: Request) -> HtpyResponse:
+    return HtpyResponse(
+        artist_form(
             post_url=request.url_for("post_create_artist"),
             request=request,
         )

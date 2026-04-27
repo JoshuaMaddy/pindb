@@ -3,8 +3,8 @@ FastAPI routes: `routes/create/__init__.py`.
 """
 
 from fastapi import Depends, Request
-from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 
 from pindb.auth import require_editor
 from pindb.routes.create import artist, pin, pin_set, shop, tag
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/create", dependencies=[Depends(require_editor)])
 
 
 @router.get(path="/")
-def get_create_index(request: Request) -> HTMLResponse:
-    return HTMLResponse(content=create_index(request=request))
+def get_create_index(request: Request) -> HtpyResponse:
+    return HtpyResponse(create_index(request=request))
 
 
 router.include_router(pin.router)

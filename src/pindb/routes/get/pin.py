@@ -5,6 +5,7 @@ FastAPI routes: `routes/get/pin.py`.
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -23,7 +24,7 @@ def get_pin(
     id: int,
     current_user: CurrentUser,
     version: str | None = Query(default=None),
-) -> HTMLResponse | RedirectResponse:
+) -> HtpyResponse | RedirectResponse:
     with session_maker() as session:
         pin_obj: Pin | None = session.scalar(
             select(Pin)
@@ -94,8 +95,8 @@ def get_pin(
                     ).all()
                 )
 
-        return HTMLResponse(
-            content=pin_page(
+        return HtpyResponse(
+            pin_page(
                 request=request,
                 pin=pin_obj,
                 is_favorited=is_favorited,

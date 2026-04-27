@@ -18,7 +18,8 @@ from fastapi.exception_handlers import (  # noqa: E402
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError  # noqa: E402
-from fastapi.responses import HTMLResponse, Response  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
+from htpy.starlette import HtpyResponse  # noqa: E402
 from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.orm import selectinload  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
@@ -160,7 +161,7 @@ def root(request: Request):
                 )
             )
         ]
-        return HTMLResponse(content=str(homepage(request=request, pins=pins)))
+        return HtpyResponse(homepage(request=request, pins=pins))
 
 
 app.include_router(health.router)

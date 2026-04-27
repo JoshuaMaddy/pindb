@@ -3,8 +3,8 @@ FastAPI routes: `routes/search.py`.
 """
 
 from fastapi import Form, Request
-from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 
 from pindb.database import session_maker
 from pindb.database.pin import Pin
@@ -19,9 +19,9 @@ router = APIRouter(prefix="/search")
 def get_search_pin(
     request: Request,
     q: str | None = None,
-) -> HTMLResponse:
-    return HTMLResponse(
-        content=search_pin_page(
+) -> HtpyResponse:
+    return HtpyResponse(
+        search_pin_page(
             post_url=request.url_for("post_search_pin"),
             request=request,
             initial_query=q,
@@ -32,8 +32,8 @@ def get_search_pin(
 @router.post(path="/pin")
 def post_search_pin(
     request: Request,
-    search: str = Form(),
-) -> HTMLResponse:
+    search: str = Form(default=""),
+) -> HtpyResponse:
     with session_maker() as session:
         pins: list[Pin] | None = search_pin(query=search, session=session)
-    return HTMLResponse(content=str(pin_grid(request=request, pins=pins)))
+    return HtpyResponse(pin_grid(request=request, pins=pins))

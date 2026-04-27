@@ -7,8 +7,9 @@ from typing import Sequence, TypeVar
 from uuid import UUID, uuid4
 
 from fastapi import Form, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -151,7 +152,7 @@ def get_bulk_options(
 
 
 @router.get(path="/pin")
-def get_bulk_pin(request: Request) -> HTMLResponse:
+def get_bulk_pin(request: Request) -> HtpyResponse:
     options_base_url: str = str(
         request.url_for("get_bulk_options", entity_type="placeholder")
     ).removesuffix("/placeholder")
@@ -161,8 +162,8 @@ def get_bulk_pin(request: Request) -> HTMLResponse:
             statement=select(Currency)
         ).all()
 
-        return HTMLResponse(
-            content=bulk_pin_page(
+        return HtpyResponse(
+            bulk_pin_page(
                 upload_image_url=str(request.url_for("post_bulk_image")),
                 submit_url=str(request.url_for("post_bulk_pins")),
                 options_base_url=options_base_url,

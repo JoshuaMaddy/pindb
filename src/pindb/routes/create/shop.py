@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
@@ -28,9 +29,9 @@ LOGGER = user_logger("pindb.routes.create.shop")
 
 
 @router.get(path="/shop")
-def get_create_shop(request: Request) -> HTMLResponse:
-    return HTMLResponse(
-        content=shop_form(
+def get_create_shop(request: Request) -> HtpyResponse:
+    return HtpyResponse(
+        shop_form(
             post_url=request.url_for("post_create_shop"),
             request=request,
         )

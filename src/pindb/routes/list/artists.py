@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -27,7 +28,7 @@ def get_list_artists(
     view: EntityListView = Query(default=EntityListView.grid),
     q: str = Query(default=""),
     sort: SortOrder = Query(default=SortOrder.name),
-) -> HTMLResponse:
+) -> HtpyResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_artists"))
 
@@ -59,8 +60,8 @@ def get_list_artists(
             ).all()
 
         if request.headers.get("HX-Request"):
-            return HTMLResponse(
-                content=artists_list_section(
+            return HtpyResponse(
+                artists_list_section(
                     request=request,
                     artists=artists,
                     view=view,
@@ -71,8 +72,8 @@ def get_list_artists(
                     sort=sort,
                 )
             )
-        return HTMLResponse(
-            content=artists_list(
+        return HtpyResponse(
+            artists_list(
                 request=request,
                 artists=artists,
                 view=view,

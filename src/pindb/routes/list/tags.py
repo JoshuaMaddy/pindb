@@ -7,6 +7,7 @@ from typing import Annotated, Sequence
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -35,7 +36,7 @@ def get_list_tags(
         BeforeValidator(empty_str_to_none),
     ] = None,
     sort: SortOrder = Query(default=SortOrder.name),
-) -> HTMLResponse:
+) -> HtpyResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_tags"))
 
@@ -65,8 +66,8 @@ def get_list_tags(
             tags = session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset)).all()
 
         if request.headers.get("HX-Request"):
-            return HTMLResponse(
-                content=tags_list_section(
+            return HtpyResponse(
+                tags_list_section(
                     request=request,
                     tags=tags,
                     view=view,
@@ -78,8 +79,8 @@ def get_list_tags(
                     sort=sort,
                 )
             )
-        return HTMLResponse(
-            content=tags_list(
+        return HtpyResponse(
+            tags_list(
                 request=request,
                 tags=tags,
                 view=view,

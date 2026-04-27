@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
@@ -51,8 +52,8 @@ def _assert_can_edit_set(pin_set: PinSet, user: User) -> None:
 def get_create_user_set(
     request: Request,
     _current_user: AuthenticatedUser,
-) -> HTMLResponse:
-    return HTMLResponse(content=str(create_user_set_page(request=request)))
+) -> HtpyResponse:
+    return HtpyResponse(create_user_set_page(request=request))
 
 
 # ---------------------------------------------------------------------------
@@ -382,12 +383,8 @@ def add_pin_to_personal_set(
                 pin_set = db.get(PinSet, set_id)
                 assert pin_set is not None
 
-            return HTMLResponse(
-                content=str(
-                    set_row(
-                        request=request, pin_id=pin_id, pin_set=pin_set, in_set=True
-                    )
-                )
+            return HtpyResponse(
+                set_row(request=request, pin_id=pin_id, pin_set=pin_set, in_set=True)
             )
     return Response(status_code=204)
 
@@ -419,7 +416,7 @@ def remove_pin_from_personal_set(
                     select(func.count()).where(pin_set_memberships.c.set_id == set_id)
                 )
 
-            return HTMLResponse(content=str(pin_count_oob(count or 0)))
+            return HtpyResponse(pin_count_oob(count or 0))
         elif hx_target.startswith("search-row-"):
             with session_maker() as db:
                 pin = db.scalar(

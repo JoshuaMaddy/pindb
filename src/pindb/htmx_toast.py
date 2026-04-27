@@ -128,6 +128,6 @@ def unique_constraint_response(
     """
     if request.headers.get("HX-Request"):
         return HTMLResponse(
-            content=_toast_signal_html(message=message, toast_type=toast_type)
+            content=str(_toast_signal_html(message=message, toast_type=toast_type))
         )
     return HTMLResponse(content=message, media_type="text/plain", status_code=409)

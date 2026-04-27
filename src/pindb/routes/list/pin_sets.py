@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -29,7 +30,7 @@ def get_list_pin_sets(
     view: EntityListView = Query(default=EntityListView.grid),
     q: str = Query(default=""),
     sort: SortOrder = Query(default=SortOrder.name),
-) -> HTMLResponse:
+) -> HtpyResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_pin_sets"))
 
@@ -74,8 +75,8 @@ def get_list_pin_sets(
             ).all()
 
         if request.headers.get("HX-Request"):
-            return HTMLResponse(
-                content=pin_sets_list_section(
+            return HtpyResponse(
+                pin_sets_list_section(
                     request=request,
                     pin_sets=pin_sets,
                     view=view,
@@ -86,8 +87,8 @@ def get_list_pin_sets(
                     sort=sort,
                 )
             )
-        return HTMLResponse(
-            content=pin_sets_list(
+        return HtpyResponse(
+            pin_sets_list(
                 request=request,
                 pin_sets=pin_sets,
                 view=view,

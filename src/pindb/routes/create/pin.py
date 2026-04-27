@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import Depends, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
+from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -40,7 +41,7 @@ LOGGER = user_logger("pindb.routes.create.pin")
 def get_create_pin(
     request: Request,
     duplicate_from: int | None = Query(default=None),
-) -> HTMLResponse:
+) -> HtpyResponse:
     with session_maker() as session:
         currencies: Sequence[Currency] = session.scalars(
             statement=select(Currency)
@@ -85,8 +86,8 @@ def get_create_pin(
             prefill_variants = list(duplicate_source.variants)
             prefill_copies = list(duplicate_source.unauthorized_copies)
 
-        return HTMLResponse(
-            content=pin_form(
+        return HtpyResponse(
+            pin_form(
                 post_url=request.url_for("post_create_pin"),
                 shops=prefill_shops,
                 pin_sets=prefill_pin_sets,

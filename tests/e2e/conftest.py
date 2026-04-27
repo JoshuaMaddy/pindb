@@ -175,17 +175,23 @@ def e2e_pg_container():
 
 @pytest.fixture(scope="session")
 def e2e_meili_container():
+    from datetime import timedelta
+
     from testcontainers.core.container import DockerContainer
-    from testcontainers.core.waiting_utils import wait_for_logs
+    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
     container = (
         DockerContainer("getmeili/meilisearch:v1.11")
         .with_env("MEILI_MASTER_KEY", "e2e-meili-key")
         .with_env("MEILI_ENV", "development")
         .with_exposed_ports(7700)
+        .waiting_for(
+            LogMessageWaitStrategy("Server listening").with_startup_timeout(
+                timedelta(seconds=30)
+            )
+        )
     )
     container.start()
-    wait_for_logs(container, "Server listening", timeout=30)
     try:
         yield container
     finally:
