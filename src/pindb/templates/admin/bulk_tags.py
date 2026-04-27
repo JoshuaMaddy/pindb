@@ -34,7 +34,7 @@ def bulk_tags_page(
                     ]
                 ),
                 page_heading(icon="tags", text="Bulk tags"),
-                p(class_="text-pin-base-300 text-sm max-w-2xl")[
+                p(class_="text-lightest text-sm max-w-2xl")[
                     'Paste JSON or upload a .json file. The payload must be either a single Tag or an object with a "tags" key: a list of tag trees (name, category, aliases, implications). '
                     "Existing tags are merged; new implications propagate to pins like the tag editor."
                 ],
@@ -48,9 +48,9 @@ def bulk_tags_page(
                     p(class_="font-semibold")["Import completed."],
                     p["Root tag IDs: ", str(result.get("root_tag_ids", []))],
                     p["Touched tag IDs: ", str(result.get("touched_tag_ids", []))],
-                    pre(
-                        class_="mt-2 text-xs bg-pin-base-900/50 p-2 rounded overflow-x-auto"
-                    )[json.dumps(result, indent=2, ensure_ascii=False)],
+                    pre(class_="mt-2 text-xs bg-darker p-2 rounded overflow-x-auto")[
+                        json.dumps(result, indent=2, ensure_ascii=False)
+                    ],
                 ],
                 form(
                     method="post",

@@ -11,7 +11,6 @@
 
   const REF = window.BULK_REF;
 
-
   const BULK_STORAGE_KEY = "bulk_persist";
   const bulkNavType =
     (performance.getEntriesByType("navigation")[0] || {}).type || "navigate";
@@ -77,7 +76,11 @@
         if (item.type.startsWith("image/")) {
           const file = item.getAsFile();
           if (!file) continue;
-          uploadImage(_hoveredImageDropCell.rowId, _hoveredImageDropCell.side, file);
+          uploadImage(
+            _hoveredImageDropCell.rowId,
+            _hoveredImageDropCell.side,
+            file,
+          );
           e.preventDefault();
           break;
         }
@@ -181,7 +184,7 @@
 
     const tr = document.createElement("tr");
     tr.id = id;
-    tr.className = "bulk-data-row border-b border-pin-border";
+    tr.className = "bulk-data-row border-b border-lightest";
     tr.dataset.rowId = id;
     tr.innerHTML = buildRowHTML(id);
     tbody.appendChild(tr);
@@ -236,7 +239,7 @@
           data-col-type="front_image"
           style="width:88px;min-width:88px;">
         <div class="image-drop-cell" data-row="${id}" data-side="front"
-             style="width:72px;height:72px;border:2px dashed var(--color-pin-border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
+             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
           Front
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="front"
@@ -249,7 +252,7 @@
       <!-- Back image -->
       <td class="bulk-td relative" data-col-type="back_image">
         <div class="image-drop-cell" data-row="${id}" data-side="back"
-             style="width:72px;height:72px;border:2px dashed var(--color-pin-border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
+             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
           Back
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="back"
@@ -334,12 +337,12 @@
 
       <!-- Width (optional) -->
       <td class="bulk-td copyable-cell" data-col="width" data-col-type="width">
-        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="width" pattern="${window.BULK_REF.magnitudeInputPattern || ''}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
+        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="width" pattern="${window.BULK_REF.magnitudeInputPattern || ""}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
       </td>
 
       <!-- Height (optional) -->
       <td class="bulk-td copyable-cell" data-col="height" data-col-type="height">
-        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="height" pattern="${window.BULK_REF.magnitudeInputPattern || ''}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
+        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="height" pattern="${window.BULK_REF.magnitudeInputPattern || ""}" autocomplete="off" placeholder="e.g. 40mm or 1.5in">
       </td>
 
       <!-- Links (optional) -->
@@ -387,7 +390,10 @@
     ];
     const noResultsRender = {
       no_results: (data) => {
-        const msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search…";
+        const msg =
+          data.input && data.input.length > 0
+            ? "No results found"
+            : "Start typing to search…";
         return `<div class="no-results">${msg}</div>`;
       },
     };
@@ -502,14 +508,18 @@
         `input[type="file"][data-side="${side}"]`,
       );
       box.addEventListener("click", () => fileInput.click());
-      box.addEventListener("mouseenter", () => { _hoveredImageDropCell = { rowId, side }; });
-      box.addEventListener("mouseleave", () => { _hoveredImageDropCell = null; });
+      box.addEventListener("mouseenter", () => {
+        _hoveredImageDropCell = { rowId, side };
+      });
+      box.addEventListener("mouseleave", () => {
+        _hoveredImageDropCell = null;
+      });
       box.addEventListener("dragover", (e) => {
         e.preventDefault();
         box.style.borderColor = "var(--color-accent)";
       });
       box.addEventListener("dragleave", () => {
-        box.style.borderColor = "var(--color-pin-border)";
+        box.style.borderColor = "var(--color-lightest)";
       });
       box.addEventListener("drop", (e) => {
         e.preventDefault();
@@ -559,9 +569,9 @@
 
     // Apply has-clipboard to new row's cells if clipboard is active
     if (cellClipboard) {
-      tr.querySelectorAll(`.copyable-cell[data-col-type="${cellClipboard.type}"]`).forEach(
-        (td) => td.classList.add("has-clipboard"),
-      );
+      tr.querySelectorAll(
+        `.copyable-cell[data-col-type="${cellClipboard.type}"]`,
+      ).forEach((td) => td.classList.add("has-clipboard"));
     }
 
     // Re-apply column visibility to new cells
@@ -603,7 +613,9 @@
         const item = typeof opt === "object" ? opt : { value: opt, text: opt };
         if (!instance.options[item.value]) instance.addOption(item);
       });
-      instance.addItems(opts.map((opt) => (typeof opt === "object" ? opt.value : opt)));
+      instance.addItems(
+        opts.map((opt) => (typeof opt === "object" ? opt.value : opt)),
+      );
     };
     prefillMulti(ts.shops, prefill.shop_options ?? prefill.shop_names);
     prefillMulti(ts.tags, prefill.tag_options ?? prefill.tag_names);
@@ -694,7 +706,7 @@
 
     const subTr = document.createElement("tr");
     subTr.id = `${rowId}-grades`;
-    subTr.className = "grades-sub-row bg-pin-main/50";
+    subTr.className = "grades-sub-row bg-main/50";
 
     const gradesJson = JSON.stringify(existing).replace(/'/g, "\\'");
 
@@ -788,7 +800,7 @@
 
     const subTr = document.createElement("tr");
     subTr.id = `${rowId}-links`;
-    subTr.className = "links-sub-row bg-pin-main/50";
+    subTr.className = "links-sub-row bg-main/50";
 
     subTr.innerHTML = `
       <td colspan="${colCount}" style="padding: 0;">
@@ -1020,7 +1032,8 @@
             const text = typeof item === "object" ? item.text : item;
             if (!instance.options[val]) {
               const newOpt = { value: val, text };
-              if (typeof item === "object" && item.category) newOpt.category = item.category;
+              if (typeof item === "object" && item.category)
+                newOpt.category = item.category;
               instance.addOption(newOpt);
             }
             instance.addItem(val, true);
@@ -1269,7 +1282,7 @@
         const card = document.createElement("a");
         card.href = `/get/pin/${r.pin_id}`;
         card.className =
-          "flex flex-col gap-1 items-center border border-pin-border rounded-lg p-2 hover:border-accent no-underline text-pin-base-text text-center";
+          "flex flex-col gap-1 items-center border border-lightest rounded-lg p-2 hover:border-accent no-underline text-pin-base-text text-center";
         card.innerHTML = `
           <div style="width:100%;aspect-ratio:1;background:url('/get/image/${r.front_image_guid}?thumbnail=true') center/cover no-repeat;border-radius:6px;"></div>
           <span class="text-xs truncate w-full text-center">${escHtml(r.pin_name || "")}</span>
@@ -1319,7 +1332,13 @@
    * When a user creates a new option in one row's TS instance, broadcast it to
    * all other existing instances of the same entity type so they can find it.
    */
-  function broadcastLocalOption(entityType, value, item, sourceRowId, sourceField) {
+  function broadcastLocalOption(
+    entityType,
+    value,
+    item,
+    sourceRowId,
+    sourceField,
+  ) {
     const fieldByType = {
       shop: "shops",
       tag: "tags",

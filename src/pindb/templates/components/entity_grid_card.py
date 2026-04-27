@@ -49,7 +49,7 @@ def entity_grid_card(
 
     return a(
         href=href,
-        class_=f"no-underline text-pin-base-text rounded-xl overflow-clip bg-pin-main {'max-md:overflow-visible' if allow_overflow else ''} "
+        class_=f"no-underline text-pin-base-text rounded-xl overflow-clip bg-main {'max-md:overflow-visible' if allow_overflow else ''} "
         "border border-pin-base-350 hover:scale-[102%] hover:border-accent flex flex-col relative",
     )[
         div(

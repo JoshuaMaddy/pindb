@@ -63,7 +63,7 @@ def _create_form(request: Request) -> Element:
             ),
             button(
                 type="submit",
-                class_="self-start px-4 py-1 rounded-lg bg-pin-main hover:bg-pin-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+                class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
             )["Create Set"],
         ],
     ]

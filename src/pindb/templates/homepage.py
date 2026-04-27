@@ -86,7 +86,7 @@ def _homepage_center(request: Request) -> Element:
                 class_="flex flex-col gap-2",
             )[
                 div(
-                    class_="p-4 rounded-3xl bg-pin-base-400 flex items-center justify-center"
+                    class_="p-4 rounded-3xl bg-lighter flex items-center justify-center"
                 )[
                     input(
                         type="text",

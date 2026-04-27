@@ -116,7 +116,13 @@ function contrastRatio(a, b) {
   return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
 }
 
-const CHROME = ["pin-main", "pin-main-hover", "pin-base-550", "pin-base-500", "pin-base-450"];
+const CHROME = [
+  "main",
+  "main-hover",
+  "pin-base-550",
+  "pin-base-500",
+  "pin-base-450",
+];
 const FG = [
   "pin-base-text",
   "pin-base-100",
@@ -196,7 +202,10 @@ const variants = parseVariants(css);
 const mochaRaw = parsePinColorDeclarations(themeBlock);
 const themes = [{ name: "mocha", raw: mochaRaw }];
 for (const { name, body } of variants) {
-  themes.push({ name, raw: { ...mochaRaw, ...parsePinColorDeclarations(body) } });
+  themes.push({
+    name,
+    raw: { ...mochaRaw, ...parsePinColorDeclarations(body) },
+  });
 }
 
 for (const { name, raw } of themes) {

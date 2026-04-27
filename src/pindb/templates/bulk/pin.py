@@ -107,7 +107,7 @@ def bulk_pin_page(
                             <i data-lucide="columns-3" aria-hidden="true"></i> Columns
                         </button>
                         <div x-show="open" @click.outside="open = false"
-                             class="absolute right-0 top-full mt-1 z-50 bg-pin-main border border-pin-border rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
+                             class="absolute right-0 top-full mt-1 z-50 bg-main border border-lightest rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
                             {
                             "".join(
                                 f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
@@ -137,11 +137,11 @@ def bulk_pin_page(
                     hr,
                     # Scrollable table container
                     div(
-                        class_="overflow-x-auto overflow-y-clip rounded-lg border border-pin-border"
+                        class_="overflow-x-auto overflow-y-clip rounded-lg border border-lightest"
                     )[
                         table(class_="bulk-table w-full border-collapse text-sm")[
                             thead[
-                                tr(class_="border-b border-pin-border")[
+                                tr(class_="border-b border-lightest")[
                                     th(
                                         class_="bulk-th bulk-sticky-left bulk-sticky-col-0 w-8"
                                     )[
@@ -251,7 +251,7 @@ def bulk_pin_page(
                 class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60",
             )[
                 div(
-                    class_="bg-pin-main border border-pin-border rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
+                    class_="bg-main border border-lightest rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
                 )[
                     div(class_="flex items-center justify-between")[
                         h1(id="modal-title", class_="text-lg font-bold sm:text-xl")[

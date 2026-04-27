@@ -47,7 +47,7 @@ window.addEventListener("load", function () {
     button.remove();
   }
   */
- 
+
   // -------------------------------
   // Tom Select Initialization
   // -------------------------------
@@ -56,7 +56,10 @@ window.addEventListener("load", function () {
 
   const _noResultsRender = {
     no_results: (data) => {
-      const msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search…";
+      const msg =
+        data.input && data.input.length > 0
+          ? "No results found"
+          : "Start typing to search…";
       return `<div class="no-results">${msg}</div>`;
     },
   };
@@ -133,21 +136,25 @@ window.addEventListener("load", function () {
       if (input.files[0]) showPreview(box, input.files[0]);
     });
 
-    box.addEventListener("mouseenter", () => { _hoveredImageBox = { box, input }; });
-    box.addEventListener("mouseleave", () => { _hoveredImageBox = null; });
+    box.addEventListener("mouseenter", () => {
+      _hoveredImageBox = { box, input };
+    });
+    box.addEventListener("mouseleave", () => {
+      _hoveredImageBox = null;
+    });
 
     box.addEventListener("dragover", (e) => {
       e.preventDefault();
-      box.classList.replace("border-pin-border", "border-accent");
+      box.classList.replace("border-lightest", "border-accent");
     });
 
     box.addEventListener("dragleave", () => {
-      box.classList.replace("border-accent", "border-pin-border");
+      box.classList.replace("border-accent", "border-lightest");
     });
 
     box.addEventListener("drop", (e) => {
       e.preventDefault();
-      box.classList.remove("border-pin-border");
+      box.classList.remove("border-lightest");
       box.classList.add("border-accent");
 
       const file = e.dataTransfer.files[0];
@@ -197,11 +204,7 @@ window.addEventListener("load", function () {
   const limitedEditionNo = document.getElementById("limited_edition_no");
 
   if (limitedEditionCheckbox && limitedEditionYes && limitedEditionNo) {
-    const limitedEditionSelected = [
-      "bg-pin-main",
-      "border-accent",
-      "text-accent",
-    ];
+    const limitedEditionSelected = ["bg-main", "border-accent", "text-accent"];
 
     limitedEditionYes.addEventListener("click", (e) => {
       e.preventDefault();

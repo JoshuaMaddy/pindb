@@ -243,8 +243,8 @@ def settings_section(
                                 label(
                                     class_=(
                                         "flex items-center gap-2 px-3 py-2 rounded-lg border"
-                                        " cursor-pointer border-pin-border"
-                                        " hover:border-pin-border-hover"
+                                        " cursor-pointer border-lightest"
+                                        " hover:border-lightest-hover"
                                         " has-[:checked]:border-accent"
                                         " has-[:checked]:bg-pin-base-450"
                                     ),
@@ -301,8 +301,8 @@ def settings_section(
                             label(
                                 class_=(
                                     "flex items-center gap-2 px-3 py-2 rounded-lg border"
-                                    " cursor-pointer border-pin-border"
-                                    " hover:border-pin-border-hover"
+                                    " cursor-pointer border-lightest"
+                                    " hover:border-lightest-hover"
                                     " has-[:checked]:border-accent"
                                     " has-[:checked]:bg-pin-base-450"
                                 ),

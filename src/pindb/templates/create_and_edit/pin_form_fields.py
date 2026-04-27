@@ -85,7 +85,7 @@ def _optional_fields(
 def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         div(
-            class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-pin-border rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
+            class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
             data_input_id="front_image",
             id="front_image_preview",
             style=f"background-image: url(/get/image/{pin.front_image_guid})"
@@ -111,7 +111,7 @@ def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
 def _back_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         div(
-            class_="image-drop w-full flex flex-col gap-1 aspect-square justify-center items-center border-2 border-pin-border rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
+            class_="image-drop w-full flex flex-col gap-1 aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
             data_input_id="back_image",
             id="back_image_preview",
             style=f"background-image: url(/get/image/{pin.back_image_guid})"
@@ -414,7 +414,7 @@ def _unauthorized_copy_pins_input(
 
 
 def _limited_edition_input(*, pin: Pin | None) -> list[Element | VoidElement]:
-    selected_classes = "bg-pin-main border-accent text-accent grow"
+    selected_classes = "bg-main border-accent text-accent grow"
     yes_selected = pin is not None and pin.limited_edition is True
     no_selected = pin is not None and pin.limited_edition is False
     limited_edition_input_kwargs: dict[str, object] = {

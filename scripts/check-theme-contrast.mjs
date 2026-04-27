@@ -18,8 +18,8 @@ function belowMin(ratio, min) {
 
 /** Surfaces that commonly sit behind body copy or controls. */
 const SURFACE_KEYS = [
-  "pin-main",
-  "pin-main-hover",
+  "main",
+  "main-hover",
   "pin-base-550",
   "pin-base-500",
   "pin-base-450",
@@ -59,9 +59,14 @@ function contrastChecks() {
     process.exit(1);
   }
   const out = [];
-  const shell = ["pin-main", "pin-base-500", "pin-base-550"];
-  const controlSurfaces = ["pin-main-hover", "pin-base-450"];
-  const strongText = ["pin-base-text", "pin-base-100", "pin-base-150", "pin-base-200"];
+  const shell = ["main", "pin-base-500", "pin-base-550"];
+  const controlSurfaces = ["main-hover", "pin-base-450"];
+  const strongText = [
+    "pin-base-text",
+    "pin-base-100",
+    "pin-base-150",
+    "pin-base-200",
+  ];
   for (const bg of shell) {
     for (const fg of TEXT_KEYS) {
       out.push({ bg, fg, min: MIN_RATIO });
@@ -104,7 +109,10 @@ function parseVariants(css) {
   let m;
   while ((m = re.exec(search)) !== null) {
     const name = m[1];
-    const open = layerIdx >= 0 ? layerIdx + m.index + m[0].length - 1 : m.index + m[0].length - 1;
+    const open =
+      layerIdx >= 0
+        ? layerIdx + m.index + m[0].length - 1
+        : m.index + m[0].length - 1;
     const body = extractBalancedBlock(css, open);
     if (body) out.push({ name, body });
   }
@@ -148,9 +156,13 @@ function parseHslToRgb(raw) {
 
   const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat;
   const p = 2 * light - q;
-  const r = Math.round(Math.min(255, Math.max(0, hue2rgb(p, q, h + 1 / 3) * 255)));
+  const r = Math.round(
+    Math.min(255, Math.max(0, hue2rgb(p, q, h + 1 / 3) * 255)),
+  );
   const g = Math.round(Math.min(255, Math.max(0, hue2rgb(p, q, h) * 255)));
-  const b = Math.round(Math.min(255, Math.max(0, hue2rgb(p, q, h - 1 / 3) * 255)));
+  const b = Math.round(
+    Math.min(255, Math.max(0, hue2rgb(p, q, h - 1 / 3) * 255)),
+  );
   return [r, g, b];
 }
 
@@ -230,12 +242,26 @@ function main() {
     for (const { bg: bgKey, fg: fgKey, min } of checks) {
       const bg = rgbForToken(resolved, bgKey);
       if ("error" in bg) {
-        failures.push({ theme: name, bg: bgKey, fg: fgKey, ratio: null, err: bg.error, min });
+        failures.push({
+          theme: name,
+          bg: bgKey,
+          fg: fgKey,
+          ratio: null,
+          err: bg.error,
+          min,
+        });
         continue;
       }
       const fg = rgbForToken(resolved, fgKey);
       if ("error" in fg) {
-        failures.push({ theme: name, bg: bgKey, fg: fgKey, ratio: null, err: fg.error, min });
+        failures.push({
+          theme: name,
+          bg: bgKey,
+          fg: fgKey,
+          ratio: null,
+          err: fg.error,
+          min,
+        });
         continue;
       }
       const ratio = contrastRatio(bg.rgb, fg.rgb);
@@ -260,7 +286,9 @@ function main() {
       if (f.err) {
         console.error(`  ${f.theme}: ${f.bg} vs ${f.fg} — ${f.err}`);
       } else {
-        console.error(`  ${f.theme}: ${f.fg} on ${f.bg} → ${f.ratio}:1 (need ${f.min}:1)`);
+        console.error(
+          `  ${f.theme}: ${f.fg} on ${f.bg} → ${f.ratio}:1 (need ${f.min}:1)`,
+        );
       }
     }
     process.exit(1);

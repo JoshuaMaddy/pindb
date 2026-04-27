@@ -122,7 +122,7 @@ def _add_to_set_panel(
                     if not user_sets
                     else request.url_for("get_me")
                 ),
-                class_="text-sm text-pin-base-100 no-underline mt-1 pt-1 border-t border-pin-base-400 hover:text-accent",
+                class_="text-sm text-pin-base-text no-underline mt-1 pt-1 border-t border-pin-base-400 hover:text-accent",
             )["+ Create a set" if not user_sets else "+ Manage sets"],
         ],
     )

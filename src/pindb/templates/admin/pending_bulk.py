@@ -30,9 +30,9 @@ def _bulk_groups_section(*, bulk_groups: Sequence[BulkGroupView]) -> Element:
         div(class_="flex items-baseline gap-2")[
             i(data_lucide="layers", class_="inline-block w-4 h-4"),
             h2["Bulk Bundles"],
-            span(
-                class_="text-xs font-semibold px-2 py-0.5 rounded bg-pin-base-700 text-pin-base-300"
-            )[str(len(bulk_groups))],
+            span(class_="text-xs font-semibold px-2 py-0.5 rounded")[
+                str(len(bulk_groups))
+            ],
         ],
         div(class_="flex flex-col gap-3")[
             [_bulk_group_card(group=group) for group in bulk_groups]
@@ -60,26 +60,22 @@ def _bulk_group_card(*, group: BulkGroupView) -> Element:
     reject_url = f"/admin/pending/reject-bulk/{group.bulk_id}"
     delete_url = f"/admin/pending/delete-bulk/{group.bulk_id}"
 
-    return div(
-        class_="rounded border border-pin-border bg-pin-base-600 p-4 flex flex-col gap-3"
-    )[
+    return div(class_="rounded border border-lightest p-4 flex flex-col gap-3")[
         div(class_="flex items-center gap-2 flex-wrap")[
             i(data_lucide="layers", class_="inline-block w-4 h-4"),
             h3(class_="font-semibold")[f"Bulk {kind}"],
-            span(class_="text-xs text-pin-base-300")[f"({summary})"],
-            span(class_="text-xs text-pin-base-400 ml-auto font-mono")[
-                str(group.bulk_id)
-            ],
+            span(class_="text-xs")[f"({summary})"],
+            span(class_="text-xs ml-auto font-mono")[str(group.bulk_id)],
         ],
         group.entities
         and div(class_="flex flex-col gap-1")[
-            span(class_="text-xs text-pin-base-300")["New items"],
+            span(class_="text-xs")["New items"],
             *[
                 div(class_="flex items-baseline gap-2 text-sm")[
-                    span(class_="text-pin-base-400 w-20")[entity_type_slug],
+                    span(class_="text-lighter w-20")[entity_type_slug],
                     a(
                         href=f"/get/{entity_type_slug}/{entity.id}",
-                        class_="hover:text-accent",
+                        class_="text-lightest hover:text-lightest",
                     )[getattr(entity, "name", f"#{entity.id}")],
                 ]
                 for entity_type_slug, entity in group.entities
@@ -87,7 +83,7 @@ def _bulk_group_card(*, group: BulkGroupView) -> Element:
         ],
         group.edits
         and div(class_="flex flex-col gap-1")[
-            span(class_="text-xs text-pin-base-300")["Edits"],
+            span(class_="text-xs")["Edits"],
             *[
                 _bulk_edit_row(
                     table_name=table_name,

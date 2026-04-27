@@ -41,16 +41,14 @@ def _pending_section(request: Request, pending_count: int) -> Element:
             class_="text-xs font-semibold px-2 py-0.5 rounded bg-amber-700 text-amber-100"
         )[str(pending_count)]
         if pending_count > 0
-        else span(
-            class_="text-xs font-semibold px-2 py-0.5 rounded bg-pin-base-700 text-pin-base-300"
-        )["0"]
+        else span(class_="text-xs font-semibold px-2 py-0.5 rounded")["0"]
     )
     return div(class_="flex flex-col gap-2")[
         div(class_="flex items-baseline gap-2")[
             page_heading(icon="clock", text="Pending Approvals", level=2),
             badge,
         ],
-        p(class_="text-pin-base-300 text-sm")[
+        p(class_="text-sm")[
             "Review entries submitted by editors that are awaiting admin approval."
         ],
         a(
@@ -74,7 +72,7 @@ def _users_section(request: Request) -> Element:
             text="User Management",
             level=2,
         ),
-        p(class_="text-pin-base-300 text-sm")["Promote or demote users to/from admin."],
+        p(class_="text-sm")["Promote or demote users to/from admin."],
         a(
             href=str(request.url_for("get_admin_users")),
             class_="btn btn-primary w-fit",
@@ -96,7 +94,7 @@ def _tags_bulk_section(request: Request) -> Element:
             text="Bulk tags",
             level=2,
         ),
-        p(class_="text-pin-base-300 text-sm")[
+        p(class_="text-sm")[
             "Paste or upload JSON to merge or create tag trees (aliases and implications)."
         ],
         a(
@@ -120,7 +118,7 @@ def _search_section() -> Element:
             text="Search Index",
             level=2,
         ),
-        p(class_="text-pin-base-300 text-sm")[
+        p(class_="text-sm")[
             "Synchronize the Meilisearch index with the current database state. "
             "This re-indexes all pins and removes stale entries."
         ],

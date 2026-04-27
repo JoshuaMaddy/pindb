@@ -70,7 +70,7 @@ def html_base(
     request: Request | None = None,
 ):
     theme: str = getattr(request.state, "theme", "mocha") if request else "mocha"
-    return html(lang="en", class_=f"{theme} bg-pin-base-550")[
+    return html(lang="en", class_=f"{theme} bg-darker")[
         head[
             meta(charset="UTF-8"),
             meta(name="viewport", content="width=device-width, initial-scale=1.0"),

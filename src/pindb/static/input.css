@@ -20,24 +20,24 @@
 @custom-variant hc-light (&:where(.hc-light, .hc-light *));
 
 @theme {
-  --color-cat-rosewater: hsl(10deg, 56%, 91%);
-  --color-cat-sky: hsl(189deg, 71%, 73%);
-  --color-pin-base-text: hsl(226deg, 64%, 88%);
-  --color-pin-base-100: hsl(227deg, 35%, 80%);
-  --color-pin-base-150: hsl(228deg, 24%, 72%);
-  --color-pin-base-200: hsl(228deg, 17%, 68%);
-  --color-pin-base-250: hsl(230deg, 13%, 63%);
   --color-pin-base-300: hsl(231deg, 11%, 58%);
   --color-pin-base-350: hsl(233deg, 12%, 39%);
   --color-pin-base-400: hsl(234deg, 13%, 31%);
   --color-pin-base-450: hsl(237deg, 16%, 23%);
   --color-pin-base-500: hsl(240deg, 21%, 15%);
   --color-pin-base-550: hsl(240deg, 23%, 9%);
-  --color-pin-main: var(--color-pin-base-500);
-  --color-pin-main-hover: var(--color-pin-base-450);
-  --color-pin-border: var(--color-pin-base-400);
-  --color-pin-border-hover: var(--color-pin-base-350);
-  --color-accent: var(--color-cat-sky);
+  
+  --color-accent: hsl(189deg, 71%, 73%);
+  --color-base-text: hsl(226deg, 64%, 88%);
+  --color-accent-light: var(--color-accent)/20;
+  --color-darker: var(--color-pin-base-550);
+  --color-darker-hover: var(--color-pin-base-500);
+  --color-main: var(--color-pin-base-500);
+  --color-main-hover: var(--color-pin-base-450);
+  --color-lighter: var(--color-pin-base-450);
+  --color-lighter-hover: var(--color-pin-base-400);
+  --color-lightest: var(--color-pin-base-350);
+  --color-lightest-hover: var(--color-pin-base-300);
 
   /* Tag category badge colors (dark/mocha defaults) */
   --color-tag-general: hsl(220, 9%, 28%);
@@ -76,9 +76,8 @@
   :root,
   :host {
     @variant macchiato {
-      --color-cat-rosewater: hsl(10deg, 58%, 90%);
-      --color-cat-sky: hsl(189deg, 59%, 73%);
-      --color-pin-base-text: hsl(227deg, 68%, 88%);
+      --color-accent: hsl(189deg, 59%, 73%);
+      --color-base-text: hsl(227deg, 68%, 88%);
       --color-pin-base-100: hsl(228deg, 39%, 80%);
       --color-pin-base-150: hsl(228deg, 24%, 72%);
       --color-pin-base-200: hsl(228deg, 20%, 70%);
@@ -124,9 +123,8 @@
     }
 
     @variant frappe {
-      --color-cat-rosewater: hsl(10deg, 57%, 88%);
-      --color-cat-sky: hsl(189deg, 48%, 73%);
-      --color-pin-base-text: hsl(227deg, 70%, 87%);
+      --color-accent: hsl(189deg, 48%, 73%);
+      --color-base-text: hsl(227deg, 70%, 87%);
       --color-pin-base-100: hsl(227deg, 44%, 83%);
       --color-pin-base-150: hsl(228deg, 29%, 79%);
       --color-pin-base-200: hsl(227deg, 22%, 77%);
@@ -172,9 +170,8 @@
     }
 
     @variant latte {
-      --color-cat-rosewater: hsl(11deg, 59%, 67%);
-      --color-cat-sky: hsl(197deg, 97%, 46%);
-      --color-pin-base-text: hsl(234deg, 16%, 35%);
+      --color-accent: hsl(197deg, 97%, 46%);
+      --color-base-text: hsl(234deg, 16%, 35%);
       --color-pin-base-100: hsl(233deg, 13%, 36%);
       --color-pin-base-150: hsl(233deg, 10%, 39%);
       --color-pin-base-200: hsl(232deg, 10%, 41%);
@@ -189,9 +186,8 @@
 
     /* ── Dracula ────────────────────────────────────────────────────────── */
     @variant dracula {
-      --color-cat-rosewater: hsl(316deg, 100%, 74%); /* pink #ff79c6 */
-      --color-cat-sky: hsl(191deg, 97%, 77%); /* cyan #8be9fd */
-      --color-pin-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 fg */
+      --color-accent: hsl(191deg, 97%, 77%); /* cyan #8be9fd */
+      --color-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 fg */
       --color-pin-base-100: hsl(225deg, 22%, 84%);
       --color-pin-base-150: hsl(225deg, 24%, 75%);
       --color-pin-base-200: hsl(225deg, 25%, 74%);
@@ -206,9 +202,8 @@
 
     /* ── Monokai ────────────────────────────────────────────────────────── */
     @variant monokai {
-      --color-cat-rosewater: hsl(338deg, 94%, 56%); /* red #f92672 */
-      --color-cat-sky: hsl(80deg, 76%, 53%); /* green #a6e22e */
-      --color-pin-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 */
+      --color-accent: hsl(80deg, 76%, 53%); /* green #a6e22e */
+      --color-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 */
       --color-pin-base-100: hsl(55deg, 20%, 80%);
       --color-pin-base-150: hsl(50deg, 16%, 68%);
       --color-pin-base-200: hsl(46deg, 14%, 64%);
@@ -223,9 +218,8 @@
 
     /* ── Monokai Pro ────────────────────────────────────────────────────── */
     @variant monokai-pro {
-      --color-cat-rosewater: hsl(347deg, 100%, 69%); /* pink #ff6188 */
-      --color-cat-sky: hsl(188deg, 72%, 69%); /* cyan #78dce8 */
-      --color-pin-base-text: hsl(60deg, 60%, 98%); /* #fcfcfa */
+      --color-accent: hsl(188deg, 72%, 69%); /* cyan #78dce8 */
+      --color-base-text: hsl(60deg, 60%, 98%); /* #fcfcfa */
       --color-pin-base-100: hsl(285deg, 6%, 80%);
       --color-pin-base-150: hsl(285deg, 5%, 68%);
       --color-pin-base-200: hsl(290deg, 3%, 67%);
@@ -240,9 +234,8 @@
 
     /* ── Nord ───────────────────────────────────────────────────────────── */
     @variant nord {
-      --color-cat-rosewater: hsl(352deg, 37%, 57%); /* aurora red #bf616a */
-      --color-cat-sky: hsl(193deg, 43%, 68%); /* frost #88c0d0 */
-      --color-pin-base-text: hsl(219deg, 27%, 88%); /* nord4 #d8dee9 */
+      --color-accent: hsl(193deg, 43%, 68%); /* frost #88c0d0 */
+      --color-base-text: hsl(219deg, 27%, 88%); /* nord4 #d8dee9 */
       --color-pin-base-100: hsl(219deg, 25%, 78%);
       --color-pin-base-150: hsl(219deg, 22%, 72%);
       --color-pin-base-200: hsl(219deg, 18%, 69%);
@@ -257,9 +250,8 @@
 
     /* ── Nord Light ─────────────────────────────────────────────────────── */
     @variant nord-light {
-      --color-cat-rosewater: hsl(352deg, 37%, 57%); /* aurora red */
-      --color-cat-sky: hsl(213deg, 32%, 52%); /* nord10 #5e81ac */
-      --color-pin-base-text: hsl(220deg, 16%, 22%); /* nord0 dark text */
+      --color-accent: hsl(213deg, 32%, 52%); /* nord10 #5e81ac */
+      --color-base-text: hsl(220deg, 16%, 22%); /* nord0 dark text */
       --color-pin-base-100: hsl(222deg, 16%, 28%); /* nord1 */
       --color-pin-base-150: hsl(222deg, 17%, 31%); /* nord2 */
       --color-pin-base-200: hsl(220deg, 17%, 32%); /* nord3 */
@@ -274,9 +266,8 @@
 
     /* ── Gruvbox Dark Hard ──────────────────────────────────────────────── */
     @variant gruvbox-dark-hard {
-      --color-cat-rosewater: hsl(3deg, 72%, 45%); /* red #cc241d */
-      --color-cat-sky: hsl(107deg, 32%, 62%); /* bright aqua #8ec07c */
-      --color-pin-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-accent: hsl(107deg, 32%, 62%); /* bright aqua #8ec07c */
+      --color-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
       --color-pin-base-100: hsl(43deg, 40%, 72%);
       --color-pin-base-150: hsl(42deg, 26%, 63%);
       --color-pin-base-200: hsl(38deg, 16%, 61%);
@@ -291,9 +282,8 @@
 
     /* ── Gruvbox Dark ───────────────────────────────────────────────────── */
     @variant gruvbox-dark {
-      --color-cat-rosewater: hsl(3deg, 72%, 45%);
-      --color-cat-sky: hsl(107deg, 32%, 62%);
-      --color-pin-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
+      --color-accent: hsl(107deg, 32%, 62%);
+      --color-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
       --color-pin-base-100: hsl(43deg, 40%, 73%); /* #d5c4a1 */
       --color-pin-base-150: hsl(42deg, 26%, 66%); /* #bdae93 */
       --color-pin-base-200: hsl(38deg, 16%, 63%); /* #a89984 */
@@ -308,9 +298,8 @@
 
     /* ── Gruvbox Dark Soft ──────────────────────────────────────────────── */
     @variant gruvbox-dark-soft {
-      --color-cat-rosewater: hsl(3deg, 72%, 45%);
-      --color-cat-sky: hsl(107deg, 32%, 62%);
-      --color-pin-base-text: hsl(43deg, 59%, 81%);
+      --color-accent: hsl(107deg, 32%, 62%);
+      --color-base-text: hsl(43deg, 59%, 81%);
       --color-pin-base-100: hsl(43deg, 40%, 73%);
       --color-pin-base-150: hsl(42deg, 26%, 66%);
       --color-pin-base-200: hsl(38deg, 16%, 63%);
@@ -325,9 +314,8 @@
 
     /* ── Gruvbox Light Hard ─────────────────────────────────────────────── */
     @variant gruvbox-light-hard {
-      --color-cat-rosewater: hsl(0deg, 100%, 31%); /* dark red #9d0006 */
-      --color-cat-sky: hsl(184deg, 35%, 38%); /* teal #458588 */
-      --color-pin-base-text: hsl(12deg, 5%, 22%); /* #3c3836 */
+      --color-accent: hsl(184deg, 35%, 38%); /* teal #458588 */
+      --color-base-text: hsl(12deg, 5%, 22%); /* #3c3836 */
       --color-pin-base-100: hsl(11deg, 7%, 29%);
       --color-pin-base-150: hsl(21deg, 10%, 34%);
       --color-pin-base-200: hsl(21deg, 11%, 36%);
@@ -342,9 +330,8 @@
 
     /* ── Gruvbox Light ──────────────────────────────────────────────────── */
     @variant gruvbox-light {
-      --color-cat-rosewater: hsl(0deg, 100%, 31%);
-      --color-cat-sky: hsl(184deg, 35%, 38%);
-      --color-pin-base-text: hsl(12deg, 5%, 22%);
+      --color-accent: hsl(184deg, 35%, 38%);
+      --color-base-text: hsl(12deg, 5%, 22%);
       --color-pin-base-100: hsl(11deg, 7%, 29%);
       --color-pin-base-150: hsl(21deg, 10%, 34%);
       --color-pin-base-200: hsl(21deg, 11%, 36%);
@@ -359,9 +346,8 @@
 
     /* ── Gruvbox Light Soft ─────────────────────────────────────────────── */
     @variant gruvbox-light-soft {
-      --color-cat-rosewater: hsl(0deg, 100%, 31%);
-      --color-cat-sky: hsl(184deg, 35%, 38%);
-      --color-pin-base-text: hsl(12deg, 5%, 22%);
+      --color-accent: hsl(184deg, 35%, 38%);
+      --color-base-text: hsl(12deg, 5%, 22%);
       --color-pin-base-100: hsl(11deg, 7%, 29%);
       --color-pin-base-150: hsl(21deg, 10%, 33%);
       --color-pin-base-200: hsl(21deg, 11%, 36%);
@@ -376,9 +362,8 @@
 
     /* ── High contrast dark (WCAG-oriented neutrals + yellow accent) ───── */
     @variant hc-dark {
-      --color-cat-rosewater: hsl(51deg, 100%, 50%);
-      --color-cat-sky: hsl(51deg, 100%, 50%);
-      --color-pin-base-text: hsl(0deg, 0%, 100%);
+      --color-accent: hsl(51deg, 100%, 50%);
+      --color-base-text: hsl(0deg, 0%, 100%);
       --color-pin-base-100: hsl(0deg, 0%, 95%);
       --color-pin-base-150: hsl(0deg, 0%, 88%);
       --color-pin-base-200: hsl(0deg, 0%, 80%);
@@ -425,9 +410,8 @@
 
     /* ── High contrast light (near black on white + blue accent) ───────── */
     @variant hc-light {
-      --color-cat-rosewater: hsl(230deg, 100%, 28%);
-      --color-cat-sky: hsl(230deg, 100%, 28%);
-      --color-pin-base-text: hsl(0deg, 0%, 0%);
+      --color-accent: hsl(230deg, 100%, 28%);
+      --color-base-text: hsl(0deg, 0%, 0%);
       --color-pin-base-100: hsl(0deg, 0%, 12%);
       --color-pin-base-150: hsl(0deg, 0%, 18%);
       --color-pin-base-200: hsl(0deg, 0%, 24%);
@@ -476,11 +460,18 @@
   /* Shared light-theme tag colors (latte, nord-light, all gruvbox-light variants).
      Single block replaces five identical per-theme overrides; matches the
      `@variant` expansion (`&:where(.X, .X *)`) so cascade behavior is preserved. */
-  :where(.latte, .latte *,
-         .nord-light, .nord-light *,
-         .gruvbox-light-hard, .gruvbox-light-hard *,
-         .gruvbox-light, .gruvbox-light *,
-         .gruvbox-light-soft, .gruvbox-light-soft *) {
+  :where(
+    .latte,
+    .latte *,
+    .nord-light,
+    .nord-light *,
+    .gruvbox-light-hard,
+    .gruvbox-light-hard *,
+    .gruvbox-light,
+    .gruvbox-light *,
+    .gruvbox-light-soft,
+    .gruvbox-light-soft *
+  ) {
     --color-tag-general: hsl(220, 9%, 86%);
     --color-tag-general-fg: hsl(220, 9%, 32%);
     --color-tag-general-hover: hsl(220, 15%, 12%);
@@ -514,7 +505,7 @@
   }
 }
 
-/* Theme picker: solid moon + filled sun disc. Base `* { color: pin-base-text }` applies to
+/* Theme picker: solid moon + filled sun disc. Base `* { color: base-text }` applies to
    svg path/circle too, so shapes must inherit the wrapper span’s `text-amber-*` color. */
 @layer components {
   .theme-appearance-icon {
@@ -545,16 +536,16 @@
 
 @layer base {
   * {
-    @apply text-pin-base-text;
+    @apply text-base-text;
   }
 
   button,
   input[type="submit"] {
     @apply border 
-    border-pin-border 
-    hover:border-pin-border-hover 
-    bg-pin-main 
-    hover:bg-pin-main-hover 
+    border-lightest
+    hover:border-lightest-hover 
+    bg-main 
+    hover:bg-main-hover 
     px-2 
     py-1 
     rounded-lg 
@@ -567,8 +558,8 @@
   select,
   textarea {
     @apply border 
-    border-pin-border 
-    bg-pin-base-450 
+    border-lightest
+    bg-lighter 
     px-2 
     py-1 
     rounded-lg
@@ -578,7 +569,7 @@
   input:focus,
   select:focus,
   textarea:focus {
-    @apply bg-pin-base-400;
+    @apply bg-lightest;
   }
 
   a {
@@ -616,9 +607,9 @@
   box-shadow: none;
   text-shadow: none;
   @apply rounded-lg 
-  text-pin-base-text 
-  border-pin-border 
-  bg-pin-base-450;
+  text-base-text 
+  bg-lighter
+  border-lightest;
 }
 
 .ts-wrapper.plugin-remove_button:not(.rtl) .item.active .remove {
@@ -635,8 +626,8 @@
   text-shadow: none;
   @apply rounded-lg 
   text-black 
-  border-pin-border 
-  bg-pin-base-450
+  bg-lighter
+  border-lightest 
   items-center 
   m-0;
 }
@@ -650,8 +641,8 @@
 .ts-control {
   box-shadow: none;
   @apply border 
-  border-pin-border 
-  bg-pin-base-400 
+  bg-lighter 
+  border-lightest 
   px-2 
   py-1 
   rounded-lg;
@@ -659,8 +650,8 @@
 
 .ts-dropdown {
   @apply border 
-  border-pin-border
-  bg-pin-base-450 
+  bg-lighter
+  border-lightest
   rounded-lg 
   shadow-lg 
   overflow-clip;
@@ -670,18 +661,18 @@
 .ts-wrapper.single .ts-control,
 .ts-control,
 .ts-wrapper.single.input-active .ts-control {
-  @apply border-pin-border bg-pin-base-450;
+  @apply border-lightest bg-lighter;
 }
 
 .ts-dropdown * {
-  @apply bg-pin-base-450 text-pin-base-text;
+  @apply bg-lighter text-base-text;
 }
 
 .ts-dropdown *.active,
 .ts-dropdown *.active.create,
 .ts-dropdown *.active > *,
 .ts-dropdown *.active.create > * {
-  @apply bg-pin-base-400 text-pin-base-text;
+  @apply bg-lighter-hover text-base-text;
 }
 
 .ts-wrapper.plugin-remove_button:not(.rtl) .item .remove,
@@ -693,13 +684,13 @@
 .ts-control,
 .ts-control input,
 .ts-dropdown {
-  @apply text-pin-base-text;
+  @apply text-base-text;
 }
 
 /** Tag category chips (Tom Select multi-select items) **/
 
 /* Force children of category chips to inherit color.
-   Needed because @layer base { * { color: pin-base-text } } explicitly sets
+   Needed because @layer base { * { color: base-text } } explicitly sets
    color on every element — explicit beats inherited regardless of specificity.
    Unlayered rules beat @layer rules, so this wins without !important. */
 .ts-wrapper.multi .ts-control [data-value][data-category] *,
@@ -778,11 +769,11 @@
 }
 
 .bulk-th {
-  @apply px-2 py-2 text-left text-xs font-semibold text-pin-base-200 border-b border-pin-border whitespace-nowrap sticky top-0 bg-pin-base-500 z-10;
+  @apply px-2 py-2 text-left text-xs font-semibold border-b border-lighter whitespace-nowrap sticky top-0 bg-main z-10;
 }
 
 .bulk-td {
-  @apply px-2 py-1 align-middle border-b border-pin-border/50;
+  @apply px-2 py-1 align-middle border-b border-lighter/50;
 }
 
 .bulk-data-row {
@@ -795,15 +786,15 @@
 }
 
 .bulk-input {
-  @apply border border-pin-border bg-pin-base-450 px-2 py-1 rounded-lg text-sm;
+  @apply border border-lightest bg-lighter px-2 py-1 rounded-lg text-sm;
 }
 
 .bulk-data-row:hover > td {
-  @apply bg-pin-base-500/60;
+  @apply bg-main/60;
 }
 
 .row-error {
-  border-left: 3px solid theme("colors.red.500");
+  @apply border-l-2 border-red-500;
 }
 
 .row-error > td {
@@ -812,21 +803,17 @@
 
 /* Copy / Paste buttons */
 .cell-copy-btn {
-  position: absolute;
   top: 3px;
   right: 20px; /* offset left of paste so they don't overlap */
-  z-index: 1;
-  @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-pin-base-400;
   line-height: 1;
+  @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-lighter-hover z-1 absolute;
 }
 
 .cell-paste-btn {
-  position: absolute;
   top: 3px;
   right: 3px;
-  z-index: 1;
-  @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-pin-base-400;
   line-height: 1;
+  @apply opacity-0 p-0.5 rounded border-0 bg-transparent hover:bg-lighter-hover z-1 absolute;
 }
 
 .cell-copy-btn svg,
@@ -841,7 +828,7 @@
 
 /* Hover: paste grayed (no clipboard) or full (clipboard match) */
 .copyable-cell:hover .cell-paste-btn {
-  @apply opacity-20 text-pin-base-200;
+  @apply opacity-20 text-base-text;
 }
 
 .copyable-cell.has-clipboard:hover .cell-paste-btn {
@@ -854,30 +841,27 @@
 
 /* Sticky left columns — pure CSS, no JS measurement */
 .bulk-sticky-left {
-  z-index: 20; /* above regular sticky-top TH (z-10) */
+  @apply z-20;
 }
 
 /* Column position classes — applied to both TH and TD */
 .bulk-sticky-col-0 {
-  position: sticky;
-  left: 0;
+  @apply sticky left-0;
 }
 .bulk-sticky-col-1 {
-  position: sticky;
-  left: 2rem;
+  @apply sticky left-8;
 } /* 32px = w-8 (checkbox width) */
 .bulk-sticky-col-2 {
-  position: sticky;
-  left: 120px;
+  @apply sticky left-30;
 } /* 32px + 88px (checkbox + front image) */
 
 .bulk-sticky-td {
   z-index: 5;
-  @apply bg-pin-main; /* solid bg prevents bleed-through on horizontal scroll */
+  @apply bg-main; /* solid bg prevents bleed-through on horizontal scroll */
 }
 
 .bulk-data-row:hover > .bulk-sticky-td {
-  @apply bg-pin-base-500;
+  @apply bg-main;
 }
 
 /* Header paste-all button */
@@ -886,7 +870,7 @@
   top: 50%;
   right: 3px;
   transform: translateY(-50%);
-  @apply p-0.5 rounded border-0 bg-transparent hover:bg-pin-base-400 text-accent;
+  @apply p-0.5 rounded border-0 bg-transparent hover:bg-lighter text-accent;
   line-height: 1;
 }
 
@@ -897,7 +881,7 @@
 
 /* Small icon-only action buttons */
 .icon-btn {
-  @apply p-1 border-0 bg-transparent hover:bg-pin-base-400 rounded;
+  @apply p-1 border-0 bg-transparent hover:bg-lighter rounded;
   line-height: 1;
 }
 
@@ -909,7 +893,7 @@
 /* Grades / links sub-rows */
 .grades-sub-row td,
 .links-sub-row td {
-  @apply border-b border-pin-border;
+  @apply border-b border-lightest;
 }
 
 /* Alpine x-cloak: hide elements until Alpine initialises */
@@ -959,10 +943,7 @@
   margin-bottom: 0.25rem;
 }
 .markdown-content blockquote {
-  border-left: 3px solid var(--color-pin-base-350);
-  padding-left: 1rem;
-  margin: 0.75rem 0;
-  color: var(--color-pin-base-200);
+  @apply text-base-text border-l-2 border-lightest pl-4 mt-2;
 }
 .markdown-content a {
   @apply underline text-accent;
@@ -970,32 +951,32 @@
 
 /* ── Doc page: prose plugin theme overrides ───────────────────────────────── */
 .doc-content {
-  --tw-prose-body: var(--color-pin-base-100);
-  --tw-prose-headings: var(--color-pin-base-50, var(--color-pin-base-100));
-  --tw-prose-lead: var(--color-pin-base-150);
+  --tw-prose-body: var(--color-base-text);
+  --tw-prose-headings: var(--color-base-text);
+  --tw-prose-lead: var(--color-base-text);
   --tw-prose-links: var(--color-accent);
-  --tw-prose-bold: var(--color-pin-base-50, var(--color-pin-base-100));
-  --tw-prose-counters: var(--color-pin-base-200);
-  --tw-prose-bullets: var(--color-pin-base-300);
-  --tw-prose-hr: var(--color-pin-border);
-  --tw-prose-quotes: var(--color-pin-base-200);
-  --tw-prose-quote-borders: var(--color-pin-base-350);
-  --tw-prose-captions: var(--color-pin-base-300);
-  --tw-prose-kbd: var(--color-pin-base-100);
+  --tw-prose-bold: var(--color-base-text);
+  --tw-prose-counters: var(--color-base-text);
+  --tw-prose-bullets: var(--color-lightest);
+  --tw-prose-hr: var(--color-lightest);
+  --tw-prose-quotes: var(--color-base-text);
+  --tw-prose-quote-borders: var(--color-lightest);
+  --tw-prose-captions: var(--color-lightest);
+  --tw-prose-kbd: var(--color-base-text);
   --tw-prose-kbd-shadows: 0 0 0;
-  --tw-prose-code: var(--color-pin-base-100);
-  --tw-prose-pre-code: var(--color-pin-base-100);
-  --tw-prose-pre-bg: var(--color-pin-base-500);
-  --tw-prose-th-borders: var(--color-pin-border);
-  --tw-prose-td-borders: var(--color-pin-base-400);
+  --tw-prose-code: var(--color-base-text);
+  --tw-prose-pre-code: var(--color-base-text);
+  --tw-prose-pre-bg: var(--color-main);
+  --tw-prose-th-borders: var(--color-lightest);
+  --tw-prose-td-borders: var(--color-lightest);
 }
 
 /* H2 accent, H3 dimmed accent */
 .doc-content h2 {
-  color: var(--color-accent) !important;
+  @apply text-accent!;
 }
 .doc-content h3 {
-  color: color-mix(in oklch, var(--color-accent) 65%, var(--color-pin-base-200)) !important;
+  @apply text-accent-light!;
 }
 
 /* Inline code: background chip, no prose backtick pseudo-elements */
@@ -1004,19 +985,15 @@
   content: none;
 }
 .doc-content :not(pre) > code {
-  @apply bg-pin-base-450 rounded px-1.5 py-0.5 text-[0.85em] font-mono;
-  color: var(--color-pin-base-100);
+  @apply bg-lighter rounded px-1.5 py-0.5 text-[0.85em] font-mono text-base-text;
 }
 
 /* Fenced code blocks */
 .doc-content pre {
-  @apply bg-pin-base-500 border border-pin-border rounded-lg p-4 overflow-x-auto;
+  @apply bg-lighter border border-lightest rounded-lg p-4 overflow-x-auto;
 }
 .doc-content pre code {
-  background: none;
-  padding: 0;
-  font-size: 0.875em;
-  color: var(--color-pin-base-100);
+  @apply bg-none p-0 text-[0.875em] text-base-text;
 }
 
 /* Table: uniform cell padding + header bg + zebra */
@@ -1025,31 +1002,30 @@
 }
 .doc-content th,
 .doc-content td {
-  @apply px-3 py-2 text-sm border border-pin-border;
+  @apply px-3 py-2 text-sm border border-lightest;
 }
 .doc-content thead th {
-  @apply bg-pin-base-500 font-semibold text-left;
+  @apply bg-main font-semibold text-left;
 }
 .doc-content tbody tr:nth-child(even) {
-  @apply bg-pin-base-500/40;
+  @apply bg-main-hover;
 }
 
 /* ── Pin grid card: subtle 3D tilt + edge glint ──────────────────────────── */
 /* JS (in base.py) sets --rx, --ry (tilt) and --gx, --gy (cursor pos) on hover. */
 .pin-3d-card {
-  transform: perspective(900px)
-    rotateX(var(--rx, 0deg))
+  transform: perspective(900px) rotateX(var(--rx, 0deg))
     rotateY(var(--ry, 0deg));
   transform-style: preserve-3d;
-  transition: transform 140ms ease-out, border-color 150ms ease-out;
+  transition:
+    transform 140ms ease-out,
+    border-color 150ms ease-out;
   will-change: transform;
 }
 
 .pin-3d-card:hover {
-  transform: perspective(900px)
-    rotateX(var(--rx, 0deg))
-    rotateY(var(--ry, 0deg))
-    scale(1.02);
+  transform: perspective(900px) rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg)) scale(1.02);
 }
 
 /* Glint: radial near cursor, masked to a thin ring so it only shows on edges. */
@@ -1068,14 +1044,14 @@
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
+  mask-composite: exclude;
   pointer-events: none;
   opacity: 0;
   transition: opacity 150ms ease-out;
 }
 
 .pin-3d-card:hover::before {
-  opacity: 1;
+  @apply opacity-1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1084,7 +1060,9 @@
     transform: none;
     transition: border-color 150ms ease-out;
   }
-  .pin-3d-card::before { display: none; }
+  .pin-3d-card::before {
+    @apply hidden;
+  }
 }
 
 /* Spinner animation */

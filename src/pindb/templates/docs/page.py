@@ -61,7 +61,7 @@ def _sidebar(section: DocSection, current_slug: str) -> Element:
                                 "block px-2 py-1 rounded text-sm font-medium "
                                 "bg-pin-base-500 text-pin-base-50"
                                 if entry.slug == current_slug
-                                else "block px-2 py-1 rounded text-sm text-pin-base-200 hover:bg-pin-base-500 hover:text-pin-base-50"
+                                else "block px-2 py-1 rounded text-sm text-pin-base-text hover:bg-pin-base-500 hover:text-pin-base-50"
                             ),
                         )[entry.title]
                     ]

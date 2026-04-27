@@ -7,7 +7,7 @@ from htpy import Element, a, button, div, form, i, nav
 
 from pindb.database.user import User
 
-_LINK: str = "no-underline text-pin-base-100 hover:text-accent"
+_LINK: str = "no-underline text-pin-base-text hover:text-accent"
 
 
 def _staff_nav_link_items(user: User) -> list[Element]:
@@ -26,18 +26,18 @@ def _auth_block(user: User | None, *, ml_auto: bool) -> Element:
     if user:
         return div(class_=cls)[
             a(
-                class_="no-underline text-pin-base-100 hover:text-accent",
+                class_="no-underline text-pin-base-text hover:text-accent",
                 href=f"/user/{user.username}",
             )[user.username],
             form(method="post", action="/auth/logout")[
                 button(
                     type="submit",
-                    class_="no-underline text-pin-base-100 bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
+                    class_="no-underline text-pin-base-text bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
                 )["Logout"]
             ],
         ]
     return a(
-        class_=cls + " no-underline text-pin-base-100",
+        class_=cls + " no-underline text-pin-base-text",
         href="/auth/login",
     )["Login"]
 
@@ -75,7 +75,7 @@ def navbar(
                 )["PinDB"],
                 button(
                     type="button",
-                    class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-100 hover:bg-pin-base-450 shrink-0",
+                    class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-text hover:bg-pin-base-450 shrink-0",
                     aria_controls="staff-nav-panel",
                     **{
                         "@click": "open = !open",
