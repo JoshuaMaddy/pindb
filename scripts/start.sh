@@ -11,9 +11,15 @@ cd "$(dirname "$0")/.."
 STATE_FILE=".deploy-active-color"
 ACTIVE=$(cat "$STATE_FILE" 2>/dev/null || echo "blue")
 
+if [ "$ACTIVE" = "blue" ]; then INACTIVE=green; else INACTIVE=blue; fi
+
 echo "==> Bringing up stack with active color: $ACTIVE"
 docker compose up -d postgres meilisearch
 docker compose --profile "$ACTIVE" up -d "app_$ACTIVE"
 docker compose up -d scheduler proxy
+
+echo "==> Stopping inactive color: $INACTIVE (if running)"
+docker compose --profile "$INACTIVE" stop "app_$INACTIVE" 2>/dev/null || true
+docker compose --profile "$INACTIVE" rm -f "app_$INACTIVE" 2>/dev/null || true
 
 echo "==> Up. Verify: curl -fsS http://localhost:8000/healthz"

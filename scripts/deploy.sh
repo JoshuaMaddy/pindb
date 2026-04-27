@@ -23,18 +23,25 @@ echo "==> Running migrations"
 docker compose --profile migrate run --rm migrate
 
 echo "==> Starting $NEXT alongside $ACTIVE"
-docker compose --profile "$NEXT" up -d --remove-orphans "app_$NEXT"
+docker compose --profile blue --profile green up -d --no-deps --force-recreate "app_$NEXT"
 
 echo "==> Waiting for $NEXT to be healthy"
 CONTAINER="${PROJECT}-app_${NEXT}-1"
-state="starting"
-for _ in $(seq 1 30); do
-  state=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "starting")
-  if [ "$state" = "healthy" ]; then break; fi
+health="starting"
+for _ in $(seq 1 45); do
+  status=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+  health=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "starting")
+  if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+    echo "!! $NEXT container $status; logs:" >&2
+    docker logs --tail 80 "$CONTAINER" >&2 || true
+    exit 1
+  fi
+  if [ "$health" = "healthy" ]; then break; fi
   sleep 2
 done
-if [ "$state" != "healthy" ]; then
-  echo "!! $NEXT never went healthy ($state); leaving $ACTIVE live and aborting" >&2
+if [ "$health" != "healthy" ]; then
+  echo "!! $NEXT never went healthy (status=$status health=$health); leaving $ACTIVE live and aborting" >&2
+  docker logs --tail 80 "$CONTAINER" >&2 || true
   docker compose --profile "$NEXT" stop "app_$NEXT"
   exit 1
 fi
