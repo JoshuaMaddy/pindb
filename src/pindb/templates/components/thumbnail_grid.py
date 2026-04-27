@@ -32,7 +32,7 @@ def thumbnail_grid(
                     "get_image", guid=pin.front_image_guid
                 ).include_query_params(thumbnail=True)
             ),
-            class_="object-contain h-full",
+            class_="object-cover aspect-square w-full h-full",
         )
         for pin in pin_list
     ]
