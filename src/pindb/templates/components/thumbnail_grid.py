@@ -32,13 +32,13 @@ def thumbnail_grid(
                     "get_image", guid=pin.front_image_guid
                 ).include_query_params(thumbnail=True)
             ),
-            class_="object-cover aspect-square w-full h-full",
+            class_="object-cover aspect-square w-full h-full bg-pin-base-450",
         )
         for pin in pin_list
     ]
 
     while len(elements) < 4:
-        elements.append(div(class_="bg-black opacity-20"))
+        elements.append(div(class_="bg-pin-base-450"))
 
     return div(
         class_="grid grid-cols-2 grid-rows-2 size-15 gap-0.5 overflow-clip rounded-sm",
