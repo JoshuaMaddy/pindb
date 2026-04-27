@@ -227,9 +227,9 @@ def bulk_pin_page(
                                         data_col="height",
                                         data_col_type="height",
                                     )["Height"],
-                                    th(
-                                        class_="bulk-th min-w-25", data_col="links"
-                                    )["Links"],
+                                    th(class_="bulk-th min-w-25", data_col="links")[
+                                        "Links"
+                                    ],
                                     th(
                                         class_="bulk-th min-w-45",
                                         data_col="description",

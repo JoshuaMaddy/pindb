@@ -479,14 +479,14 @@
 
   button,
   input[type="submit"] {
-    @apply border 
+    @apply border
     border-lightest
-    hover:border-lightest-hover 
-    bg-main 
-    hover:bg-main-hover 
-    px-2 
-    py-1 
-    rounded-lg 
+    hover:border-lightest-hover
+    bg-main
+    hover:bg-main-hover
+    px-2
+    py-1
+    rounded-lg
     cursor-pointer
     transition-all
     duration-50;
@@ -495,11 +495,11 @@
   input,
   select,
   textarea {
-    @apply border 
+    @apply border
     border-lightest
-    bg-lighter 
-    px-2 
-    py-1 
+    bg-lighter
+    px-2
+    py-1
     rounded-lg
     outline-0;
   }
@@ -544,8 +544,8 @@
   background-repeat: inherit;
   box-shadow: none;
   text-shadow: none;
-  @apply rounded-lg 
-  text-base-text 
+  @apply rounded-lg
+  text-base-text
   bg-lighter
   border-lightest;
 }
@@ -562,11 +562,11 @@
   background-repeat: inherit;
   box-shadow: none;
   text-shadow: none;
-  @apply rounded-lg 
-  text-black 
+  @apply rounded-lg
+  text-black
   bg-lighter
-  border-lightest 
-  items-center 
+  border-lightest
+  items-center
   m-0;
 }
 
@@ -578,20 +578,20 @@
 .focus .ts-control,
 .ts-control {
   box-shadow: none;
-  @apply border 
-  bg-lighter 
-  border-lightest 
-  px-2 
-  py-1 
+  @apply border
+  bg-lighter
+  border-lightest
+  px-2
+  py-1
   rounded-lg;
 }
 
 .ts-dropdown {
-  @apply border 
+  @apply border
   bg-lighter
   border-lightest
-  rounded-lg 
-  shadow-lg 
+  rounded-lg
+  shadow-lg
   overflow-clip;
 }
 

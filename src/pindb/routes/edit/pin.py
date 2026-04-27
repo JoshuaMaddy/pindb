@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Artist, Shop, session_maker
+from pindb.database import session_maker
 from pindb.database.currency import Currency
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,

@@ -25,10 +25,10 @@ from pindb.database.user_pin_queries import (
 )
 from pindb.routes.user.lists import router as lists_router
 from pindb.routes.user.sets import router as sets_router
-from pindb.templates.user.profile import (
+from pindb.templates.user.profile import user_profile_page
+from pindb.templates.user.profile_settings import (
     VALID_DIMENSION_UNITS,
     VALID_THEME_VALUES,
-    user_profile_page,
 )
 
 router = APIRouter(prefix="/user", tags=["user"])

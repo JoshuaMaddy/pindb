@@ -21,8 +21,6 @@ from pindb.templates.user.profile_sections import (
     _want_list_section,
 )
 from pindb.templates.user.profile_settings import (
-    VALID_DIMENSION_UNITS,
-    VALID_THEME_VALUES,
     settings_section,
 )
 

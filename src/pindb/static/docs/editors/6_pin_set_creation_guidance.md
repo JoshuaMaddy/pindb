@@ -24,7 +24,7 @@ Global sets have no owner and are maintained by editors and administrators. They
 - Series or event-based groupings (all pins from a specific convention year)
 - Thematic reference collections that the community would find useful
 
-Submitting a global set requires direct admin approval, and currently requires speaking directly with an admin. 
+Submitting a global set requires direct admin approval, and currently requires speaking directly with an admin.
 
 ### Personal sets
 
