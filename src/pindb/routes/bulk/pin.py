@@ -127,6 +127,7 @@ def _get_or_create(
 def get_bulk_options(
     entity_type: EntityType,
     q: str = Query(default=""),
+    exclude_name: str | None = Query(default=None),
 ) -> JSONResponse:
     if entity_type == EntityType.tag:
         raw: dict[str, object] = TAGS_INDEX.search(query=q, opt_params={"limit": 50})  # type: ignore[assignment]
@@ -141,6 +142,7 @@ def get_bulk_options(
                     "category": str(hit.get("category", "")),
                 }
                 for hit in tag_hits
+                if exclude_name is None or str(hit.get("name")) != exclude_name
             ]
         )
     model = entity_type.model
@@ -148,7 +150,13 @@ def get_bulk_options(
         rows = session.scalars(
             statement=select(model).where(model.name.ilike(f"%{q}%")).limit(50)
         ).all()
-    return JSONResponse(content=[{"value": row.name, "text": row.name} for row in rows])
+    return JSONResponse(
+        content=[
+            {"value": row.name, "text": row.name}
+            for row in rows
+            if exclude_name is None or row.name != exclude_name
+        ]
+    )
 
 
 @router.get(path="/pin")

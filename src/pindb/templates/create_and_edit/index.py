@@ -65,6 +65,25 @@ def create_index(request: Request) -> Element:
                         ],
                     ],
                 ],
+                div(class_="md:col-span-2")[
+                    card(
+                        href=request.url_for("get_bulk_tag"),
+                        content="Bulk Create Tags",
+                        icon="tags",
+                        additional_classes="max-md:hidden",
+                    ),
+                    div(
+                        class_="md:hidden flex gap-2 rounded-xl border border-lightest bg-main p-2 text-base-text opacity-80"
+                    )[
+                        i(data_lucide="tags", class_="inline-block shrink-0"),
+                        div(class_="flex min-w-0 flex-col gap-0.5")[
+                            div(class_="font-semibold")["Bulk Create Tags"],
+                            div(class_="text-sm text-base-text")[
+                                "Not available on small screens."
+                            ],
+                        ],
+                    ],
+                ],
             ],
             additional_classes="grid min-md:grid-cols-2",
             content_width="small",
