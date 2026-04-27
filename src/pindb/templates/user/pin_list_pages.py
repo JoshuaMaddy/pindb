@@ -46,19 +46,20 @@ PAGE_SIZE: int = 24
 
 ViewMode = Literal["grid", "table"]
 
-_TOGGLE_ACTIVE: str = "px-2 py-1 rounded border border-accent bg-pin-base-450 text-accent text-sm no-underline"
+_TOGGLE_ACTIVE: str = (
+    "px-2 py-1 rounded border border-accent bg-lighter text-accent text-sm no-underline"
+)
 _TOGGLE_INACTIVE: str = (
-    "px-2 py-1 rounded border border-pin-base-400 bg-pin-base-500"
-    " text-pin-base-300 text-sm no-underline hover:border-accent hover:text-pin-base-text"
+    "px-2 py-1 rounded border border-lightest bg-main"
+    " text-lightest-hover text-sm no-underline hover:border-accent hover:text-base-text"
 )
 _TH_CLASS: str = (
-    "text-left whitespace-nowrap py-2 px-2 font-medium text-pin-base-300 "
-    "border-b border-pin-base-400"
+    "text-left whitespace-nowrap py-2 px-2 font-medium text-lightest-hover "
+    "border-b border-lightest"
 )
-_TD_CLASS: str = "py-2 px-2 border-b border-pin-base-400 align-middle"
+_TD_CLASS: str = "py-2 px-2 border-b border-lightest align-middle"
 _TD_LINK: str = (
-    "py-2 px-2 border-b border-pin-base-400 align-middle max-w-none "
-    "[&_a]:whitespace-nowrap"
+    "py-2 px-2 border-b border-lightest align-middle max-w-none [&_a]:whitespace-nowrap"
 )
 _TABLE_PIN_LIST: str = "border-collapse text-sm w-max min-w-full"
 
@@ -166,7 +167,7 @@ def _pin_button(request: Request, pin: Pin) -> Element:
 
 def _shop_links(request: Request, shops: set[Shop]) -> Element:
     if not shops:
-        return span(class_="text-pin-base-400")["—"]
+        return span(class_="text-lighter-hover")["—"]
     return div(
         class_="inline-flex max-w-none flex-wrap gap-x-2 gap-y-1 [&_a]:whitespace-nowrap",
     )[
@@ -182,7 +183,7 @@ def _shop_links(request: Request, shops: set[Shop]) -> Element:
 
 def _artist_links(request: Request, artists: set[Artist]) -> Element:
     if not artists:
-        return span(class_="text-pin-base-400")["—"]
+        return span(class_="text-lighter-hover")["—"]
     return div(
         class_="inline-flex max-w-none flex-wrap gap-x-2 gap-y-1 [&_a]:whitespace-nowrap",
     )[

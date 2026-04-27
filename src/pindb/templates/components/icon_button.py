@@ -19,12 +19,12 @@ def icon_button(
     Extra kwargs are forwarded as attributes (e.g. hx_delete, hx_target).
     """
     color = (
-        "text-red-200 hover:border-red-400"
+        "text-error-main border-error-dark hover:border-error-dark-hover"
         if variant == "danger"
-        else "text-pin-base-text hover:border-accent"
+        else "text-base-text border-lightest hover:border-accent"
     )
     base_class = (
-        f"p-1.5 rounded border border-pin-base-400 "
+        f"p-1.5 rounded border "
         f"bg-transparent cursor-pointer {color} {additional_class if additional_class else ''}"
     )
 

@@ -50,7 +50,7 @@ def _sidebar(section: DocSection, current_slug: str) -> Element:
     return aside(class_="w-56 shrink-0 sticky top-4 self-start hidden md:block")[
         nav[
             h2(
-                class_="text-xs font-semibold uppercase tracking-wider text-pin-base-300 mb-3"
+                class_="text-xs font-semibold uppercase tracking-wider text-lightest-hover mb-3"
             )[section.label],
             ul(class_="flex flex-col gap-1")[
                 [
@@ -59,9 +59,9 @@ def _sidebar(section: DocSection, current_slug: str) -> Element:
                             href=f"/docs/{section.key}/{entry.slug}",
                             class_=(
                                 "block px-2 py-1 rounded text-sm font-medium "
-                                "bg-pin-base-500 text-pin-base-50"
+                                "bg-main text-base-text"
                                 if entry.slug == current_slug
-                                else "block px-2 py-1 rounded text-sm text-pin-base-text hover:bg-pin-base-500 hover:text-pin-base-50"
+                                else "block px-2 py-1 rounded text-sm text-base-text hover:bg-main-hover hover:text-base-text"
                             ),
                         )[entry.title]
                     ]

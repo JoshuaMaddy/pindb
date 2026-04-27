@@ -1,4 +1,4 @@
-/** One-off: print suggested hsl(L%) for base-200/250/300 per theme. Run from repo root. */
+/** One-off: print suggested hsl(L%) for semantic muted text ramp per theme. Run from repo root. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,7 +41,7 @@ function parseVariants(css) {
 
 function parsePinColorDeclarations(block) {
   const vars = {};
-  const declRe = /--color-(pin-[\w-]+)\s*:\s*([^;]+);/g;
+  const declRe = /--color-([\w-]+)\s*:\s*([^;]+);/g;
   let m;
   while ((m = declRe.exec(block)) !== null) {
     vars[m[1]] = m[2].trim();
@@ -54,7 +54,7 @@ function resolveVars(rawMap) {
   for (let r = 0; r < 20; r++) {
     let changed = false;
     for (const [key, val] of Object.entries(map)) {
-      const m = val.match(/^var\(\s*--color-(pin-[\w-]+)\s*\)$/i);
+      const m = val.match(/^var\(\s*--color-([\w-]+)\s*\)$/i);
       if (m && map[m[1]] && !map[m[1]].startsWith("var(")) {
         map[key] = map[m[1]];
         changed = true;
@@ -117,20 +117,14 @@ function contrastRatio(a, b) {
 }
 
 const CHROME = [
+  "darker",
+  "darker-hover",
   "main",
   "main-hover",
-  "pin-base-550",
-  "pin-base-500",
-  "pin-base-450",
+  "lighter",
+  "lighter-hover",
 ];
-const FG = [
-  "pin-base-text",
-  "pin-base-100",
-  "pin-base-150",
-  "pin-base-200",
-  "pin-base-250",
-  "pin-base-300",
-];
+const FG = ["base-text", "accent"];
 
 function rgbMapFromRaw(raw) {
   const resolved = resolveVars(raw);
@@ -157,37 +151,28 @@ function minContrastOnChrome(rgbMap) {
   return min;
 }
 
-function tuneTriple(raw, keys) {
+function tuneSingle(raw, key) {
   const isLight = (() => {
     const m = resolveVars(raw);
-    const p500 = parseHsl(m["pin-base-500"]);
+    const p500 = parseHsl(m.main);
     return p500 && p500.l >= 50;
   })();
 
   const rawCopy = { ...raw };
-  const k200 = keys[0];
-  const k250 = keys[1];
-  const k300 = keys[2];
 
   for (let step = 0; step < 200; step++) {
     const rgbMap = rgbMapFromRaw(rawCopy);
     if (minContrastOnChrome(rgbMap) >= 4.5) {
-      return {
-        [k200]: rawCopy[k200],
-        [k250]: rawCopy[k250],
-        [k300]: rawCopy[k300],
-      };
+      return { [key]: rawCopy[key] };
     }
-    for (const key of [k300, k250, k200]) {
-      const p = parseHsl(rawCopy[key]);
-      if (!p) return null;
-      if (isLight) {
-        p.l = Math.max(8, p.l - 0.6);
-      } else {
-        p.l = Math.min(88, p.l + 0.6);
-      }
-      rawCopy[key] = `hsl(${p.h}deg, ${p.s}%, ${p.l}%)`;
+    const parsed = parseHsl(rawCopy[key]);
+    if (!parsed) return null;
+    if (isLight) {
+      parsed.l = Math.max(8, parsed.l - 0.6);
+    } else {
+      parsed.l = Math.min(88, parsed.l + 0.6);
     }
+    rawCopy[key] = `hsl(${parsed.h}deg, ${parsed.s}%, ${parsed.l}%)`;
   }
   return null;
 }
@@ -209,13 +194,11 @@ for (const { name, body } of variants) {
 }
 
 for (const { name, raw } of themes) {
-  const out = tuneTriple(raw, ["pin-base-200", "pin-base-250", "pin-base-300"]);
+  const out = tuneSingle(raw, "base-text");
   console.log(`\n## ${name}`);
   if (!out) {
     console.log("FAILED to converge");
     continue;
   }
-  for (const k of ["pin-base-200", "pin-base-250", "pin-base-300"]) {
-    console.log(`${k}: ${out[k]}`);
-  }
+  console.log(`base-text: ${out["base-text"]}`);
 }

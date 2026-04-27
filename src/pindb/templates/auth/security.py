@@ -105,7 +105,7 @@ def security_page(
                 hr,
                 error_message(error),
                 p(class_="text-green-200")[success] if success else None,
-                ul(class_="text-red-200 list-disc pl-5")[
+                ul(class_="text-error-main list-disc pl-5")[
                     [li[rule] for rule in password_errors]
                 ]
                 if password_errors

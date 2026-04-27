@@ -49,7 +49,7 @@ def _create_form(request: Request) -> Element:
                     name="name",
                     required=True,
                     autocomplete="off",
-                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
+                    class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
                     placeholder="My Collection",
                 ),
             ),
@@ -63,7 +63,7 @@ def _create_form(request: Request) -> Element:
             ),
             button(
                 type="submit",
-                class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+                class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-lightest cursor-pointer text-base-text w-full",
             )["Create Set"],
         ],
     ]

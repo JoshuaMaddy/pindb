@@ -16,7 +16,7 @@ def create_index(request: Request) -> Element:
         request=request,
         body_content=centered_div(
             content=[
-                div(class_="min-md:col-span-2")[
+                div(class_="md:col-span-2")[
                     h1["Create"],
                     hr,
                 ],
@@ -45,8 +45,8 @@ def create_index(request: Request) -> Element:
                     content="Artist",
                     icon="palette",
                 ),
-                div(class_="min-md:col-span-2")[hr],
-                div(class_="min-md:col-span-2")[
+                div(class_="md:col-span-2")[hr],
+                div(class_="md:col-span-2")[
                     card(
                         href=request.url_for("get_bulk_pin"),
                         content="Bulk Import Pins",
@@ -54,12 +54,12 @@ def create_index(request: Request) -> Element:
                         additional_classes="max-md:hidden",
                     ),
                     div(
-                        class_="min-md:hidden flex gap-2 rounded-xl border border-pin-base-350 bg-main p-2 text-pin-base-text opacity-80"
+                        class_="md:hidden flex gap-2 rounded-xl border border-lightest bg-main p-2 text-base-text opacity-80"
                     )[
                         i(data_lucide="table-2", class_="inline-block shrink-0"),
                         div(class_="flex min-w-0 flex-col gap-0.5")[
                             div(class_="font-semibold")["Bulk Import Pins"],
-                            div(class_="text-sm text-pin-base-text")[
+                            div(class_="text-sm text-base-text")[
                                 "Not available on small screens."
                             ],
                         ],

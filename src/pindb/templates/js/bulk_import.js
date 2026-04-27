@@ -244,7 +244,7 @@
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="front"
                accept="image/png,image/jpeg,image/jpg,image/webp">
-        <div class="img-spinner hidden absolute inset-0 flex items-center justify-center bg-black/30 rounded" data-row="${id}" data-side="front">
+        <div class="img-spinner hidden absolute inset-0 flex items-center justify-center bg-darker rounded" data-row="${id}" data-side="front">
           <i data-lucide="loader-circle" class="animate-spin"></i>
         </div>
       </td>
@@ -257,7 +257,7 @@
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="back"
                accept="image/png,image/jpeg,image/jpg,image/webp">
-        <div class="img-spinner hidden absolute inset-0 flex items-center justify-center bg-black/30 rounded" data-row="${id}" data-side="back">
+        <div class="img-spinner hidden absolute inset-0 flex items-center justify-center bg-darker rounded" data-row="${id}" data-side="back">
           <i data-lucide="loader-circle" class="animate-spin"></i>
         </div>
       </td>
@@ -372,7 +372,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Row initialisation (Tom Select, images, events, copy/paste, prefill)
+  // Row initialization (Tom Select, images, events, copy/paste, prefill)
   // ---------------------------------------------------------------------------
 
   function initRow(rowId, prefill) {
@@ -706,7 +706,7 @@
 
     const subTr = document.createElement("tr");
     subTr.id = `${rowId}-grades`;
-    subTr.className = "grades-sub-row bg-main/50";
+    subTr.className = "grades-sub-row bg-main-hover";
 
     const gradesJson = JSON.stringify(existing).replace(/'/g, "\\'");
 
@@ -727,7 +727,7 @@
               <button type="button"
                       @click="grades.splice(index, 1)"
                       x-show="grades.length > 1"
-                      class="icon-btn text-red-200">
+                      class="icon-btn text-error-main">
                 <i data-lucide="minus-circle"></i>
               </button>
             </div>
@@ -800,7 +800,7 @@
 
     const subTr = document.createElement("tr");
     subTr.id = `${rowId}-links`;
-    subTr.className = "links-sub-row bg-main/50";
+    subTr.className = "links-sub-row bg-main-hover";
 
     subTr.innerHTML = `
       <td colspan="${colCount}" style="padding: 0;">
@@ -817,7 +817,7 @@
               <button type="button"
                       @click="links.splice(index, 1)"
                       x-show="links.length > 1"
-                      class="icon-btn text-red-200">
+                      class="icon-btn text-error-main">
                 <i data-lucide="minus-circle"></i>
               </button>
             </div>
@@ -1282,7 +1282,7 @@
         const card = document.createElement("a");
         card.href = `/get/pin/${r.pin_id}`;
         card.className =
-          "flex flex-col gap-1 items-center border border-lightest rounded-lg p-2 hover:border-accent no-underline text-pin-base-text text-center";
+          "flex flex-col gap-1 items-center border border-lightest rounded-lg p-2 hover:border-accent no-underline text-base-text text-center";
         card.innerHTML = `
           <div style="width:100%;aspect-ratio:1;background:url('/get/image/${r.front_image_guid}?thumbnail=true') center/cover no-repeat;border-radius:6px;"></div>
           <span class="text-xs truncate w-full text-center">${escHtml(r.pin_name || "")}</span>
@@ -1292,7 +1292,7 @@
 
     if (result.failed_count > 0) {
       const errTitle = document.createElement("p");
-      errTitle.className = "col-span-full text-sm text-red-200 font-semibold";
+      errTitle.className = "col-span-full text-sm text-error-main font-semibold";
       errTitle.textContent =
         "Failed rows remain in the table — fix errors and resubmit.";
       grid.appendChild(errTitle);

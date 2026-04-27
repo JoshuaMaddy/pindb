@@ -28,7 +28,7 @@ _ACTIVE_CLASS: str = (
     "px-3 py-1 rounded border border-accent text-accent text-sm no-underline"
 )
 _INACTIVE_CLASS: str = (
-    "px-3 py-1 rounded border border-pin-base-400 text-pin-base-300 text-sm "
+    "px-3 py-1 rounded border border-lightest text-lightest-hover text-sm "
     "hover:border-accent no-underline"
 )
 
@@ -53,7 +53,7 @@ def _sort_control(
         )[_SORT_LABELS[sort]]
 
     return div(class_="flex items-center gap-1")[
-        span(class_="text-sm text-pin-base-300 mr-0.5")["Sort:"],
+        span(class_="text-sm text-lightest-hover mr-0.5")["Sort:"],
         _link(SortOrder.name),
         _link(SortOrder.newest),
         _link(SortOrder.oldest),
@@ -87,7 +87,7 @@ def list_search_input(
         ),
         aria_label="Search",
         class_=(
-            "bg-pin-base-450 border border-pin-base-400 rounded px-3 py-1.5 text-pin-base-text w-full"
+            "bg-lighter border border-lightest rounded px-3 py-1.5 text-base-text w-full"
         ),
     )
 
@@ -151,11 +151,11 @@ def entity_list_section(
             div(
                 class_=(
                     "absolute right-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-                    " bg-gradient-to-r from-transparent to-[var(--color-pin-base-550)]"
+                    " bg-gradient-to-r from-transparent to-[var(--color-darker)]"
                 )
             ),
         ],
-        span(class_="text-sm text-pin-base-300")[f"{total_count} items"],
+        span(class_="text-sm text-lightest-hover")[f"{total_count} items"],
         content,
         pagination_controls(
             base_url=base_url,

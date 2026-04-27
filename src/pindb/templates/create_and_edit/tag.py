@@ -111,7 +111,9 @@ def tag_form(
                     hx_swap="innerHTML",
                     class_="flex flex-col gap-2 [&_label]:font-semibold",
                 )[
-                    label(for_="name")["Name", span(class_="text-red-200 ml-0.5")["*"]],
+                    label(for_="name")[
+                        "Name", span(class_="text-error-main ml-0.5")["*"]
+                    ],
                     input(
                         type="text",
                         name="name",

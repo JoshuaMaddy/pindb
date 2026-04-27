@@ -189,7 +189,7 @@ _USER_SETTINGS_FORM_SCRIPT: str = """
   function onThemeRadioChange(ev) {
     var t = ev.target;
     if (!t || t.name !== "theme" || t.type !== "radio" || !t.checked) return;
-    document.documentElement.className = t.value + " bg-pin-base-550";
+    document.documentElement.className = t.value + " bg-darker";
   }
   function boot() {
     if (!document.getElementById("user-settings-form")) return;
@@ -236,7 +236,7 @@ def settings_section(
                 [
                     div(class_="flex flex-col gap-2 mb-4")[
                         h3(
-                            class_="text-xs font-semibold uppercase tracking-wider text-pin-base-300"
+                            class_="text-xs font-semibold uppercase tracking-wider text-lightest-hover"
                         )[section.section_heading],
                         div(class_="flex flex-wrap gap-2")[
                             [
@@ -246,7 +246,7 @@ def settings_section(
                                         " cursor-pointer border-lightest"
                                         " hover:border-lightest-hover"
                                         " has-[:checked]:border-accent"
-                                        " has-[:checked]:bg-pin-base-450"
+                                        " has-[:checked]:bg-lighter"
                                     ),
                                 )[
                                     input(
@@ -290,10 +290,10 @@ def settings_section(
                     h3(
                         class_=(
                             "text-xs font-semibold uppercase tracking-wider "
-                            "text-pin-base-300"
+                            "text-lightest-hover"
                         )
                     )["Pin dimensions"],
-                    p(class_="text-sm text-pin-base-300 mb-1")[
+                    p(class_="text-sm text-lightest-hover mb-1")[
                         "How sizes appear on pin detail pages."
                     ],
                     div(class_="flex flex-wrap gap-2")[
@@ -304,7 +304,7 @@ def settings_section(
                                     " cursor-pointer border-lightest"
                                     " hover:border-lightest-hover"
                                     " has-[:checked]:border-accent"
-                                    " has-[:checked]:bg-pin-base-450"
+                                    " has-[:checked]:bg-lighter"
                                 ),
                             )[
                                 input(
@@ -325,19 +325,19 @@ def settings_section(
                 ],
             ],
             script[Markup(_USER_SETTINGS_FORM_SCRIPT)],
-            div(class_="mt-6 pt-6 border-t border-pin-base-400 flex flex-col gap-3")[
+            div(class_="mt-6 pt-6 border-t border-lightest flex flex-col gap-3")[
                 h3(
                     class_=(
                         "text-xs font-semibold uppercase tracking-wider "
-                        "text-pin-base-300"
+                        "text-lightest-hover"
                     )
                 )["Account"],
                 delete_account_modal(
                     trigger=button(
                         type="button",
                         class_=(
-                            "self-start text-sm text-red-600 underline "
-                            "underline-offset-2 hover:text-red-500 cursor-pointer "
+                            "self-start text-sm text-error-main underline "
+                            "underline-offset-2 hover:text-error-main-hover cursor-pointer "
                             "bg-transparent border-0 p-0"
                         ),
                     )["Delete account"],

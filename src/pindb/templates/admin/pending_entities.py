@@ -94,7 +94,7 @@ def _sections(
 
     if not sections:
         sections.append(
-            div(class_="text-pin-base-300 text-center py-8")[
+            div(class_="text-lightest-hover text-center py-8")[
                 i(data_lucide="check-circle", class_="inline-block w-8 h-8 mb-2"),
                 p["No pending entries. All clear."],
             ]
@@ -117,15 +117,13 @@ def _entity_section(
             i(data_lucide=icon, class_="inline-block w-4 h-4"),
             h2[label],
             span(
-                class_="text-xs font-semibold px-2 py-0.5 rounded bg-pin-base-700 text-pin-base-300"
+                class_="text-xs font-semibold px-2 py-0.5 rounded bg-darker text-lightest-hover"
             )[str(len(items))],
         ],
         div(class_=TABLE_LIST_SCROLL)[
             table(class_="w-full text-sm")[
                 thead[
-                    tr(
-                        class_="text-left text-pin-base-300 border-b border-pin-base-700"
-                    )[
+                    tr(class_="text-left text-lightest-hover border-b border-darker")[
                         th(class_="py-2 pr-6 font-medium")["Name"],
                         th(class_="py-2 pr-6 font-medium")["Submitted by"],
                         th(class_="py-2 pr-6 font-medium")["Submitted at"],
@@ -176,16 +174,16 @@ def _entity_row(
             + [tag.display_name for tag in entity.tags if tag.is_pending]
         )
         if pending_deps:
-            dep_note = span(class_="block text-xs text-amber-400 mt-0.5")[
+            dep_note = span(class_="block text-xs text-error-main mt-0.5")[
                 "Will also approve: " + ", ".join(pending_deps)
             ]
 
-    return tr(class_="border-b border-pin-base-800 hover:bg-pin-base-500")[
+    return tr(class_="border-b border-darker hover:bg-main-hover")[
         td(class_="py-2 pr-6")[
             a(href=f"/get/{entity_type}/{entity.id}")[name], dep_note
         ],
-        td(class_="py-2 pr-6 text-pin-base-400")[creator_name],
-        td(class_="py-2 pr-6 text-pin-base-400")[local_date_formatter(created_at)],
+        td(class_="py-2 pr-6 text-lighter-hover")[creator_name],
+        td(class_="py-2 pr-6 text-lighter-hover")[local_date_formatter(created_at)],
         td(class_="py-2")[
             div(class_="flex gap-2")[
                 form(method="post", action=approve_url)[

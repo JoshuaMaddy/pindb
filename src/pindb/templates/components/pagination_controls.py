@@ -42,12 +42,12 @@ def pagination_controls(
                 hx_target=f"#{section_id}",
                 hx_swap="outerHTML",
                 hx_push_url="true",
-                class_="px-2 py-1 rounded border border-pin-base-400 hover:border-accent",
+                class_="px-2 py-1 rounded border border-lightest hover:border-accent",
             )[label]
         return a(
             href=href,
             aria_label=aria_label,
-            class_="px-2 py-1 rounded border border-pin-base-400 hover:border-accent",
+            class_="px-2 py-1 rounded border border-lightest hover:border-accent",
         )[label]
 
     return div(class_="flex items-center justify-center gap-2 text-sm mt-4 w-full")[
@@ -57,7 +57,7 @@ def pagination_controls(
             target_page=page - 1,
             enabled=page > 1,
         ),
-        span(class_="text-pin-base-400")[f"Page {page} of {total_pages}"],
+        span(class_="text-lighter-hover")[f"Page {page} of {total_pages}"],
         _nav_link(
             label="Next →",
             aria_label="Next page",

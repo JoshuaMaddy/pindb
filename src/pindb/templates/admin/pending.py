@@ -62,10 +62,10 @@ def pending_page(
                 div(class_="flex items-baseline gap-3")[
                     page_heading(icon="clock", text="Pending Approvals"),
                     span(
-                        class_="text-xs font-semibold px-2 py-0.5 rounded bg-amber-700 text-amber-100"
+                        class_="text-xs font-semibold px-2 py-0.5 rounded bg-error-dark-hover text-error-main-hover"
                     )[str(total)],
                 ],
-                p(class_="text-pin-base-300 text-sm")[
+                p(class_="text-lightest-hover text-sm")[
                     "Review and approve or reject pending entries submitted by editors. "
                     "Approving a pin also approves its pending dependencies (shops, artists, tags)."
                 ],

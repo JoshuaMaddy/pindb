@@ -97,7 +97,7 @@ window.addEventListener("load", function () {
       } else if (entityType === "pin") {
         const pinRender = (item, escape) => {
           const thumb = item.thumbnail
-            ? `<img src="${escape(item.thumbnail)}" class="w-6 h-6 object-contain rounded bg-pin-base-500 shrink-0 mr-2" alt="">`
+            ? `<img src="${escape(item.thumbnail)}" class="w-6 h-6 object-contain rounded bg-main shrink-0 mr-2" alt="">`
             : "";
           return `<div class="flex items-center gap-1">${thumb}<span>${escape(item.text)}</span></div>`;
         };

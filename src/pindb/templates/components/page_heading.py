@@ -16,9 +16,9 @@ def page_heading(
 ) -> Element:
     """Icon + heading; optional extras sit after the title on large screens, below on small."""
     heading_el: Element = (
-        h1(class_="min-w-0 break-words")[text]
+        h1(class_="min-w-0 wrap-break-word")[text]
         if level == 1
-        else h2(class_="min-w-0 break-words")[text]
+        else h2(class_="min-w-0 wrap-break-word")[text]
     )
     title_row: Element = div(class_="flex gap-2 items-baseline min-w-0")[
         i(data_lucide=icon, class_="shrink-0", aria_hidden="true"),

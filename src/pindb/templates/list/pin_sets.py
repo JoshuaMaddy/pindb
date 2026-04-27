@@ -49,9 +49,11 @@ def _detailed_items(
                 div[
                     p(class_="text-lg")[
                         ("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
-                        span(class_="text-pin-base-300 ml-1")[f"({len(pin_set.pins)})"],
+                        span(class_="text-lightest-hover ml-1")[
+                            f"({len(pin_set.pins)})"
+                        ],
                     ],
-                    p(class_="text-pin-base-300")[pin_set.description],
+                    p(class_="text-lightest-hover")[pin_set.description],
                 ],
             ],
         )

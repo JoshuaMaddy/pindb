@@ -14,12 +14,12 @@ from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 
 _ACTION_BUTTON_CLASS = (
-    "flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400"
-    " bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text"
+    "flex items-center gap-1 px-2 py-1 rounded-lg border border-lightest"
+    " bg-lighter hover:border-accent cursor-pointer text-base-text"
 )
 _ROW_BUTTON_CLASS = (
-    "w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-pin-base-450"
-    " cursor-pointer text-pin-base-text bg-transparent border-0 text-left font-inherit"
+    "w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-lighter-hover"
+    " cursor-pointer text-base-text bg-transparent border-0 text-left font-inherit"
 )
 
 
@@ -29,7 +29,7 @@ _ROW_BUTTON_CLASS = (
 
 
 _PANEL_CLASS = (
-    "absolute z-10 top-full mt-1 left-0 bg-pin-base-500 border border-pin-base-400"
+    "absolute z-10 top-full mt-1 left-0 bg-main border border-lightest"
     " rounded-lg shadow-lg p-2 flex flex-col gap-1 text-sm"
 )
 
@@ -144,11 +144,11 @@ def _owned_row_existing(
     safe_grade_name: Markup = Markup.escape(grade_name)
 
     return Markup(
-        f"""<div class="flex items-center gap-2 py-1.5 px-1 border-b border-pin-base-400 last:border-0"
+        f"""<div class="flex items-center gap-2 py-1.5 px-1 border-b border-lightest last:border-0"
              x-data="{{ tradeable: {is_tradeable}, tradeable_qty: {tradeable_qty}, max_qty: {entry.quantity} }}">
           <span class="w-20 text-sm shrink-0">{safe_grade_name}</span>
           <input type="number" value="{entry.quantity}" min="1"
-                 class="w-14 text-sm bg-pin-base-450 border border-pin-base-400 rounded px-1 py-0.5"
+                 class="w-14 text-sm bg-lighter border border-lightest rounded px-1 py-0.5"
                  title="Quantity owned"
                  @change="max_qty = Math.max(1, parseInt($el.value) || 1); tradeable_qty = Math.min(tradeable_qty, max_qty); htmx.ajax('PATCH', '{patch_url}', {{target: '#{target_id}', swap: 'outerHTML', values: {{quantity: max_qty, tradeable_quantity: tradeable ? tradeable_qty : 0}}}})">
           <label class="flex items-center gap-1 text-sm cursor-pointer select-none shrink-0">
@@ -158,11 +158,11 @@ def _owned_row_existing(
           </label>
           <input type="number" x-show="tradeable" x-model.number="tradeable_qty"
                  :min="1" :max="max_qty"
-                 class="w-14 text-sm bg-pin-base-450 border border-pin-base-400 rounded px-1 py-0.5"
+                 class="w-14 text-sm bg-lighter border border-lightest rounded px-1 py-0.5"
                  title="Quantity tradeable"
                  @change="tradeable_qty = Math.min(Math.max(1, parseInt($el.value) || 1), max_qty); htmx.ajax('PATCH', '{patch_url}', {{target: '#{target_id}', swap: 'outerHTML', values: {{quantity: max_qty, tradeable_quantity: tradeable_qty}}}})">
           <button type="button"
-                  class="ml-auto shrink-0 text-pin-base-300 hover:text-red-200 cursor-pointer bg-transparent border-0 text-lg leading-none"
+                  class="ml-auto shrink-0 text-lightest-hover hover:text-error-main-hover cursor-pointer bg-transparent border-0 text-lg leading-none"
                   aria-label="Remove from collection"
                   hx-delete="{delete_url}"
                   hx-target="#{target_id}"
@@ -187,12 +187,12 @@ def _owned_row_new(
     safe_grade_name: Markup = Markup.escape(grade_name)
 
     return Markup(
-        f"""<div class="flex items-center gap-2 py-1.5 px-1 border-b border-pin-base-400 last:border-0">
-          <span class="w-20 text-sm shrink-0 text-pin-base-300">{safe_grade_name}</span>
+        f"""<div class="flex items-center gap-2 py-1.5 px-1 border-b border-lightest last:border-0">
+          <span class="w-20 text-sm shrink-0 text-lightest-hover">{safe_grade_name}</span>
           <form hx-post="{add_url}" hx-target="#{target_id}" hx-swap="outerHTML" class="contents">
             {grade_input}
             <input type="number" name="quantity" value="1" min="1"
-                   class="w-14 text-sm bg-pin-base-450 border border-pin-base-400 rounded px-1 py-0.5"
+                   class="w-14 text-sm bg-lighter border border-lightest rounded px-1 py-0.5"
                    title="Quantity to add">
             <button type="submit"
                     class="text-sm text-accent hover:underline cursor-pointer bg-transparent border-0 p-0 shrink-0">

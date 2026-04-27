@@ -22,7 +22,7 @@ def audit_timestamps(
 ) -> Fragment:
     """Subtle one-line row showing created/updated timestamps, localized client-side."""
     return fragment[
-        span(class_="text-xs text-pin-base-300")[
+        span(class_="text-xs text-lightest-hover")[
             created_at and "Added ",
             created_at and _local_time(created_at),
             updated_at and " · Updated ",

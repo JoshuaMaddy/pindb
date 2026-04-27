@@ -26,7 +26,7 @@
   --color-pin-base-450: hsl(237deg, 16%, 23%);
   --color-pin-base-500: hsl(240deg, 21%, 15%);
   --color-pin-base-550: hsl(240deg, 23%, 9%);
-  
+
   --color-accent: hsl(189deg, 71%, 73%);
   --color-base-text: hsl(226deg, 64%, 88%);
   --color-accent-light: var(--color-accent)/20;
@@ -38,6 +38,10 @@
   --color-lighter-hover: var(--color-pin-base-400);
   --color-lightest: var(--color-pin-base-350);
   --color-lightest-hover: var(--color-pin-base-300);
+  --color-error-dark: hsl(355deg, 52%, 30%);
+  --color-error-dark-hover: hsl(355deg, 52%, 36%);
+  --color-error-main: hsl(355deg, 72%, 62%);
+  --color-error-main-hover: hsl(355deg, 74%, 68%);
 
   /* Tag category badge colors (dark/mocha defaults) */
   --color-tag-general: hsl(220, 9%, 28%);
@@ -78,10 +82,6 @@
     @variant macchiato {
       --color-accent: hsl(189deg, 59%, 73%);
       --color-base-text: hsl(227deg, 68%, 88%);
-      --color-pin-base-100: hsl(228deg, 39%, 80%);
-      --color-pin-base-150: hsl(228deg, 24%, 72%);
-      --color-pin-base-200: hsl(228deg, 20%, 70%);
-      --color-pin-base-250: hsl(230deg, 13%, 64%);
       --color-pin-base-300: hsl(230deg, 12%, 59%);
       --color-pin-base-350: hsl(232deg, 14%, 41%);
       --color-pin-base-400: hsl(234deg, 14%, 35%);
@@ -125,10 +125,6 @@
     @variant frappe {
       --color-accent: hsl(189deg, 48%, 73%);
       --color-base-text: hsl(227deg, 70%, 87%);
-      --color-pin-base-100: hsl(227deg, 44%, 83%);
-      --color-pin-base-150: hsl(228deg, 29%, 79%);
-      --color-pin-base-200: hsl(227deg, 22%, 77%);
-      --color-pin-base-250: hsl(229deg, 15%, 69%);
       --color-pin-base-300: hsl(229deg, 12%, 67%);
       --color-pin-base-350: hsl(232deg, 14%, 48%);
       --color-pin-base-400: hsl(234deg, 16%, 41%);
@@ -172,10 +168,6 @@
     @variant latte {
       --color-accent: hsl(197deg, 97%, 46%);
       --color-base-text: hsl(234deg, 16%, 35%);
-      --color-pin-base-100: hsl(233deg, 13%, 36%);
-      --color-pin-base-150: hsl(233deg, 10%, 39%);
-      --color-pin-base-200: hsl(232deg, 10%, 41%);
-      --color-pin-base-250: hsl(231deg, 10%, 44%);
       --color-pin-base-300: hsl(228deg, 11%, 46%);
       --color-pin-base-350: hsl(227deg, 12%, 71%);
       --color-pin-base-400: hsl(225deg, 14%, 77%);
@@ -188,10 +180,6 @@
     @variant dracula {
       --color-accent: hsl(191deg, 97%, 77%); /* cyan #8be9fd */
       --color-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 fg */
-      --color-pin-base-100: hsl(225deg, 22%, 84%);
-      --color-pin-base-150: hsl(225deg, 24%, 75%);
-      --color-pin-base-200: hsl(225deg, 25%, 74%);
-      --color-pin-base-250: hsl(225deg, 26%, 68%);
       --color-pin-base-300: hsl(225deg, 27%, 66%); /* #6272a4 comment */
       --color-pin-base-350: hsl(232deg, 14%, 42%);
       --color-pin-base-400: hsl(232deg, 14%, 36%);
@@ -204,10 +192,6 @@
     @variant monokai {
       --color-accent: hsl(80deg, 76%, 53%); /* green #a6e22e */
       --color-base-text: hsl(60deg, 30%, 96%); /* #f8f8f2 */
-      --color-pin-base-100: hsl(55deg, 20%, 80%);
-      --color-pin-base-150: hsl(50deg, 16%, 68%);
-      --color-pin-base-200: hsl(46deg, 14%, 64%);
-      --color-pin-base-250: hsl(42deg, 13%, 57%);
       --color-pin-base-300: hsl(40deg, 13%, 57%); /* #75715e comment */
       --color-pin-base-350: hsl(60deg, 9%, 32%);
       --color-pin-base-400: hsl(63deg, 9%, 27%);
@@ -220,10 +204,6 @@
     @variant monokai-pro {
       --color-accent: hsl(188deg, 72%, 69%); /* cyan #78dce8 */
       --color-base-text: hsl(60deg, 60%, 98%); /* #fcfcfa */
-      --color-pin-base-100: hsl(285deg, 6%, 80%);
-      --color-pin-base-150: hsl(285deg, 5%, 68%);
-      --color-pin-base-200: hsl(290deg, 3%, 67%);
-      --color-pin-base-250: hsl(300deg, 2%, 61%);
       --color-pin-base-300: hsl(300deg, 1%, 60%); /* #727072 comment */
       --color-pin-base-350: hsl(285deg, 3%, 36%);
       --color-pin-base-400: hsl(285deg, 3%, 30%);
@@ -236,10 +216,6 @@
     @variant nord {
       --color-accent: hsl(193deg, 43%, 68%); /* frost #88c0d0 */
       --color-base-text: hsl(219deg, 27%, 88%); /* nord4 #d8dee9 */
-      --color-pin-base-100: hsl(219deg, 25%, 78%);
-      --color-pin-base-150: hsl(219deg, 22%, 72%);
-      --color-pin-base-200: hsl(219deg, 18%, 69%);
-      --color-pin-base-250: hsl(220deg, 17%, 64%);
       --color-pin-base-300: hsl(220deg, 16%, 61%);
       --color-pin-base-350: hsl(220deg, 17%, 36%); /* nord3 #4c566a */
       --color-pin-base-400: hsl(222deg, 17%, 32%); /* nord2 #434c5e */
@@ -252,10 +228,6 @@
     @variant nord-light {
       --color-accent: hsl(213deg, 32%, 52%); /* nord10 #5e81ac */
       --color-base-text: hsl(220deg, 16%, 22%); /* nord0 dark text */
-      --color-pin-base-100: hsl(222deg, 16%, 28%); /* nord1 */
-      --color-pin-base-150: hsl(222deg, 17%, 31%); /* nord2 */
-      --color-pin-base-200: hsl(220deg, 17%, 32%); /* nord3 */
-      --color-pin-base-250: hsl(217deg, 19%, 38%);
       --color-pin-base-300: hsl(216deg, 22%, 44%);
       --color-pin-base-350: hsl(215deg, 24%, 74%);
       --color-pin-base-400: hsl(219deg, 26%, 82%);
@@ -268,10 +240,6 @@
     @variant gruvbox-dark-hard {
       --color-accent: hsl(107deg, 32%, 62%); /* bright aqua #8ec07c */
       --color-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
-      --color-pin-base-100: hsl(43deg, 40%, 72%);
-      --color-pin-base-150: hsl(42deg, 26%, 63%);
-      --color-pin-base-200: hsl(38deg, 16%, 61%);
-      --color-pin-base-250: hsl(28deg, 10%, 56%);
       --color-pin-base-300: hsl(22deg, 9%, 53%);
       --color-pin-base-350: hsl(18deg, 7%, 32%);
       --color-pin-base-400: hsl(12deg, 6%, 25%);
@@ -284,10 +252,6 @@
     @variant gruvbox-dark {
       --color-accent: hsl(107deg, 32%, 62%);
       --color-base-text: hsl(43deg, 59%, 81%); /* #ebdbb2 */
-      --color-pin-base-100: hsl(43deg, 40%, 73%); /* #d5c4a1 */
-      --color-pin-base-150: hsl(42deg, 26%, 66%); /* #bdae93 */
-      --color-pin-base-200: hsl(38deg, 16%, 63%); /* #a89984 */
-      --color-pin-base-250: hsl(30deg, 11%, 58%);
       --color-pin-base-300: hsl(21deg, 11%, 57%); /* #7c6f64 bg4 */
       --color-pin-base-350: hsl(21deg, 10%, 36%); /* #665c54 bg3 */
       --color-pin-base-400: hsl(11deg, 7%, 29%); /* #504945 bg2 */
@@ -300,10 +264,6 @@
     @variant gruvbox-dark-soft {
       --color-accent: hsl(107deg, 32%, 62%);
       --color-base-text: hsl(43deg, 59%, 81%);
-      --color-pin-base-100: hsl(43deg, 40%, 73%);
-      --color-pin-base-150: hsl(42deg, 26%, 66%);
-      --color-pin-base-200: hsl(38deg, 16%, 63%);
-      --color-pin-base-250: hsl(30deg, 11%, 61%);
       --color-pin-base-300: hsl(21deg, 11%, 61%); /* bg4 */
       --color-pin-base-350: hsl(21deg, 10%, 37%); /* bg3 */
       --color-pin-base-400: hsl(11deg, 7%, 29%); /* bg2 */
@@ -316,10 +276,6 @@
     @variant gruvbox-light-hard {
       --color-accent: hsl(184deg, 35%, 38%); /* teal #458588 */
       --color-base-text: hsl(12deg, 5%, 22%); /* #3c3836 */
-      --color-pin-base-100: hsl(11deg, 7%, 29%);
-      --color-pin-base-150: hsl(21deg, 10%, 34%);
-      --color-pin-base-200: hsl(21deg, 11%, 36%);
-      --color-pin-base-250: hsl(30deg, 11%, 41%);
       --color-pin-base-300: hsl(38deg, 14%, 43%);
       --color-pin-base-350: hsl(38deg, 36%, 73%);
       --color-pin-base-400: hsl(43deg, 50%, 79%);
@@ -332,10 +288,6 @@
     @variant gruvbox-light {
       --color-accent: hsl(184deg, 35%, 38%);
       --color-base-text: hsl(12deg, 5%, 22%);
-      --color-pin-base-100: hsl(11deg, 7%, 29%);
-      --color-pin-base-150: hsl(21deg, 10%, 34%);
-      --color-pin-base-200: hsl(21deg, 11%, 36%);
-      --color-pin-base-250: hsl(30deg, 11%, 41%);
       --color-pin-base-300: hsl(38deg, 14%, 43%);
       --color-pin-base-350: hsl(38deg, 36%, 73%);
       --color-pin-base-400: hsl(43deg, 50%, 79%);
@@ -348,10 +300,6 @@
     @variant gruvbox-light-soft {
       --color-accent: hsl(184deg, 35%, 38%);
       --color-base-text: hsl(12deg, 5%, 22%);
-      --color-pin-base-100: hsl(11deg, 7%, 29%);
-      --color-pin-base-150: hsl(21deg, 10%, 33%);
-      --color-pin-base-200: hsl(21deg, 11%, 36%);
-      --color-pin-base-250: hsl(30deg, 11%, 39%);
       --color-pin-base-300: hsl(38deg, 14%, 41%);
       --color-pin-base-350: hsl(38deg, 36%, 73%);
       --color-pin-base-400: hsl(43deg, 50%, 79%);
@@ -364,17 +312,12 @@
     @variant hc-dark {
       --color-accent: hsl(51deg, 100%, 50%);
       --color-base-text: hsl(0deg, 0%, 100%);
-      --color-pin-base-100: hsl(0deg, 0%, 95%);
-      --color-pin-base-150: hsl(0deg, 0%, 88%);
-      --color-pin-base-200: hsl(0deg, 0%, 80%);
-      --color-pin-base-250: hsl(0deg, 0%, 72%);
       --color-pin-base-300: hsl(0deg, 0%, 65%);
       --color-pin-base-350: hsl(0deg, 0%, 45%);
       --color-pin-base-400: hsl(0deg, 0%, 28%);
       --color-pin-base-450: hsl(0deg, 0%, 18%);
       --color-pin-base-500: hsl(0deg, 0%, 10%);
       --color-pin-base-550: hsl(0deg, 0%, 0%);
-      --color-accent: hsl(51deg, 100%, 50%);
 
       --color-tag-general: hsl(0deg, 0%, 22%);
       --color-tag-general-fg: hsl(0deg, 0%, 100%);
@@ -412,17 +355,12 @@
     @variant hc-light {
       --color-accent: hsl(230deg, 100%, 28%);
       --color-base-text: hsl(0deg, 0%, 0%);
-      --color-pin-base-100: hsl(0deg, 0%, 12%);
-      --color-pin-base-150: hsl(0deg, 0%, 18%);
-      --color-pin-base-200: hsl(0deg, 0%, 24%);
-      --color-pin-base-250: hsl(0deg, 0%, 32%);
       --color-pin-base-300: hsl(0deg, 0%, 40%);
       --color-pin-base-350: hsl(0deg, 0%, 58%);
       --color-pin-base-400: hsl(0deg, 0%, 78%);
       --color-pin-base-450: hsl(0deg, 0%, 90%);
       --color-pin-base-500: hsl(0deg, 0%, 98%);
       --color-pin-base-550: hsl(0deg, 0%, 100%);
-      --color-accent: hsl(230deg, 100%, 35%);
 
       --color-tag-general: hsl(0deg, 0%, 90%);
       --color-tag-general-fg: hsl(0deg, 0%, 0%);
@@ -551,7 +489,7 @@
     rounded-lg 
     cursor-pointer
     transition-all
-    duration-75;
+    duration-50;
   }
 
   input,
@@ -573,7 +511,7 @@
   }
 
   a {
-    @apply underline text-accent;
+    @apply underline text-accent transition-all duration-50;
   }
 
   h1 {
@@ -896,7 +834,7 @@
   @apply border-b border-lightest;
 }
 
-/* Alpine x-cloak: hide elements until Alpine initialises */
+/* Alpine x-cloak: hide elements until Alpine initializes */
 [x-cloak] {
   display: none !important;
 }
@@ -1040,6 +978,9 @@
     rgba(255, 255, 255, 0.75),
     rgba(255, 255, 255, 0) 60%
   );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);

@@ -25,7 +25,7 @@ def markdown_editor(
         # ── Editor column ────────────────────────────────────────────────────
         div(class_="flex-1 flex flex-col gap-1")[
             span(
-                class_="text-xs font-medium uppercase tracking-wide text-pin-base-300"
+                class_="text-xs font-medium uppercase tracking-wide text-lightest-hover"
             )["Write"],
             div(
                 id=editor_el_id,
@@ -43,11 +43,11 @@ def markdown_editor(
         # ── Preview column ───────────────────────────────────────────────────
         div(class_="flex-1 flex flex-col gap-1")[
             span(
-                class_="text-xs font-medium uppercase tracking-wide text-pin-base-300"
+                class_="text-xs font-medium uppercase tracking-wide text-lightest-hover"
             )["Preview"],
             div(
                 id=preview_el_id,
-                class_="markdown-content min-h-20 p-3 rounded-lg bg-pin-base-500 border border-pin-base-400",
+                class_="markdown-content min-h-20 p-3 rounded-lg bg-main border border-lightest",
             ),
         ],
     ]

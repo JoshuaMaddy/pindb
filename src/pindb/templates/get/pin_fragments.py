@@ -32,7 +32,7 @@ def favorite_button(request: Request, pin_id: int, is_favorited: bool) -> Elemen
                 i(data_lucide="heart", class_=f"inline-block {icon_fill}".strip()),
                 label_text,
             ],
-            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text",
+            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-lightest bg-lighter hover:border-accent cursor-pointer text-base-text",
         )
     ]
 
@@ -63,6 +63,6 @@ def set_row(
                 ),
                 pin_set.name,
             ],
-            class_="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-pin-base-450 cursor-pointer text-pin-base-text bg-transparent border-0 text-left font-inherit",
+            class_="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-lighter-hover cursor-pointer text-base-text bg-transparent border-0 text-left font-inherit",
         )
     ]

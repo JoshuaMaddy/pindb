@@ -16,9 +16,9 @@ def card(
 ) -> Element:
     return div(
         onclick=f"window.location.href='{str(href)}'" if href else None,
-        class_="p-2 no-underline text-pin-base-text bg-main rounded-xl border border-pin-base-350 flex gap-2 "
+        class_="p-2 no-underline text-base-text bg-main rounded-xl border border-lightest flex gap-2 "
         + (additional_classes + " " if additional_classes else "")
-        + "cursor-pointer hover:scale-[102%] hover:border-accent hover:bg-main-hover"
+        + "cursor-pointer hover:scale-[102%] hover:border-accent hover:bg-main-hover transition-all duration-100 ease-linear"
         if href
         else "",
     )[

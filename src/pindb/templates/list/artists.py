@@ -49,9 +49,11 @@ def _detailed_items(
                 div[
                     p(class_="text-lg")[
                         ("(P) " + artist.name) if artist.is_pending else artist.name,
-                        span(class_="text-pin-base-300 ml-1")[f"({len(artist.pins)})"],
+                        span(class_="text-lightest-hover ml-1")[
+                            f"({len(artist.pins)})"
+                        ],
                     ],
-                    p(class_="text-pin-base-300")[artist.description],
+                    p(class_="text-lightest-hover")[artist.description],
                 ],
             ],
         )

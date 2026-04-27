@@ -70,7 +70,7 @@ def bulk_edit_page(
                     )
                 ],
                 page_heading(icon="pencil-ruler", text=title),
-                p(class_="text-pin-base-300")[source_description],
+                p(class_="text-lightest-hover")[source_description],
                 _pin_count_banner(pin_count=pin_count),
                 _pending_notice(viewer_is_admin=viewer_is_admin),
                 hr,
@@ -96,7 +96,7 @@ def bulk_edit_page(
 
 
 def _pin_count_banner(pin_count: int) -> Element:
-    tone = "bg-pin-base-600" if pin_count else "bg-red-900 border border-red-600"
+    tone = "bg-darker" if pin_count else "bg-error-dark border border-error-dark"
     return div(class_=f"rounded px-4 py-2 text-sm {tone}")[
         i(data_lucide="layers", class_="inline-block w-4 h-4 mr-1"),
         f"This change will affect {pin_count} pin(s).",
@@ -107,7 +107,7 @@ def _pending_notice(viewer_is_admin: bool) -> Element | str:
     if viewer_is_admin:
         return ""
     return div(
-        class_="rounded bg-amber-900 border border-amber-600 text-amber-200 px-4 py-2 text-sm"
+        class_="rounded bg-error-dark border border-error-dark text-error-main px-4 py-2 text-sm"
     )[
         i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
         "Each affected pin will receive a pending edit for admin approval.",
@@ -169,7 +169,9 @@ def _tag_section(
                         ),
                         div[
                             span(class_="font-medium")[label_text],
-                            span(class_="block text-xs text-pin-base-300")[description],
+                            span(class_="block text-xs text-lightest-hover")[
+                                description
+                            ],
                         ],
                     ]
                     for mode, label_text, description in modes
@@ -182,7 +184,7 @@ def _tag_section(
 def _scalar_section() -> Fragment:
     return fragment[
         h2["Fields"],
-        p(class_="text-pin-base-300 text-sm")[
+        p(class_="text-lightest-hover text-sm")[
             "Only fields with the checkbox ticked are updated. Unticked fields "
             "are left unchanged on every pin.",
         ],

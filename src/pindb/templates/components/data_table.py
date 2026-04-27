@@ -156,7 +156,7 @@ document.addEventListener('alpine:init', function () {{
             div(class_="overflow-x-auto")[
                 table(class_="w-full text-sm border-collapse")[
                     thead[
-                        tr(class_="text-left border-b border-pin-base-700")[
+                        tr(class_="text-left border-b border-darker")[
                             [_th(col) for col in columns],
                         ]
                     ],
@@ -178,7 +178,7 @@ def _search_input() -> VoidElement:
         placeholder="Search…",
         aria_label="Search",
         **{"x-model": "search", "@input": "page = 1"},
-        class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text max-w-sm",
+        class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text max-w-sm",
     )
 
 
@@ -218,7 +218,7 @@ def _pagination_controls(total_row_count: int) -> Element:
             aria_label="Next page",
             **{"@click": "setPage(page + 1)", ":disabled": "page >= totalPages"},
         )["→"],
-        span(class_="ml-auto text-pin-base-400")[
+        span(class_="ml-auto text-lighter-hover")[
             span(**{"x-text": "filteredRows.length"}),
             f" of {total_row_count}",
         ],

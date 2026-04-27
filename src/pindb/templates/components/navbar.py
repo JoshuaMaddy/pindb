@@ -7,7 +7,7 @@ from htpy import Element, a, button, div, form, i, nav
 
 from pindb.database.user import User
 
-_LINK: str = "no-underline text-pin-base-text hover:text-accent"
+_LINK: str = "no-underline text-base-text hover:text-accent"
 
 
 def _staff_nav_link_items(user: User) -> list[Element]:
@@ -26,18 +26,18 @@ def _auth_block(user: User | None, *, ml_auto: bool) -> Element:
     if user:
         return div(class_=cls)[
             a(
-                class_="no-underline text-pin-base-text hover:text-accent",
+                class_="no-underline text-base-text hover:text-accent",
                 href=f"/user/{user.username}",
             )[user.username],
             form(method="post", action="/auth/logout")[
                 button(
                     type="submit",
-                    class_="no-underline text-pin-base-text bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
+                    class_="no-underline text-base-text bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
                 )["Logout"]
             ],
         ]
     return a(
-        class_=cls + " no-underline text-pin-base-text",
+        class_=cls + " no-underline text-base-text",
         href="/auth/login",
     )["Login"]
 
@@ -50,7 +50,7 @@ def navbar(
 
     if not is_staff:
         return nav(
-            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-pin-base-500 relative z-[10]"
+            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-main relative z-10"
         )[
             a(class_="no-underline text-accent font-bold shrink-0", href="/")["PinDB"],
             a(class_=_LINK, href="/list")["List"],
@@ -59,7 +59,7 @@ def navbar(
         ]
 
     assert user is not None
-    return nav(class_="px-2 py-1 bg-pin-base-500 relative z-[10]")[
+    return nav(class_="px-2 py-1 bg-main relative z-10")[
         div(
             class_="flex flex-col gap-2 sm:gap-0 w-full",
             x_data="{ open: false }",
@@ -75,7 +75,7 @@ def navbar(
                 )["PinDB"],
                 button(
                     type="button",
-                    class_="sm:hidden inline-flex items-center justify-center rounded border border-pin-base-400 p-1.5 text-pin-base-text hover:bg-pin-base-450 shrink-0",
+                    class_="sm:hidden inline-flex items-center justify-center rounded border border-lightest p-1.5 text-base-text hover:bg-lighter-hover shrink-0",
                     aria_controls="staff-nav-panel",
                     **{
                         "@click": "open = !open",
@@ -92,7 +92,7 @@ def navbar(
             ],
             div(
                 id="staff-nav-panel",
-                class_="sm:hidden flex flex-col gap-2 border-t border-pin-base-400 pt-2",
+                class_="sm:hidden flex flex-col gap-2 border-t border-lightest pt-2",
                 x_show="open",
             )[*_staff_nav_link_items(user)],
         ]

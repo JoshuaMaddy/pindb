@@ -40,7 +40,7 @@ def simple_aliased_entity_form(
     create_icon: str,
     create_article: str,
 ) -> Element:
-    """Shared scaffold; ``entity_kind`` capitalised (``"Artist"``/``"Shop"``)."""
+    """Shared scaffold; ``entity_kind`` capitalized (``"Artist"``/``"Shop"``)."""
     current_aliases: Sequence[str] = [a.alias for a in entity.aliases] if entity else []
     entity_links: list[str] = [link.path for link in entity.links] if entity else []
     if not entity_links:
@@ -69,7 +69,9 @@ def simple_aliased_entity_form(
                     hx_swap="innerHTML",
                     class_="flex flex-col gap-2 [&_label]:font-semibold",
                 )[
-                    label(for_="name")["Name", span(class_="text-red-200 ml-0.5")["*"]],
+                    label(for_="name")[
+                        "Name", span(class_="text-error-main ml-0.5")["*"]
+                    ],
                     input(
                         type="text",
                         name="name",

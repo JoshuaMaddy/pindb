@@ -92,7 +92,7 @@ def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
             if pin
             else False,
         )[
-            fragment["Front Image", span(class_="text-red-200 ml-0.5")["*"]]
+            fragment["Front Image", span(class_="text-error-main ml-0.5")["*"]]
             if not pin
             else ""
         ],
@@ -150,7 +150,7 @@ def _text_field(
 ) -> list[Element | VoidElement]:
     """Reusable label + input pair for the pin form grid."""
     label_element = (
-        label(for_=name)[label_text, span(class_="text-red-200 ml-0.5")["*"]]
+        label(for_=name)[label_text, span(class_="text-error-main ml-0.5")["*"]]
         if required
         else label(for_=name)[label_text]
     )
@@ -191,7 +191,7 @@ def _shops_input(
     pin: Pin | None,
 ) -> list[Element | VoidElement]:
     return [
-        label(for_="shop_ids")["Shops", span(class_="text-red-200 ml-0.5")["*"]],
+        label(for_="shop_ids")["Shops", span(class_="text-error-main ml-0.5")["*"]],
         select(
             name="shop_ids",
             id="shop_ids",
@@ -214,7 +214,7 @@ def _shops_input(
 def _acquisition_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         label(for_="acquisition_type")[
-            "Acquisition", span(class_="text-red-200 ml-0.5")["*"]
+            "Acquisition", span(class_="text-error-main ml-0.5")["*"]
         ],
         select(
             name="acquisition_type",
@@ -256,7 +256,7 @@ def _grades_input(
     grades_json = json.dumps(grades_data)
 
     return [
-        label(for_="grade")["Grade", span(class_="text-red-200 ml-0.5")["*"]],
+        label(for_="grade")["Grade", span(class_="text-error-main ml-0.5")["*"]],
         Markup(f"""<div class="flex w-full min-w-0 flex-wrap gap-2">
             <div class="flex min-w-0 flex-1 flex-col gap-2" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
                 <template x-for="grade in grades" :key="grade.id">
@@ -272,7 +272,7 @@ def _grades_input(
         select(
             name="currency_id",
             id="currency_id",
-            class_="w-full min-w-0 sm:w-auto sm:min-w-[8rem]",
+            class_="w-full min-w-0 sm:w-auto sm:min-w-32",
         )[
             [
                 option(
@@ -294,7 +294,7 @@ def _tag_ids_input(
 ) -> list[Element | VoidElement]:
     preview_url = str(request.url_for("get_tag_implication_preview"))
     return [
-        label(for_="tag_ids")["Tags", span(class_="text-red-200 ml-0.5")["*"]],
+        label(for_="tag_ids")["Tags", span(class_="text-error-main ml-0.5")["*"]],
         select(
             name="tag_ids",
             id="tag_ids",

@@ -116,7 +116,7 @@ def html_base(
         ],
         body(class_="min-h-screen flex flex-col")[
             navbar(request=request),
-            main_el(class_="min-h-screen relative z-[5]")[body_content,],
+            main_el(class_="min-h-screen relative z-5")[body_content,],
             footer(),
             div(
                 id="pindb-toast-host",

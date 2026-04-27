@@ -104,10 +104,10 @@ def _user_row_template() -> Element:
         "their personal pin sets. Cannot be undone."
     )
 
-    return tr(class_="border-b border-pin-base-800")[
+    return tr(class_="border-b border-darker")[
         td(class_="py-2 pr-6", **{"x-text": "row.username"}),
         td(
-            class_="py-2 pr-6 text-pin-base-400",
+            class_="py-2 pr-6 text-lighter-hover",
             **{"x-text": "row.email || '—'"},
         ),
         td(class_="py-2 pr-6")[
@@ -117,8 +117,8 @@ def _user_row_template() -> Element:
                     **{
                         ":class": (
                             "row.is_admin"
-                            " ? 'bg-amber-700 text-amber-100'"
-                            " : 'bg-pin-base-700 text-pin-base-300'"
+                            " ? 'bg-error-dark-hover text-error-main-hover'"
+                            " : 'bg-darker text-lightest-hover'"
                         ),
                         "x-text": "row.is_admin ? 'Admin' : 'User'",
                     },

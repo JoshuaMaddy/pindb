@@ -29,8 +29,8 @@ def confirm_modal(
 
     # Build the confirm button inside the modal
     confirm_btn_base_class = (
-        "flex items-center gap-1 px-2 py-1 rounded border border-red-400 "
-        "bg-transparent cursor-pointer text-red-200 hover:bg-red-950/30"
+        "flex items-center gap-1 px-2 py-1 rounded border border-error-dark "
+        "bg-transparent cursor-pointer text-error-main hover:bg-error-dark-hover"
     )
 
     if form_action is not None:
@@ -59,19 +59,19 @@ def confirm_modal(
         )[confirm_label]
 
     cancel_class = (
-        "flex items-center gap-1 px-2 py-1 rounded border border-pin-base-400 "
-        "bg-transparent cursor-pointer text-pin-base-text hover:border-accent"
+        "flex items-center gap-1 px-2 py-1 rounded border border-lightest "
+        "bg-transparent cursor-pointer text-base-text hover:border-accent"
     )
 
     modal_overlay: Element = div(
-        class_="fixed inset-0 z-50 flex items-center justify-center bg-black/50",
+        class_="fixed inset-0 z-50 flex items-center justify-center bg-darker",
         x_show="open",
         x_cloak=True,
         **{"@click.self": "open = false"},
     )[
         div(
             class_=(
-                "relative bg-pin-base-500 border border-pin-base-400 rounded-xl "
+                "relative bg-main border border-lightest rounded-xl "
                 "shadow-2xl p-6 max-w-sm w-full mx-4 flex flex-col gap-4"
             ),
             **{"@click.stop": ""},
@@ -82,7 +82,7 @@ def confirm_modal(
                 class_=(
                     "absolute top-3 right-3 flex items-center justify-center "
                     "w-6 h-6 rounded border-0 bg-transparent cursor-pointer "
-                    "text-pin-base-300 hover:text-pin-base-text"
+                    "text-lightest-hover hover:text-base-text"
                 ),
                 **{"@click": "open = false"},
             )[i(data_lucide="x", class_="w-4 h-4")],

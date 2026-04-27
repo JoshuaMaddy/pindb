@@ -27,9 +27,9 @@ def _see_all_card(*, url: str, label: str) -> Element:
         class_=(
             "absolute right-0 top-0 bottom-0 z-20 w-12"
             " flex items-center justify-center"
-            " rounded-lg bg-pin-base-450 border border-pin-base-400"
+            " rounded-lg bg-lighter border border-lightest"
             " hover:border-accent hover:text-accent"
-            " text-pin-base-300 no-underline"
+            " text-lightest-hover no-underline"
         ),
     )[i(data_lucide="chevron-right", aria_hidden="true")]
 
@@ -51,7 +51,7 @@ def _pin_preview_row(
         div(
             class_=(
                 "absolute right-0 top-0 bottom-0 w-44 z-10 pointer-events-none"
-                " bg-gradient-to-r from-transparent to-[var(--color-pin-base-550)]"
+                " bg-gradient-to-r from-transparent to-[var(--color-darker)]"
             )
         ),
         _see_all_card(url=see_all_url, label=see_all_label),
@@ -117,11 +117,11 @@ def _sets_section(
                     div[
                         p[
                             pin_set.name,
-                            span(class_="text-pin-base-300 ml-1")[
+                            span(class_="text-lightest-hover ml-1")[
                                 f"({len(pin_set.pins)})"
                             ],
                         ],
-                        p(class_="text-pin-base-300")[pin_set.description],
+                        p(class_="text-lightest-hover")[pin_set.description],
                     ],
                     is_own_profile
                     and div(

@@ -9,7 +9,7 @@ def pill_link(
     href: str,
     text: str,
     icon: str | None = None,
-    color_classes: str = "bg-pin-base-500 text-pin-base-text border-pin-base-400",
+    color_classes: str = "bg-main text-base-text border-lightest",
     hover_classes: str = "hover:border-accent hover:text-accent",
 ) -> Element:
     return a(

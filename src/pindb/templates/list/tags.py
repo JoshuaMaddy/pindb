@@ -57,7 +57,7 @@ def _detailed_items(
                         ("(P) " + tag.display_name)
                         if tag.is_pending
                         else tag.display_name,
-                        span(class_="text-pin-base-300 ml-1")[f"({len(tag.pins)})"],
+                        span(class_="text-lightest-hover ml-1")[f"({len(tag.pins)})"],
                     ],
                     category_badge(tag.category),
                 ],
@@ -80,8 +80,8 @@ def _category_select(base_url: str, category: TagCategory | None) -> Element:
         hx_replace_url="true",
         hx_include=f"#{SECTION_ID} [name='view'], #{SECTION_ID} [name='sort'], [name='q']",
         class_=(
-            "bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1.5 "
-            "text-pin-base-text text-sm"
+            "bg-lighter border border-lightest rounded px-2 py-1.5 "
+            "text-base-text text-sm"
         ),
     )[
         option(value="", selected=(category is None))["All categories"],

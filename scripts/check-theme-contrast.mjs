@@ -1,6 +1,6 @@
 /**
- * WCAG 2.1 contrast matrix for PinDB theme tokens in src/pindb/static/input.css.
- * Resolves --color-pin-* per theme (mocha = @theme defaults + variant overlays).
+ * WCAG 2.1 contrast matrix for PinDB semantic theme tokens in src/pindb/static/input.css.
+ * Resolves --color-* vars per theme (mocha = @theme defaults + variant overlays).
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,31 +18,28 @@ function belowMin(ratio, min) {
 
 /** Surfaces that commonly sit behind body copy or controls. */
 const SURFACE_KEYS = [
+  "darker",
+  "darker-hover",
   "main",
   "main-hover",
-  "pin-base-550",
-  "pin-base-500",
-  "pin-base-450",
-  "pin-base-400",
+  "lighter",
+  "lighter-hover",
+  "lightest",
+  "lightest-hover",
 ];
 
 const TEXT_KEYS = [
-  "pin-base-text",
-  "pin-base-100",
-  "pin-base-150",
-  "pin-base-200",
-  "pin-base-250",
-  "pin-base-300",
+  "base-text",
+  "accent",
 ];
 
 /**
  * Semantic checks (WCAG AA 4.5:1 for normal text):
- * - Full neutral ramp on primary shell: main, base-500, base-550 (typical body + muted).
- * - Hover and input surfaces (main-hover, base-450): text through base-200 only
- *   (controls rarely use base-250/300 as foreground on these).
+ * - Full semantic text ramp on primary shell surfaces.
+ * - Hover/input surfaces focus on stronger text colors.
  *
  * Use `PIN_CONTRAST_MATRIX=full` to audit every surface × text combination
- * (includes pin-base-400 × full ramp).
+ * (includes lightest/lightest-hover surfaces).
  */
 function contrastChecks() {
   if (MATRIX === "full") {
@@ -59,14 +56,9 @@ function contrastChecks() {
     process.exit(1);
   }
   const out = [];
-  const shell = ["main", "pin-base-500", "pin-base-550"];
-  const controlSurfaces = ["main-hover", "pin-base-450"];
-  const strongText = [
-    "pin-base-text",
-    "pin-base-100",
-    "pin-base-150",
-    "pin-base-200",
-  ];
+  const shell = ["darker", "main", "lighter", "lightest"];
+  const controlSurfaces = ["darker-hover", "main-hover", "lighter-hover", "lightest-hover"];
+  const strongText = ["base-text", "accent"];
   for (const bg of shell) {
     for (const fg of TEXT_KEYS) {
       out.push({ bg, fg, min: MIN_RATIO });
@@ -121,7 +113,7 @@ function parseVariants(css) {
 
 function parsePinColorDeclarations(block) {
   const vars = {};
-  const declRe = /--color-(pin-[\w-]+)\s*:\s*([^;]+);/g;
+  const declRe = /--color-([\w-]+)\s*:\s*([^;]+);/g;
   let m;
   while ((m = declRe.exec(block)) !== null) {
     vars[m[1]] = m[2].trim();
@@ -189,7 +181,7 @@ function resolveVars(rawMap) {
   for (let round = 0; round < 20; round++) {
     let changed = false;
     for (const [key, val] of Object.entries(map)) {
-      const m = val.match(/^var\(\s*--color-(pin-[\w-]+)\s*\)$/i);
+      const m = val.match(/^var\(\s*--color-([\w-]+)\s*\)$/i);
       if (m) {
         const target = m[1];
         if (map[target] && !map[target].startsWith("var(")) {
@@ -208,7 +200,7 @@ function rgbForToken(resolved, token) {
   if (!v) return { error: `missing ${token}` };
   if (v.startsWith("var(")) return { error: `unresolved ${token}: ${v}` };
   const rgb = parseHslToRgb(v);
-  if (!rgb) return { error: `unparseable ${token}: ${v}` };
+  if (!rgb) return { error: `unparsable ${token}: ${v}` };
   return { rgb };
 }
 

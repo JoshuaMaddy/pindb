@@ -99,7 +99,7 @@ def _add_to_set_panel(
     pin_set_ids: set[int] = {ps.id for ps in pin.sets}
     return dropdown_panel(
         trigger=div(
-            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-pin-base-400 bg-pin-base-450 hover:border-accent cursor-pointer text-pin-base-text"
+            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-lightest bg-lighter hover:border-accent cursor-pointer text-base-text"
         )[
             i(data_lucide="layout-grid", class_="inline-block"),
             "Add to Set",
@@ -115,14 +115,14 @@ def _add_to_set_panel(
                 for ps in user_sets
             ],
             not user_sets
-            and p(class_="text-sm text-pin-base-300 px-2 py-1")["No sets yet."],
+            and p(class_="text-sm text-lightest-hover px-2 py-1")["No sets yet."],
             a(
                 href=str(
                     request.url_for("get_create_user_set")
                     if not user_sets
                     else request.url_for("get_me")
                 ),
-                class_="text-sm text-pin-base-text no-underline mt-1 pt-1 border-t border-pin-base-400 hover:text-accent",
+                class_="text-sm text-base-text no-underline mt-1 pt-1 border-t border-lightest hover:text-accent",
             )["+ Create a set" if not user_sets else "+ Manage sets"],
         ],
     )
@@ -219,12 +219,12 @@ def _grades(pin: Pin) -> Element | None:
             i(data_lucide="banknote", class_="inline-block pr-2"),
             "Grades",
         ],
-        div(class_="ml-4 border border-pin-base-400 w-min")[
+        div(class_="ml-4 border border-lightest w-min")[
             table(class_="border-collapse")[
                 tbody[
                     [
                         tr[
-                            td(class_="px-2 border-r border-pin-base-400")[grade.name],
+                            td(class_="px-2 border-r border-lightest")[grade.name],
                             td(class_="px-2")[
                                 format_currency_code(
                                     amount=grade.price, code=pin.currency.code
@@ -284,7 +284,7 @@ def _tags(pin: Pin, request: Request) -> Element:
                 else tag.display_name,
                 icon=CATEGORY_ICONS.get(tag.category, "tag"),
                 color_classes=CATEGORY_COLORS.get(
-                    tag.category, "bg-pin-base-500 text-pin-base-text"
+                    tag.category, "bg-main text-base-text"
                 ),
                 hover_classes=CATEGORY_HOVER_CLASSES.get(
                     tag.category, "hover:border-accent hover:text-accent"

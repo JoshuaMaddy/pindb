@@ -44,7 +44,7 @@ def signup_page(
                 h1["Sign Up"],
                 hr,
                 error_message(error),
-                ul(class_="text-red-200 list-disc pl-5")[
+                ul(class_="text-error-main list-disc pl-5")[
                     [li[rule] for rule in password_errors]
                 ]
                 if password_errors

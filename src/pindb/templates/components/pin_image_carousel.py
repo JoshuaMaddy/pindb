@@ -12,9 +12,7 @@ from htpy import Element, Fragment, div, fragment, img, link
 from pindb.database.pin import Pin
 from pindb.templates.pin_image_alt import pin_back_image_alt, pin_front_image_alt
 
-IMG_CAROUSEL_HEIGHT: str = (
-    "w-full max-h-[30vh] sm:max-h-[60vh] object-contain bg-pin-base-500"
-)
+IMG_CAROUSEL_HEIGHT: str = "w-full max-h-[30vh] sm:max-h-[60vh] object-contain bg-main"
 
 PIN_SWIPER_INIT: str = """
 (function () {
@@ -113,7 +111,7 @@ def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
             pin_front_image_alt(pin) if idx == 0 else pin_back_image_alt(pin)
         )
         main_slides.append(
-            div(class_="swiper-slide flex items-center justify-center bg-pin-base-500")[
+            div(class_="swiper-slide flex items-center justify-center bg-main")[
                 img(
                     alt=slide_alt,
                     class_=IMG_CAROUSEL_HEIGHT + " pin-zoomable cursor-zoom-in",
@@ -127,7 +125,7 @@ def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
         )
         thumb_slides.append(
             div(
-                class_="swiper-slide box-border! overflow-hidden rounded border border-pin-base-400"
+                class_="swiper-slide box-border! overflow-hidden rounded border border-lightest"
             )[
                 img(
                     alt=slide_alt,

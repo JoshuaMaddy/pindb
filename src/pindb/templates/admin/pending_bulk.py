@@ -75,7 +75,7 @@ def _bulk_group_card(*, group: BulkGroupView) -> Element:
                     span(class_="text-lighter w-20")[entity_type_slug],
                     a(
                         href=f"/get/{entity_type_slug}/{entity.id}",
-                        class_="text-lightest hover:text-lightest",
+                        class_="text-lightest hover:text-accent",
                     )[getattr(entity, "name", f"#{entity.id}")],
                 ]
                 for entity_type_slug, entity in group.entities
@@ -128,9 +128,9 @@ def _bulk_edit_row(
     slug: str = entity_type.slug if entity_type is not None else table_name
     name: str = getattr(entity, "name", f"#{entity_id}") if entity else f"#{entity_id}"
     return div(class_="flex items-baseline gap-2 text-sm")[
-        span(class_="text-pin-base-400 w-20")[slug],
+        span(class_="text-lighter-hover w-20")[slug],
         a(href=f"/get/{slug}/{entity_id}?version=pending", class_="hover:text-accent")[
             name
         ],
-        span(class_="text-xs text-pin-base-400")[f"({len(chain)} edit(s))"],
+        span(class_="text-xs text-lighter-hover")[f"({len(chain)} edit(s))"],
     ]

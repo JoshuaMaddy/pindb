@@ -24,7 +24,7 @@ def search_pin_input(
         hx_target=hx_target,
         class_="flex flex-col gap-2 [&_label]:font-semibold",
     )[
-        div(class_="p-4 rounded-3xl bg-pin-base-400 flex items-center justify-center")[
+        div(class_="p-4 rounded-3xl bg-lighter-hover flex items-center justify-center")[
             input(
                 type="text",
                 name="search",

@@ -175,12 +175,12 @@ PIN_LIGHTBOX_INIT: str = """
 
 def pin_lightbox() -> Element:
     btn_cls = (
-        "p-2 rounded-lg bg-pin-base-500/80 hover:bg-pin-base-450 "
-        "border border-pin-base-400 text-pin-base-text"
+        "p-2 rounded-lg bg-main hover:bg-lighter-hover "
+        "border border-lightest text-base-text"
     )
     return div(
         id="pin-lightbox",
-        class_="hidden fixed inset-0 z-50 items-center justify-center bg-black/85",
+        class_="hidden fixed inset-0 z-50 items-center justify-center bg-darker",
         role="dialog",
         aria_modal="true",
         aria_label="Pin image — full size",
@@ -220,7 +220,7 @@ def pin_lightbox() -> Element:
             id="pin-lightbox-zoom-label",
             class_=(
                 "absolute bottom-3 left-1/2 -translate-x-1/2 text-white text-sm "
-                "bg-black/60 px-2 py-0.5 rounded"
+                "bg-darker px-2 py-0.5 rounded"
             ),
             aria_live="polite",
         )["100%"],

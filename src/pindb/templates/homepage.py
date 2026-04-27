@@ -77,7 +77,7 @@ def _masonry_bg(request: Request, pins: list[Pin]) -> Element:
 def _homepage_center(request: Request) -> Element:
     return div(id="homepage-center")[
         div(id="homepage-card")[
-            h1(class_="text-center")["PinDB"],
+            h1(class_="text-center text-accent")["PinDB"],
             h2(class_="text-center")["A database for all things pins."],
             form(
                 id="homepage-search",
@@ -86,7 +86,7 @@ def _homepage_center(request: Request) -> Element:
                 class_="flex flex-col gap-2",
             )[
                 div(
-                    class_="p-4 rounded-3xl bg-lighter flex items-center justify-center"
+                    class_="p-4 rounded-3xl bg-lighter flex items-center justify-center border-lightest border"
                 )[
                     input(
                         type="text",

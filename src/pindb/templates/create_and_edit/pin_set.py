@@ -95,7 +95,7 @@ def pin_set_create_page(request: Request) -> Element:
                             name="name",
                             required=True,
                             autocomplete="off",
-                            class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
+                            class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
                             placeholder="Set Name",
                         ),
                     ),
@@ -109,7 +109,7 @@ def pin_set_create_page(request: Request) -> Element:
                     ),
                     button(
                         type="submit",
-                        class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+                        class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-lightest cursor-pointer text-base-text w-full",
                     )["Create Set"],
                 ],
             ],
@@ -170,7 +170,7 @@ def pin_set_edit_page(
             content=[
                 a(
                     href=back_href,
-                    class_="text-pin-base-300 no-underline hover:text-accent",
+                    class_="text-lightest-hover no-underline hover:text-accent",
                 )[
                     i(data_lucide="arrow-left", class_="inline-block mb-1"),
                     f" {back_label}",
@@ -219,7 +219,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
                     value=pin_set.name,
                     required=True,
                     autocomplete="off",
-                    class_="bg-pin-base-450 border border-pin-base-400 rounded px-2 py-1 text-pin-base-text",
+                    class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
                 ),
             ),
             form_field(
@@ -233,7 +233,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
             ),
             button(
                 type="submit",
-                class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-pin-base-400 cursor-pointer text-pin-base-text w-full",
+                class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-lightest cursor-pointer text-base-text w-full",
             )["Save"],
         ],
     ]
@@ -247,7 +247,7 @@ def pin_list_section(
 ) -> Element:
     return div(id="pin-list-section", class_="flex flex-col gap-2")[
         h2(id="pin-list-count")[f"Pins ({len(pins)})"],
-        pins and p(class_="text-sm text-pin-base-300")["Drag cards to reorder."],
+        pins and p(class_="text-sm text-lightest-hover")["Drag cards to reorder."],
         div(
             id="pin-list",
             data_reorder_url=reorder_url,
@@ -256,7 +256,7 @@ def pin_list_section(
             *(
                 [_pin_card(request=request, pin=pin, set_id=pin_set.id) for pin in pins]
                 or [
-                    p(id="pin-list-empty", class_="text-pin-base-300")[
+                    p(id="pin-list-empty", class_="text-lightest-hover")[
                         "No pins in this set yet."
                     ]
                 ]
@@ -294,7 +294,7 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
     return div(
         id=f"pin-row-{pin.id}",
         data_pin_id=str(pin.id),
-        class_="relative flex flex-col w-[100px] shrink-0 rounded-lg bg-pin-base-450 border border-pin-base-400 overflow-hidden cursor-grab select-none hover:border-accent",
+        class_="relative flex flex-col w-25 shrink-0 rounded-lg bg-lighter border border-lightest overflow-hidden cursor-grab select-none hover:border-accent",
     )[
         button(
             type="button",
@@ -302,7 +302,7 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
             hx_delete=remove_url,
             hx_target=f"#pin-row-{pin.id}",
             hx_swap="outerHTML",
-            class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-pin-base-500 border border-pin-base-400 cursor-pointer text-red-200 hover:text-red-300 hover:border-red-400 p-0",
+            class_="absolute top-1 right-1 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-main border border-error-dark cursor-pointer text-error-main hover:text-error-main-hover hover:border-error-dark-hover p-0",
         )[i(data_lucide="x", class_="w-3 h-3", aria_hidden="true")],
         a(
             href=str(
@@ -316,13 +316,13 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
             img(
                 src=image_url,
                 alt=pin_front_image_alt(pin),
-                class_="w-full aspect-square object-contain bg-pin-base-500",
+                class_="w-full aspect-square object-contain bg-main",
             )
         ],
-        p(
-            class_="px-2 pt-1 pb-0 text-xs text-pin-base-text leading-tight line-clamp-2"
-        )[pin.name],
-        div(class_="flex justify-center pb-1 pt-0.5 text-pin-base-300")[
+        p(class_="px-2 pt-1 pb-0 text-xs text-base-text leading-tight line-clamp-2")[
+            pin.name
+        ],
+        div(class_="flex justify-center pb-1 pt-0.5 text-lightest-hover")[
             i(data_lucide="grip-horizontal", class_="w-4 h-4"),
         ],
     ]
@@ -379,13 +379,13 @@ def search_result_row(
             )
         )
         icon = "check-square"
-        text_class = "text-pin-base-300"
+        text_class = "text-lightest-hover"
     else:
         action_url = str(
             request.url_for("add_pin_to_personal_set", set_id=set_id, pin_id=pin.id)
         )
         icon = "square"
-        text_class = "text-pin-base-text"
+        text_class = "text-base-text"
 
     thumbnail_url = str(
         request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
@@ -400,7 +400,7 @@ def search_result_row(
     )
     return div(
         id=f"search-row-{pin.id}",
-        class_="flex items-center gap-2 p-2 rounded bg-pin-base-450 border border-pin-base-400",
+        class_="flex items-center gap-2 p-2 rounded bg-lighter border border-lightest",
     )[
         toggle_button(
             url=action_url,
@@ -411,12 +411,12 @@ def search_result_row(
                 img(
                     src=thumbnail_url,
                     alt=pin_front_image_alt(pin),
-                    class_="w-10 h-10 object-contain rounded bg-pin-base-500 shrink-0",
+                    class_="w-10 h-10 object-contain rounded bg-main shrink-0",
                 ),
                 div(class_="flex flex-col gap-0.5 flex-1 min-w-0")[
                     span(class_="truncate")[pin.name],
                     bool(shop_text or artist_text)
-                    and div(class_="flex gap-3 text-xs text-pin-base-300")[
+                    and div(class_="flex gap-3 text-xs text-lightest-hover")[
                         bool(shop_text) and span[shop_text],
                         bool(artist_text) and span[artist_text],
                     ],

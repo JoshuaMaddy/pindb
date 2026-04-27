@@ -95,9 +95,9 @@ def login_page(
 
     email_divider: Element | None = (
         div(class_="my-5 flex w-full items-center gap-3")[
-            hr(class_="flex-1 border-pin-base-400"),
+            hr(class_="flex-1 border-lightest"),
             span(class_="shrink-0 text-sm text-subtle")["or continue with email"],
-            hr(class_="flex-1 border-pin-base-400"),
+            hr(class_="flex-1 border-lightest"),
         ]
         if oauth_any
         else None

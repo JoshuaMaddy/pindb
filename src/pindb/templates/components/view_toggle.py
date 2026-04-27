@@ -12,7 +12,7 @@ _ACTIVE_CLASS: str = (
     "px-3 py-1 rounded border border-accent text-accent text-sm no-underline"
 )
 _INACTIVE_CLASS: str = (
-    "px-3 py-1 rounded border border-pin-base-400 text-pin-base-300 text-sm "
+    "px-3 py-1 rounded border border-lightest text-lightest-hover text-sm "
     "hover:border-accent no-underline"
 )
 

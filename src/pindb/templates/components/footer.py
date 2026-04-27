@@ -15,10 +15,10 @@ def footer() -> Element:
     year: int = datetime.now().year
     email: str = CONFIGURATION.contact_email
 
-    link_cls: str = "text-pin-base-text hover:text-accent hover:cursor-pointer"
+    link_cls: str = "text-base-text hover:text-accent hover:cursor-pointer"
 
     return footer_el(
-        class_="mt-8 bg-pin-base-550 text-pin-base-text text-sm px-5 py-6 relative z-[10] border-t border-pin-base-400"
+        class_="mt-8 bg-darker text-base-text text-sm px-5 py-6 relative z-10 border-t border-lightest"
     )[
         div(class_="max-w-5xl mx-auto flex flex-col gap-3")[
             div(
@@ -26,7 +26,7 @@ def footer() -> Element:
             )[
                 div(class_="flex flex-wrap gap-x-4 gap-y-1 items-center")[
                     p(class_="font-semibold")[f"\u00a9 {year} PinDB"],
-                    p(class_="text-pin-base-text")[f"v{__version__}"],
+                    p(class_="text-base-text")[f"v{__version__}"],
                 ],
                 div(class_="flex flex-wrap gap-x-4 gap-y-1 items-center")[
                     a(class_=link_cls, href="/docs")["Docs"],
@@ -36,7 +36,7 @@ def footer() -> Element:
                     a(class_=link_cls, href=f"mailto:{email}")["Contact"],
                 ],
             ],
-            p(class_="text-pin-base-text text-xs leading-relaxed")[
+            p(class_="text-base-text text-xs leading-relaxed")[
                 "Pin images, names, brands, designs, and trademarks are the "
                 "property of their respective owners. PinDB is a community "
                 "cataloging service and claims no ownership of, affiliation "

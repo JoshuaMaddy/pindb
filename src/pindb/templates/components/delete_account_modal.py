@@ -17,29 +17,29 @@ def delete_account_modal(
     x_data: str = f"{{ open: false, expected: {expected_json}, typed: '' }}"
 
     confirm_btn_class = (
-        "flex items-center gap-1 px-3 py-1.5 rounded border border-red-400 "
-        "bg-transparent text-red-200 hover:bg-red-950/30 "
+        "flex items-center gap-1 px-3 py-1.5 rounded border border-error-dark "
+        "bg-transparent text-error-main hover:bg-error-dark-hover "
         "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
     )
     cancel_class = (
-        "flex items-center gap-1 px-3 py-1.5 rounded border border-pin-base-400 "
-        "bg-transparent cursor-pointer text-pin-base-text hover:border-accent"
+        "flex items-center gap-1 px-3 py-1.5 rounded border border-lightest "
+        "bg-transparent cursor-pointer text-base-text hover:border-accent"
     )
     input_class = (
-        "w-full px-3 py-2 rounded-lg border border-pin-base-400 bg-pin-base-550 "
-        "text-pin-base-text placeholder:text-pin-base-400 focus:outline-none "
+        "w-full px-3 py-2 rounded-lg border border-lightest bg-darker "
+        "text-base-text placeholder:text-lighter-hover focus:outline-none "
         "focus:border-accent"
     )
 
     modal_overlay: Element = div(
-        class_="fixed inset-0 z-50 flex items-center justify-center bg-black/50",
+        class_="fixed inset-0 z-50 flex items-center justify-center bg-darker",
         x_show="open",
         x_cloak=True,
         **{"@click.self": "open = false"},
     )[
         div(
             class_=(
-                "relative bg-pin-base-500 border border-pin-base-400 rounded-xl "
+                "relative bg-main border border-lightest rounded-xl "
                 "shadow-2xl p-6 max-w-md w-full mx-4 flex flex-col gap-4"
             ),
             **{"@click.stop": ""},
@@ -49,17 +49,17 @@ def delete_account_modal(
                 class_=(
                     "absolute top-3 right-3 flex items-center justify-center "
                     "w-6 h-6 rounded border-0 bg-transparent cursor-pointer "
-                    "text-pin-base-300 hover:text-pin-base-text"
+                    "text-lightest-hover hover:text-base-text"
                 ),
                 **{"@click": "open = false"},
             )[i(data_lucide="x", class_="w-4 h-4")],
-            p(class_="text-base font-medium text-pin-base-text")[
+            p(class_="text-base font-medium text-base-text")[
                 "Delete your account permanently?"
             ],
-            p(class_="text-sm text-pin-base-300")[
+            p(class_="text-sm text-lightest-hover")[
                 "This removes your profile, sessions, linked sign-in providers, "
                 "favorites, collection and want lists, and personal pin sets. "
-                "Audit history that referred to you will be anonymised. "
+                "Audit history that referred to you will be anonymized. "
                 "This cannot be undone."
             ],
             form(
@@ -68,7 +68,7 @@ def delete_account_modal(
                 class_="flex flex-col gap-4",
             )[
                 div(class_="flex flex-col gap-2")[
-                    label(class_="text-sm text-pin-base-300")[
+                    label(class_="text-sm text-lightest-hover")[
                         "Type your username to confirm:"
                     ],
                     input(

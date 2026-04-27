@@ -14,7 +14,7 @@ def form_field(
     """Labeled form field: flex-col wrapper with a bold label above an input/textarea/select."""
     label_content: list[str | Element] = [label_text]
     if required:
-        label_content.append(span(class_="text-red-200 ml-0.5")["*"])
+        label_content.append(span(class_="text-error-main ml-0.5")["*"])
     return div(class_="flex flex-col gap-1")[
         label(for_=field_id, class_="font-semibold")[label_content],
         child,

@@ -10,5 +10,5 @@ def empty_state(
     small: bool = False,
 ) -> Element:
     """Muted paragraph for empty list/section states."""
-    classes = "text-pin-base-300 text-sm" if small else "text-pin-base-300"
+    classes = "text-lightest-hover text-sm" if small else "text-lightest-hover"
     return p(class_=classes)[message]

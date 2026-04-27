@@ -39,9 +39,7 @@ def _relation_pills(tags: list[Tag], request: Request) -> list[Element]:
             href=str(request.url_for("get_tag", id=t.id)),
             text=("(P) " + t.display_name) if t.is_pending else t.display_name,
             icon=CATEGORY_ICONS.get(t.category, "tag"),
-            color_classes=CATEGORY_COLORS.get(
-                t.category, "bg-pin-base-500 text-pin-base-text"
-            ),
+            color_classes=CATEGORY_COLORS.get(t.category, "bg-main text-base-text"),
             hover_classes=CATEGORY_HOVER_CLASSES.get(
                 t.category, "hover:border-accent hover:text-accent"
             ),
@@ -69,7 +67,7 @@ def tag_relation_items(
             hx_swap="outerHTML",
             role="button",
             aria_label="Show all",
-            class_="cursor-pointer text-sm text-pin-base-300 hover:text-accent px-1",
+            class_="cursor-pointer text-sm text-lightest-hover hover:text-accent px-1",
         )["…"]
         return div(id=target_id, class_="contents")[*pills[:_RELATION_CAP], expand_btn]
     return div(id=target_id, class_="contents")[*pills]
@@ -102,12 +100,12 @@ def tag_implication_preview(resolved: set[Tag], selected: set[Tag]) -> Element:
         ]
 
     return div(class_="flex flex-col gap-1 mt-1")[
-        p(class_="text-xs text-pin-base-300 font-semibold")["Tag parents:"],
+        p(class_="text-xs text-lightest-hover font-semibold")["Tag parents:"],
         div(class_="flex flex-col gap-1")[
             [
                 div(class_="flex items-center flex-wrap gap-1")[
                     _badge(source),
-                    span(class_="text-pin-base-300 text-xs")["→"],
+                    span(class_="text-lightest-hover text-xs")["→"],
                     [
                         _badge(t, implied=True)
                         for t in sorted(new_implied, key=lambda t: t.name)
@@ -212,7 +210,7 @@ def tag_page(
                     label="Also known as",
                     items=[
                         code(
-                            class_="bg-pin-base-700 text-pin-base-text rounded px-1.5 py-0.5 text-sm font-mono"
+                            class_="bg-darker text-base-text rounded px-1.5 py-0.5 text-sm font-mono"
                         )[a.alias]
                         for a in sorted(tag.aliases, key=lambda a: a.alias)
                     ],

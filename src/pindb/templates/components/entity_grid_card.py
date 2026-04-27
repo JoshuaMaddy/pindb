@@ -40,17 +40,17 @@ def entity_grid_card(
                     guid=pin.front_image_guid,
                 ).include_query_params(thumbnail=True)
             ),
-            class_=f"object-cover w-full h-full aspect-square bg-pin-base-450 {_CORNER_CLASSES[index]}",
+            class_=f"object-cover w-full h-full aspect-square bg-lighter {_CORNER_CLASSES[index]}",
         )
         for index, pin in enumerate(pin_list)
     ]
     while len(images) < 4:
-        images.append(div(class_=f"bg-pin-base-450 {_CORNER_CLASSES[len(images)]}"))
+        images.append(div(class_=f"bg-lighter {_CORNER_CLASSES[len(images)]}"))
 
     return a(
         href=href,
-        class_=f"no-underline text-pin-base-text rounded-xl overflow-clip bg-main {'max-md:overflow-visible' if allow_overflow else ''} "
-        "border border-pin-base-350 hover:scale-[102%] hover:border-accent flex flex-col relative",
+        class_=f"no-underline text-base-text rounded-xl overflow-clip bg-main {'max-md:overflow-visible' if allow_overflow else ''} "
+        "border border-lightest hover:scale-[102%] hover:border-accent transition-all duration-100 ease-linear flex flex-col relative",
     )[
         div(
             class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2",
@@ -59,7 +59,7 @@ def entity_grid_card(
         div(class_="p-2 text-sm font-medium flex items-center justify-between gap-1")[
             div()[
                 name,
-                span(class_="text-pin-base-300 ml-1")[f"({pin_count})"],
+                span(class_="text-lightest-hover ml-1")[f"({pin_count})"],
             ],
             badge and badge,
         ],

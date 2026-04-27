@@ -102,7 +102,7 @@ def shop_page(
                     label="Also known as",
                     items=[
                         code(
-                            class_="bg-pin-base-700 text-pin-base-text rounded px-1.5 py-0.5 text-sm font-mono"
+                            class_="bg-darker text-base-text rounded px-1.5 py-0.5 text-sm font-mono"
                         )[a.alias]
                         for a in sorted(shop.aliases, key=lambda a: a.alias)
                     ],

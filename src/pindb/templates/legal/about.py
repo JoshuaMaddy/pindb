@@ -19,7 +19,7 @@ def about_page(request: Request) -> Element:
         body_content=legal_container(
             div[
                 h1(class_="text-2xl font-bold mb-2 sm:text-3xl")["About PinDB"],
-                p(class_="text-pin-base-text mb-6")[f"Version {__version__}"],
+                p(class_="text-base-text mb-6")[f"Version {__version__}"],
                 h2(class_="text-lg font-semibold mt-6 mb-2 sm:text-xl")[
                     "What is PinDB?"
                 ],

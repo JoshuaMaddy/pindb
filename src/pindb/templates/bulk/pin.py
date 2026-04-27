@@ -87,10 +87,10 @@ def bulk_pin_page(
             # Page wrapper — full width with padding
             div(class_="px-4 py-4 flex flex-col gap-2 h-full")[
                 div(
-                    class_="min-md:hidden rounded-lg border border-amber-600 bg-amber-950/80 px-3 py-2 text-sm text-amber-100"
+                    class_="md:hidden rounded-lg border border-error-dark bg-error-dark px-3 py-2 text-sm text-error-main-hover"
                 )[
                     p(class_="font-semibold")["Not available on small screens."],
-                    p(class_="mt-1 text-amber-200/90")[
+                    p(class_="mt-1 text-error-main")[
                         "Bulk pin import needs a wider layout. Resize the window or use a tablet or desktop to add rows and submit."
                     ],
                 ],
@@ -107,7 +107,7 @@ def bulk_pin_page(
                             <i data-lucide="columns-3" aria-hidden="true"></i> Columns
                         </button>
                         <div x-show="open" @click.outside="open = false"
-                             class="absolute right-0 top-full mt-1 z-50 bg-main border border-lightest rounded-lg p-3 flex flex-col gap-2 min-w-[160px]">
+                             class="absolute right-0 top-full mt-1 z-50 bg-main border border-lightest rounded-lg p-3 flex flex-col gap-2 min-w-40">
                             {
                             "".join(
                                 f'<label class="flex items-center gap-2 cursor-pointer font-semibold">'
@@ -150,27 +150,27 @@ def bulk_pin_page(
                                         )
                                     ],
                                     th(
-                                        class_="bulk-th bulk-sticky-left bulk-sticky-col-1 w-[88px]"
+                                        class_="bulk-th bulk-sticky-left bulk-sticky-col-1 w-22"
                                     )["Front *"],
-                                    th(class_="bulk-th w-[88px]")["Back"],
+                                    th(class_="bulk-th w-22")["Back"],
                                     th(
                                         class_="bulk-th bulk-sticky-left bulk-sticky-col-2 min-w-[15ch]",
                                         data_col_type="name",
                                     )["Name *"],
                                     th(
-                                        class_="bulk-th min-w-[180px]",
+                                        class_="bulk-th min-w-45",
                                         data_col_type="shops",
                                     )["Shops *"],
                                     th(
-                                        class_="bulk-th min-w-[140px]",
+                                        class_="bulk-th min-w-35",
                                         data_col_type="acquisition_type",
                                     )["Acquisition *"],
                                     th(
-                                        class_="bulk-th min-w-[100px]",
+                                        class_="bulk-th min-w-25",
                                         data_col_type="grades",
                                     )["Grades *"],
                                     th(
-                                        class_="bulk-th min-w-[120px]",
+                                        class_="bulk-th min-w-30",
                                         data_col_type="currency_id",
                                     )["Currency *"],
                                     th(
@@ -179,59 +179,59 @@ def bulk_pin_page(
                                     )["Tags *"],
                                     # Optional columns
                                     th(
-                                        class_="bulk-th min-w-[160px]",
+                                        class_="bulk-th min-w-40",
                                         data_col="artists",
                                         data_col_type="artists",
                                     )["Artists"],
                                     th(
-                                        class_="bulk-th min-w-[160px]",
+                                        class_="bulk-th min-w-40",
                                         data_col="pin_sets",
                                         data_col_type="pin_sets",
                                     )["Pin Sets"],
                                     th(
-                                        class_="bulk-th min-w-[80px]",
+                                        class_="bulk-th min-w-20",
                                         data_col="limited_edition",
                                     )["Ltd. Ed."],
                                     th(
-                                        class_="bulk-th min-w-[100px]",
+                                        class_="bulk-th min-w-25",
                                         data_col="number_produced",
                                         data_col_type="number_produced",
                                     )["# Produced"],
                                     th(
-                                        class_="bulk-th min-w-[130px]",
+                                        class_="bulk-th min-w-32.5",
                                         data_col="release_date",
                                         data_col_type="release_date",
                                     )["Release Date"],
                                     th(
-                                        class_="bulk-th min-w-[130px]",
+                                        class_="bulk-th min-w-32.5",
                                         data_col="end_date",
                                         data_col_type="end_date",
                                     )["End Date"],
                                     th(
-                                        class_="bulk-th min-w-[130px]",
+                                        class_="bulk-th min-w-32.5",
                                         data_col="funding_type",
                                         data_col_type="funding_type",
                                     )["Funding"],
                                     th(
-                                        class_="bulk-th min-w-[70px]",
+                                        class_="bulk-th min-w-17.5",
                                         data_col="posts",
                                         data_col_type="posts",
                                     )["Posts"],
                                     th(
-                                        class_="bulk-th min-w-[90px]",
+                                        class_="bulk-th min-w-22.5",
                                         data_col="width",
                                         data_col_type="width",
                                     )["Width"],
                                     th(
-                                        class_="bulk-th min-w-[90px]",
+                                        class_="bulk-th min-w-22.5",
                                         data_col="height",
                                         data_col_type="height",
                                     )["Height"],
                                     th(
-                                        class_="bulk-th min-w-[100px]", data_col="links"
+                                        class_="bulk-th min-w-25", data_col="links"
                                     )["Links"],
                                     th(
-                                        class_="bulk-th min-w-[180px]",
+                                        class_="bulk-th min-w-45",
                                         data_col="description",
                                         data_col_type="description",
                                     )["Description"],
@@ -248,7 +248,7 @@ def bulk_pin_page(
             # Success modal (hidden until submit succeeds)
             div(
                 id="success-modal",
-                class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60",
+                class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-darker",
             )[
                 div(
                     class_="bg-main border border-lightest rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
