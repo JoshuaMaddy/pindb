@@ -40,7 +40,7 @@ def entity_grid_card(
                     guid=pin.front_image_guid,
                 ).include_query_params(thumbnail=True)
             ),
-            class_=f"object-cover w-full h-full {_CORNER_CLASSES[index]}",
+            class_=f"object-cover w-full h-full aspect-square {_CORNER_CLASSES[index]}",
         )
         for index, pin in enumerate(pin_list)
     ]
