@@ -121,6 +121,7 @@ return HTMLResponse(content=str(template(pin=pin)))
 - `Pin.document()` returns indexed dict.
 - Searchable attributes configured on startup.
 - APScheduler syncs every N minutes (`search_sync_interval_minutes`, default 5). Manual: `POST /admin/search/sync`.
+- **DB ↔ Meili sync rule:** Every write that changes entity visibility or content must be followed by a Meili call. Use `sync_entity(entity_type, entity_id)` (upsert or auto-delete if gone) or `delete_one(entity_type, id)` (immediate remove). For pin approval with cascade, use `sync_pin_with_deps(pin_id)` which also re-syncs the pin's shops/artists/tags. Applies to: create, direct edit, approve, reject, delete — for all five tracked entity types (Pin, Tag, Artist, Shop, PinSet). Call **after** the write session closes.
 
 ### Global vs Personal PinSets
 - `PinSet.owner_id = NULL` → global/curator set (admin-editable).

@@ -11,7 +11,7 @@ from pindb.auth import require_admin
 from pindb.database import session_maker
 from pindb.database.entity_type import EntityType
 from pindb.log import user_logger
-from pindb.search.update import delete_pin as delete_pin_from_index
+from pindb.search.update import delete_one
 from pindb.utils import utc_now
 
 router = APIRouter(prefix="/delete", dependencies=[Depends(require_admin)])
@@ -32,7 +32,6 @@ def post_delete_entity(entity_type: EntityType, id: int) -> RedirectResponse:
         else:
             LOGGER.warning("Delete target %s id=%d not found", entity_type.value, id)
 
-    if entity_type is EntityType.pin:
-        delete_pin_from_index(pin_id=id)
+    delete_one(entity_type, id)
 
     return RedirectResponse(url="/", status_code=303)

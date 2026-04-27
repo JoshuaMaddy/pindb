@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from pindb.auth import EditorUser
 from pindb.database import Artist, session_maker
 from pindb.database.artist import replace_artist_aliases
+from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
     get_edit_chain,
@@ -28,6 +29,7 @@ from pindb.routes.edit._pending_helpers import (
     apply_simple_aliased_direct_edit,
     submit_simple_aliased_pending_edit,
 )
+from pindb.search.update import sync_entity
 from pindb.templates.create_and_edit.artist import artist_form
 
 router = APIRouter()
@@ -128,6 +130,8 @@ def post_edit_artist(
 
         session.flush()
         artist_id: int = artist.id
+
+    sync_entity(EntityType.artist, artist_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

@@ -24,10 +24,17 @@ from pindb.database.pending_edit_utils import (
 )
 from pindb.database.pending_mixin import PendingAuditEntity, PendingMixin
 from pindb.database.user import User
+from pindb.search.update import delete_one, sync_entity, sync_pin_with_deps
 from pindb.templates.admin.pending import BulkGroupView, pending_page
 from pindb.utils import utc_now
 
 router = APIRouter(prefix="/admin/pending", dependencies=[Depends(require_admin)])
+
+_MODEL_TO_ENTITY_TYPE: dict[type, EntityType] = {et.model: et for et in EntityType}
+
+
+def _entity_type_of(entity: object) -> EntityType | None:
+    return _MODEL_TO_ENTITY_TYPE.get(type(entity))
 
 
 class _BulkGroupBucket:
@@ -338,6 +345,11 @@ def approve_entity(
 
         _approve_with_cascade(entity, current_user.id, now)
 
+    if entity_type == EntityType.pin:
+        sync_pin_with_deps(entity_id)
+    else:
+        sync_entity(entity_type, entity_id)
+
     return RedirectResponse(url="/admin/pending", status_code=303)
 
 
@@ -354,6 +366,8 @@ def reject_entity(
             entity.rejected_at = now  # type: ignore[misc]
             entity.rejected_by_id = current_user.id  # type: ignore[misc]
 
+    delete_one(entity_type, entity_id)
+
     return RedirectResponse(url="/admin/pending", status_code=303)
 
 
@@ -369,6 +383,8 @@ def delete_pending_entity(
         if isinstance(entity, AuditMixin):
             entity.deleted_at = now
             entity.deleted_by_id = current_user.id
+
+    delete_one(entity_type, entity_id)
 
     return RedirectResponse(url="/admin/pending", status_code=303)
 
@@ -407,6 +423,11 @@ def approve_pending_edits(
             _approve_with_cascade(
                 cast(PendingAuditEntity, entity), current_user.id, now
             )
+
+    if entity_type == EntityType.pin:
+        sync_pin_with_deps(entity_id)
+    else:
+        sync_entity(entity_type, entity_id)
 
     return RedirectResponse(url="/admin/pending", status_code=303)
 
@@ -479,10 +500,15 @@ def approve_bulk(
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
     now = utc_now()
+    to_sync: set[tuple[EntityType, int]] = set()
+
     with session_maker.begin() as session:
         for entity in _collect_bulk_entities(session, bulk_id):
             if entity.approved_at is None and entity.rejected_at is None:
                 _approve_with_cascade(entity, current_user.id, now)
+                et = _entity_type_of(entity)
+                if et is not None:
+                    to_sync.add((et, entity.id))
 
         edits = _collect_bulk_edits(session, bulk_id)
         edits_by_entity: dict[tuple[str, int], list[PendingEdit]] = {}
@@ -506,6 +532,13 @@ def approve_bulk(
             for edit in full_chain:
                 edit.approved_at = now
                 edit.approved_by_id = current_user.id
+            to_sync.add((entity_type, entity_id))
+
+    for et, eid in to_sync:
+        if et == EntityType.pin:
+            sync_pin_with_deps(eid)
+        else:
+            sync_entity(et, eid)
 
     return RedirectResponse(url="/admin/pending", status_code=303)
 
@@ -516,15 +549,23 @@ def reject_bulk(
     current_user: User = Depends(require_admin),
 ) -> RedirectResponse:
     now = utc_now()
+    to_delete: list[tuple[EntityType, int]] = []
+
     with session_maker.begin() as session:
         for entity in _collect_bulk_entities(session, bulk_id):
             if entity.rejected_at is None and entity.approved_at is None:
                 entity.rejected_at = now  # type: ignore[misc]
                 entity.rejected_by_id = current_user.id  # type: ignore[misc]
+                et = _entity_type_of(entity)
+                if et is not None:
+                    to_delete.append((et, entity.id))
 
         for edit in _collect_bulk_edits(session, bulk_id):
             edit.rejected_at = now
             edit.rejected_by_id = current_user.id
+
+    for et, eid in to_delete:
+        delete_one(et, eid)
 
     return RedirectResponse(url="/admin/pending", status_code=303)
 
@@ -536,12 +577,19 @@ def delete_bulk(
 ) -> RedirectResponse:
     now = utc_now()
     with session_maker.begin() as session:
+        to_delete: list[tuple[EntityType, int]] = []
         for entity in _collect_bulk_entities(session, bulk_id):
             if isinstance(entity, AuditMixin) and entity.deleted_at is None:
                 entity.deleted_at = now
                 entity.deleted_by_id = current_user.id
+                et = _entity_type_of(entity)
+                if et is not None:
+                    to_delete.append((et, entity.id))
 
         for edit in _collect_bulk_edits(session, bulk_id):
             session.delete(edit)
+
+    for et, eid in to_delete:
+        delete_one(et, eid)
 
     return RedirectResponse(url="/admin/pending", status_code=303)

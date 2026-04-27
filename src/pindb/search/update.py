@@ -235,6 +235,72 @@ def _fetch_all(
     )
 
 
+def _fetch_entity_for_sync(
+    session: Session, entity_type: EntityType, entity_id: int
+) -> _Indexable | None:
+    if entity_type == EntityType.pin:
+        return session.scalar(
+            select(Pin)
+            .where(Pin.id == entity_id)
+            .options(
+                selectinload(Pin.shops).selectinload(Shop.aliases),
+                selectinload(Pin.tags).selectinload(Tag.aliases),
+                selectinload(Pin.artists).selectinload(Artist.aliases),
+            )
+        )
+    if entity_type == EntityType.tag:
+        return session.scalar(
+            select(Tag).where(Tag.id == entity_id).options(selectinload(Tag.aliases))
+        )
+    if entity_type == EntityType.artist:
+        return session.scalar(
+            select(Artist)
+            .where(Artist.id == entity_id)
+            .options(selectinload(Artist.aliases))
+        )
+    if entity_type == EntityType.shop:
+        return session.scalar(
+            select(Shop).where(Shop.id == entity_id).options(selectinload(Shop.aliases))
+        )
+    if entity_type == EntityType.pin_set:
+        return session.get(PinSet, entity_id)
+    return None
+
+
+def sync_entity(entity_type: EntityType, entity_id: int) -> None:
+    """Re-fetch entity from DB and upsert to Meili, or delete if absent/deleted."""
+    with session_maker() as session:
+        entity = _fetch_entity_for_sync(session, entity_type, entity_id)
+    if entity is None:
+        delete_one(entity_type, entity_id)
+    else:
+        update_one(entity_type, entity)
+
+
+def sync_pin_with_deps(pin_id: int) -> None:
+    """Sync pin and its related shops/artists/tags after cascade approval."""
+    with session_maker() as session:
+        pin = session.scalar(
+            select(Pin)
+            .where(Pin.id == pin_id)
+            .options(
+                selectinload(Pin.shops).selectinload(Shop.aliases),
+                selectinload(Pin.tags).selectinload(Tag.aliases),
+                selectinload(Pin.artists).selectinload(Artist.aliases),
+            )
+        )
+    if pin is None:
+        delete_one(EntityType.pin, pin_id)
+        return
+    update_pin(pin)
+    for shop in pin.shops:
+        update_shop(shop)
+    for tag in pin.tags:
+        update_tag(tag)
+    for artist in pin.artists:
+        update_artist(artist)
+
+
 def update_all() -> None:
     """Reconcile every Meilisearch index with the current database rows (add + prune)."""
     LOGGER.info("Updating all search indexes.")

@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from pindb.auth import EditorUser
 from pindb.database import session_maker
 from pindb.database.currency import Currency
+from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
     get_edit_chain,
@@ -35,6 +36,7 @@ from pindb.routes._pin_shared import (
     parse_grade_dicts,
 )
 from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
+from pindb.search.update import sync_entity
 from pindb.templates.create_and_edit.pin import pin_form
 
 router = APIRouter()
@@ -248,6 +250,8 @@ async def post_edit_pin(
         )
         session.flush()
         pin_id: int = pin.id
+
+    sync_entity(EntityType.pin, pin_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
