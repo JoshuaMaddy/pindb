@@ -32,13 +32,13 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
-from pindb.templates.components.bread_crumb import bread_crumb
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.empty_state import empty_state
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.pagination_controls import pagination_controls
-from pindb.templates.components.pill_link import pill_link
-from pindb.templates.components.pin_grid import pin_grid
+from pindb.templates.components.display.empty_state import empty_state
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.listing.pagination_controls import pagination_controls
+from pindb.templates.components.nav.bread_crumb import bread_crumb
+from pindb.templates.components.nav.pill_link import pill_link
+from pindb.templates.components.pins.pin_grid import pin_grid
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.pin_image_alt import pin_front_image_alt
 

@@ -32,8 +32,8 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
-from pindb.templates.components.markdown_editor import markdown_editor
-from pindb.templates.components.name_availability import (
+from pindb.templates.components.forms.markdown_editor import markdown_editor
+from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )

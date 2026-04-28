@@ -48,7 +48,7 @@ def set_markdown_field(page: Page, name: str, value: str) -> None:
 
     The shop / artist / tag / pin forms render the description via a hidden
     ``<input name=...>`` synced from an Overtype editor (see
-    ``templates/components/markdown_editor.py``). ``page.fill`` can't target
+    ``templates/components/forms/markdown_editor.py``). ``page.fill`` can't target
     hidden inputs, so we set the value directly via JS — the form submit picks
     it up since it's still a real form field.
     """

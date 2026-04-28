@@ -34,8 +34,8 @@ from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.routes.bulk._helpers import TagMode
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 
 
 def bulk_edit_page(
@@ -56,7 +56,7 @@ def bulk_edit_page(
     return html_base(
         title=title,
         request=request,
-        template_js_extra=("pin_creation.js",),
+        template_js_extra=("pins/pin_creation.js",),
         body_content=centered_div(
             content=[
                 script(**{"type": "application/json"}, id="pin-form-ref-data")[

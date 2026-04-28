@@ -14,7 +14,7 @@ from pindb.auth import CurrentUser
 from pindb.database import Pin, Shop, session_maker
 from pindb.database.joins import pins_shops
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
-from pindb.templates.components.paginated_pin_grid import (
+from pindb.templates.components.pins.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
 )

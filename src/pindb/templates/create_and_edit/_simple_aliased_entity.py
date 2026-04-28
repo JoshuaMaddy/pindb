@@ -25,13 +25,13 @@ from markupsafe import Markup
 from pindb.database.artist import Artist
 from pindb.database.shop import Shop
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.markdown_editor import markdown_editor
-from pindb.templates.components.name_availability import (
+from pindb.templates.components.forms.markdown_editor import markdown_editor
+from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 
 
 def simple_aliased_entity_form(
@@ -79,7 +79,7 @@ def simple_aliased_entity_form(
 
     return html_base(
         title=title,
-        template_js_extra=("alias_select_init.js", "entity_form_gate.js"),
+        template_js_extra=("forms/alias_select_init.js", "forms/entity_form_gate.js"),
         body_content=centered_div(
             content=[
                 page_heading(icon=heading_icon, text=heading_text),

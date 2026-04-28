@@ -12,10 +12,10 @@ from htpy import title as title_el
 from markupsafe import Markup
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
-from pindb.templates.components.bread_crumb import BreadCrumbLink
-from pindb.templates.components.footer import footer
-from pindb.templates.components.navbar import navbar
-from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.templates.components.nav.bread_crumb import BreadCrumbLink
+from pindb.templates.components.shell.footer import footer
+from pindb.templates.components.shell.navbar import navbar
+from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
 from pindb.templates.js_urls import templates_js_url
 from pindb.templates.types import Content
 
@@ -74,7 +74,7 @@ def html_base(
                 Markup(_TAG_CATEGORY_JSON)
             ],
             script(
-                src=templates_js_url("data_table_alpine_register.js"),
+                src=templates_js_url("tables/data_table_alpine_register.js"),
                 defer=True,
             ),
             script(
@@ -104,11 +104,11 @@ def html_base(
             src=f"/static/vendor/lucide.min.js?v={STATIC_CACHE_BUSTER}",
             defer=True,
         ),
-        script(src=templates_js_url("pindb_shell.js"), defer=True),
-        script(src=templates_js_url("tag_category_bootstrap.js"), defer=True),
-        script(src=templates_js_url("tag_select.js"), defer=True),
-        script(src=templates_js_url("form_persist.js"), defer=True),
-        script(src=templates_js_url("markdown_editor.js"), defer=True),
-        script(src=templates_js_url("form_validate.js"), defer=True),
+        script(src=templates_js_url("shell/pindb_shell.js"), defer=True),
+        script(src=templates_js_url("tags/tag_category_bootstrap.js"), defer=True),
+        script(src=templates_js_url("tags/tag_select.js"), defer=True),
+        script(src=templates_js_url("forms/form_persist.js"), defer=True),
+        script(src=templates_js_url("forms/markdown_editor.js"), defer=True),
+        script(src=templates_js_url("forms/form_validate.js"), defer=True),
         *extra_scripts,
     ]

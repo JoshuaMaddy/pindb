@@ -28,7 +28,7 @@ from titlecase import titlecase
 
 from pindb.database.tag import TagCategory
 from pindb.templates.base import html_base
-from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
 
 
 def bulk_tag_page(
@@ -57,7 +57,7 @@ def bulk_tag_page(
     return html_base(
         title="Bulk Create Tags",
         request=request,
-        template_js_extra=("bulk_tag.js",),
+        template_js_extra=("bulk/bulk_tag.js",),
         body_content=[
             script(**{"type": "application/json"}, id="bulk-tag-ref-data")[
                 Markup(ref_json)

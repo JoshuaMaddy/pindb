@@ -9,8 +9,8 @@ from htpy import Element, button, div, form, h1, hr, i, span, td, tr
 
 from pindb.database.user import User
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.data_table import TableColumn, data_table
+from pindb.templates.components.display.data_table import TableColumn, data_table
+from pindb.templates.components.layout.centered import centered_div
 
 
 def admin_users_page(

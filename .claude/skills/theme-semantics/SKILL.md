@@ -57,7 +57,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 
 - **Tag categories**
   - Tag/category chips are a documented exception to the core neutral/accent ramp.
-  - Use `tag-*` tokens from `templates/components/tag_branding.py` and `static/input.css`.
+  - Use `tag-*` tokens from `templates/components/tags/tag_branding.py` and `static/input.css`.
   - Do not remap tag-category colors to neutral/error semantics.
 
 ## Examples From Codebase
@@ -72,7 +72,7 @@ return nav(class_="px-2 py-1 bg-main relative z-[10]")[...]
 class_="sm:hidden inline-flex ... border border-lightest ... text-base-text hover:bg-lighter-hover ..."
 ```
 
-Source: `src/pindb/templates/components/navbar.py`
+Source: `src/pindb/templates/components/shell/navbar.py`
 
 ### 2) Interactive button with semantic hover
 

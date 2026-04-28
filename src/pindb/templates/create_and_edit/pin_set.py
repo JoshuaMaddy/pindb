@@ -26,19 +26,19 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.confirm_modal import confirm_modal
-from pindb.templates.components.empty_state import empty_state
-from pindb.templates.components.form_field import form_field
-from pindb.templates.components.htmx_search_input import htmx_search_input
-from pindb.templates.components.icon_button import icon_button
-from pindb.templates.components.markdown_editor import markdown_editor
-from pindb.templates.components.name_availability import (
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.empty_state import empty_state
+from pindb.templates.components.forms.form_field import form_field
+from pindb.templates.components.forms.htmx_search_input import htmx_search_input
+from pindb.templates.components.forms.icon_button import icon_button
+from pindb.templates.components.forms.markdown_editor import markdown_editor
+from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.toggle_button import toggle_button
+from pindb.templates.components.forms.toggle_button import toggle_button
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.pin_image_alt import pin_front_image_alt
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ def pin_set_create_page(request: Request) -> Element:
     return html_base(
         title="Create Pin Set",
         request=request,
-        template_js_extra=("entity_form_gate.js",),
+        template_js_extra=("forms/entity_form_gate.js",),
         body_content=centered_div(
             content=[
                 page_heading(
@@ -178,7 +178,7 @@ def pin_set_edit_page(
     return html_base(
         title=f"Edit — {pin_set.name}",
         request=request,
-        template_js_extra=("pin_set_sortable.js",),
+        template_js_extra=("pins/pin_set_sortable.js",),
         body_content=centered_div(
             content=[
                 a(

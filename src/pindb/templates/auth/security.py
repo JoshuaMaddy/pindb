@@ -26,8 +26,8 @@ from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import describe_policy
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.error_message import error_message
+from pindb.templates.components.forms.error_message import error_message
+from pindb.templates.components.layout.centered import centered_div
 
 _PROVIDER_LABELS = {
     OAuthProvider.google: "Google",

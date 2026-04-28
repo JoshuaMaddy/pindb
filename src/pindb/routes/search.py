@@ -9,7 +9,7 @@ from htpy.starlette import HtpyResponse
 from pindb.database import session_maker
 from pindb.database.pin import Pin
 from pindb.search.search import search_pin
-from pindb.templates.components.pin_grid import pin_grid
+from pindb.templates.components.pins.pin_grid import pin_grid
 from pindb.templates.search.pin import search_pin_page
 
 router = APIRouter(prefix="/search")

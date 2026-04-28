@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from pindb.database import Pin, session_maker
 from pindb.database.joins import pin_set_memberships
 from pindb.database.pin_set import PinSet
-from pindb.templates.components.paginated_pin_grid import (
+from pindb.templates.components.pins.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
 )

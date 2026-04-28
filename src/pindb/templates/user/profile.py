@@ -11,8 +11,8 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.user.profile_sections import (
     _collection_section,
     _favorites_section,

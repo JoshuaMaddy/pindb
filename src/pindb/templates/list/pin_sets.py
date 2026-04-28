@@ -10,10 +10,10 @@ from htpy import Element, div, p, span
 from pindb.database.pin_set import PinSet
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
-from pindb.templates.components.bread_crumb import bread_crumb
-from pindb.templates.components.card import card
-from pindb.templates.components.entity_grid_card import entity_grid_card
-from pindb.templates.components.thumbnail_grid import thumbnail_grid
+from pindb.templates.components.layout.card import card
+from pindb.templates.components.nav.bread_crumb import bread_crumb
+from pindb.templates.components.pins.entity_grid_card import entity_grid_card
+from pindb.templates.components.pins.thumbnail_grid import thumbnail_grid
 from pindb.templates.list.base import (
     DEFAULT_PER_PAGE,
     base_list,

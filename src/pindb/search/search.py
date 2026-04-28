@@ -1,7 +1,7 @@
 """Meilisearch query helpers and Pydantic wrappers for API responses."""
 
 from meilisearch.index import Index
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -17,6 +17,44 @@ TAGS_INDEX: Index = CONFIGURATION.meili_client.index(uid="tags")
 ARTISTS_INDEX: Index = CONFIGURATION.meili_client.index(uid="artists")
 SHOPS_INDEX: Index = CONFIGURATION.meili_client.index(uid="shops")
 PIN_SETS_INDEX: Index = CONFIGURATION.meili_client.index(uid="pin_sets")
+
+
+def meilisearch_hit_dicts(raw: dict[str, object]) -> list[dict[str, object]]:
+    """Return the ``hits`` array from a Meilisearch search response as typed dict rows."""
+    hits_value = raw.get("hits", [])
+    if not isinstance(hits_value, list):
+        return []
+    rows: list[dict[str, object]] = []
+    for element in hits_value:
+        if isinstance(element, dict):
+            rows.append({str(key): value for key, value in element.items()})
+    return rows
+
+
+def meilisearch_total_hits(raw: dict[str, object], *, hit_count: int) -> int:
+    """Best-effort total from Meilisearch response keys, falling back to ``hit_count``."""
+    estimated = raw.get("estimatedTotalHits")
+    if isinstance(estimated, int):
+        return estimated
+    total_hits_value = raw.get("totalHits")
+    if isinstance(total_hits_value, int):
+        return total_hits_value
+    return hit_count
+
+
+def _hit_ids_from_documents(hits: list[dict[str, object]]) -> list[int]:
+    ids: list[int] = []
+    for hit in hits:
+        raw_id = hit["id"]
+        if isinstance(raw_id, int) and not isinstance(raw_id, bool):
+            ids.append(raw_id)
+        elif isinstance(raw_id, str):
+            ids.append(int(raw_id))
+        else:
+            raise TypeError(
+                f"Meilisearch hit id must be int or str, got {type(raw_id)}"
+            )
+    return ids
 
 
 class PinSearchHit(BaseModel):
@@ -40,10 +78,7 @@ class PinSearchResult(BaseModel):
     processing_time_ms: int
     query: str
 
-    model_config: dict[str, bool | None] = {
-        "populate_by_name": True,
-        "alias_generator": None,
-    }
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, raw: dict[str, object]) -> "PinSearchResult":
@@ -90,9 +125,9 @@ def _search_index(
     if filter_str:
         opt_params["filter"] = filter_str
     raw: dict[str, object] = index.search(query=query, opt_params=opt_params)  # type: ignore[assignment]
-    hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
-    total: int = int(raw.get("estimatedTotalHits") or raw.get("totalHits") or len(hits))
-    ids: list[int] = [int(h["id"]) for h in hits]
+    hits = meilisearch_hit_dicts(raw)
+    total = meilisearch_total_hits(raw, hit_count=len(hits))
+    ids = _hit_ids_from_documents(hits)
     return ids, total
 
 
@@ -181,7 +216,7 @@ def search_entity_options(
     in the document so the (P) prefix can be applied without a DB query.
     """
     raw: dict[str, object] = index.search(query=query, opt_params={"limit": limit})  # type: ignore[assignment]
-    hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
+    hits = meilisearch_hit_dicts(raw)
     results = []
     for hit in hits:
         text = str(hit.get("display_name") or hit["name"])

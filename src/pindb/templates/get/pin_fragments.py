@@ -11,7 +11,7 @@ from fastapi import Request
 from htpy import Element, div, i
 
 from pindb.database.pin_set import PinSet
-from pindb.templates.components.toggle_button import toggle_button
+from pindb.templates.components.forms.toggle_button import toggle_button
 
 
 def favorite_button(request: Request, pin_id: int, is_favorited: bool) -> Element:

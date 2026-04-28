@@ -22,7 +22,7 @@ from htpy import (
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
-from pindb.templates.components.card import card
+from pindb.templates.components.layout.card import card
 
 
 def _masonry_pin_card(request: Request, pin: Pin) -> Element:

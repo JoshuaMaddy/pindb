@@ -12,13 +12,13 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.templates.base import html_base
-from pindb.templates.components.bread_crumb import bread_crumb
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.confirm_modal import confirm_modal
-from pindb.templates.components.description_block import description_block
-from pindb.templates.components.icon_button import icon_button
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.paginated_pin_grid import paginated_pin_grid
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.forms.icon_button import icon_button
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.nav.bread_crumb import bread_crumb
+from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 
 
 def pin_set_page(

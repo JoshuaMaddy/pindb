@@ -77,7 +77,7 @@ def bulk_pin_page(
     return html_base(
         title="Bulk Import Pins",
         request=request,
-        template_js_extra=("bulk_import.js",),
+        template_js_extra=("bulk/bulk_import.js",),
         body_content=[
             script(**{"type": "application/json"}, id="bulk-ref-data")[
                 Markup(ref_json)

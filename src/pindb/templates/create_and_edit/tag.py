@@ -25,14 +25,14 @@ from titlecase import titlecase
 
 from pindb.database.tag import Tag, TagCategory
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.markdown_editor import markdown_editor
-from pindb.templates.components.name_availability import (
+from pindb.templates.components.forms.markdown_editor import markdown_editor
+from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
 
 
 def _duplicate_notice(source_display_name: str) -> Element:
@@ -81,7 +81,7 @@ def tag_form(
 
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
-        template_js_extra=("tag_form.js", "entity_form_gate.js"),
+        template_js_extra=("tags/tag_form.js", "forms/entity_form_gate.js"),
         body_content=centered_div(
             content=[
                 page_heading(

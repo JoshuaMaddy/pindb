@@ -16,12 +16,12 @@ from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
-from pindb.templates.components.description_block import description_block
-from pindb.templates.components.dropdown_panel import dropdown_panel
-from pindb.templates.components.icon_list_element import icon_list_item
-from pindb.templates.components.linked_items_row import linked_items_row
-from pindb.templates.components.pill_link import pill_link
-from pindb.templates.components.tag_branding import (
+from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.display.dropdown_panel import dropdown_panel
+from pindb.templates.components.display.icon_list_element import icon_list_item
+from pindb.templates.components.display.linked_items_row import linked_items_row
+from pindb.templates.components.nav.pill_link import pill_link
+from pindb.templates.components.tags.tag_branding import (
     CATEGORY_COLORS,
     CATEGORY_HOVER_CLASSES,
     CATEGORY_ICONS,

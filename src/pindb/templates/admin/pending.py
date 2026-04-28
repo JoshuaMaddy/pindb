@@ -19,8 +19,8 @@ from pindb.database.user import User
 from pindb.templates.admin.pending_bulk import BulkGroupView, _bulk_groups_section
 from pindb.templates.admin.pending_entities import _sections
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 
 
 def _local_date(dt: datetime | None) -> Element | str:

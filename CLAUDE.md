@@ -38,6 +38,8 @@ Or: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 Standard layout: `src/pindb/{database,routes,templates,search,models}/`. Names mirror — route `routes/get/pin.py` → template `templates/get/pin.py`. Env config = Pydantic Settings in `config.py` (source of truth for env vars).
 
+First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/`; use `templates_js_url("pins/pin_lightbox.js")` style paths (see `templates/base.py` and `template_js_extra` on pages).
+
 Key files where behavior not obvious from name:
 - `audit_events.py` — session-level SQLAlchemy events (before_flush, after_flush, do_orm_execute). Soft-delete + pending filters here.
 - `auth.py` — FastAPI Depends (`CurrentUser`, `AuthenticatedUser`, `EditorUser`, `AdminUser`) + middleware threads user into audit ContextVars.
@@ -170,7 +172,7 @@ Entry: `database/erasure.py::erase_user_account(session, user_id)`.
 
 ## Legal Pages & Footer
 - `routes/legal.py` serves `/about`, `/privacy`, `/terms` (public). Templates in `templates/legal/`, shared "not legal advice" banner in `_shared.py`.
-- `templates/components/footer.py` rendered by `html_base()` on every full page (not HTMX fragments). Shows version from `pindb.__version__` via `importlib.metadata` and `CONFIGURATION.contact_email`.
+- `templates/components/shell/footer.py` rendered by `html_base()` on every full page (not HTMX fragments). Shows version from `pindb.__version__` via `importlib.metadata` and `CONFIGURATION.contact_email`.
 - Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.flex-grow.min-h-screen`.
 - Copyright: project name only ("PinDB"), no person named.
 

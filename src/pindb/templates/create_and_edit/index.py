@@ -6,8 +6,8 @@ from fastapi import Request
 from htpy import Element, div, h1, hr, i
 
 from pindb.templates.base import html_base
-from pindb.templates.components.card import card
-from pindb.templates.components.centered import centered_div
+from pindb.templates.components.layout.card import card
+from pindb.templates.components.layout.centered import centered_div
 
 
 def create_index(request: Request) -> Element:

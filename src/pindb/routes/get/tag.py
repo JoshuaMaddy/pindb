@@ -17,7 +17,7 @@ from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.database.tag import resolve_implications
 from pindb.search.search import search_entity_options
 from pindb.search.update import TAGS_INDEX
-from pindb.templates.components.paginated_pin_grid import (
+from pindb.templates.components.pins.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
 )

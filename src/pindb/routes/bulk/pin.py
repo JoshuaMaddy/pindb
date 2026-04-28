@@ -33,6 +33,7 @@ from pindb.log import user_logger
 from pindb.model_utils import parse_magnitude_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
+from pindb.search.search import meilisearch_hit_dicts
 from pindb.search.update import TAGS_INDEX
 from pindb.templates.bulk.pin import bulk_pin_page
 
@@ -131,7 +132,7 @@ def get_bulk_options(
 ) -> JSONResponse:
     if entity_type == EntityType.tag:
         raw: dict[str, object] = TAGS_INDEX.search(query=q, opt_params={"limit": 50})  # type: ignore[assignment]
-        tag_hits: list[dict[str, object]] = raw.get("hits", [])  # type: ignore[assignment]
+        tag_hits = meilisearch_hit_dicts(raw)
         return JSONResponse(
             content=[
                 {

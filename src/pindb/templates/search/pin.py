@@ -8,7 +8,7 @@ from htpy import Element, a, div, form, h1, hr, i, input
 
 from pindb.database.user import User
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
+from pindb.templates.components.layout.centered import centered_div
 
 
 def search_pin_input(

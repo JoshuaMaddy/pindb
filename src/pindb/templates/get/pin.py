@@ -14,14 +14,14 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
-from pindb.templates.components.audit_timestamps import audit_timestamps
-from pindb.templates.components.back_link import back_link
-from pindb.templates.components.confirm_modal import confirm_modal
-from pindb.templates.components.icon_button import icon_button
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.pending_edit_banner import pending_edit_banner
-from pindb.templates.components.pin_image_carousel import pin_image_carousel
-from pindb.templates.components.pin_lightbox import pin_lightbox
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
+from pindb.templates.components.forms.icon_button import icon_button
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.nav.back_link import back_link
+from pindb.templates.components.pins.pin_image_carousel import pin_image_carousel
+from pindb.templates.components.pins.pin_lightbox import pin_lightbox
 from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
@@ -46,7 +46,7 @@ def pin_page(
     return html_base(
         title=pin.name,
         request=request,
-        template_js_extra=("pin_swiper.js", "pin_lightbox.js"),
+        template_js_extra=("pins/pin_swiper.js", "pins/pin_lightbox.js"),
         body_content=fragment[
             _page_layout(
                 request=request,

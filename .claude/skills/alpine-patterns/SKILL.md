@@ -125,7 +125,7 @@ div(x_data="{ open: false }")[
 ]
 ```
 
-Use this for small, fully contained widgets like toggles and confirm modals. See `confirm_modal` in `templates/components/confirm_modal.py`.
+Use this for small, fully contained widgets like toggles and confirm modals. See `confirm_modal` in `templates/components/dialogs/confirm_modal.py`.
 
 ### Named component (`Alpine.data`) for complex or reusable state
 
@@ -139,7 +139,7 @@ Alpine.data('dataTable_users', function () {
 });
 ```
 
-Use this when the state object has computed properties, methods, or when the same logic might appear on multiple pages. The `data_table` component in `templates/components/data_table.py` is the canonical example.
+Use this when the state object has computed properties, methods, or when the same logic might appear on multiple pages. The `data_table` component in `templates/components/display/data_table.py` is the canonical example.
 
 **Unique naming:** When multiple instances of a named component can appear on one page, include a caller-supplied `table_id` in the name (`dataTable_{table_id}`) to avoid collisions.
 

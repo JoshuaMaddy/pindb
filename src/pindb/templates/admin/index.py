@@ -6,8 +6,8 @@ from fastapi import Request
 from htpy import Element, a, button, div, form, hr, i, p, span
 
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 
 
 def admin_panel_page(request: Request, pending_count: int = 0) -> Element:

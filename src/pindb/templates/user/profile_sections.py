@@ -10,13 +10,13 @@ from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
-from pindb.templates.components.card import card
-from pindb.templates.components.confirm_modal import confirm_modal
-from pindb.templates.components.empty_state import empty_state
-from pindb.templates.components.icon_button import icon_button
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.pin_preview_card import pin_preview_card
-from pindb.templates.components.thumbnail_grid import thumbnail_grid
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.empty_state import empty_state
+from pindb.templates.components.forms.icon_button import icon_button
+from pindb.templates.components.layout.card import card
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.pins.pin_preview_card import pin_preview_card
+from pindb.templates.components.pins.thumbnail_grid import thumbnail_grid
 from pindb.templates.user.pin_list_pages import unique_pins
 
 

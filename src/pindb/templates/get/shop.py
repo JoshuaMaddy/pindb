@@ -10,16 +10,16 @@ from htpy import Element, a, br, code, div, fragment, h2
 from pindb.database import Shop, User
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
-from pindb.templates.components.audit_timestamps import audit_timestamps
-from pindb.templates.components.bread_crumb import bread_crumb
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.confirm_modal import confirm_modal
-from pindb.templates.components.description_block import description_block
-from pindb.templates.components.icon_button import icon_button
-from pindb.templates.components.linked_items_row import linked_items_row
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.paginated_pin_grid import paginated_pin_grid
-from pindb.templates.components.pending_edit_banner import pending_edit_banner
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.display.linked_items_row import linked_items_row
+from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
+from pindb.templates.components.forms.icon_button import icon_button
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.nav.bread_crumb import bread_crumb
+from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 
 
 def shop_page(

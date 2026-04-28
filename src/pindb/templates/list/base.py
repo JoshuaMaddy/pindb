@@ -10,10 +10,10 @@ from htpy import Element, VoidElement, a, div, hr, input, span
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
-from pindb.templates.components.pagination_controls import pagination_controls
-from pindb.templates.components.view_toggle import view_toggle
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.listing.pagination_controls import pagination_controls
+from pindb.templates.components.listing.view_toggle import view_toggle
 
 SECTION_ID: str = "entity-list-section"
 DEFAULT_PER_PAGE: int = 100

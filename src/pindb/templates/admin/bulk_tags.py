@@ -9,10 +9,10 @@ from fastapi import Request
 from htpy import Element, a, button, div, form, hr, i, input, p, pre, textarea
 
 from pindb.templates.base import html_base
-from pindb.templates.components.bread_crumb import bread_crumb
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.form_field import form_field
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.forms.form_field import form_field
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.nav.bread_crumb import bread_crumb
 
 
 def bulk_tags_page(

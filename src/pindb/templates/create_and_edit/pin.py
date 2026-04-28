@@ -24,8 +24,8 @@ from pindb.database.currency import Currency
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.templates.base import html_base
-from pindb.templates.components.centered import centered_div
-from pindb.templates.components.page_heading import page_heading
+from pindb.templates.components.layout.centered import centered_div
+from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.create_and_edit.pin_form_fields import (
     _back_image_input,
     _front_image_input,
@@ -71,7 +71,7 @@ def pin_form(
 
     return html_base(
         title="Create Pin" if not pin else "Edit Pin",
-        template_js_extra=("pin_creation.js",),
+        template_js_extra=("pins/pin_creation.js",),
         body_content=centered_div(
             content=[
                 script(**{"type": "application/json"}, id="pin-form-ref-data")[

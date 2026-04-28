@@ -134,7 +134,7 @@ class Configuration(BaseSettings):
 
     @property
     def templates_js_dir(self) -> Path:
-        """First-party page scripts co-located with htpy templates (``templates/js``)."""
+        """First-party page scripts under ``templates/js/`` (subfolders by area)."""
         return Path(__file__).resolve().parent / "templates" / "js"
 
 

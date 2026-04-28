@@ -1,0 +1,24 @@
+"""
+htpy page and fragment builders: `templates/components/pins/pin_grid.py`.
+"""
+
+from typing import Iterable
+
+from fastapi import Request
+from htpy import Element, div
+
+from pindb.database.pin import Pin
+from pindb.templates.components.pins.pin_preview_card import pin_preview_card
+
+
+def pin_grid(
+    request: Request,
+    pins: Iterable[Pin] | None,
+) -> Element:
+    return div(
+        class_=(
+            "grid grid-cols-[repeat(auto-fill,_minmax(100px,_1fr))] "
+            "sm:grid-cols-[repeat(auto-fill,_minmax(192px,_1fr))] "
+            "auto auto-rows-[1fr_max-content_max-content] gap-2"
+        )
+    )[bool(pins) and [pin_preview_card(request=request, pin=pin) for pin in pins]]
