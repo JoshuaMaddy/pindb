@@ -22,6 +22,9 @@ src/pindb/static/vendor/
 # Pi coding agent (project-local sessions from .pi/settings.json)
 .pi/sessions/
 
+# Claude Code local permissions (per-machine)
+.claude/settings.local.json
+
 # Dev
 .env
 

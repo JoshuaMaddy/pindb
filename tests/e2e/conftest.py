@@ -572,15 +572,40 @@ def _truncate_e2e_state(_e2e_pg_conn) -> Iterator[None]:
     """
     yield
 
+    import time
+
+    import psycopg
     from psycopg import sql as pgsql
 
-    with _e2e_pg_conn.cursor() as cur:
-        cur.execute(
-            pgsql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
-                pgsql.SQL(", ").join(pgsql.Identifier(t) for t in _TRUNCATE_TABLES)
-            )
-        )
-    _e2e_pg_conn.commit()
+    truncate_sql = pgsql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
+        pgsql.SQL(", ").join(pgsql.Identifier(t) for t in _TRUNCATE_TABLES)
+    )
+
+    # The app subprocess may still hold AccessShareLock from in-flight requests
+    # (Playwright fires background fetches mid-teardown). Without lock_timeout,
+    # TRUNCATE deadlocks against those, leaves conn in INERROR, and every
+    # subsequent test on this worker cascades with InFailedSqlTransaction.
+    last_exc: Exception | None = None
+    for attempt in range(5):
+        try:
+            _e2e_pg_conn.rollback()
+            with _e2e_pg_conn.cursor() as cur:
+                cur.execute("SET LOCAL lock_timeout = '3s'")
+                cur.execute(truncate_sql)
+            _e2e_pg_conn.commit()
+            return
+        except (
+            psycopg.errors.LockNotAvailable,
+            psycopg.errors.DeadlockDetected,
+        ) as exc:
+            last_exc = exc
+            _e2e_pg_conn.rollback()
+            time.sleep(0.2 * (attempt + 1))
+        except psycopg.Error:
+            _e2e_pg_conn.rollback()
+            raise
+    if last_exc is not None:
+        raise last_exc
 
 
 # ---------------------------------------------------------------------------
