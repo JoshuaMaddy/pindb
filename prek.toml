@@ -1,0 +1,53 @@
+[[repos]]
+repo = "builtin"
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+args = ["--fix=lf"]
+
+[[repos.hooks]]
+id = "check-illegal-windows-names"
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.12"
+
+[[repos.hooks]]
+id = "ruff-format"
+
+[[repos.hooks]]
+id = "ruff-check"
+args = ["--fix", "--select=I"]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "ty-check"
+name = "ty check"
+entry = "uvx"
+args = ["ty", "check"]
+language = "system"
+types_or = ["python", "pyi"]
+pass_filenames = false
+
+[[repos.hooks]]
+id = "oxlint"
+name = "oxlint"
+entry = "npm"
+args = ["run", "js:lint", "--"]
+language = "system"
+files = '\.(js|mjs)$'
+pass_filenames = false

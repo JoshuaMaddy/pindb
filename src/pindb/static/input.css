@@ -42,6 +42,10 @@
   --color-error-dark-hover: hsl(355deg, 52%, 36%);
   --color-error-main: hsl(355deg, 72%, 62%);
   --color-error-main-hover: hsl(355deg, 74%, 68%);
+  --color-pending-dark: hsl(38deg, 52%, 28%);
+  --color-pending-dark-hover: hsl(38deg, 52%, 34%);
+  --color-pending-main: hsl(38deg, 78%, 58%);
+  --color-pending-main-hover: hsl(38deg, 82%, 65%);
 
   /* Tag category badge colors (dark/mocha defaults) */
   --color-tag-general: hsl(220, 9%, 28%);
@@ -510,6 +514,16 @@
     @apply bg-lightest;
   }
 
+  /* No reserved height/gap until duplicate-name feedback is swapped in */
+  .name-availability-feedback:empty {
+    display: none;
+  }
+
+  .name-availability-field:has(.name-availability-feedback:not(:empty))
+    > input {
+    @apply border-error-main text-error-main underline decoration-error-main underline-offset-2;
+  }
+
   a {
     @apply underline text-accent transition-all duration-50;
   }
@@ -672,6 +686,17 @@
   gap: 0.25rem;
 }
 
+.ts-wrapper.single[data-selected-category] .ts-control > input {
+  flex: 0 0 0;
+  min-width: 0;
+  width: 0 !important;
+  opacity: 0;
+}
+
+.ts-wrapper.single[data-selected-category] .ts-control:after {
+  border-color: currentColor transparent transparent transparent;
+}
+
 .ts-wrapper.single[data-selected-category="general"] .ts-control {
   @apply bg-tag-general text-tag-general-fg border-tag-general-fg;
 }
@@ -698,6 +723,59 @@
 }
 .ts-wrapper.single[data-selected-category="company"] .ts-control {
   @apply bg-tag-company text-tag-company-fg border-tag-company-fg;
+}
+
+/** Bulk Tag Table **/
+
+.bulk-tag-table {
+  table-layout: fixed;
+}
+
+.bulk-tag-table th[data-col-type="name"] {
+  width: 16rem;
+}
+
+.bulk-tag-table th[data-col-type="category"] {
+  width: 12rem;
+}
+
+.bulk-tag-table th[data-col-type="implications"],
+.bulk-tag-table th[data-col-type="aliases"] {
+  width: 18rem;
+}
+
+.bulk-tag-table th[data-col-type="description"],
+.bulk-tag-table td[data-col-type="description"] {
+  min-width: 20rem;
+  width: 20rem;
+}
+
+.bulk-tag-table th:last-child {
+  width: 8rem;
+}
+
+.bulk-tag-table td {
+  vertical-align: middle;
+}
+
+.bulk-tag-table .ts-wrapper,
+.bulk-tag-table .ts-control {
+  min-width: 0;
+  width: 100%;
+}
+
+.bulk-tag-table td > input {
+  min-width: 0;
+  width: 100%;
+}
+
+.bulk-tag-table td > textarea {
+  display: block;
+  height: 100%;
+  width: 100%;
+  min-width: 5rem;
+  min-height: 2.75rem;
+  resize: vertical;
 }
 
 /** Bulk Import Table **/

@@ -2,6 +2,8 @@
 htpy page and fragment builders: `templates/create_and_edit/pin_set.py`.
 """
 
+import json
+
 from fastapi import Request
 from htpy import (
     Element,
@@ -15,8 +17,10 @@ from htpy import (
     img,
     input,
     p,
+    script,
     span,
 )
+from markupsafe import Markup
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -29,38 +33,13 @@ from pindb.templates.components.form_field import form_field
 from pindb.templates.components.htmx_search_input import htmx_search_input
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.name_availability import (
+    name_availability_field,
+    name_check_attrs,
+)
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.toggle_button import toggle_button
 from pindb.templates.pin_image_alt import pin_front_image_alt
-
-# Dynamically loads SortableJS then initializes the draggable pin grid.
-_SORTABLE_INIT = """
-(function () {
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
-    s.onload = function () {
-        var grid = document.getElementById('pin-list');
-        if (!grid) return;
-        Sortable.create(grid, {
-            animation: 150,
-            onEnd: function () {
-                var items = grid.querySelectorAll('[data-pin-id]');
-                var fd = new FormData();
-                items.forEach(function (el) {
-                    fd.append('pin_ids', el.getAttribute('data-pin-id'));
-                });
-                fetch(grid.getAttribute('data-reorder-url'), {
-                    method: 'POST',
-                    body: fd,
-                    headers: { 'HX-Request': 'true' },
-                });
-            },
-        });
-    };
-    document.head.appendChild(s);
-})();
-"""
-
 
 # ---------------------------------------------------------------------------
 # Admin create page
@@ -68,9 +47,26 @@ _SORTABLE_INIT = """
 
 
 def pin_set_create_page(request: Request) -> Element:
+    name_feedback_id: str = "pin-set-name-availability-feedback"
+    gate_cfg = {
+        "formId": "pin-set-create-form",
+        "submitId": "pin-set-create-submit",
+        "fields": [
+            {
+                "key": "name",
+                "kind": "text",
+                "inputId": "name",
+                "hint": "Enter a name for this pin set.",
+                "highlightSelector": '[data-pin-field="name"]',
+            }
+        ],
+    }
+    gate_json = json.dumps(gate_cfg).replace("</", "<\\/")
+
     return html_base(
         title="Create Pin Set",
         request=request,
+        template_js_extra=("entity_form_gate.js",),
         body_content=centered_div(
             content=[
                 page_heading(
@@ -78,7 +74,11 @@ def pin_set_create_page(request: Request) -> Element:
                     text="Create Pin Set",
                 ),
                 hr,
+                script(**{"type": "application/json"}, id="entity-form-gate-data")[
+                    Markup(gate_json)
+                ],
                 form(
+                    id="pin-set-create-form",
                     method="post",
                     action=str(request.url_for("post_create_pin_set")),
                     hx_post=str(request.url_for("post_create_pin_set")),
@@ -89,14 +89,25 @@ def pin_set_create_page(request: Request) -> Element:
                         label_text="Name",
                         field_id="name",
                         required=True,
-                        child=input(
-                            type="text",
-                            id="name",
-                            name="name",
-                            required=True,
-                            autocomplete="off",
-                            class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
-                            placeholder="Set Name",
+                        child=name_availability_field(
+                            feedback_id=name_feedback_id,
+                            data_pin_field="name",
+                            child=input(
+                                type="text",
+                                id="name",
+                                name="name",
+                                required=True,
+                                autocomplete="off",
+                                class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
+                                placeholder="Set Name",
+                                **name_check_attrs(
+                                    check_url=str(
+                                        request.url_for("get_create_check_name")
+                                    ),
+                                    kind="pin_set",
+                                    target_id=name_feedback_id,
+                                ),
+                            ),
                         ),
                     ),
                     form_field(
@@ -109,7 +120,9 @@ def pin_set_create_page(request: Request) -> Element:
                     ),
                     button(
                         type="submit",
-                        class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-lightest cursor-pointer text-base-text w-full",
+                        id="pin-set-create-submit",
+                        formnovalidate=True,
+                        class_="self-start px-4 py-1 rounded-lg bg-main hover:bg-main-hover border border-lightest cursor-pointer text-base-text w-full transition-opacity",
                     )["Create Set"],
                 ],
             ],
@@ -165,7 +178,7 @@ def pin_set_edit_page(
     return html_base(
         title=f"Edit — {pin_set.name}",
         request=request,
-        script_content=_SORTABLE_INIT,
+        template_js_extra=("pin_set_sortable.js",),
         body_content=centered_div(
             content=[
                 a(
@@ -199,6 +212,12 @@ def pin_set_edit_page(
 
 
 def _metadata_form(request: Request, pin_set: PinSet) -> Element:
+    name_feedback_id: str = "pin-set-name-availability-feedback"
+    check_url: str = str(
+        request.url_for("get_create_check_name")
+        if pin_set.owner_id is None
+        else request.url_for("get_personal_set_check_name")
+    )
     return div(class_="flex flex-col gap-2")[
         h2["Details"],
         form(
@@ -212,14 +231,23 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
                 label_text="Name",
                 field_id="name",
                 required=True,
-                child=input(
-                    type="text",
-                    id="name",
-                    name="name",
-                    value=pin_set.name,
-                    required=True,
-                    autocomplete="off",
-                    class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
+                child=name_availability_field(
+                    feedback_id=name_feedback_id,
+                    child=input(
+                        type="text",
+                        id="name",
+                        name="name",
+                        value=pin_set.name,
+                        required=True,
+                        autocomplete="off",
+                        class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
+                        **name_check_attrs(
+                            check_url=check_url,
+                            kind="pin_set",
+                            target_id=name_feedback_id,
+                            exclude_id=pin_set.id,
+                        ),
+                    ),
                 ),
             ),
             form_field(

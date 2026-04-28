@@ -9,6 +9,10 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.form_field import form_field
 from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.name_availability import (
+    name_availability_field,
+    name_check_attrs,
+)
 from pindb.templates.components.page_heading import page_heading
 
 
@@ -32,6 +36,7 @@ def create_user_set_page(request: Request) -> Element:
 
 
 def _create_form(request: Request) -> Element:
+    name_feedback_id: str = "personal-pin-set-name-availability-feedback"
     return div(class_="flex flex-col gap-2")[
         form(
             method="post",
@@ -43,14 +48,24 @@ def _create_form(request: Request) -> Element:
             form_field(
                 label_text="Name",
                 field_id="name",
-                child=input(
-                    type="text",
-                    id="name",
-                    name="name",
-                    required=True,
-                    autocomplete="off",
-                    class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
-                    placeholder="My Collection",
+                child=name_availability_field(
+                    feedback_id=name_feedback_id,
+                    child=input(
+                        type="text",
+                        id="name",
+                        name="name",
+                        required=True,
+                        autocomplete="off",
+                        class_="bg-lighter border border-lightest rounded px-2 py-1 text-base-text",
+                        placeholder="My Collection",
+                        **name_check_attrs(
+                            check_url=str(
+                                request.url_for("get_personal_set_check_name")
+                            ),
+                            kind="pin_set",
+                            target_id=name_feedback_id,
+                        ),
+                    ),
                 ),
             ),
             form_field(

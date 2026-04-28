@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
 from sqlalchemy import (
-    Enum as SQLAlchemyEnum,
-)
-from sqlalchemy import (
+    Computed,
     ForeignKey,
     Index,
     UniqueConstraint,
@@ -17,6 +15,9 @@ from sqlalchemy import (
     insert,
     literal,
     select,
+)
+from sqlalchemy import (
+    Enum as SQLAlchemyEnum,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import (
@@ -98,11 +99,20 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             unique=True,
             postgresql_where="deleted_at IS NULL",
         ),
+        Index(
+            "ix_tags_normalized_name_active",
+            "normalized_name",
+            postgresql_where="deleted_at IS NULL",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
 
     name: Mapped[str] = mapped_column()
+    normalized_name: Mapped[str] = mapped_column(
+        Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
+        init=False,
+    )
     description: Mapped[str | None] = mapped_column(default=None)
     category: Mapped[TagCategory] = mapped_column(
         SQLAlchemyEnum(TagCategory, name="tagcategory", native_enum=False),

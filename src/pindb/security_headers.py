@@ -9,10 +9,13 @@ Headers set:
   particular were served with a bare ``image`` type before).
 - ``X-Frame-Options: DENY`` — no third-party framing.
 - ``Referrer-Policy: strict-origin-when-cross-origin``.
-- ``Content-Security-Policy`` — report-only for now because inline
-  ``<script>`` blocks are used for Alpine/HTMX glue. The policy still
-  constrains ``object-src`` and ``base-uri``; tighten to enforce mode
-  once the inline scripts migrate to external files with nonces.
+- ``Content-Security-Policy`` — report-only for now. Executable page JS is
+  loaded from same-origin ``/static/`` and ``/templates-js/`` (both allowed
+  by ``script-src 'self'``), plus CDNs used by vendored and lazy-loaded
+  libraries. Non-executable ``<script type="application/json">`` data blocks
+  do not run as script and are unaffected by ``script-src``. The policy still
+  constrains ``object-src`` and ``base-uri``; moving to enforce mode may
+  require removing ``'unsafe-inline'`` and relying on nonces or hashes.
 """
 
 from __future__ import annotations
@@ -24,6 +27,8 @@ from fastapi.responses import Response
 
 from pindb.config import CONFIGURATION
 
+# script-src 'self' must cover first-party script URLs mounted in ``pindb``:
+# ``/static/*`` (vendor + CSS build) and ``/templates-js/*`` (``CONFIGURATION.templates_js_dir``).
 _CSP = (
     "default-src 'self'; "
     "img-src 'self' data: https:; "

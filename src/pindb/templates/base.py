@@ -3,8 +3,7 @@ htpy page and fragment builders: `templates/base.py`.
 """
 
 import json
-import time
-from pathlib import Path
+from collections.abc import Sequence
 
 from fastapi import Request
 from htpy import BaseElement, body, div, head, html, link, meta, script
@@ -12,105 +11,82 @@ from htpy import main as main_el
 from htpy import title as title_el
 from markupsafe import Markup
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.templates.components.bread_crumb import BreadCrumbLink
 from pindb.templates.components.footer import footer
 from pindb.templates.components.navbar import navbar
 from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.templates.js_urls import templates_js_url
 from pindb.templates.types import Content
 
-_TAG_CATEGORY_DATA_JS: str = (
-    "window.TagCategoryData = "
-    + json.dumps(
-        {
-            cat.value: {"icon": CATEGORY_ICONS[cat], "color": CATEGORY_COLORS[cat]}
-            for cat in CATEGORY_ICONS
-        }
-    )
-    + ";"
-)
-
-with open(
-    file=Path(__file__).parent / "js/tag_select.js",
-    mode="r",
-    encoding="utf-8",
-) as _fp:
-    _TAG_SELECT_SCRIPT: str = _fp.read()
-
-with open(
-    file=Path(__file__).parent / "js/form_persist.js",
-    mode="r",
-    encoding="utf-8",
-) as _fp:
-    _FORM_PERSIST_SCRIPT: str = _fp.read()
-
-with open(
-    file=Path(__file__).parent / "js/markdown_editor.js",
-    mode="r",
-    encoding="utf-8",
-) as _fp:
-    _MARKDOWN_EDITOR_SCRIPT: str = _fp.read()
-
-with open(
-    file=Path(__file__).parent / "js/form_validate.js",
-    mode="r",
-    encoding="utf-8",
-) as _fp:
-    _FORM_VALIDATE_SCRIPT: str = _fp.read()
-
-
-_STARTUP_TIME = int(time.time())
+_TAG_CATEGORY_JSON: str = json.dumps(
+    {
+        cat.value: {"icon": CATEGORY_ICONS[cat], "color": CATEGORY_COLORS[cat]}
+        for cat in CATEGORY_ICONS
+    }
+).replace("</", "<\\/")
 
 
 def html_base(
     body_content: Content,
-    script_content: BaseElement | str | None = None,
+    template_js_extra: Sequence[str] = (),
     head_content: Content = None,
     bread_crumb_links: list[BreadCrumbLink | str] | None = None,
     title: str = "Document",
     request: Request | None = None,
 ):
     theme: str = getattr(request.state, "theme", "mocha") if request else "mocha"
+    extra_scripts = [
+        script(src=templates_js_url(name), defer=True) for name in template_js_extra
+    ]
     return html(lang="en", class_=f"{theme} bg-darker")[
         head[
             meta(charset="UTF-8"),
             meta(name="viewport", content="width=device-width, initial-scale=1.0"),
             link(rel="icon", href="/static/favicon.png"),
             script(
-                src=f"/static/vendor/htmx.min.js?v={_STARTUP_TIME}",
+                src=f"/static/vendor/htmx.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
             script(
-                src=f"/static/vendor/notyf.min.js?v={_STARTUP_TIME}",
+                src=f"/static/vendor/notyf.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
             script(
-                src=f"/static/vendor/tom-select.complete.min.js?v={_STARTUP_TIME}",
+                src=f"/static/vendor/tom-select.complete.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
             link(
                 rel="stylesheet",
-                href=f"/static/vendor/tom-select.default.min.css?v={_STARTUP_TIME}",
+                href=f"/static/vendor/tom-select.default.min.css?v={STATIC_CACHE_BUSTER}",
             ),
             link(
                 rel="stylesheet",
-                href=f"/static/vendor/notyf.min.css?v={_STARTUP_TIME}",
+                href=f"/static/vendor/notyf.min.css?v={STATIC_CACHE_BUSTER}",
             ),
             link(
                 rel="stylesheet",
-                href=f"/static/main.css?v={_STARTUP_TIME}",
+                href=f"/static/main.css?v={STATIC_CACHE_BUSTER}",
             ),
             title_el[title + " | PinDB"],
             head_content,
+            script(**{"type": "application/json"}, id="pindb-tag-category-data")[
+                Markup(_TAG_CATEGORY_JSON)
+            ],
             script(
-                src=f"/static/vendor/alpine.min.js?v={_STARTUP_TIME}",
+                src=templates_js_url("data_table_alpine_register.js"),
                 defer=True,
             ),
             script(
-                src=f"/static/vendor/overtype.min.js?v={_STARTUP_TIME}",
+                src=f"/static/vendor/alpine.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
             script(
-                src=f"/static/vendor/marked.min.js?v={_STARTUP_TIME}",
+                src=f"/static/vendor/overtype.min.js?v={STATIC_CACHE_BUSTER}",
+                defer=True,
+            ),
+            script(
+                src=f"/static/vendor/marked.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
         ],
@@ -125,117 +101,14 @@ def html_base(
             ),
         ],
         script(
-            src=f"/static/vendor/lucide.min.js?v={_STARTUP_TIME}",
+            src=f"/static/vendor/lucide.min.js?v={STATIC_CACHE_BUSTER}",
             defer=True,
         ),
-        script[
-            Markup(
-                object="""
-(function () {
-  function pindbAfterVendorScripts() {
-    var element = document.getElementById('back-link');
-    if (element != null) {
-        var storageKey = 'pin_back:' + window.location.pathname;
-        var params = new URLSearchParams(window.location.search);
-        var backUrl = params.get('back');
-        if (backUrl) {
-            sessionStorage.setItem(storageKey, backUrl);
-            element.setAttribute('href', backUrl);
-        } else {
-            var stored = sessionStorage.getItem(storageKey);
-            if (stored) {
-                element.setAttribute('href', stored);
-            } else {
-                element.setAttribute('href', document.referrer || '#');
-                element.onclick = function() { history.back(); return false; };
-            }
-        }
-    }
-    window.pindbNotyf = new Notyf({
-        dismissible: true,
-        duration: 4500,
-        position: { x: 'right', y: 'bottom' },
-        ripple: true,
-    });
-    document.addEventListener('pindbToast', function (evt) {
-        var d = evt.detail;
-        if (!d || typeof d !== 'object') {
-            return;
-        }
-        var msg = d.message;
-        if (!msg) {
-            return;
-        }
-        var typ = d.type || 'success';
-        if (typ === 'success') {
-            window.pindbNotyf.success(msg);
-        } else {
-            window.pindbNotyf.error(msg);
-        }
-    });
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        lucide.createIcons();
-        var target = evt.detail.target;
-        if (!target || target.id !== 'pindb-toast-host') {
-            return;
-        }
-        var sig = target.querySelector('#pindb-toast-signal');
-        if (!sig) {
-            return;
-        }
-        var msg = sig.dataset.pindbMessage;
-        if (!msg) {
-            target.innerHTML = '';
-            return;
-        }
-        var typ = sig.dataset.pindbType || 'error';
-        if (typ === 'success') {
-            window.pindbNotyf.success(msg);
-        } else {
-            window.pindbNotyf.error(msg);
-        }
-        target.innerHTML = '';
-    });
-    if (window.lucide) {
-        lucide.createIcons();
-    }
-    document.addEventListener('mousemove', function(evt) {
-        var card = evt.target.closest && evt.target.closest('.pin-3d-card');
-        if (!card) return;
-        var r = card.getBoundingClientRect();
-        var x = (evt.clientX - r.left) / r.width;
-        var y = (evt.clientY - r.top) / r.height;
-        card.style.setProperty('--gx', (x * 100).toFixed(2) + '%');
-        card.style.setProperty('--gy', (y * 100).toFixed(2) + '%');
-        card.style.setProperty('--rx', ((0.5 - y) * 5).toFixed(2) + 'deg');
-        card.style.setProperty('--ry', ((x - 0.5) * 5).toFixed(2) + 'deg');
-    }, { passive: true });
-    document.addEventListener('mouseout', function(evt) {
-        var card = evt.target.closest && evt.target.closest('.pin-3d-card');
-        if (!card) return;
-        if (evt.relatedTarget && card.contains(evt.relatedTarget)) return;
-        card.style.removeProperty('--rx');
-        card.style.removeProperty('--ry');
-    });
-    document.querySelectorAll('time[data-localtime]').forEach(function(el) {
-        var iso = el.getAttribute('datetime');
-        if (!iso) return;
-        try { el.textContent = new Date(iso).toLocaleDateString(); } catch(e) {}
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', pindbAfterVendorScripts);
-  } else {
-    pindbAfterVendorScripts();
-  }
-})();
-"""
-            )
-        ],
-        script[Markup(object=_TAG_CATEGORY_DATA_JS)],
-        script[Markup(object=_TAG_SELECT_SCRIPT)],
-        script[Markup(object=_FORM_PERSIST_SCRIPT)],
-        script[Markup(object=_MARKDOWN_EDITOR_SCRIPT)],
-        script[Markup(object=_FORM_VALIDATE_SCRIPT)],
-        script_content and script[Markup(object=script_content)],
+        script(src=templates_js_url("pindb_shell.js"), defer=True),
+        script(src=templates_js_url("tag_category_bootstrap.js"), defer=True),
+        script(src=templates_js_url("tag_select.js"), defer=True),
+        script(src=templates_js_url("form_persist.js"), defer=True),
+        script(src=templates_js_url("markdown_editor.js"), defer=True),
+        script(src=templates_js_url("form_validate.js"), defer=True),
+        *extra_scripts,
     ]

@@ -24,6 +24,7 @@ from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.orm import selectinload  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
+from starlette.staticfiles import StaticFiles  # noqa: E402
 
 from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
@@ -95,6 +96,12 @@ app.mount(
         directory=Path(__file__).parent / "static",
     ),
     name="static",
+)
+
+app.mount(
+    path="/templates-js",
+    app=StaticFiles(directory=str(CONFIGURATION.templates_js_dir)),
+    name="templates_js",
 )
 
 

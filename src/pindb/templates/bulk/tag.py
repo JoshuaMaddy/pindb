@@ -7,7 +7,6 @@ stub shell; the JS-driven row table is loaded from ``bulk_tag.js``."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from fastapi import Request
 from htpy import (
@@ -15,8 +14,9 @@ from htpy import (
     button,
     div,
     h1,
-    p,
+    hr,
     script,
+    span,
     table,
     tbody,
     th,
@@ -30,13 +30,6 @@ from pindb.database.tag import TagCategory
 from pindb.templates.base import html_base
 from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
 
-with open(
-    file=Path(__file__).parent.parent / "js/bulk_tag.js",
-    mode="r",
-    encoding="utf-8",
-) as _js_file:
-    _SCRIPT_CONTENT = _js_file.read()
-
 
 def bulk_tag_page(
     submit_url: str,
@@ -46,6 +39,9 @@ def bulk_tag_page(
     ref_data: dict[str, object] = {
         "submitUrl": submit_url,
         "optionsBaseUrl": options_base_url,
+        "nameCheckUrl": (
+            str(request.url_for("get_create_check_name")) if request is not None else ""
+        ),
         "categories": [
             {
                 "value": cat.value,
@@ -56,56 +52,87 @@ def bulk_tag_page(
             for cat in TagCategory
         ],
     }
+    ref_json = json.dumps(ref_data).replace("</", "<\\/")
 
     return html_base(
         title="Bulk Create Tags",
         request=request,
+        template_js_extra=("bulk_tag.js",),
         body_content=[
-            script[Markup(f"window.BULK_TAG_REF = {json.dumps(ref_data)};")],
+            script(**{"type": "application/json"}, id="bulk-tag-ref-data")[
+                Markup(ref_json)
+            ],
             div(class_="px-4 py-4 flex flex-col gap-2 h-full")[
-                h1(class_="text-xl font-semibold")["Bulk Create Tags"],
-                p(class_="text-sm text-muted")[
-                    "Create many tags at once. Implications can reference "
-                    "existing tags or other rows in this batch."
-                ],
-                div(class_="flex gap-2")[
+                div(class_="flex items-center gap-2 flex-wrap")[
+                    h1(class_="grow")["Bulk Create Tags"],
                     button(
                         type="button",
                         id="bulk-tag-add-row",
-                        class_="px-3 py-1 rounded bg-accent text-white",
-                    )["+ Add row"],
+                        class_="flex items-center gap-1",
+                    )[
+                        Markup('<i data-lucide="plus" aria-hidden="true"></i>'),
+                        " Add Row",
+                    ],
                     button(
                         type="button",
                         id="bulk-tag-submit",
-                        class_="px-3 py-1 rounded border border-accent text-accent",
-                    )["Submit"],
-                ],
-                table(class_="bulk-tag-table w-full border-collapse text-sm")[
-                    thead[
-                        tr(class_="border-b border-lightest")[
-                            th(class_="px-2 py-1 text-left", data_col_type="name")[
-                                "Name *"
-                            ],
-                            th(class_="px-2 py-1 text-left", data_col_type="category")[
-                                "Category"
-                            ],
-                            th(
-                                class_="px-2 py-1 text-left",
-                                data_col_type="implications",
-                            )["Child of"],
-                            th(class_="px-2 py-1 text-left", data_col_type="aliases")[
-                                "Aliases"
-                            ],
-                            th(
-                                class_="px-2 py-1 text-left",
-                                data_col_type="description",
-                            )["Description"],
-                            th(class_="px-2 py-1 text-left")["Actions"],
-                        ]
+                        class_="flex items-center gap-1 border-accent text-accent",
+                    )[
+                        Markup('<i data-lucide="upload" aria-hidden="true"></i>'),
+                        span(id="bulk-tag-submit-label")["Submit"],
                     ],
-                    tbody(id="bulk-tag-tbody"),
+                ],
+                hr,
+                div(
+                    class_="overflow-x-auto overflow-y-clip rounded-lg border border-lightest"
+                )[
+                    table(class_="bulk-tag-table w-full border-collapse text-sm")[
+                        thead[
+                            tr(class_="border-b border-lightest")[
+                                th(class_="bulk-th", data_col_type="name")["Name *"],
+                                th(class_="bulk-th", data_col_type="category")[
+                                    "Category"
+                                ],
+                                th(class_="bulk-th", data_col_type="implications")[
+                                    "Child of"
+                                ],
+                                th(class_="bulk-th", data_col_type="aliases")[
+                                    "Aliases"
+                                ],
+                                th(
+                                    class_="bulk-th min-w-20",
+                                    data_col_type="description",
+                                )["Description"],
+                                th(class_="bulk-th")["Actions"],
+                            ]
+                        ],
+                        tbody(id="bulk-tag-tbody"),
+                    ],
                 ],
             ],
+            div(
+                id="bulk-tag-success-modal",
+                class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-darker/80",
+            )[
+                div(
+                    class_="bg-main border border-lightest rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
+                )[
+                    div(class_="flex items-center justify-between")[
+                        h1(
+                            id="bulk-tag-modal-title",
+                            class_="text-lg font-bold sm:text-xl",
+                        )["Tag Creation Complete"],
+                        button(
+                            id="bulk-tag-modal-close-btn",
+                            type="button",
+                            class_="hover:text-accent",
+                        )[Markup('<i data-lucide="x"></i>')],
+                    ],
+                    div(
+                        id="bulk-tag-modal-grid",
+                        class_="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 overflow-y-auto",
+                    ),
+                ]
+            ],
         ],
-        script_content=_SCRIPT_CONTENT,
     )

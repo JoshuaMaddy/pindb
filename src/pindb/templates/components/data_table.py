@@ -20,8 +20,9 @@ Usage:
         extra_state={"currentUserId": 7},  # merged into Alpine data as JSON values
     )
 
-The component returns a Fragment containing a <script> (Alpine component registration)
-and a <div x-data="..."> wrapping the table, search input, and pagination controls.
+The component returns a Fragment containing a JSON ``<script>`` (spec for
+``data_table_alpine_register.js``) and a ``<div x-data="...">`` wrapping the table,
+search input, and pagination controls.
 
 Row template notes:
 - Alpine provides the variable `row` for each item in `paginatedRows`.
@@ -76,78 +77,22 @@ def data_table(
         (c.key for c in columns if c.sortable and c.key is not None), None
     )
 
-    # Escape </script> sequences so embedded JSON cannot break the script tag.
-    rows_json: str = json.dumps(rows).replace("</", "<\\/")
-    search_keys_json: str = json.dumps(search_keys)
-    default_sort_json: str = json.dumps(first_sortable_key)
-
-    extra_lines = ""
-    if extra_state:
-        for k, v in extra_state.items():
-            extra_lines += f"            {k}: {json.dumps(v)},\n"
-
-    js = f"""
-document.addEventListener('alpine:init', function () {{
-    Alpine.data('{component_name}', function () {{
-        return {{
-            rows: {rows_json},
-            search: '',
-            sortCol: {default_sort_json},
-            sortDir: 'asc',
-            page: 1,
-            pageSize: {page_size},
-            searchKeys: {search_keys_json},
-{extra_lines}
-            get filteredRows() {{
-                var r = this.rows;
-                var q = this.search.trim().toLowerCase();
-                if (q) {{
-                    var keys = this.searchKeys;
-                    r = r.filter(function (row) {{
-                        return keys.some(function (k) {{
-                            return String(row[k] || '').toLowerCase().indexOf(q) !== -1;
-                        }});
-                    }});
-                }}
-                var col = this.sortCol;
-                if (col) {{
-                    var dir = this.sortDir === 'asc' ? 1 : -1;
-                    r = r.slice().sort(function (a, b) {{
-                        return String(a[col] || '').localeCompare(String(b[col] || '')) * dir;
-                    }});
-                }}
-                return r;
-            }},
-
-            get totalPages() {{
-                return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize));
-            }},
-
-            get paginatedRows() {{
-                var start = (this.page - 1) * this.pageSize;
-                return this.filteredRows.slice(start, start + this.pageSize);
-            }},
-
-            sort: function (col) {{
-                if (this.sortCol === col) {{
-                    this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
-                }} else {{
-                    this.sortCol = col;
-                    this.sortDir = 'asc';
-                }}
-                this.page = 1;
-            }},
-
-            setPage: function (p) {{
-                this.page = Math.max(1, Math.min(p, this.totalPages));
-            }},
-        }};
-    }});
-}});
-"""
+    spec: dict[str, object] = {
+        "componentName": component_name,
+        "rows": rows,
+        "searchKeys": search_keys,
+        "pageSize": page_size,
+        "defaultSortCol": first_sortable_key,
+        "extraState": extra_state or {},
+    }
+    spec_json: str = json.dumps(spec).replace("</", "<\\/")
 
     return fragment[
-        script[Markup(js)],
+        script(
+            **{"type": "application/json"},
+            class_="pindb-data-table-spec",
+            id=f"pindb-data-table-spec-{table_id}",
+        )[Markup(spec_json)],
         div(
             **{"x-data": component_name},
             class_="flex flex-col gap-2",

@@ -19,8 +19,9 @@ from htpy import (
     span,
 )
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
-from pindb.templates.base import _STARTUP_TIME, html_base
+from pindb.templates.base import html_base
 from pindb.templates.components.card import card
 
 
@@ -128,10 +129,10 @@ def _head_extras() -> Fragment:
     return fragment[
         link(
             rel="stylesheet",
-            href=f"/static/homepage.css?v={_STARTUP_TIME}",
+            href=f"/static/homepage.css?v={STATIC_CACHE_BUSTER}",
         ),
         script(
-            src=f"/static/homepage.js?v={_STARTUP_TIME}",
+            src=f"/static/homepage.js?v={STATIC_CACHE_BUSTER}",
             defer=True,
         ),
     ]

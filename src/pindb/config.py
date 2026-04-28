@@ -132,6 +132,11 @@ class Configuration(BaseSettings):
     log_file_max_bytes: int = Field(default=200 * 1024 * 1024)
     log_file_backup_count: int = Field(default=7)
 
+    @property
+    def templates_js_dir(self) -> Path:
+        """First-party page scripts co-located with htpy templates (``templates/js``)."""
+        return Path(__file__).resolve().parent / "templates" / "js"
+
 
 try:
     CONFIGURATION = Configuration()  # type: ignore

@@ -3,7 +3,6 @@ htpy page and fragment builders: `templates/bulk/pin.py`.
 """
 
 import json
-from pathlib import Path
 from typing import Sequence
 
 from fastapi import Request
@@ -30,13 +29,6 @@ from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 
-with open(
-    file=Path(__file__).parent.parent / "js/bulk_import.js",
-    mode="r",
-    encoding="utf-8",
-) as _js_file:
-    _SCRIPT_CONTENT = _js_file.read()
-
 
 def bulk_pin_page(
     upload_image_url: str,
@@ -51,6 +43,9 @@ def bulk_pin_page(
         "uploadImageUrl": upload_image_url,
         "submitUrl": submit_url,
         "optionsBaseUrl": options_base_url,
+        "nameCheckUrl": (
+            str(request.url_for("get_create_check_name")) if request is not None else ""
+        ),
         "currencies": [{"value": c.id, "text": c.code} for c in currencies],
         "acquisitionTypes": [
             {"value": a, "text": titlecase(a.replace("_", " "))}
@@ -77,13 +72,16 @@ def bulk_pin_page(
         ("links", "Links"),
         ("description", "Description"),
     ]
+    ref_json = json.dumps(ref_data).replace("</", "<\\/")
 
     return html_base(
         title="Bulk Import Pins",
         request=request,
+        template_js_extra=("bulk_import.js",),
         body_content=[
-            # Inject reference data
-            script[Markup(f"window.BULK_REF = {json.dumps(ref_data)};")],
+            script(**{"type": "application/json"}, id="bulk-ref-data")[
+                Markup(ref_json)
+            ],
             # Page wrapper — full width with padding
             div(class_="px-4 py-4 flex flex-col gap-2 h-full")[
                 div(
@@ -248,7 +246,7 @@ def bulk_pin_page(
             # Success modal (hidden until submit succeeds)
             div(
                 id="success-modal",
-                class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-darker",
+                class_="hidden fixed inset-0 z-50 flex items-center justify-center bg-darker/80",
             )[
                 div(
                     class_="bg-main border border-lightest rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col gap-4"
@@ -270,5 +268,4 @@ def bulk_pin_page(
                 ]
             ],
         ],
-        script_content=_SCRIPT_CONTENT,
     )

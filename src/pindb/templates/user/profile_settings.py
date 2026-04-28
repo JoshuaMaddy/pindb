@@ -6,12 +6,12 @@ from typing import Literal
 
 from fastapi import Request
 from htpy import Element, a, button, div, form, h3, i, input, label, p, script, span
-from markupsafe import Markup
 from pydantic import BaseModel, ConfigDict
 
 from pindb.database.user import User
 from pindb.templates.components.delete_account_modal import delete_account_modal
 from pindb.templates.components.page_heading import page_heading
+from pindb.templates.js_urls import templates_js_url
 
 ThemeAppearance = Literal["dark", "light"]
 
@@ -165,48 +165,6 @@ VALID_THEME_VALUES: frozenset[str] = frozenset(
     variant.value for section in THEME_GROUPS for variant in section.variants
 )
 
-_USER_SETTINGS_FORM_SCRIPT: str = """
-(function () {
-  function syncThemeRadiosFromHtmlClass() {
-    var root = document.documentElement;
-    var cls = root.className || "";
-    var theme = (cls.match(/^([^\\s]+)/) || [, "mocha"])[1];
-    var form = document.getElementById("user-settings-form");
-    if (!form) return;
-    form.querySelectorAll('input[name="theme"]').forEach(function (inp) {
-      inp.checked = inp.value === theme;
-    });
-  }
-  function syncDimensionRadiosFromDataAttr() {
-    var form = document.getElementById("user-settings-form");
-    if (!form) return;
-    var du = form.getAttribute("data-dimension-unit");
-    if (!du) return;
-    form.querySelectorAll('input[name="dimension_unit"]').forEach(function (inp) {
-      inp.checked = inp.value === du;
-    });
-  }
-  function onThemeRadioChange(ev) {
-    var t = ev.target;
-    if (!t || t.name !== "theme" || t.type !== "radio" || !t.checked) return;
-    document.documentElement.className = t.value + " bg-darker";
-  }
-  function boot() {
-    if (!document.getElementById("user-settings-form")) return;
-    syncThemeRadiosFromHtmlClass();
-    syncDimensionRadiosFromDataAttr();
-    setTimeout(function () {
-      document.body.addEventListener("change", onThemeRadioChange);
-    }, 0);
-  }
-  if (document.readyState === "complete") {
-    boot();
-  } else {
-    window.addEventListener("load", boot);
-  }
-})();
-"""
-
 
 def settings_section(
     *,
@@ -324,7 +282,7 @@ def settings_section(
                     ],
                 ],
             ],
-            script[Markup(_USER_SETTINGS_FORM_SCRIPT)],
+            script(src=templates_js_url("user_settings_form.js"), defer=True),
             div(class_="mt-6 pt-6 border-t border-lightest flex flex-col gap-3")[
                 h3(
                     class_=(

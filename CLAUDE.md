@@ -5,12 +5,13 @@
 ## Project Overview
 PinDB: FastAPI app cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password + OAuth (Google, Discord, Meta).
 
-## After Every Python Change
+## After Every Code Change
 Run before task done:
 ```bash
 uvx ruff check --select I --fix .
 uvx ruff format .
 uvx ty check
+npm run js:lint
 ```
 
 ## Tech Stack
@@ -19,7 +20,7 @@ uvx ty check
 - **Frontend:** htpy, HTMX, Tailwind CSS 4, Alpine.js, Tom Select, Lucide icons
 - **Database:** PostgreSQL 17, Meilisearch
 - **Migrations:** Alembic (runs on container start, not app startup)
-- **Tooling:** UV, Ruff, ty
+- **Tooling:** UV, Ruff, ty, Oxlint
 - **CSS build:** Node.js **20+** required (Tailwind v4 `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
 - **Lucide (JS):** `npm run build` / `vendor:build` runs `scripts/lucide/build-lucide.mjs` (Rolldown) tree-shakes `lucide` from auto-generated icon list. New dynamic names: add literal in templates or entry in `EXTRA_KEBAB` in that script.
 

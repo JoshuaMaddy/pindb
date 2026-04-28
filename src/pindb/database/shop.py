@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Computed, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -55,6 +55,11 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             unique=True,
             postgresql_where="deleted_at IS NULL",
         ),
+        Index(
+            "ix_shops_normalized_name_active",
+            "normalized_name",
+            postgresql_where="deleted_at IS NULL",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -64,6 +69,10 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
     # Required Attributes
     name: Mapped[str] = mapped_column()
+    normalized_name: Mapped[str] = mapped_column(
+        Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
+        init=False,
+    )
 
     # Optional Attributes
     description: Mapped[str | None] = mapped_column(default=None)

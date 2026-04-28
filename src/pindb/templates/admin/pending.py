@@ -62,7 +62,7 @@ def pending_page(
                 div(class_="flex items-baseline gap-3")[
                     page_heading(icon="clock", text="Pending Approvals"),
                     span(
-                        class_="text-xs font-semibold px-2 py-0.5 rounded bg-error-dark-hover text-error-main-hover"
+                        class_="text-xs font-semibold px-2 py-0.5 rounded bg-pending-dark-hover text-pending-main-hover"
                     )[str(total)],
                 ],
                 p(class_="text-lightest-hover text-sm")[

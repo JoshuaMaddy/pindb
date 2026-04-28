@@ -7,7 +7,19 @@ from typing import Sequence
 
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, div, form, hr, input, label, option, select, span
+from htpy import (
+    Element,
+    button,
+    div,
+    form,
+    hr,
+    input,
+    label,
+    option,
+    script,
+    select,
+    span,
+)
 from markupsafe import Markup
 
 from pindb.database.artist import Artist
@@ -15,20 +27,11 @@ from pindb.database.shop import Shop
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.name_availability import (
+    name_availability_field,
+    name_check_attrs,
+)
 from pindb.templates.components.page_heading import page_heading
-
-_ALIAS_SCRIPT = """
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll("select.alias-select").forEach(function(el) {
-        new TomSelect(el, {
-            maxItems: null,
-            create: true,
-            persist: false,
-            plugins: ["remove_button"],
-        });
-    });
-});
-"""
 
 
 def simple_aliased_entity_form(
@@ -50,6 +53,7 @@ def simple_aliased_entity_form(
 
     creating = entity is None
     title = f"Create {entity_kind}" if creating else f"Edit {entity_kind}"
+    name_feedback_id: str = f"{entity_kind.lower()}-name-availability-feedback"
     heading_icon = create_icon if creating else "pencil"
     heading_text = (
         f"Create {create_article} {entity_kind}"
@@ -57,13 +61,34 @@ def simple_aliased_entity_form(
         else f"Edit {create_article} {entity_kind}"
     )
 
+    name_hint = f"Enter {create_article} {entity_kind.lower()} name."
+    gate_cfg = {
+        "formId": "simple-entity-form",
+        "submitId": "simple-entity-submit",
+        "fields": [
+            {
+                "key": "name",
+                "kind": "text",
+                "inputId": "name",
+                "hint": name_hint,
+                "highlightSelector": '[data-pin-field="name"]',
+            }
+        ],
+    }
+    gate_json = json.dumps(gate_cfg).replace("</", "<\\/")
+
     return html_base(
         title=title,
+        template_js_extra=("alias_select_init.js", "entity_form_gate.js"),
         body_content=centered_div(
             content=[
                 page_heading(icon=heading_icon, text=heading_text),
                 hr,
+                script(**{"type": "application/json"}, id="entity-form-gate-data")[
+                    Markup(gate_json)
+                ],
                 form(
+                    id="simple-entity-form",
                     hx_post=str(post_url),
                     hx_target="#pindb-toast-host",
                     hx_swap="innerHTML",
@@ -72,14 +97,24 @@ def simple_aliased_entity_form(
                     label(for_="name")[
                         "Name", span(class_="text-error-main ml-0.5")["*"]
                     ],
-                    input(
-                        type="text",
-                        name="name",
-                        id="name",
-                        required=True,
-                        autocomplete="off",
-                        class_="grow",
-                        value=entity.name if entity else None,
+                    name_availability_field(
+                        feedback_id=name_feedback_id,
+                        data_pin_field="name",
+                        child=input(
+                            type="text",
+                            name="name",
+                            id="name",
+                            required=True,
+                            autocomplete="off",
+                            class_="grow",
+                            value=entity.name if entity else None,
+                            **name_check_attrs(
+                                check_url=str(request.url_for("get_create_check_name")),
+                                kind=entity_kind.lower(),
+                                target_id=name_feedback_id,
+                                exclude_id=entity.id if entity else None,
+                            ),
+                        ),
                     ),
                     label(for_="md-editor-description")["Description"],
                     markdown_editor(
@@ -124,14 +159,18 @@ def simple_aliased_entity_form(
                             for alias in current_aliases
                         ]
                     ],
-                    input(
+                    button(
                         type="submit",
-                        value="Submit",
-                        class_="mt-2",
-                    ),
+                        id="simple-entity-submit",
+                        formnovalidate=True,
+                        class_=(
+                            "mt-2 px-4 py-2 rounded-lg bg-main hover:bg-main-hover "
+                            "border border-lightest cursor-pointer text-base-text "
+                            "w-full transition-opacity"
+                        ),
+                    )["Submit"],
                 ],
             ]
         ),
-        script_content=Markup(_ALIAS_SCRIPT),
         request=request,
     )

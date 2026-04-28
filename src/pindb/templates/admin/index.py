@@ -38,7 +38,7 @@ def admin_panel_page(request: Request, pending_count: int = 0) -> Element:
 def _pending_section(request: Request, pending_count: int) -> Element:
     badge: Element | str = (
         span(
-            class_="text-xs font-semibold px-2 py-0.5 rounded bg-error-dark-hover text-error-main-hover"
+            class_="text-xs font-semibold px-2 py-0.5 rounded bg-pending-dark-hover text-pending-main-hover"
         )[str(pending_count)]
         if pending_count > 0
         else span(class_="text-xs font-semibold px-2 py-0.5 rounded")["0"]

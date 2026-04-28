@@ -7,11 +7,19 @@
 // pickers so chips re-color reactively. Implication search merges DB hits
 // (via /bulk/options/tag) with batch-local rows still being created.
 //
-// Reads window.BULK_TAG_REF (injected by templates/bulk/tag.py).
+// Reads window.BULK_TAG_REF (injected by templates/bulk/tag.py), including
+// nameCheckUrl for HTMX duplicate-name hints.
 // =============================================================================
 
 (function () {
   "use strict";
+
+  var _tagRefEl = document.getElementById("bulk-tag-ref-data");
+  if (_tagRefEl && _tagRefEl.textContent && !window.BULK_TAG_REF) {
+    try {
+      window.BULK_TAG_REF = JSON.parse(_tagRefEl.textContent);
+    } catch {}
+  }
 
   const REF = window.BULK_TAG_REF;
   if (!REF) return;
@@ -26,9 +34,7 @@
 
   function uuid() {
     return (
-      Math.random().toString(36).slice(2, 10) +
-      "-" +
-      Date.now().toString(36)
+      Math.random().toString(36).slice(2, 10) + "-" + Date.now().toString(36)
     );
   }
 
@@ -54,7 +60,10 @@
         }
       }
       if (ts.options[item.value]) {
-        ts.updateOption(item.value, Object.assign({}, ts.options[item.value], item));
+        ts.updateOption(
+          item.value,
+          Object.assign({}, ts.options[item.value], item),
+        );
       } else {
         ts.addOption(item);
       }
@@ -91,34 +100,42 @@
     });
 
     const TS = window.TomSelect;
-    const tagSelectHelpers = (window.TagSelect &&
-      window.TagSelect.tagSingleSelectCallbacks) || (() => ({}));
-    const ts = new TS(selectEl, Object.assign(
-      {
-        valueField: "value",
-        labelField: "text",
-        searchField: ["text"],
-        maxItems: 1,
-        plugins: ["caret_position"],
-        render: {
-          option: window.TagSelect && window.TagSelect.tagOptionRender,
-          item: window.TagSelect && window.TagSelect.tagItemRender,
+    const tagSelectHelpers =
+      (window.TagSelect && window.TagSelect.tagSingleSelectCallbacks) ||
+      (() => ({}));
+    const tagSelectOptions = tagSelectHelpers();
+    const helperOnChange = tagSelectOptions.onChange;
+    tagSelectOptions.onChange = function (value) {
+      if (helperOnChange) helperOnChange.call(this, value);
+      const entry = rowRegistry.get(rowId);
+      if (!entry) return;
+      entry.category = value || "general";
+      if (entry.name) {
+        broadcastUpsert(rowId, {
+          value: entry.name,
+          text: entry.name,
+          category: entry.category,
+        });
+      }
+    };
+    const ts = new TS(
+      selectEl,
+      Object.assign(
+        {
+          valueField: "value",
+          labelField: "text",
+          searchField: ["text"],
+          maxItems: 1,
+          plugins: ["caret_position"],
+          dropdownParent: "body",
+          render: {
+            option: window.TagSelect && window.TagSelect.tagOptionRender,
+            item: window.TagSelect && window.TagSelect.tagItemRender,
+          },
         },
-        onChange: function (value) {
-          const entry = rowRegistry.get(rowId);
-          if (!entry) return;
-          entry.category = value;
-          if (entry.name) {
-            broadcastUpsert(rowId, {
-              value: entry.name,
-              text: entry.name,
-              category: value,
-            });
-          }
-        },
-      },
-      tagSelectHelpers()
-    ));
+        tagSelectOptions,
+      ),
+    );
     return ts;
   }
 
@@ -127,53 +144,66 @@
   // ---------------------------------------------------------------------------
   function buildImplicationsSelect(selectEl, rowId) {
     const TS = window.TomSelect;
-    const lucideHelpers = (window.TagSelect &&
-      window.TagSelect.tagSelectLucideCallbacks) || (() => ({}));
+    const lucideHelpers =
+      (window.TagSelect && window.TagSelect.tagSelectLucideCallbacks) ||
+      (() => ({}));
 
-    const ts = new TS(selectEl, Object.assign(
-      {
-        valueField: "value",
-        labelField: "text",
-        searchField: ["text"],
-        maxItems: null,
-        plugins: ["remove_button", "caret_position"],
-        persist: false,
-        dropdownParent: "body",
-        shouldLoad: function (q) {
-          return q.length >= 1;
-        },
-        load: function (query, callback) {
-          const entry = rowRegistry.get(rowId);
-          const selfName = entry && entry.name;
-          const qs = new URLSearchParams({ q: query });
-          if (selfName) qs.set("exclude_name", selfName);
-          fetch(REF.optionsBaseUrl + "/tag?" + qs.toString())
-            .then(function (r) { return r.json(); })
-            .then(function (results) {
-              // Merge local row entries (other rows) matching the query.
-              const q = query.toLowerCase();
-              rowRegistry.forEach(function (other, otherRowId) {
-                if (otherRowId === rowId) return;
-                if (!other.name) return;
-                if (q && other.name.indexOf(q) === -1) return;
-                if (results.find(function (r) { return r.value === other.name; })) return;
-                results.push({
-                  value: other.name,
-                  text: other.name,
-                  category: other.category || "general",
+    const ts = new TS(
+      selectEl,
+      Object.assign(
+        {
+          valueField: "value",
+          labelField: "text",
+          searchField: ["text"],
+          maxItems: null,
+          plugins: ["remove_button", "caret_position"],
+          persist: false,
+          dropdownParent: "body",
+          shouldLoad: function (q) {
+            return q.length >= 1;
+          },
+          load: function (query, callback) {
+            const entry = rowRegistry.get(rowId);
+            const selfName = entry && entry.name;
+            const qs = new URLSearchParams({ q: query });
+            if (selfName) qs.set("exclude_name", selfName);
+            fetch(REF.optionsBaseUrl + "/tag?" + qs.toString())
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (results) {
+                // Merge local row entries (other rows) matching the query.
+                const q = query.toLowerCase();
+                rowRegistry.forEach(function (other, otherRowId) {
+                  if (otherRowId === rowId) return;
+                  if (!other.name) return;
+                  if (q && other.name.indexOf(q) === -1) return;
+                  if (
+                    results.find(function (r) {
+                      return r.value === other.name;
+                    })
+                  )
+                    return;
+                  results.push({
+                    value: other.name,
+                    text: other.name,
+                    category: other.category || "general",
+                  });
                 });
+                callback(results);
+              })
+              .catch(function () {
+                callback();
               });
-              callback(results);
-            })
-            .catch(function () { callback(); });
+          },
+          render: {
+            option: window.TagSelect && window.TagSelect.tagOptionRender,
+            item: window.TagSelect && window.TagSelect.tagItemRender,
+          },
         },
-        render: {
-          option: window.TagSelect && window.TagSelect.tagOptionRender,
-          item: window.TagSelect && window.TagSelect.tagItemRender,
-        },
-      },
-      lucideHelpers()
-    ));
+        lucideHelpers(),
+      ),
+    );
     return ts;
   }
 
@@ -187,6 +217,7 @@
       labelField: "text",
       maxItems: null,
       plugins: ["remove_button", "caret_position"],
+      dropdownParent: "body",
       persist: false,
       create: function (input) {
         return { value: input, text: input };
@@ -203,53 +234,86 @@
     const tr = document.createElement("tr");
     tr.dataset.rowId = rowId;
     tr.dataset.clientId = uuid();
-    tr.className = "border-b border-lightest";
+    tr.className = "bulk-data-row border-b border-lightest";
 
     const nameTd = document.createElement("td");
-    nameTd.className = "px-2 py-1";
+    nameTd.className = "bulk-td";
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.required = true;
-    nameInput.className = "w-full bg-transparent border border-lightest rounded px-1 py-0.5";
+    nameInput.className =
+      "w-full bg-transparent border border-lightest rounded px-1 py-0.5";
     nameInput.placeholder = "tag_name";
-    nameTd.appendChild(nameInput);
+    if (REF.nameCheckUrl) {
+      nameInput.setAttribute("name", "name");
+      nameInput.setAttribute("hx-get", REF.nameCheckUrl);
+      nameInput.setAttribute("hx-trigger", "input changed delay:1s, search");
+      nameInput.setAttribute(
+        "hx-target",
+        "#bulk-tag-name-feedback-" + rowId,
+      );
+      nameInput.setAttribute("hx-swap", "innerHTML");
+      nameInput.setAttribute(
+        "hx-vals",
+        JSON.stringify({ kind: "tag" }),
+      );
+      const nameWrap = document.createElement("div");
+      nameWrap.className = "name-availability-field flex flex-col gap-1";
+      nameWrap.appendChild(nameInput);
+      const nameFeedback = document.createElement("div");
+      nameFeedback.id = "bulk-tag-name-feedback-" + rowId;
+      nameFeedback.className = "name-availability-feedback";
+      nameWrap.appendChild(nameFeedback);
+      nameTd.appendChild(nameWrap);
+    } else {
+      nameTd.appendChild(nameInput);
+    }
 
     const categoryTd = document.createElement("td");
-    categoryTd.className = "px-2 py-1";
+    categoryTd.className = "bulk-td";
     const categorySelect = document.createElement("select");
     categoryTd.appendChild(categorySelect);
 
     const implsTd = document.createElement("td");
-    implsTd.className = "px-2 py-1";
+    implsTd.className = "bulk-td";
     const implsSelect = document.createElement("select");
     implsSelect.multiple = true;
     implsTd.appendChild(implsSelect);
 
     const aliasesTd = document.createElement("td");
-    aliasesTd.className = "px-2 py-1";
+    aliasesTd.className = "bulk-td";
     const aliasesSelect = document.createElement("select");
     aliasesSelect.multiple = true;
     aliasesTd.appendChild(aliasesSelect);
 
     const descTd = document.createElement("td");
-    descTd.className = "px-2 py-1";
+    descTd.className = "bulk-td min-w-20";
+    descTd.dataset.colType = "description";
     const descInput = document.createElement("textarea");
     descInput.rows = 1;
-    descInput.className = "w-full bg-transparent border border-lightest rounded px-1 py-0.5";
+    descInput.className =
+      "w-full min-w-20 bg-transparent border border-lightest rounded px-1 py-0.5";
     descTd.appendChild(descInput);
 
     const actionsTd = document.createElement("td");
-    actionsTd.className = "px-2 py-1 flex gap-1";
+    actionsTd.className = "bulk-td";
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "flex gap-1 justify-center";
     const dupBtn = document.createElement("button");
     dupBtn.type = "button";
-    dupBtn.className = "text-xs px-2 py-0.5 border border-lightest rounded hover:border-accent";
-    dupBtn.textContent = "Duplicate";
+    dupBtn.className = "dup-btn icon-btn";
+    dupBtn.title = "Duplicate row";
+    dupBtn.setAttribute("aria-label", "Duplicate row");
+    dupBtn.innerHTML = '<i data-lucide="copy"></i>';
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.className = "text-xs px-2 py-0.5 border border-error-main rounded hover:bg-error-dark";
-    delBtn.textContent = "Delete";
-    actionsTd.appendChild(dupBtn);
-    actionsTd.appendChild(delBtn);
+    delBtn.className = "del-btn icon-btn";
+    delBtn.title = "Delete row";
+    delBtn.setAttribute("aria-label", "Delete row");
+    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+    actionsWrap.appendChild(dupBtn);
+    actionsWrap.appendChild(delBtn);
+    actionsTd.appendChild(actionsWrap);
 
     tr.appendChild(nameTd);
     tr.appendChild(categoryTd);
@@ -284,8 +348,12 @@
       if (newName) {
         broadcastUpsert(
           rowId,
-          { value: newName, text: newName, category: entry.category || "general" },
-          oldName
+          {
+            value: newName,
+            text: newName,
+            category: entry.category || "general",
+          },
+          oldName,
         );
       } else if (oldName) {
         broadcastRemove(rowId, oldName);
@@ -296,12 +364,15 @@
       const entry = rowRegistry.get(rowId);
       if (entry) {
         Object.values(entry.tomSelectInstances).forEach(function (ts) {
-          try { ts.destroy(); } catch (e) {}
+          try {
+            ts.destroy();
+          } catch {}
         });
         if (entry.name) broadcastRemove(rowId, entry.name);
       }
       rowRegistry.delete(rowId);
       tr.remove();
+      updateSubmitLabel();
     });
 
     dupBtn.addEventListener("click", function () {
@@ -312,11 +383,16 @@
       // Copy category + description; not name (would dup), not impls (cycle risk).
       if (entry.tomSelectInstances.category) {
         newEntry.tomSelectInstances.category.setValue(
-          entry.tomSelectInstances.category.getValue()
+          entry.tomSelectInstances.category.getValue(),
         );
       }
-      newRow.querySelector("textarea").value = tr.querySelector("textarea").value;
+      newRow.querySelector("textarea").value =
+        tr.querySelector("textarea").value;
+      updateSubmitLabel();
     });
+
+    if (window.lucide) lucide.createIcons({ nodes: [tr] });
+    if (window.htmx) htmx.process(tr);
 
     return tr;
   }
@@ -332,7 +408,8 @@
     const name = normalize(nameInput.value || "");
     const category = (entry && entry.category) || "general";
     const ts = entry && entry.tomSelectInstances;
-    const implication_names = ts && ts.implications ? ts.implications.getValue() : [];
+    const implication_names =
+      ts && ts.implications ? ts.implications.getValue() : [];
     const aliases = ts && ts.aliases ? ts.aliases.getValue() : [];
     return {
       client_id: tr.dataset.clientId,
@@ -356,61 +433,191 @@
     tr.title = message;
   }
 
-  function submit() {
+  function notifySuccess(message) {
+    if (window.pindbNotyf) window.pindbNotyf.success(message);
+  }
+
+  function notifyError(message) {
+    if (window.pindbNotyf) {
+      window.pindbNotyf.error(message);
+    } else {
+      alert(message);
+    }
+  }
+
+  function setLucideIcon(container, iconName) {
+    const existing =
+      container.querySelector("i") ?? container.querySelector("svg");
+    const el = document.createElement("i");
+    el.setAttribute("data-lucide", iconName);
+    if (existing) {
+      existing.replaceWith(el);
+    } else {
+      container.prepend(el);
+    }
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function destroyRow(tr) {
+    const entry = rowRegistry.get(tr.dataset.rowId);
+    if (entry) {
+      Object.values(entry.tomSelectInstances).forEach(function (ts) {
+        try {
+          ts.destroy();
+        } catch {}
+      });
+      rowRegistry.delete(tr.dataset.rowId);
+    }
+    tr.remove();
+  }
+
+  function updateSubmitLabel() {
+    const label = document.getElementById("bulk-tag-submit-label");
+    if (!label) return;
+    const count = tbody.querySelectorAll("tr.bulk-data-row").length;
+    label.textContent = "Submit (" + count + ")";
+  }
+
+  async function submit() {
     const trs = Array.from(tbody.querySelectorAll("tr"));
     if (trs.length === 0) return;
 
     // Client-side validation: name required, unique within batch.
     const rows = trs.map(collectRow);
     const seen = new Map();
+    let allValid = true;
     rows.forEach(function (r, i) {
       if (!r.name) {
         markRowError(trs[i], "Name is required");
+        allValid = false;
         return;
       }
       if (seen.has(r.name)) {
         markRowError(trs[seen.get(r.name)], "Duplicate name in batch");
         markRowError(trs[i], "Duplicate name in batch");
+        allValid = false;
       } else {
         clearRowError(trs[i]);
         seen.set(r.name, i);
       }
     });
+    if (!allValid) {
+      notifyError("Fix highlighted rows before submitting.");
+      return;
+    }
 
-    fetch(REF.submitUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tags: rows }),
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        const byClientId = new Map();
-        data.results.forEach(function (res) { byClientId.set(res.client_id, res); });
-        trs.forEach(function (tr) {
-          const res = byClientId.get(tr.dataset.clientId);
-          if (!res) return;
-          if (res.success) {
-            const entry = rowRegistry.get(tr.dataset.rowId);
-            if (entry) {
-              Object.values(entry.tomSelectInstances).forEach(function (ts) {
-                try { ts.destroy(); } catch (e) {}
-              });
-              rowRegistry.delete(tr.dataset.rowId);
-            }
-            tr.remove();
-          } else {
-            markRowError(tr, res.error || "Failed");
-          }
-        });
-        if (window.notyf) {
-          window.notyf.success(
-            "Created " + data.created_count + " tag(s); " + data.failed_count + " failed."
-          );
-        }
-      })
-      .catch(function (err) {
-        if (window.notyf) window.notyf.error("Submit failed: " + err);
+    submitBtn.disabled = true;
+    setLucideIcon(submitBtn, "loader-circle");
+
+    try {
+      const response = await fetch(REF.submitUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags: rows }),
       });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error("Server error " + response.status + ": " + detail);
+      }
+      const data = await response.json();
+      handleSubmitResult(data, trs);
+    } catch (err) {
+      console.error("Submit failed", err);
+      notifyError("Submit failed: " + (err && err.message ? err.message : err));
+    } finally {
+      submitBtn.disabled = false;
+      setLucideIcon(submitBtn, "upload");
+    }
+  }
+
+  function handleSubmitResult(result, trs) {
+    const byClientId = new Map();
+    result.results.forEach(function (res) {
+      byClientId.set(res.client_id, res);
+    });
+    trs.forEach(function (tr) {
+      const res = byClientId.get(tr.dataset.clientId);
+      if (!res) return;
+      if (res.success) {
+        destroyRow(tr);
+      } else {
+        markRowError(tr, res.error || "Failed");
+      }
+    });
+    updateSubmitLabel();
+
+    if (tbody.querySelectorAll("tr.bulk-data-row").length === 0) {
+      makeRow();
+      updateSubmitLabel();
+    }
+
+    if (result.failed_count > 0) {
+      notifyError("Failed rows remain in the table — fix errors and resubmit.");
+    } else {
+      notifySuccess(
+        "Created " +
+          result.created_count +
+          " tag" +
+          (result.created_count === 1 ? "" : "s") +
+          ".",
+      );
+    }
+    showSuccessModal(result);
+  }
+
+  function showSuccessModal(result) {
+    const modal = document.getElementById("bulk-tag-success-modal");
+    const grid = document.getElementById("bulk-tag-modal-grid");
+    const title = document.getElementById("bulk-tag-modal-title");
+    if (!modal || !grid || !title) return;
+
+    title.textContent =
+      result.created_count +
+      " tag" +
+      (result.created_count === 1 ? "" : "s") +
+      " created" +
+      (result.failed_count ? ", " + result.failed_count + " failed" : "");
+
+    grid.innerHTML = "";
+    result.results
+      .filter(function (row) {
+        return row.success;
+      })
+      .forEach(function (row) {
+        const card = document.createElement("a");
+        card.href = "/get/tag/" + row.tag_id;
+        card.className =
+          "flex flex-col gap-1 items-center border border-lightest rounded-lg p-2 hover:border-accent no-underline text-base-text text-center";
+        card.innerHTML =
+          '<i data-lucide="tag" class="w-8 h-8"></i>' +
+          '<span class="text-xs truncate w-full text-center">' +
+          escHtml(row.tag_name || "") +
+          "</span>";
+        grid.appendChild(card);
+      });
+
+    if (result.failed_count > 0) {
+      const errTitle = document.createElement("p");
+      errTitle.className = "col-span-full text-sm text-error-main font-semibold";
+      errTitle.textContent =
+        "Failed rows remain in the table — fix errors and resubmit.";
+      grid.appendChild(errTitle);
+    }
+
+    modal.classList.remove("hidden");
+    if (window.lucide) lucide.createIcons({ nodes: [modal] });
+  }
+
+  function closeSuccessModal() {
+    const modal = document.getElementById("bulk-tag-success-modal");
+    if (modal) modal.classList.add("hidden");
   }
 
   // ---------------------------------------------------------------------------
@@ -418,10 +625,16 @@
   // ---------------------------------------------------------------------------
   function init() {
     if (!tbody || !addRowBtn || !submitBtn) return;
-    addRowBtn.addEventListener("click", function () { makeRow(); });
+    addRowBtn.addEventListener("click", function () {
+      makeRow();
+      updateSubmitLabel();
+    });
     submitBtn.addEventListener("click", submit);
+    const closeBtn = document.getElementById("bulk-tag-modal-close-btn");
+    if (closeBtn) closeBtn.addEventListener("click", closeSuccessModal);
     makeRow();
     makeRow();
+    updateSubmitLabel();
   }
 
   if (document.readyState === "loading") {

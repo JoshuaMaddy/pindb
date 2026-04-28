@@ -7,7 +7,6 @@ column, and HTMX fragments live in sibling modules.
 
 from fastapi import Request
 from htpy import Element, div, fragment
-from markupsafe import Markup
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -21,11 +20,8 @@ from pindb.templates.components.confirm_modal import confirm_modal
 from pindb.templates.components.icon_button import icon_button
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.pending_edit_banner import pending_edit_banner
-from pindb.templates.components.pin_image_carousel import (
-    PIN_SWIPER_INIT,
-    pin_image_carousel,
-)
-from pindb.templates.components.pin_lightbox import PIN_LIGHTBOX_INIT, pin_lightbox
+from pindb.templates.components.pin_image_carousel import pin_image_carousel
+from pindb.templates.components.pin_lightbox import pin_lightbox
 from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
@@ -50,7 +46,7 @@ def pin_page(
     return html_base(
         title=pin.name,
         request=request,
-        script_content=Markup(PIN_SWIPER_INIT + PIN_LIGHTBOX_INIT),
+        template_js_extra=("pin_swiper.js", "pin_lightbox.js"),
         body_content=fragment[
             _page_layout(
                 request=request,

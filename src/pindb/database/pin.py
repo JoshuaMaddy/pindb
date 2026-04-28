@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey, and_
+from sqlalchemy import Computed, ForeignKey, Index, and_
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -58,11 +58,16 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     """Collectible pin: images, metadata, grades, and graph to shops/artists/tags."""
 
     __tablename__ = "pins"
+    __table_args__ = (Index("ix_pins_normalized_name", "normalized_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
 
     # Required Attributes
     name: Mapped[str]
+    normalized_name: Mapped[str] = mapped_column(
+        Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
+        init=False,
+    )
     acquisition_type: Mapped[AcquisitionType]
     front_image_guid: Mapped[UUID]
     currency_id: Mapped[int] = mapped_column(ForeignKey("currencies.id"), init=False)

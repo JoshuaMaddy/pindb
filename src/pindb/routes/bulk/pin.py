@@ -6,7 +6,7 @@ from datetime import date
 from typing import Sequence, TypeVar
 from uuid import UUID, uuid4
 
-from fastapi import Form, Query, Request, UploadFile
+from fastapi import Depends, Form, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pindb.auth import EditorUser
+from pindb.auth import require_admin
 from pindb.database import (
     Artist,
     PinSet,
@@ -159,7 +159,7 @@ def get_bulk_options(
     )
 
 
-@router.get(path="/pin")
+@router.get(path="/pin", dependencies=[Depends(require_admin)])
 def get_bulk_pin(request: Request) -> HtpyResponse:
     options_base_url: str = str(
         request.url_for("get_bulk_options", entity_type="placeholder")
@@ -181,23 +181,19 @@ def get_bulk_pin(request: Request) -> HtpyResponse:
         )
 
 
-@router.post(path="/pin/image")
+@router.post(path="/pin/image", dependencies=[Depends(require_admin)])
 async def post_bulk_image(image: UploadFile = Form()) -> JSONResponse:
     guid: UUID = await save_image(file=image)
     LOGGER.info("Bulk image upload guid=%s", guid)
     return JSONResponse(content={"guid": str(guid)})
 
 
-@router.post(path="/pin")
-async def post_bulk_pins(
-    body: BulkPinInput,
-    current_user: EditorUser,
-) -> JSONResponse:
+@router.post(path="/pin", dependencies=[Depends(require_admin)])
+async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     results: list[PinRowResult] = []
 
     # One bulk_id for the entire submission. Admin-created entities auto-approve
-    # via audit_events, so the bulk_id is effectively inert for admins; for
-    # editors it groups the submitted pins (and new deps) in the approval queue.
+    # via audit_events; bulk_id still ties the batch for auditing / grouping.
     bulk_id: UUID = uuid4()
     LOGGER.info("Bulk-creating %d pins bulk_id=%s", len(body.pins), bulk_id)
 

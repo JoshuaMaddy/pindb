@@ -174,7 +174,7 @@ def _entity_row(
             + [tag.display_name for tag in entity.tags if tag.is_pending]
         )
         if pending_deps:
-            dep_note = span(class_="block text-xs text-error-main mt-0.5")[
+            dep_note = span(class_="block text-xs text-pending-main mt-0.5")[
                 "Will also approve: " + ", ".join(pending_deps)
             ]
 

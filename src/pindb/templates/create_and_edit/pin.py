@@ -3,13 +3,13 @@ htpy page and fragment builders: `templates/create_and_edit/pin.py`.
 """
 
 import json
-from pathlib import Path
 from typing import Sequence
 
 from fastapi import Request
 from fastapi.datastructures import URL
 from htpy import (
     Element,
+    button,
     div,
     form,
     hr,
@@ -32,13 +32,6 @@ from pindb.templates.create_and_edit.pin_form_fields import (
     _optional_fields,
     _required_fields,
 )
-
-with open(
-    file=Path(__file__).parent.parent / "js/pin_creation.js",
-    mode="r",
-    encoding="utf-8",
-) as js_file:
-    SCRIPT_CONTENT: str = js_file.read()
 
 
 def pin_form(
@@ -68,15 +61,21 @@ def pin_form(
 
     # Source for non-image field values (name, shops, grades, etc.).
     prefill: Pin | None = pin if pin is not None else duplicate_source
+    pin_form_ref_json = json.dumps(
+        {
+            "optionsBaseUrl": options_base_url,
+            "excludePinId": pin.id if pin is not None else None,
+            "requireFrontImage": pin is None,
+        }
+    ).replace("</", "<\\/")
 
     return html_base(
         title="Create Pin" if not pin else "Edit Pin",
+        template_js_extra=("pin_creation.js",),
         body_content=centered_div(
             content=[
-                script[
-                    Markup(
-                        f"window.PIN_FORM_REF = {json.dumps({'optionsBaseUrl': options_base_url, 'excludePinId': pin.id if pin is not None else None})};"
-                    )
+                script(**{"type": "application/json"}, id="pin-form-ref-data")[
+                    Markup(pin_form_ref_json)
                 ],
                 page_heading(
                     icon="circle-star" if not pin else "pencil",
@@ -87,6 +86,7 @@ def pin_form(
                 _pending_notice(request=request, pin=pin),
                 hr,
                 form(
+                    id="pin-form",
                     hx_post=str(post_url),
                     hx_encoding="multipart/form-data",
                     hx_swap="none",
@@ -107,6 +107,7 @@ def pin_form(
                             pin=prefill,
                             currencies=currencies,
                             request=request,
+                            name_check_exclude_id=pin.id if pin is not None else None,
                         ),
                         hr(class_="col-span-full"),
                         _optional_fields(
@@ -116,16 +117,20 @@ def pin_form(
                             variant_pins=variant_pins,
                             unauthorized_copy_pins=unauthorized_copy_pins,
                         ),
-                        input(
+                        button(
                             type="submit",
-                            value="Submit",
-                            class_="col-span-full mt-2",
-                        ),
+                            id="pin-form-submit",
+                            formnovalidate=True,
+                            class_=(
+                                "col-span-full mt-2 px-4 py-2 rounded-lg bg-main "
+                                "hover:bg-main-hover border border-lightest "
+                                "cursor-pointer text-base-text w-full transition-opacity"
+                            ),
+                        )["Submit"],
                     ],
                 ],
             ],
         ),
-        script_content=SCRIPT_CONTENT,
         request=request,
     )
 
@@ -153,7 +158,7 @@ def _pending_notice(request: Request, pin: Pin | None) -> Element | str:
         else "Your submission will be reviewed by an admin before becoming visible."
     )
     return div(
-        class_="rounded bg-error-dark border border-error-dark text-error-main px-4 py-2 text-sm my-2"
+        class_="rounded bg-pending-dark border border-pending-dark text-pending-main px-4 py-2 text-sm my-2"
     )[
         i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
         msg,

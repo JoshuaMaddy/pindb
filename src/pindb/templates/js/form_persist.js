@@ -48,7 +48,7 @@
   var data;
   try {
     data = JSON.parse(rawStored);
-  } catch (_) {
+  } catch {
     return;
   }
 
@@ -76,7 +76,7 @@
             });
           }
         }
-      } catch (_) {}
+      } catch {}
     });
 
     // Restore non-Alpine form fields

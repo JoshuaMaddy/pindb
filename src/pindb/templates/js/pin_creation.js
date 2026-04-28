@@ -1,4 +1,11 @@
 window.addEventListener("load", function () {
+  var _refEl = document.getElementById("pin-form-ref-data");
+  if (_refEl && _refEl.textContent && !window.PIN_FORM_REF) {
+    try {
+      window.PIN_FORM_REF = JSON.parse(_refEl.textContent);
+    } catch {}
+  }
+
   // -------------------------------
   // Link Add/Remove
   // -------------------------------
@@ -222,4 +229,238 @@ window.addEventListener("load", function () {
       limitedEditionYes.classList.remove(...limitedEditionSelected);
     });
   }
+
+  // -------------------------------
+  // Required-field gate + hints (submit UX)
+  // -------------------------------
+
+  initPinFormValidation();
 });
+
+/**
+ * Disables submit visually until required fields are satisfied; if the user
+ * submits while invalid, shows inline guidance (only after that attempt).
+ */
+function initPinFormValidation() {
+  const form = document.getElementById("pin-form");
+  const submitBtn = document.getElementById("pin-form-submit");
+  const ref = window.PIN_FORM_REF;
+  if (!form || !submitBtn || !ref) return;
+
+  const FIELD_ORDER = [
+    "name",
+    "front",
+    "shops",
+    "acquisition",
+    "grades",
+    "tags",
+  ];
+
+  const HINT_TEXT = {
+    name: "Enter a name for this pin.",
+    front: "Upload a front image.",
+    shops: "Select at least one shop.",
+    acquisition: "Choose how this pin was acquired.",
+    grades: "Enter at least one grade name.",
+    tags: "Select at least one tag.",
+  };
+
+  const ERR_CLASSES = [
+    "ring-2",
+    "ring-error-main",
+    "rounded-md",
+    "border",
+    "border-error-main",
+    "p-1",
+  ];
+
+  let hintsShown = false;
+
+  function tomSelectHasItems(selectId) {
+    const el = document.getElementById(selectId);
+    if (!el || !el.tomselect) return false;
+    const v = el.tomselect.getValue();
+    if (Array.isArray(v)) return v.length > 0;
+    return v !== "" && v !== null && typeof v !== "undefined";
+  }
+
+  function acquisitionOk() {
+    const el = document.getElementById("acquisition_type");
+    if (!el) return false;
+    if (el.tomselect) {
+      const v = el.tomselect.getValue();
+      return v !== "" && v !== null && typeof v !== "undefined";
+    }
+    return !!el.value;
+  }
+
+  function gradesOk() {
+    const inputs = document.querySelectorAll(
+      '#pin-form input[name="grade_names"]',
+    );
+    for (let i = 0; i < inputs.length; i++) {
+      if (inputs[i].value.trim()) return true;
+    }
+    return false;
+  }
+
+  function frontOk() {
+    if (!ref.requireFrontImage) return true;
+    const inp = document.getElementById("front_image");
+    if (inp && inp.files && inp.files.length > 0) return true;
+    const prev = document.getElementById("front_image_preview");
+    if (!prev) return false;
+    const bg = (prev.style && prev.style.backgroundImage) || "";
+    if (!bg || bg === "none") return false;
+    return bg.includes("url(");
+  }
+
+  const checks = {
+    name: () => {
+      const el = document.getElementById("name");
+      return !!(el && el.value.trim());
+    },
+    front: frontOk,
+    shops: () => tomSelectHasItems("shop_ids"),
+    acquisition: acquisitionOk,
+    grades: gradesOk,
+    tags: () => tomSelectHasItems("tag_ids"),
+  };
+
+  function computeValid() {
+    return FIELD_ORDER.every((k) => checks[k]());
+  }
+
+  function findHighlightEl(key) {
+    if (key === "name") {
+      return document.querySelector('[data-pin-field="name"]');
+    }
+    if (key === "front") {
+      return document.querySelector('[data-pin-field="front"]');
+    }
+    if (key === "grades") {
+      return document.getElementById("pin-grade-section");
+    }
+    const selId =
+      key === "shops"
+        ? "shop_ids"
+        : key === "tags"
+          ? "tag_ids"
+          : key === "acquisition"
+            ? "acquisition_type"
+            : null;
+    const sel = selId ? document.getElementById(selId) : null;
+    if (!sel) return null;
+    return sel.tomselect ? sel.tomselect.wrapper : sel;
+  }
+
+  function removeHints() {
+    document.querySelectorAll(".pin-form-field-hint").forEach((n) => n.remove());
+  }
+
+  function clearErrorDecorations() {
+    removeHints();
+    FIELD_ORDER.forEach((key) => {
+      const el = findHighlightEl(key);
+      if (!el) return;
+      ERR_CLASSES.forEach((c) => el.classList.remove(c));
+    });
+  }
+
+  function applyHintsForInvalid() {
+    clearErrorDecorations();
+    FIELD_ORDER.forEach((key) => {
+      if (checks[key]()) return;
+      const target = findHighlightEl(key);
+      if (!target) return;
+      ERR_CLASSES.forEach((c) => target.classList.add(c));
+      const hint = document.createElement("p");
+      /* Right-column fields use the inner label|field grid: pin hint under field only,
+         leave column 1 empty on that row (front image lives in the outer left column). */
+      hint.className =
+        key === "front"
+          ? "pin-form-field-hint text-error-main text-sm mt-1"
+          : "pin-form-field-hint text-error-main text-sm mt-1 max-sm:col-span-full sm:col-start-2";
+      hint.setAttribute("role", "alert");
+      hint.textContent = HINT_TEXT[key];
+      target.insertAdjacentElement("afterend", hint);
+    });
+  }
+
+  function updateSubmitAppearance() {
+    const ok = computeValid();
+    submitBtn.classList.toggle("opacity-40", !ok);
+    submitBtn.classList.toggle("cursor-not-allowed", !ok);
+    submitBtn.setAttribute("aria-disabled", ok ? "false" : "true");
+    submitBtn.title = ok ? "" : "Fill required fields to submit";
+  }
+
+  function refreshAfterHintsGate() {
+    if (computeValid()) {
+      hintsShown = false;
+    }
+    updateSubmitAppearance();
+    if (!hintsShown) {
+      clearErrorDecorations();
+      return;
+    }
+    applyHintsForInvalid();
+  }
+
+  function scrollToFirstInvalid() {
+    for (let i = 0; i < FIELD_ORDER.length; i++) {
+      const key = FIELD_ORDER[i];
+      if (checks[key]()) continue;
+      const el = findHighlightEl(key);
+      if (el && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      break;
+    }
+  }
+
+  form.addEventListener(
+    "submit",
+    function (e) {
+      if (computeValid()) {
+        hintsShown = false;
+        clearErrorDecorations();
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      hintsShown = true;
+      applyHintsForInvalid();
+      updateSubmitAppearance();
+      scrollToFirstInvalid();
+    },
+    true,
+  );
+
+  form.addEventListener("input", function () {
+    refreshAfterHintsGate();
+  });
+
+  form.addEventListener(
+    "change",
+    function () {
+      refreshAfterHintsGate();
+    },
+    true,
+  );
+
+  ["shop_ids", "tag_ids", "acquisition_type"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && el.tomselect) {
+      el.tomselect.on("change", refreshAfterHintsGate);
+    }
+  });
+
+  const frontInp = document.getElementById("front_image");
+  if (frontInp) {
+    frontInp.addEventListener("change", refreshAfterHintsGate);
+  }
+
+  updateSubmitAppearance();
+}

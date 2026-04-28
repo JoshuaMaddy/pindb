@@ -6,6 +6,7 @@
     "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
     "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify",
     "css:contrast": "node scripts/check-theme-contrast.mjs",
+    "js:lint": "oxlint --deny-warnings src/pindb/templates/js scripts/*.mjs scripts/lucide/*.mjs",
     "vendor:build": "node scripts/vendor.mjs && node scripts/lucide/build-lucide.mjs",
     "build": "npm run css:build && npm run vendor:build"
   },
@@ -22,6 +23,7 @@
     "tom-select": "^2.6.0"
   },
   "devDependencies": {
+    "oxlint": "^1.62.0",
     "rolldown": "^1.0.0-rc.17"
   }
 }

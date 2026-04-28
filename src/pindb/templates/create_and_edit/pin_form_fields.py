@@ -33,6 +33,10 @@ from pindb.database.pin_set import PinSet
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.name_availability import (
+    name_availability_field,
+    name_check_attrs,
+)
 
 
 def _required_fields(
@@ -42,10 +46,15 @@ def _required_fields(
     currencies: Sequence[Currency],
     request: Request,
     pin: Pin | None = None,
+    name_check_exclude_id: int | None = None,
 ) -> Fragment:
     return fragment[
         h2(class_="col-span-full")["Required"],
-        _name_input(pin=pin),
+        _name_input(
+            pin=pin,
+            request=request,
+            exclude_id=name_check_exclude_id,
+        ),
         _shops_input(pin=pin, shops=shops),
         _acquisition_input(pin=pin),
         _grades_input(currencies=currencies, pin=pin),
@@ -88,6 +97,7 @@ def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
             class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
             data_input_id="front_image",
             id="front_image_preview",
+            data_pin_field="front",
             style=f"background-image: url(/get/image/{pin.front_image_guid})"
             if pin
             else False,
@@ -175,14 +185,36 @@ def _text_field(
     ]
 
 
-def _name_input(*, pin: Pin | None) -> list[Element | VoidElement]:
-    return _text_field(
-        name="name",
-        label_text="Name",
-        value=pin.name if pin else "",
-        required=True,
-        placeholder="e.g. Cherry Blossom Artist Edition",
-    )
+def _name_input(
+    *,
+    pin: Pin | None,
+    request: Request,
+    exclude_id: int | None,
+) -> list[Element | VoidElement]:
+    name_feedback_id: str = "pin-name-availability-feedback"
+    return [
+        label(for_="name")["Name", span(class_="text-error-main ml-0.5")["*"]],
+        name_availability_field(
+            feedback_id=name_feedback_id,
+            data_pin_field="name",
+            child=input(
+                name="name",
+                id="name",
+                type="text",
+                required=True,
+                autocomplete="off",
+                value=pin.name if pin else "",
+                placeholder="e.g. Cherry Blossom Artist Edition",
+                class_="w-full min-w-0",
+                **name_check_attrs(
+                    check_url=str(request.url_for("get_create_check_name")),
+                    kind="pin",
+                    target_id=name_feedback_id,
+                    exclude_id=exclude_id,
+                ),
+            ),
+        ),
+    ]
 
 
 def _shops_input(
@@ -199,6 +231,7 @@ def _shops_input(
             multiple=True,
             class_="multi-select w-full min-w-0",
             data_entity_type="shop",
+            data_pin_field="shops",
         )[
             [
                 option(
@@ -221,6 +254,7 @@ def _acquisition_input(*, pin: Pin | None) -> list[Element | VoidElement]:
             id="acquisition_type",
             class_="single-select w-full min-w-0",
             required=True,
+            data_pin_field="acquisition",
         )[
             [
                 option(
@@ -258,7 +292,7 @@ def _grades_input(
     return [
         label(for_="grade")["Grade", span(class_="text-error-main ml-0.5")["*"]],
         Markup(f"""<div class="flex w-full min-w-0 flex-wrap gap-2">
-            <div class="flex min-w-0 flex-1 flex-col gap-2" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
+            <div id="pin-grade-section" data-pin-field="grades" class="flex min-w-0 flex-1 flex-col gap-2" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
                 <template x-for="grade in grades" :key="grade.id">
                     <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
                         <input class="w-full min-w-0 sm:w-auto sm:min-w-0 sm:flex-1" type="text" name="grade_names" x-model="grade.name" required autocomplete="off" placeholder="Grade">
@@ -302,6 +336,7 @@ def _tag_ids_input(
             multiple=True,
             class_="multi-select w-full min-w-0",
             data_entity_type="tag",
+            data_pin_field="tags",
             hx_get=preview_url,
             hx_swap="innerHTML",
             hx_trigger="load, change",

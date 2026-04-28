@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Sequence
 
 from fastapi import Request
@@ -38,13 +37,6 @@ from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.page_heading import page_heading
 
-with open(
-    file=Path(__file__).parent.parent / "js/pin_creation.js",
-    mode="r",
-    encoding="utf-8",
-) as _js_file:
-    _PIN_CREATION_SCRIPT: str = _js_file.read()
-
 
 def bulk_edit_page(
     *,
@@ -58,16 +50,17 @@ def bulk_edit_page(
     request: Request,
 ) -> Element:
     title = f"Bulk edit — {source_label}"
+    pin_form_ref_json = json.dumps({"optionsBaseUrl": options_base_url}).replace(
+        "</", "<\\/"
+    )
     return html_base(
         title=title,
         request=request,
-        script_content=_PIN_CREATION_SCRIPT,
+        template_js_extra=("pin_creation.js",),
         body_content=centered_div(
             content=[
-                script[
-                    Markup(
-                        f"window.PIN_FORM_REF = {json.dumps({'optionsBaseUrl': options_base_url})};"
-                    )
+                script(**{"type": "application/json"}, id="pin-form-ref-data")[
+                    Markup(pin_form_ref_json)
                 ],
                 page_heading(icon="pencil-ruler", text=title),
                 p(class_="text-lightest-hover")[source_description],
@@ -107,7 +100,7 @@ def _pending_notice(viewer_is_admin: bool) -> Element | str:
     if viewer_is_admin:
         return ""
     return div(
-        class_="rounded bg-error-dark border border-error-dark text-error-main px-4 py-2 text-sm"
+        class_="rounded bg-pending-dark border border-pending-dark text-pending-main px-4 py-2 text-sm"
     )[
         i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
         "Each affected pin will receive a pending edit for admin approval.",

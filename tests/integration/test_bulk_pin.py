@@ -1,6 +1,6 @@
 """`/bulk/pin*` routes: image upload, JSON pin creation, and per-entity-type
-options lookup. Editors are allowed; their submissions stay pending and share
-a single ``bulk_id``. Admin creations auto-approve."""
+options lookup. Bulk pin import is admin-only; ``/bulk/options/*`` stays
+editor-accessible for tag/pin forms. Admin submissions auto-approve."""
 
 from __future__ import annotations
 
@@ -21,10 +21,9 @@ class TestBulkPinAuthorization:
         response = auth_client.get("/bulk/pin")
         assert response.status_code == 403
 
-    def test_editor_allowed(self, editor_client):
-        # Editors can bulk-create; their pins land pending and share a bulk_id.
+    def test_editor_rejected(self, editor_client):
         response = editor_client.get("/bulk/pin")
-        assert response.status_code == 200
+        assert response.status_code == 403
 
     def test_admin_allowed(self, admin_client):
         response = admin_client.get("/bulk/pin")
@@ -33,6 +32,13 @@ class TestBulkPinAuthorization:
 
 @pytest.mark.integration
 class TestBulkImageUpload:
+    def test_editor_rejected(self, editor_client, png_upload):
+        response = editor_client.post(
+            "/bulk/pin/image",
+            files={"image": png_upload},
+        )
+        assert response.status_code == 403
+
     def test_upload_returns_guid(self, admin_client, png_upload):
         response = admin_client.post(
             "/bulk/pin/image",
@@ -46,6 +52,10 @@ class TestBulkImageUpload:
 
 @pytest.mark.integration
 class TestBulkPinsCreate:
+    def test_editor_post_rejected(self, editor_client):
+        response = editor_client.post("/bulk/pin", json={"pins": []})
+        assert response.status_code == 403
+
     def test_single_pin_created(self, admin_client, png_upload, db_session):
         image_response = admin_client.post(
             "/bulk/pin/image", files={"image": png_upload}
@@ -112,31 +122,31 @@ class TestBulkPinsCreate:
 
 @pytest.mark.integration
 class TestBulkCreationBulkId:
-    def test_editor_pins_share_bulk_id_and_stay_pending(
-        self, editor_client, png_upload, db_session
+    def test_admin_pins_in_one_submission_share_bulk_id(
+        self, admin_client, png_upload, db_session
     ):
-        image_one = editor_client.post(
+        image_one = admin_client.post(
             "/bulk/pin/image", files={"image": png_upload}
         ).json()["guid"]
-        image_two = editor_client.post(
+        image_two = admin_client.post(
             "/bulk/pin/image", files={"image": png_upload}
         ).json()["guid"]
 
-        response = editor_client.post(
+        response = admin_client.post(
             "/bulk/pin",
             json={
                 "pins": [
                     {
-                        "name": "Editor Bulk 1",
+                        "name": "Admin Bulk Pair 1",
                         "acquisition_type": AcquisitionType.single.value,
                         "front_image_guid": image_one,
-                        "shop_names": ["Shared Editor Shop"],
+                        "shop_names": ["Shared Admin Shop"],
                     },
                     {
-                        "name": "Editor Bulk 2",
+                        "name": "Admin Bulk Pair 2",
                         "acquisition_type": AcquisitionType.single.value,
                         "front_image_guid": image_two,
-                        "shop_names": ["Shared Editor Shop"],
+                        "shop_names": ["Shared Admin Shop"],
                     },
                 ]
             },
@@ -146,15 +156,13 @@ class TestBulkCreationBulkId:
 
         db_session.expire_all()
         pins = db_session.scalars(
-            select(Pin)
-            .where(Pin.name.in_(["Editor Bulk 1", "Editor Bulk 2"]))
-            .execution_options(include_pending=True)
+            select(Pin).where(Pin.name.in_(["Admin Bulk Pair 1", "Admin Bulk Pair 2"]))
         ).all()
         assert len(pins) == 2
         bulk_ids = {pin.bulk_id for pin in pins}
         assert len(bulk_ids) == 1
         assert next(iter(bulk_ids)) is not None
-        assert all(pin.approved_at is None for pin in pins)
+        assert all(pin.approved_at is not None for pin in pins)
 
     def test_admin_pins_auto_approve(self, admin_client, png_upload, db_session):
         front_guid = admin_client.post(
@@ -197,3 +205,8 @@ class TestBulkOptionsLookup:
         names = [row["value"] for row in response.json()]
         assert "Alpha Shop" in names
         assert "Beta Shop" not in names
+
+    def test_editor_can_query_tag_options(self, editor_client):
+        response = editor_client.get("/bulk/options/tag", params={"q": ""})
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)

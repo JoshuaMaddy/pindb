@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import Form, HTTPException, Request
+from fastapi import Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
@@ -18,6 +18,13 @@ from pindb.database.joins import (
     user_favorite_pins,
 )
 from pindb.htmx_toast import redirect_or_htmx_toast
+from pindb.routes._name_check import (
+    NameCheckKind,
+    duplicate_name_response,
+    empty_name_check_response,
+    normalized_name_exists,
+    normalized_name_key,
+)
 from pindb.search.search import search_pin
 from pindb.templates.create_and_edit.pin_set import (
     pin_card_oob,
@@ -54,6 +61,31 @@ def get_create_user_set(
     _current_user: AuthenticatedUser,
 ) -> HtpyResponse:
     return HtpyResponse(create_user_set_page(request=request))
+
+
+@router.get("/me/sets/check-name", response_model=None)
+def get_personal_set_check_name(
+    current_user: AuthenticatedUser,
+    name: str = Query(default=""),
+    exclude_id: int | None = Query(default=None),
+) -> HTMLResponse:
+    normalized_name: str = normalized_name_key(name=name)
+    if not normalized_name:
+        return empty_name_check_response()
+
+    with session_maker() as db:
+        exists: bool = normalized_name_exists(
+            session=db,
+            kind=NameCheckKind.pin_set,
+            normalized_name=normalized_name,
+            exclude_id=exclude_id,
+            owner_id=current_user.id,
+            include_pending=True,
+        )
+
+    if not exists:
+        return empty_name_check_response()
+    return duplicate_name_response(name=name)
 
 
 # ---------------------------------------------------------------------------

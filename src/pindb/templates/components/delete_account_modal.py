@@ -32,7 +32,7 @@ def delete_account_modal(
     )
 
     modal_overlay: Element = div(
-        class_="fixed inset-0 z-50 flex items-center justify-center bg-darker",
+        class_="fixed inset-0 z-50 flex items-center justify-center bg-darker/80",
         x_show="open",
         x_cloak=True,
         **{"@click.self": "open = false"},

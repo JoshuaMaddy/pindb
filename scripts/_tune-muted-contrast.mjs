@@ -18,13 +18,6 @@ function extractBalancedBlock(css, openBraceIndex) {
   return null;
 }
 
-function extractThemeBlock(css) {
-  const i = css.indexOf("@theme");
-  if (i < 0) return null;
-  const brace = css.indexOf("{", i);
-  return extractBalancedBlock(css, brace);
-}
-
 function parseVariants(css) {
   const layerIdx = css.indexOf("@layer theme");
   const search = layerIdx >= 0 ? css.slice(layerIdx) : css;

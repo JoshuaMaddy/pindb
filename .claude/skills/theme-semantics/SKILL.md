@@ -12,7 +12,8 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 3. Borders should use `border-lightest` or `border-accent` (and hover equivalents) for interactive and component-level chrome.
 4. Structural borders (table/grid separators, section dividers, row rules) may use other semantic border colors when needed for hierarchy/legibility.
 5. Use semantic error colors for destructive/error states: `error-dark`, `error-main`, and hover counterparts.
-6. Do not introduce raw `pin-base-*`, custom mixes, or opacity-based new colors.
+6. Use semantic pending colors (`pending-dark`, `pending-main`, and hover counterparts) for approvals-queue UX — banners, badges, and notes tied to “pending approval” or “pending edit”, same layering patterns as `error-*` but amber-based.
+7. Do not introduce raw `pin-base-*`, custom mixes, or opacity-based new colors.
 
 ## Semantic Token Intent
 
@@ -26,6 +27,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 - `error-dark-hover`: hover state for `error-dark`.
 - `error-main`: primary destructive text/icon/accent color.
 - `error-main-hover`: hover state for `error-main`.
+- `pending-dark` / `pending-dark-hover` / `pending-main` / `pending-main-hover`: queued-for-approval surfaces and accents (amber ramp; same roles as `error-*`).
 - `darker-hover`, `main-hover`, `lighter-hover`, `lightest-hover`: interactive state versions of the same layer.
 - `tag-*`: category palette tokens for tag/category chips and taxonomy visuals.
 
@@ -39,6 +41,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
   - Neutral borders: `border-lightest`.
   - Emphasis/selection/action borders: `border-accent`.
   - Error borders/actions: `border-error-dark` or `border-error-main` depending on emphasis.
+  - Pending-queue banners/badges (awaiting approval): `border-pending-dark` / `bg-pending-dark` with `text-pending-main`; hovers use `*-pending-*-hover`.
   - Interactive neutral borders should use `hover:border-lightest-hover`.
   - Interactive emphasized borders should use `hover:border-accent`.
   - Interactive error borders should use `hover:border-error-dark-hover` or `hover:border-error-main-hover`.
@@ -48,6 +51,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
   - Default readable text: `text-base-text`.
   - Emphasis/action text: `text-accent`.
   - Error/destructive text: `text-error-main`.
+  - Pending-queue text/accent: `text-pending-main` (and `*-hover` for interactive).
   - Muted/helper text: `text-lightest-hover`.
   - Interactive text should include `hover:text-*` and generally switch to `accent` for links/actions.
 
@@ -98,5 +102,5 @@ Source: `src/pindb/templates/list/base.py`
 - [ ] Layer order follows `darker -> main -> lighter -> lightest`.
 - [ ] Interactive elements use `*-hover`.
 - [ ] Borders use semantic families (`lightest`/`accent` by default; structural separators may use other semantic tones).
-- [ ] Error/destructive states use `error-*` semantic tokens.
+- [ ] Error/destructive states use `error-*` semantic tokens; pending-approval/edit surfaces use `pending-*`.
 - [ ] No `pin-base-*` classes or ad-hoc color variants were introduced.

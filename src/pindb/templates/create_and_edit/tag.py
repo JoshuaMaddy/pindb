@@ -2,9 +2,24 @@
 htpy page and fragment builders: `templates/create_and_edit/tag.py`.
 """
 
+import json
+
 from fastapi import Request
 from fastapi.datastructures import URL
-from htpy import Element, div, form, hr, i, input, label, option, select, span
+from htpy import (
+    Element,
+    button,
+    div,
+    form,
+    hr,
+    i,
+    input,
+    label,
+    option,
+    script,
+    select,
+    span,
+)
 from markupsafe import Markup
 from titlecase import titlecase
 
@@ -12,56 +27,12 @@ from pindb.database.tag import Tag, TagCategory
 from pindb.templates.base import html_base
 from pindb.templates.components.centered import centered_div
 from pindb.templates.components.markdown_editor import markdown_editor
+from pindb.templates.components.name_availability import (
+    name_availability_field,
+    name_check_attrs,
+)
 from pindb.templates.components.page_heading import page_heading
 from pindb.templates.components.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
-
-_INIT_SCRIPT = """
-document.addEventListener('DOMContentLoaded', function() {
-    var _tagRender = { option: TagSelect.tagOptionRender, item: TagSelect.tagItemRender };
-    var _noResults = {
-        no_results: function(data) {
-            var msg = data.input && data.input.length > 0 ? "No results found" : "Start typing to search\u2026";
-            return '<div class="no-results">' + msg + '</div>';
-        }
-    };
-
-    document.querySelectorAll("select.multi-select").forEach(function(el) {
-        var optionsUrl = el.dataset.optionsUrl;
-        new TomSelect(el, Object.assign({
-            load: function(query, callback) {
-                var sep = optionsUrl.includes('?') ? '&' : '?';
-                fetch(optionsUrl + sep + 'q=' + encodeURIComponent(query))
-                    .then(function(r) { return r.json(); })
-                    .then(callback)
-                    .catch(function() { callback(); });
-            },
-            shouldLoad: function(q) { return q.length > 0; },
-            maxItems: null,
-            valueField: "value",
-            labelField: "text",
-            persist: true,
-            plugins: ["caret_position", "remove_button"],
-            render: Object.assign({}, _noResults, _tagRender)
-        }, TagSelect.tagSelectLucideCallbacks()));
-    });
-
-    document.querySelectorAll("select.single-select").forEach(function(el) {
-        new TomSelect(el, Object.assign({
-            render: _tagRender
-        }, TagSelect.tagSingleSelectCallbacks()));
-    });
-
-    document.querySelectorAll("select.alias-select").forEach(function(el) {
-        new TomSelect(el, {
-            maxItems: null,
-            create: true,
-            persist: false,
-            plugins: ["remove_button"],
-            onInitialize: function() { this.addItems([]); }
-        });
-    });
-});
-"""
 
 
 def _duplicate_notice(source_display_name: str) -> Element:
@@ -92,8 +63,25 @@ def tag_form(
     prefill: Tag | None = tag if tag is not None else duplicate_source
     selected_implications: list[Tag] = list(prefill.implications) if prefill else []
     current_aliases: list[str] = [a.alias for a in prefill.aliases] if prefill else []
+    name_feedback_id: str = "tag-name-availability-feedback"
+    gate_cfg = {
+        "formId": "tag-form",
+        "submitId": "tag-form-submit",
+        "fields": [
+            {
+                "key": "name",
+                "kind": "text",
+                "inputId": "name",
+                "hint": "Enter a tag name.",
+                "highlightSelector": '[data-pin-field="name"]',
+            }
+        ],
+    }
+    gate_json = json.dumps(gate_cfg).replace("</", "<\\/")
+
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
+        template_js_extra=("tag_form.js", "entity_form_gate.js"),
         body_content=centered_div(
             content=[
                 page_heading(
@@ -105,7 +93,11 @@ def tag_form(
                     source_display_name=duplicate_source.display_name,
                 ),
                 hr,
+                script(**{"type": "application/json"}, id="entity-form-gate-data")[
+                    Markup(gate_json)
+                ],
                 form(
+                    id="tag-form",
                     hx_post=str(post_url),
                     hx_target="#pindb-toast-host",
                     hx_swap="innerHTML",
@@ -114,13 +106,23 @@ def tag_form(
                     label(for_="name")[
                         "Name", span(class_="text-error-main ml-0.5")["*"]
                     ],
-                    input(
-                        type="text",
-                        name="name",
-                        id="name",
-                        required=True,
-                        autocomplete="off",
-                        value=prefill.display_name if prefill else None,
+                    name_availability_field(
+                        feedback_id=name_feedback_id,
+                        data_pin_field="name",
+                        child=input(
+                            type="text",
+                            name="name",
+                            id="name",
+                            required=True,
+                            autocomplete="off",
+                            value=prefill.display_name if prefill else None,
+                            **name_check_attrs(
+                                check_url=str(request.url_for("get_create_check_name")),
+                                kind="tag",
+                                target_id=name_feedback_id,
+                                exclude_id=tag.id if tag else None,
+                            ),
+                        ),
                     ),
                     label(for_="md-editor-description")["Description"],
                     markdown_editor(
@@ -175,14 +177,18 @@ def tag_form(
                             for alias in current_aliases
                         ]
                     ],
-                    input(
+                    button(
                         type="submit",
-                        value="Submit",
-                        class_="mt-2",
-                    ),
+                        id="tag-form-submit",
+                        formnovalidate=True,
+                        class_=(
+                            "mt-2 px-4 py-2 rounded-lg bg-main hover:bg-main-hover "
+                            "border border-lightest cursor-pointer text-base-text "
+                            "w-full transition-opacity"
+                        ),
+                    )["Submit"],
                 ],
             ]
         ),
-        script_content=Markup(_INIT_SCRIPT),
         request=request,
     )

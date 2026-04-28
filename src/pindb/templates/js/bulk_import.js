@@ -1,5 +1,8 @@
 // =============================================================================
 // PinDB Bulk Import
+//
+// window.BULK_REF includes nameCheckUrl — HTMX duplicate-name checks on each
+// pin name field (same endpoint as single-pin create).
 // =============================================================================
 
 (function () {
@@ -8,6 +11,13 @@
   // ---------------------------------------------------------------------------
   // Module state
   // ---------------------------------------------------------------------------
+
+  var _bulkRefEl = document.getElementById("bulk-ref-data");
+  if (_bulkRefEl && _bulkRefEl.textContent && !window.BULK_REF) {
+    try {
+      window.BULK_REF = JSON.parse(_bulkRefEl.textContent);
+    } catch {}
+  }
 
   const REF = window.BULK_REF;
 
@@ -60,7 +70,7 @@
     if (bulkNavType === "reload" && savedBulk) {
       try {
         JSON.parse(savedBulk).forEach((pin) => addRow(pin));
-      } catch (_) {
+      } catch {
         addRow();
       }
     } else {
@@ -111,7 +121,7 @@
     rows.forEach((tr) => {
       try {
         pins.push(collectRowData(tr.dataset.rowId));
-      } catch (_) {}
+      } catch {}
     });
     sessionStorage.setItem(BULK_STORAGE_KEY, JSON.stringify(pins));
   }
@@ -265,7 +275,19 @@
       <!-- Name -->
       <td class="bulk-td bulk-sticky-td bulk-sticky-col-2 copyable-cell"
           data-col-type="name">
-        <input type="text" class="bulk-input w-full" data-row="${id}" data-field="name" placeholder="Pin name" autocomplete="off">
+        ${
+          REF.nameCheckUrl
+            ? `<div class="name-availability-field flex flex-col gap-1">
+          <input type="text" name="name" class="bulk-input w-full" data-row="${id}" data-field="name" placeholder="Pin name" autocomplete="off"
+            hx-get="${REF.nameCheckUrl}"
+            hx-trigger="input changed delay:1s, search"
+            hx-target="#bulk-pin-name-feedback-${id}"
+            hx-swap="innerHTML"
+            hx-vals='${JSON.stringify({ kind: "pin" })}'>
+          <div id="bulk-pin-name-feedback-${id}" class="name-availability-feedback"></div>
+        </div>`
+            : `<input type="text" class="bulk-input w-full" data-row="${id}" data-field="name" placeholder="Pin name" autocomplete="off">`
+        }
       </td>
 
       <!-- Shops -->
@@ -434,7 +456,7 @@
           }
           localOptionsByType.get(entityType).set(input, item);
           // Broadcast to all other existing instances of same type
-          broadcastLocalOption(entityType, input, item, rowId, field);
+          broadcastLocalOption(entityType, input, item, rowId);
           callback(item);
         },
         plugins: ["remove_button", "caret_position"],
@@ -557,6 +579,7 @@
 
     // Re-run Lucide on new row
     if (window.lucide) lucide.createIcons({ nodes: [tr] });
+    if (window.htmx) htmx.process(tr);
 
     // Prefill values if duplicating
     if (prefill) applyPrefill(rowId, prefill);
@@ -767,7 +790,7 @@
           const validGrades = grades.filter((g) => g.name);
           tr.querySelector(`.grades-count[data-row="${rowId}"]`).textContent =
             validGrades.length;
-        } catch (_) {}
+        } catch {}
       }
       subTr.remove();
     }
@@ -854,7 +877,7 @@
           const validLinks = links.filter((l) => l.trim());
           tr.querySelector(`.links-count[data-row="${rowId}"]`).textContent =
             validLinks.length;
-        } catch (_) {}
+        } catch {}
       }
       subTr.remove();
     }
@@ -977,7 +1000,7 @@
         const gradesDiv = document.querySelector(`#${rowId}-grades [x-data]`);
         try {
           return Alpine.$data(gradesDiv).grades;
-        } catch (_) {}
+        } catch {}
       }
       return JSON.parse(tr.dataset.grades || "[]");
     }
@@ -1087,7 +1110,7 @@
         const gradesDiv = document.querySelector(`#${rowId}-grades [x-data]`);
         try {
           return normalizeGrades(Alpine.$data(gradesDiv).grades);
-        } catch (_) {}
+        } catch {}
       }
       return normalizeGrades(JSON.parse(tr.dataset.grades || "[]"));
     })();
@@ -1097,7 +1120,7 @@
         const linksDiv = document.querySelector(`#${rowId}-links [x-data]`);
         try {
           return Alpine.$data(linksDiv).links.filter((l) => l.trim());
-        } catch (_) {}
+        } catch {}
       }
       return JSON.parse(tr.dataset.links || "[]").filter((l) => l.trim());
     })();
@@ -1253,7 +1276,7 @@
       updateSubmitLabel();
     } else {
       // Remove only successful rows
-      result.results.forEach((r, i) => {
+      result.results.forEach((r) => {
         if (r.success) {
           const tr = rowArr[r.index];
           if (tr) deleteRow(tr.dataset.rowId);
@@ -1337,7 +1360,6 @@
     value,
     item,
     sourceRowId,
-    sourceField,
   ) {
     const fieldByType = {
       shop: "shops",
