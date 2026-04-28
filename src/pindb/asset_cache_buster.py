@@ -1,4 +1,8 @@
-"""Process-lifetime token for optional ``?v=`` on first-party script URLs."""
+"""Process-lifetime token for ``?v=`` on first-party ``/templates-js`` script URLs.
+
+Paired with long ``immutable`` cache headers: restart/deploy bumps the query so
+browsers fetch new bytes.
+"""
 
 import time
 

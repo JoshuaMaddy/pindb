@@ -1,4 +1,4 @@
-"""``Cache-Control`` for ``/static`` (vendored + main.css) and path helper coverage.
+"""``Cache-Control`` for ``/static`` (vendored + main.css), ``/templates-js``, and path helpers.
 
 Uses the same integration stack as other route tests: Postgres via testcontainers
 (Docker), real ``pindb`` app, and the ``client`` TestClient.
@@ -46,3 +46,14 @@ class TestCacheBustedStaticFiles:
         r = client.get("/static/input.css", follow_redirects=False)
         assert r.status_code == 200
         assert r.headers.get("cache-control") != VENDORED_STATIC_CACHE_CONTROL
+
+
+@pytest.mark.integration
+class TestCacheBustedTemplateJsFiles:
+    def test_templates_js_is_long_cache(self, client):
+        r = client.get(
+            "/templates-js/shell/pindb_shell.js?v=bust",
+            follow_redirects=False,
+        )
+        assert r.status_code == 200
+        assert r.headers["cache-control"] == VENDORED_STATIC_CACHE_CONTROL

@@ -6,9 +6,11 @@ from random import sample
 from typing import Sequence, cast
 
 from fastapi import Request
-from htpy import Element, VoidElement, div, img
+from htpy import Element, VoidElement, div
 
 from pindb.database import Pin, PinSet
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
+from pindb.templates.pin_image_alt import pin_front_image_alt
 
 
 def thumbnail_grid(
@@ -26,12 +28,11 @@ def thumbnail_grid(
         pin_list = sample(pin_list, k=4)
 
     elements: list[VoidElement | Element] = [
-        img(
-            src=str(
-                request.url_for(
-                    "get_image", guid=pin.front_image_guid
-                ).include_query_params(thumbnail=True)
-            ),
+        pin_thumbnail_img(
+            request,
+            pin.front_image_guid,
+            sizes="(min-width: 64rem) 30px, (min-width: 40rem) 6vw, 30px",
+            alt=pin_front_image_alt(pin),
             class_="object-cover aspect-square w-full h-full bg-lighter",
         )
         for pin in pin_list

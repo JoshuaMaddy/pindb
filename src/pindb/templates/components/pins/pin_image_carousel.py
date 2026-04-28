@@ -6,10 +6,13 @@ Front/back pin images as a Swiper carousel with thumbnails. Pairs with
 shared lightbox script picks them up.
 """
 
+from uuid import UUID
+
 from fastapi import Request
 from htpy import Element, Fragment, div, fragment, img, link
 
 from pindb.database.pin import Pin
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_back_image_alt, pin_front_image_alt
 
 IMG_CAROUSEL_HEIGHT: str = "w-full max-h-[30vh] sm:max-h-[60vh] object-contain bg-main"
@@ -18,24 +21,15 @@ IMG_CAROUSEL_HEIGHT: str = "w-full max-h-[30vh] sm:max-h-[60vh] object-contain b
 def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
     """Front/back images as a Swiper carousel (thumbnails, drag, arrows, loop)."""
     front_full: str = str(request.url_for("get_image", guid=pin.front_image_guid))
-    front_thumb: str = str(
-        request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
-            thumbnail=True
-        )
-    )
-    slides: list[tuple[str, str, str]] = [
-        ("Front", front_full, front_thumb),
+    slides: list[tuple[str, str, UUID]] = [
+        ("Front", front_full, pin.front_image_guid),
     ]
     if pin.back_image_guid:
         slides.append(
             (
                 "Back",
                 str(request.url_for("get_image", guid=pin.back_image_guid)),
-                str(
-                    request.url_for(
-                        "get_image", guid=pin.back_image_guid
-                    ).include_query_params(thumbnail=True)
-                ),
+                pin.back_image_guid,
             )
         )
     slide_count: int = len(slides)
@@ -43,7 +37,7 @@ def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
 
     main_slides: list[Element] = []
     thumb_slides: list[Element] = []
-    for idx, (_label, full_url, thumb_url) in enumerate(slides):
+    for idx, (_label, full_url, thumb_guid) in enumerate(slides):
         slide_alt: str = (
             pin_front_image_alt(pin) if idx == 0 else pin_back_image_alt(pin)
         )
@@ -64,11 +58,13 @@ def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
             div(
                 class_="swiper-slide box-border! overflow-hidden rounded border border-lightest"
             )[
-                img(
+                pin_thumbnail_img(
+                    request,
+                    thumb_guid,
+                    sizes="(min-width: 48rem) 80px, 72px",
                     alt=slide_alt,
                     class_="h-full w-full object-cover",
                     loading="lazy",
-                    src=thumb_url,
                 )
             ]
         )

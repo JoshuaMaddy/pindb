@@ -38,7 +38,7 @@ Or: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 Standard layout: `src/pindb/{database,routes,templates,search,models}/`. Names mirror — route `routes/get/pin.py` → template `templates/get/pin.py`. Env config = Pydantic Settings in `config.py` (source of truth for env vars).
 
-First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/`; use `templates_js_url("pins/pin_lightbox.js")` style paths (see `templates/base.py` and `template_js_extra` on pages).
+First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/` with `CacheBustedTemplateJsFiles` (same long cache as vendored static); use `templates_js_url("pins/pin_lightbox.js")` so every URL includes `?v=<process start>` (see `templates/base.py` and `template_js_extra` on pages).
 
 Key files where behavior not obvious from name:
 - `audit_events.py` — session-level SQLAlchemy events (before_flush, after_flush, do_orm_execute). Soft-delete + pending filters here.
@@ -114,7 +114,8 @@ return HTMLResponse(content=str(template(pin=pin)))
 
 ### Images
 - Pin has `front_image_guid` (required), `back_image_guid` (optional) — UUIDs.
-- Thumbnails at `{uuid}.thumbnail` (256px WebP), generated eagerly at ingest.
+- Thumbnails: objects `{uuid}.thumb.{w}` for `w ∈ {50, 100, 200, 400, 600}` (WebP, long-edge fit), generated eagerly at ingest. Legacy data may still have `{uuid}.thumbnail` (256px WebP); `GET /get/image/{guid}?thumbnail=true` prefers `.thumb.200` then falls back to `.thumbnail`.
+- `GET /get/image/{guid}?w=N` serves a sized thumb when `N` is in that set. Templates use `pin_thumbnail_img()`: `src` is the smallest stored width (fallback), `srcset` lists all widths with `w` descriptors, `sizes` is a comma-separated media-query list (first match wins) per layout.
 - Two backends (mutually exclusive): `filesystem` or `r2` (Cloudflare R2).
 - R2 with `r2_public_url` set → redirects; else proxies bytes. Filesystem → `FileResponse`.
 - 20 MB upload limit; EXIF/ICC/XMP stripped on ingest (`_strip_metadata`) prevents GPS/device leaks.

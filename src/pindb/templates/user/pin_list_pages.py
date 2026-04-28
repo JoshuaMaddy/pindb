@@ -15,7 +15,6 @@ from htpy import (
     a,
     div,
     hr,
-    img,
     span,
     table,
     tbody,
@@ -39,6 +38,7 @@ from pindb.templates.components.listing.pagination_controls import pagination_co
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.nav.pill_link import pill_link
 from pindb.templates.components.pins.pin_grid import pin_grid
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.pin_image_alt import pin_front_image_alt
 
@@ -143,12 +143,10 @@ def _list_shell(
 
 
 def _thumbnail(request: Request, pin: Pin) -> VoidElement:
-    return img(
-        src=str(
-            request.url_for(
-                "get_image", guid=pin.front_image_guid
-            ).include_query_params(thumbnail=True)
-        ),
+    return pin_thumbnail_img(
+        request,
+        pin.front_image_guid,
+        sizes="(min-width: 48rem) 48px, 44px",
         alt=pin_front_image_alt(pin),
         class_="w-12 h-12 object-contain rounded",
     )

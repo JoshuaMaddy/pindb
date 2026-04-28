@@ -12,7 +12,6 @@ from htpy import (
     fragment,
     h1,
     h2,
-    img,
     input,
     link,
     script,
@@ -23,6 +22,7 @@ from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
 from pindb.templates.base import html_base
 from pindb.templates.components.layout.card import card
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 
 
 def _masonry_pin_card(request: Request, pin: Pin) -> Element:
@@ -36,11 +36,12 @@ def _masonry_pin_card(request: Request, pin: Pin) -> Element:
         tabindex="-1",
         aria_hidden="true",
     )[
-        img(
-            src=str(
-                request.url_for(
-                    "get_image", guid=pin.front_image_guid
-                ).include_query_params(thumbnail=True)
+        pin_thumbnail_img(
+            request,
+            pin.front_image_guid,
+            sizes=(
+                # Seven equal flex columns; #pindb-masonry-bg uses 5rem side padding + gaps.
+                "max(2rem, min(30rem, calc((100vw - 11.5rem) / 7)))"
             ),
             alt="",
             loading="lazy",

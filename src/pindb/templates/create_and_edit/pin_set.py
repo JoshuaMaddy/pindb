@@ -14,7 +14,6 @@ from htpy import (
     h2,
     hr,
     i,
-    img,
     input,
     p,
     script,
@@ -39,6 +38,7 @@ from pindb.templates.components.forms.name_availability import (
 from pindb.templates.components.forms.toggle_button import toggle_button
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_front_image_alt
 
 # ---------------------------------------------------------------------------
@@ -314,11 +314,6 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
     remove_url = str(
         request.url_for("remove_pin_from_personal_set", set_id=set_id, pin_id=pin.id)
     )
-    image_url = str(
-        request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
-            thumbnail=True
-        )
-    )
     return div(
         id=f"pin-row-{pin.id}",
         data_pin_id=str(pin.id),
@@ -341,8 +336,10 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
             class_="block",
             tabindex="-1",
         )[
-            img(
-                src=image_url,
+            pin_thumbnail_img(
+                request,
+                pin.front_image_guid,
+                sizes="(min-width: 48rem) 100px, 88px",
                 alt=pin_front_image_alt(pin),
                 class_="w-full aspect-square object-contain bg-main",
             )
@@ -415,11 +412,6 @@ def search_result_row(
         icon = "square"
         text_class = "text-base-text"
 
-    thumbnail_url = str(
-        request.url_for("get_image", guid=pin.front_image_guid).include_query_params(
-            thumbnail=True
-        )
-    )
     shops = sorted(pin.shops, key=lambda s: s.name)
     artists = sorted(pin.artists, key=lambda a: a.name)
     shop_text = (shops[0].name + (" …" if len(shops) > 1 else "")) if shops else None
@@ -436,8 +428,10 @@ def search_result_row(
             target_id=f"search-row-{pin.id}",
             children=[
                 i(data_lucide=icon, class_="inline-block shrink-0"),
-                img(
-                    src=thumbnail_url,
+                pin_thumbnail_img(
+                    request,
+                    pin.front_image_guid,
+                    sizes="(min-width: 48rem) 40px, 36px",
                     alt=pin_front_image_alt(pin),
                     class_="w-10 h-10 object-contain rounded bg-main shrink-0",
                 ),

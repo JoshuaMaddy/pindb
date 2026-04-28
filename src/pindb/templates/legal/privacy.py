@@ -90,8 +90,9 @@ def privacy_page(request: Request) -> Element:
                 _p(
                     "Pin images you upload are stored by a random UUID. "
                     "EXIF and other embedded metadata (including camera "
-                    "GPS coordinates) are stripped on ingest. A 256 px "
-                    "WebP thumbnail is generated at the same time."
+                    "GPS coordinates) are stripped on ingest. Multiple WebP "
+                    "thumbnails (several fixed widths) are generated at the "
+                    "same time."
                 ),
                 _h2("3. Data we do NOT collect"),
                 _ul(

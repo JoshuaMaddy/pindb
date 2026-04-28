@@ -24,7 +24,6 @@ from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.orm import selectinload  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
-from starlette.staticfiles import StaticFiles  # noqa: E402
 
 from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
@@ -33,7 +32,10 @@ from pindb.csrf import csrf_origin_middleware  # noqa: E402
 from pindb.database import session_maker  # noqa: E402
 from pindb.database.pin import Pin  # noqa: E402
 from pindb.htmx_toast import htmx_error_toast  # noqa: E402
-from pindb.http_caching import CacheBustedStaticFiles  # noqa: E402
+from pindb.http_caching import (  # noqa: E402
+    CacheBustedStaticFiles,
+    CacheBustedTemplateJsFiles,
+)
 from pindb.lifespan import lifespan  # noqa: E402
 from pindb.routes import (  # noqa: E402
     admin,
@@ -100,7 +102,7 @@ app.mount(
 
 app.mount(
     path="/templates-js",
-    app=StaticFiles(directory=str(CONFIGURATION.templates_js_dir)),
+    app=CacheBustedTemplateJsFiles(directory=str(CONFIGURATION.templates_js_dir)),
     name="templates_js",
 )
 

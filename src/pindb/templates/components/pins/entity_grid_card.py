@@ -6,9 +6,11 @@ from random import sample
 from typing import Sequence
 
 from fastapi import Request
-from htpy import BaseElement, Element, VoidElement, a, div, img, span
+from htpy import BaseElement, Element, VoidElement, a, div, span
 
 from pindb.database.pin import Pin
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
+from pindb.templates.pin_image_alt import pin_front_image_alt
 
 # Grid is 2×2; corners flow left-to-right, top-to-bottom.
 _CORNER_CLASSES: list[str] = [
@@ -33,13 +35,16 @@ def entity_grid_card(
         pin_list = sample(population=pin_list, k=4)
 
     images: list[VoidElement | Element] = [
-        img(
-            src=str(
-                request.url_for(
-                    "get_image",
-                    guid=pin.front_image_guid,
-                ).include_query_params(thumbnail=True)
+        pin_thumbnail_img(
+            request,
+            pin.front_image_guid,
+            sizes=(
+                # 2×2 tile inside the card; cap vw so wide viewports do not pick 600w.
+                "(min-width: 64rem) 96px, "
+                "(min-width: 40rem) min(24vw, 120px), "
+                "min(26vw, 130px)"
             ),
+            alt=pin_front_image_alt(pin),
             class_=f"object-cover w-full h-full aspect-square bg-lighter {_CORNER_CLASSES[index]}",
         )
         for index, pin in enumerate(pin_list)

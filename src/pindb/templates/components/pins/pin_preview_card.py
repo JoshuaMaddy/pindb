@@ -3,9 +3,10 @@ htpy page and fragment builders: `templates/components/pins/pin_preview_card.py`
 """
 
 from fastapi import Request
-from htpy import Element, a, div, i, img, span
+from htpy import Element, a, div, i, span
 
 from pindb.database.pin import Pin
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_front_image_alt
 
 
@@ -42,12 +43,16 @@ def pin_preview_card(
             ),
             class_="h-full",
         )[
-            img(
-                src=str(
-                    request.url_for(
-                        "get_image",
-                        guid=pin.front_image_guid,
-                    ).include_query_params(thumbnail=True)
+            pin_thumbnail_img(
+                request,
+                pin.front_image_guid,
+                sizes=(
+                    # Multi-column grid cells are ~220px wide; cap at 200px so 1x picks 200w
+                    # (400w needs sizes >200 CSS px). Still cap vw to avoid 600w on wide tablets.
+                    # Narrow single-column: keep min(100vw, 360px) so large phones use 400w.
+                    "(min-width: 64rem) min(200px, 22vw), "
+                    "(min-width: 40rem) min(45vw, 200px), "
+                    "min(100vw, 360px)"
                 ),
                 alt=pin_front_image_alt(pin),
                 class_="object-cover aspect-square w-full",

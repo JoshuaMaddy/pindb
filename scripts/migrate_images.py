@@ -17,11 +17,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pindb.config import CONFIGURATION
 from pindb.file_handler import (
+    THUMBNAIL_SIZES,
     THUMBNAIL_SUFFIX,
     FilesystemBackend,
     R2Backend,
     _make_thumbnail_bytes,
+    thumbnail_storage_key,
 )
+
+_LEGACY_THUMB_DIM = 256
 
 
 def _r2_backend() -> R2Backend:
@@ -63,11 +67,18 @@ def migrate(
 
         dest.save(key, data)
 
-        thumb_key = f"{key}{THUMBNAIL_SUFFIX}"
-        thumb_data = source.load(thumb_key)
-        if thumb_data is None:
-            thumb_data = _make_thumbnail_bytes(data)
-        dest.save(thumb_key, thumb_data)
+        for w in THUMBNAIL_SIZES:
+            thumb_key = thumbnail_storage_key(key, w)
+            thumb_data = source.load(thumb_key)
+            if thumb_data is None:
+                thumb_data = _make_thumbnail_bytes(data, w)
+            dest.save(thumb_key, thumb_data)
+
+        legacy_key = f"{key}{THUMBNAIL_SUFFIX}"
+        legacy_data = source.load(legacy_key)
+        if legacy_data is None:
+            legacy_data = _make_thumbnail_bytes(data, _LEGACY_THUMB_DIM)
+        dest.save(legacy_key, legacy_data)
 
         print(f"  [{i}/{len(keys)}] OK   {key}")
         ok += 1

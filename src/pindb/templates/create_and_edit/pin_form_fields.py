@@ -410,7 +410,7 @@ def _pin_option(*, pin_obj: Pin) -> Element:
     return option(
         value=str(pin_obj.id),
         selected=True,
-        data_thumbnail=f"/get/image/{pin_obj.front_image_guid}?thumbnail=true",
+        data_thumbnail=f"/get/image/{pin_obj.front_image_guid}?w=100",
     )["(P) " + pin_obj.name if pin_obj.is_pending else pin_obj.name]
 
 

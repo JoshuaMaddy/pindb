@@ -1,12 +1,15 @@
 """Pin image storage, ingest, and serving helpers.
 
 Images are stored as opaque UUID keys (no extension). Uploads are capped at
-``MAX_IMAGE_BYTES``, stripped of embedded metadata, and written with a
-companion ``{uuid}.thumbnail`` WebP file. The active backend comes from
-``CONFIGURATION`` (local directory or Cloudflare R2).
+``MAX_IMAGE_BYTES``, stripped of embedded metadata, and written with WebP
+sidecars ``{uuid}.thumb.{w}`` for each width in ``THUMBNAIL_SIZES``. The active
+backend comes from ``CONFIGURATION`` (local directory or Cloudflare R2).
+
+Legacy data may still have a single ``{uuid}.thumbnail`` (256px WebP).
 """
 
 import io
+import re
 import uuid
 from math import floor
 from pathlib import Path
@@ -21,7 +24,17 @@ from pindb.config import CONFIGURATION
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 THUMBNAIL_SUFFIX = ".thumbnail"
-_THUMBNAIL_DIM = 256
+# Fixed long-edge pixel sizes for stored WebP thumbnails.
+THUMBNAIL_SIZES: tuple[int, ...] = (50, 100, 200, 400, 600)
+# Default for legacy ``?thumbnail=true`` (maps to ``.thumb.200`` when present).
+DEFAULT_THUMB_DISPLAY_W = 200
+# Long edge for historic ``{uuid}.thumbnail`` sidecars only.
+_LEGACY_THUMB_DIM = 256
+
+_ORIGINAL_KEY_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z",
+    re.I,
+)
 
 # Clamp PIL's decompression-bomb guard below the default (~89 MP). A
 # 20 MB JPEG/PNG can still decode into gigabytes of RAM at the default
@@ -30,25 +43,35 @@ _THUMBNAIL_DIM = 256
 Image.MAX_IMAGE_PIXELS = 24_000_000
 
 
-def _make_thumbnail_bytes(data: bytes) -> bytes:
-    """Build a WebP thumbnail from raw image bytes.
+def is_original_image_key(name: str) -> bool:
+    """Return True if *name* is a bare UUID key (original image), not a sidecar."""
+    return bool(_ORIGINAL_KEY_PATTERN.fullmatch(name))
 
-    Args:
-        data (bytes): Encoded image bytes (any format Pillow can open).
 
-    Returns:
-        bytes: WebP-encoded thumbnail sized to fit within ``_THUMBNAIL_DIM``
-            pixels on the long edge while preserving aspect ratio.
-    """
-    image = Image.open(io.BytesIO(data))
+def thumbnail_storage_key(guid_str: str, w: int) -> str:
+    """Object key for a sized WebP thumbnail: ``{uuid}.thumb.{w}``."""
+    if w not in THUMBNAIL_SIZES:
+        raise ValueError(
+            f"Invalid thumbnail width {w}; expected one of {THUMBNAIL_SIZES}"
+        )
+    return f"{guid_str}.thumb.{w}"
+
+
+def _thumbnail_webp_from_image(image: Image.Image, max_dim: int) -> bytes:
     aspect = image.width / image.height
     if aspect >= 1:
-        width, height = _THUMBNAIL_DIM, floor(_THUMBNAIL_DIM / aspect)
+        width, height = max_dim, floor(max_dim / aspect)
     else:
-        width, height = floor(_THUMBNAIL_DIM * aspect), _THUMBNAIL_DIM
+        width, height = floor(max_dim * aspect), max_dim
     buffer = io.BytesIO()
     image.resize((int(width), int(height))).save(buffer, format="webp")
     return buffer.getvalue()
+
+
+def _make_thumbnail_bytes(data: bytes, max_dim: int) -> bytes:
+    """Build a WebP thumbnail from raw image bytes at *max_dim* on the long edge."""
+    image = Image.open(io.BytesIO(data))
+    return _thumbnail_webp_from_image(image, max_dim)
 
 
 def _strip_metadata(data: bytes) -> bytes:
@@ -119,16 +142,15 @@ class FilesystemBackend:
         return path if path.is_file() else None
 
     def list_keys(self) -> list[str]:
-        """List stored object keys, excluding thumbnail sidecars.
+        """List stored original image keys (bare UUID filenames only).
 
         Returns:
-            list[str]: Basenames of regular files in the directory that do
-                not end with ``THUMBNAIL_SUFFIX``.
+            list[str]: Basenames that match the original UUID pattern.
         """
         return [
             child_path.name
             for child_path in self._dir.iterdir()
-            if child_path.is_file() and not child_path.name.endswith(THUMBNAIL_SUFFIX)
+            if child_path.is_file() and is_original_image_key(child_path.name)
         ]
 
 
@@ -186,18 +208,18 @@ class R2Backend:
         return None
 
     def list_keys(self) -> list[str]:
-        """List object keys in the bucket, excluding thumbnail sidecars.
+        """List original image keys in the bucket (bare UUID object keys only).
 
         Returns:
-            list[str]: Keys from paginated ``list_objects_v2`` results that
-                do not end with ``THUMBNAIL_SUFFIX``.
+            list[str]: Keys from paginated ``list_objects_v2`` that match
+                the original UUID pattern.
         """
         paginator = self._client.get_paginator("list_objects_v2")
         keys: list[str] = []
         for page in paginator.paginate(Bucket=self._bucket):
             for bucket_object in page.get("Contents", []):
                 object_key: str = bucket_object["Key"]
-                if not object_key.endswith(THUMBNAIL_SUFFIX):
+                if is_original_image_key(object_key):
                     keys.append(object_key)
         return keys
 
@@ -258,7 +280,7 @@ def load_image(key: str) -> bytes | None:
     """Load raw bytes for *key* from the active backend.
 
     Args:
-        key (str): Stored object key (UUID string or ``{uuid}.thumbnail``).
+        key (str): Stored object key.
 
     Returns:
         bytes | None: Object bytes, or ``None`` if missing.
@@ -296,19 +318,34 @@ def sniff_image_mime(data: bytes) -> str:
     return "application/octet-stream"
 
 
-def ensure_thumbnail(guid_str: str) -> bool:
-    """Ensure a ``.thumbnail`` sidecar exists for *guid_str* when possible.
-
-    On the filesystem backend, creates the thumbnail from the original file if
-    it was missing (legacy data). On R2, only reports whether the thumbnail
-    object already exists.
-
-    Args:
-        guid_str (str): UUID string without the ``.thumbnail`` suffix.
+def ensure_sized_thumbnail_on_disk(guid_str: str, w: int) -> bool:
+    """Filesystem only: ensure ``{uuid}.thumb.{w}`` exists, generating from the original if needed.
 
     Returns:
-        bool: ``True`` if the thumbnail exists (or was created on disk);
-            ``False`` if the original is missing on disk.
+        bool: ``True`` if the sized thumbnail exists or was created;
+            ``False`` if the original image is missing on disk.
+    """
+    if w not in THUMBNAIL_SIZES:
+        raise ValueError(f"Invalid thumbnail width {w}")
+    key = thumbnail_storage_key(guid_str, w)
+    backend = get_backend()
+    if not isinstance(backend, FilesystemBackend):
+        return True
+    if backend.file_path(key) is not None:
+        return True
+    original_path = backend.file_path(guid_str)
+    if original_path is None:
+        return False
+    backend.save(key, _make_thumbnail_bytes(original_path.read_bytes(), w))
+    return True
+
+
+def ensure_legacy_thumbnail_on_disk(guid_str: str) -> bool:
+    """Filesystem only: ensure legacy ``{uuid}.thumbnail`` (256px WebP) exists.
+
+    Returns:
+        bool: ``True`` if the legacy thumbnail exists or was created;
+            ``False`` if the original image is missing on disk.
     """
     key = f"{guid_str}{THUMBNAIL_SUFFIX}"
     backend = get_backend()
@@ -319,12 +356,14 @@ def ensure_thumbnail(guid_str: str) -> bool:
     original_path = backend.file_path(guid_str)
     if original_path is None:
         return False
-    backend.save(key, _make_thumbnail_bytes(original_path.read_bytes()))
+    backend.save(
+        key, _make_thumbnail_bytes(original_path.read_bytes(), _LEGACY_THUMB_DIM)
+    )
     return True
 
 
 async def save_image(file: UploadFile | Path) -> uuid.UUID:
-    """Ingest an uploaded image: validate size, strip metadata, store + thumb.
+    """Ingest an uploaded image: validate size, strip metadata, store + thumbs.
 
     Args:
         file (UploadFile | Path): Incoming upload or path to bytes on disk.
@@ -342,7 +381,7 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
         raise HTTPException(status_code=413, detail="Image exceeds 20 MB limit")
     try:
         stripped = _strip_metadata(data)
-        thumbnail = _make_thumbnail_bytes(stripped)
+        source = Image.open(io.BytesIO(stripped))
     except Image.DecompressionBombError as exc:
         raise HTTPException(
             status_code=413, detail="Image dimensions too large."
@@ -351,5 +390,8 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
     key = str(file_uuid)
     backend = get_backend()
     backend.save(key, stripped)
-    backend.save(f"{key}{THUMBNAIL_SUFFIX}", thumbnail)
+    for w in THUMBNAIL_SIZES:
+        backend.save(
+            thumbnail_storage_key(key, w), _thumbnail_webp_from_image(source, w)
+        )
     return file_uuid

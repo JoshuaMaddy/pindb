@@ -1307,7 +1307,7 @@
         card.className =
           "flex flex-col gap-1 items-center border border-lightest rounded-lg p-2 hover:border-accent no-underline text-base-text text-center";
         card.innerHTML = `
-          <div style="width:100%;aspect-ratio:1;background:url('/get/image/${r.front_image_guid}?thumbnail=true') center/cover no-repeat;border-radius:6px;"></div>
+          <div style="width:100%;aspect-ratio:1;background:url('/get/image/${r.front_image_guid}?w=200') center/cover no-repeat;border-radius:6px;"></div>
           <span class="text-xs truncate w-full text-center">${escHtml(r.pin_name || "")}</span>
         `;
         grid.appendChild(card);
