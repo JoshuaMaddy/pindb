@@ -45,7 +45,7 @@ def oauth_onboarding_page(
             content=[
                 h1["Finish signing up"],
                 hr,
-                p[
+                p(id="oauth-onboarding-intro")[
                     "We've verified your ",
                     provider_label,
                     " account",
@@ -58,6 +58,7 @@ def oauth_onboarding_page(
                     method="post",
                     action="/auth/oauth/onboarding",
                     class_="flex flex-col gap-2",
+                    aria_describedby="oauth-onboarding-intro",
                 )[
                     label(for_="username")["Username"],
                     input(

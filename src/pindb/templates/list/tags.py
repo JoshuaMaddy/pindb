@@ -73,6 +73,7 @@ def _category_select(base_url: str, category: TagCategory | None) -> Element:
 
     return select(
         name="category",
+        aria_label="Filter by category",
         hx_get=base_url,
         hx_trigger="change",
         hx_target=f"#{SECTION_ID}",

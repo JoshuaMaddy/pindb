@@ -3,7 +3,7 @@ Profile page section builders and shared preview-row helpers.
 """
 
 from fastapi import Request
-from htpy import Element, a, div, i, p, span
+from htpy import Element, a, div, i, p, section, span
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -66,11 +66,15 @@ def _favorites_section(
     username: str,
 ) -> Element:
     see_all_url: str = str(request.url_for("user_favorites_list", username=username))
-    return div(class_="flex flex-col gap-2")[
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-favorites-heading",
+    )[
         page_heading(
             icon="heart",
             text=f"Favorites ({total})",
             level=2,
+            heading_id="profile-favorites-heading",
         ),
         _pin_preview_row(
             request=request,
@@ -94,7 +98,10 @@ def _sets_section(
         current_user is not None and current_user.id == profile_user.id
     )
 
-    return div(class_="flex flex-col gap-2")[
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-sets-heading",
+    )[
         page_heading(
             icon="layout-grid",
             text="Sets",
@@ -107,11 +114,13 @@ def _sets_section(
                 ),
             ],
             level=2,
+            heading_id="profile-sets-heading",
         ),
         sets
         and [
             card(
                 href=request.url_for("get_pin_set", id=pin_set.id),
+                wrap_in_anchor=False,
                 content=div(class_="flex gap-2 w-full")[
                     thumbnail_grid(request, pin_set.pins),
                     div[
@@ -166,11 +175,15 @@ def _collection_section(
 ) -> Element:
     see_all_url: str = str(request.url_for("user_collection_list", username=username))
     pins: list[Pin] = unique_pins(entries=owned_pins)
-    return div(class_="flex flex-col gap-2")[
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-collection-heading",
+    )[
         page_heading(
             icon="package-check",
             text=f"Collection ({total})",
             level=2,
+            heading_id="profile-collection-heading",
         ),
         _pin_preview_row(
             request=request,
@@ -192,11 +205,15 @@ def _want_list_section(
 ) -> Element:
     see_all_url: str = str(request.url_for("user_wants_list", username=username))
     pins: list[Pin] = unique_pins(entries=wanted_pins)
-    return div(class_="flex flex-col gap-2")[
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-wants-heading",
+    )[
         page_heading(
             icon="star",
             text=f"Want List ({total})",
             level=2,
+            heading_id="profile-wants-heading",
         ),
         _pin_preview_row(
             request=request,
@@ -218,11 +235,15 @@ def _tradeable_section(
 ) -> Element:
     see_all_url: str = str(request.url_for("user_trades_list", username=username))
     pins: list[Pin] = unique_pins(entries=tradeable_entries)
-    return div(class_="flex flex-col gap-2")[
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-trades-heading",
+    )[
         page_heading(
             icon="arrow-left-right",
             text=f"Trades ({total})",
             level=2,
+            heading_id="profile-trades-heading",
         ),
         _pin_preview_row(
             request=request,

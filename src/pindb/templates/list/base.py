@@ -52,7 +52,7 @@ def _sort_control(
             class_=_ACTIVE_CLASS if current_sort == sort else _INACTIVE_CLASS,
         )[_SORT_LABELS[sort]]
 
-    return div(class_="flex items-center gap-1")[
+    return div(class_="flex items-center gap-1", role="group", aria_label="Sort")[
         span(class_="text-sm text-lightest-hover mr-0.5")["Sort:"],
         _link(SortOrder.name),
         _link(SortOrder.newest),
@@ -126,7 +126,11 @@ def entity_list_section(
     pagination_extra: dict[str, str] = {"view": view.value, "sort": sort.value}
     pagination_extra.update(extra_params or {})
 
-    return div(id=SECTION_ID)[
+    return div(
+        id=SECTION_ID,
+        role="region",
+        aria_label="Directory results",
+    )[
         # Hidden inputs — picked up by search input via hx-include
         input(type="hidden", name="view", value=view.value),
         input(type="hidden", name="sort", value=sort.value),

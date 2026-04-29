@@ -14,6 +14,7 @@ from htpy import (
     img,
     input,
     label,
+    section,
     span,
 )
 
@@ -90,7 +91,12 @@ def login_page(
 
     oauth_any = bool(oauth_rows)
     oauth_block: Element | None = (
-        div(class_="flex w-full flex-col gap-2")[oauth_rows] if oauth_rows else None
+        section(
+            class_="flex w-full flex-col gap-2",
+            aria_label="Sign in with a social account",
+        )[oauth_rows]
+        if oauth_rows
+        else None
     )
 
     email_divider: Element | None = (

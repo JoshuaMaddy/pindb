@@ -14,6 +14,7 @@ from htpy import (
     h2,
     input,
     link,
+    nav,
     script,
     span,
 )
@@ -100,7 +101,10 @@ def _homepage_center(request: Request) -> Element:
                     ),
                 ],
             ],
-            div(class_="grid grid-cols-2 gap-2")[
+            nav(
+                class_="grid grid-cols-2 gap-2",
+                aria_label="Browse entity lists",
+            )[
                 card(
                     href=request.url_for("get_list_shops"),
                     content="Shops",

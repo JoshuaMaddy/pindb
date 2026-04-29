@@ -3,7 +3,7 @@ htpy page and fragment builders: `templates/list/index.py`.
 """
 
 from fastapi import Request
-from htpy import Element, Fragment, div, fragment, h1, hr
+from htpy import Element, Fragment, div, fragment, h1, hr, nav
 
 from pindb.templates.base import html_base
 from pindb.templates.components.layout.card import card
@@ -12,26 +12,31 @@ from pindb.templates.components.layout.centered import centered_div
 
 def list_index(request: Request) -> Fragment:
     return fragment[
-        card(
-            href=request.url_for("get_list_shops"),
-            content="Shops",
-            icon="store",
-        ),
-        card(
-            href=request.url_for("get_list_tags"),
-            content="Tags",
-            icon="tag",
-        ),
-        card(
-            href=request.url_for("get_list_pin_sets"),
-            content="Pin Sets",
-            icon="layout-grid",
-        ),
-        card(
-            href=request.url_for("get_list_artists"),
-            content="Artists",
-            icon="palette",
-        ),
+        nav(
+            class_="min-md:col-span-2 grid min-md:grid-cols-2 gap-2",
+            aria_label="Browse entity lists",
+        )[
+            card(
+                href=request.url_for("get_list_shops"),
+                content="Shops",
+                icon="store",
+            ),
+            card(
+                href=request.url_for("get_list_tags"),
+                content="Tags",
+                icon="tag",
+            ),
+            card(
+                href=request.url_for("get_list_pin_sets"),
+                content="Pin Sets",
+                icon="layout-grid",
+            ),
+            card(
+                href=request.url_for("get_list_artists"),
+                content="Artists",
+                icon="palette",
+            ),
+        ],
     ]
 
 

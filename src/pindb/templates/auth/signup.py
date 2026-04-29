@@ -78,8 +78,9 @@ def signup_page(
                         required=True,
                         autocomplete="new-password",
                         minlength=str(policy.min_length),
+                        aria_describedby="signup-password-hint",
                     ),
-                    div(class_="text-sm text-subtle")[
+                    div(id="signup-password-hint", class_="text-sm text-subtle")[
                         p["Password requirements:"],
                         ul(class_="list-disc pl-5")[
                             [li[bullet] for bullet in policy.bullets()]

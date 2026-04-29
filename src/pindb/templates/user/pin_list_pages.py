@@ -15,6 +15,7 @@ from htpy import (
     a,
     div,
     hr,
+    nav,
     span,
     table,
     tbody,
@@ -83,7 +84,7 @@ def _list_shell(
     grid_url: str = f"{current_url}?view=grid&page=1"
     table_url: str = f"{current_url}?view=table&page=1"
 
-    toggle: Element = div(class_="flex gap-1")[
+    toggle: Element = nav(class_="flex gap-1", aria_label="Pin list layout")[
         a(href=grid_url, class_=_TOGGLE_ACTIVE if view == "grid" else _TOGGLE_INACTIVE)[
             "Grid"
         ],
@@ -122,6 +123,7 @@ def _list_shell(
                         icon="user",
                         text=f"{profile_user.username} / {breadcrumb_label}",
                         level=1,
+                        heading_id="user-pin-list-heading",
                     ),
                     toggle,
                 ],
@@ -264,11 +266,16 @@ def _pin_grouped_table(
         table(class_=_TABLE_PIN_LIST)[
             thead[
                 tr[
-                    th(class_=_TH_CLASS)[""],
-                    th(class_=_TH_CLASS)["Name"],
-                    th(class_=_TH_CLASS)["Shops"],
-                    th(class_=_TH_CLASS)["Artists"],
-                    [th(class_=_TH_CLASS)[header] for header in extra_headers],
+                    th(class_=_TH_CLASS, scope="col")[
+                        span(class_="sr-only")["Thumbnail"],
+                    ],
+                    th(class_=_TH_CLASS, scope="col")["Name"],
+                    th(class_=_TH_CLASS, scope="col")["Shops"],
+                    th(class_=_TH_CLASS, scope="col")["Artists"],
+                    [
+                        th(class_=_TH_CLASS, scope="col")[header]
+                        for header in extra_headers
+                    ],
                 ]
             ],
             tbody[rows],
@@ -315,10 +322,12 @@ def _favorites_table(request: Request, pins: list[Pin]) -> Element:
         table(class_=_TABLE_PIN_LIST)[
             thead[
                 tr[
-                    th(class_=_TH_CLASS)[""],
-                    th(class_=_TH_CLASS)["Name"],
-                    th(class_=_TH_CLASS)["Shops"],
-                    th(class_=_TH_CLASS)["Artists"],
+                    th(class_=_TH_CLASS, scope="col")[
+                        span(class_="sr-only")["Thumbnail"],
+                    ],
+                    th(class_=_TH_CLASS, scope="col")["Name"],
+                    th(class_=_TH_CLASS, scope="col")["Shops"],
+                    th(class_=_TH_CLASS, scope="col")["Artists"],
                 ]
             ],
             tbody[

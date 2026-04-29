@@ -8,7 +8,25 @@ image carousel.
 """
 
 from fastapi import Request
-from htpy import Element, Fragment, a, div, fragment, h2, i, p, table, tbody, td, tr
+from htpy import (
+    Element,
+    Fragment,
+    a,
+    aside,
+    button,
+    div,
+    fragment,
+    h2,
+    h3,
+    i,
+    p,
+    table,
+    tbody,
+    td,
+    th,
+    thead,
+    tr,
+)
 from titlecase import titlecase
 
 from pindb.database.pin import Pin
@@ -39,7 +57,7 @@ def pin_details(
     owned_entries: list[UserOwnedPin],
     wanted_entries: list[UserWantedPin],
 ) -> Element:
-    return div(class_="md:ml-2")[
+    return aside(class_="md:ml-2", aria_labelledby="pin-details-heading")[
         user
         and _user_actions(
             request=request,
@@ -49,7 +67,7 @@ def pin_details(
             owned_entries=owned_entries,
             wanted_entries=wanted_entries,
         ),
-        h2["Details"],
+        h2(id="pin-details-heading")["Details"],
         div(class_="flex flex-col gap-2")[
             _description(pin=pin),
             _shops(pin=pin, request=request),
@@ -98,12 +116,19 @@ def _add_to_set_panel(
 ) -> Element:
     pin_set_ids: set[int] = {ps.id for ps in pin.sets}
     return dropdown_panel(
-        trigger=div(
-            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-lightest bg-lighter hover:border-accent cursor-pointer text-base-text"
+        trigger=button(
+            type="button",
+            class_="flex items-center gap-1 px-2 py-1 rounded-lg border border-lightest bg-lighter hover:border-accent cursor-pointer text-base-text text-left",
+            **{
+                ":aria-expanded": "open",
+            },
+            aria_haspopup="menu",
+            aria_controls="pin-add-to-set-panel",
         )[
-            i(data_lucide="layout-grid", class_="inline-block"),
+            i(data_lucide="layout-grid", class_="inline-block", aria_hidden="true"),
             "Add to Set",
         ],
+        panel_id="pin-add-to-set-panel",
         content=fragment[
             [
                 set_row(
@@ -132,6 +157,7 @@ def _shops(pin: Pin, request: Request) -> Element:
     return linked_items_row(
         icon="store",
         label="Shops",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_shop", id=shop.id)),
@@ -148,6 +174,7 @@ def _artists(pin: Pin, request: Request) -> Element | None:
     return linked_items_row(
         icon="palette",
         label="Artists",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_artist", id=artist.id)),
@@ -164,6 +191,7 @@ def _links(pin: Pin) -> Element | None:
     return linked_items_row(
         icon="link",
         label="Links",
+        heading_level=3,
         items=[
             pill_link(href=link.path, text=domain_from_url(url=link.path))
             for link in pin.links
@@ -177,6 +205,7 @@ def _variants(pin: Pin, request: Request) -> Element | None:
     return linked_items_row(
         icon="copy",
         label="Variants",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_pin", id=variant.id)),
@@ -193,6 +222,7 @@ def _unauthorized_copies(pin: Pin, request: Request) -> Element | None:
     return linked_items_row(
         icon="triangle-alert",
         label="Unauthorized Copies",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_pin", id=copy.id)),
@@ -215,17 +245,41 @@ def _grades(pin: Pin) -> Element | None:
     if not pin.grades:
         return None
     return div[
-        p(class_="text-base font-semibold sm:text-lg")[
-            i(data_lucide="banknote", class_="inline-block pr-2"),
+        h3(
+            id="pin-details-grades-heading",
+            class_="text-base font-semibold sm:text-lg m-0",
+        )[
+            i(
+                data_lucide="banknote",
+                class_="inline-block pr-2",
+                aria_hidden="true",
+            ),
             "Grades",
         ],
-        div(class_="ml-4 border border-lightest w-min")[
-            table(class_="border-collapse")[
+        div(class_="border border-lightest w-full rounded")[
+            table(
+                class_="border-collapse w-full",
+                aria_labelledby="pin-details-grades-heading",
+            )[
+                thead(class_="border-b border-lightest bg-main")[
+                    tr[
+                        th(
+                            scope="col",
+                            class_="text-left pl-2 w-min whitespace-nowrap",
+                        )["Name"],
+                        th(
+                            scope="col",
+                            class_="text-right pr-2 pl-2 w-full",
+                        )["Price"],
+                    ]
+                ],
                 tbody[
                     [
                         tr[
-                            td(class_="px-2 border-r border-lightest")[grade.name],
-                            td(class_="px-2")[
+                            td(
+                                class_="px-2 border-r border-lightest w-min whitespace-nowrap"
+                            )[grade.name],
+                            td(class_="text-right px-2 w-full")[
                                 format_currency_code(
                                     amount=grade.price, code=pin.currency.code
                                 )
@@ -260,6 +314,7 @@ def _pin_sets(
     return linked_items_row(
         icon="layout-grid",
         label="Pin Sets",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_pin_set", id=ps.id)),
@@ -276,6 +331,7 @@ def _tags(pin: Pin, request: Request) -> Element:
     return linked_items_row(
         icon="tag",
         label="Tags",
+        heading_level=3,
         items=[
             pill_link(
                 href=str(request.url_for("get_tag", id=tag.id)),

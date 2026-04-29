@@ -38,7 +38,7 @@ def view_toggle(
             class_=_ACTIVE_CLASS if is_active else _INACTIVE_CLASS,
         )[label]
 
-    return div(class_="flex gap-2")[
+    return div(class_="flex gap-2", role="group", aria_label="Layout")[
         _link(label="Grid", view=EntityListView.grid),
         _link(label="Detailed", view=EntityListView.detailed),
     ]

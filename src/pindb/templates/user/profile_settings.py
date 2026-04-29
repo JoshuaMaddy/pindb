@@ -5,7 +5,21 @@ Profile settings section and related theme definitions.
 from typing import Literal
 
 from fastapi import Request
-from htpy import Element, a, button, div, form, h3, i, input, label, p, script, span
+from htpy import (
+    Element,
+    a,
+    button,
+    div,
+    form,
+    h3,
+    i,
+    input,
+    label,
+    p,
+    script,
+    section,
+    span,
+)
 from pydantic import BaseModel, ConfigDict
 
 from pindb.database.user import User
@@ -177,8 +191,16 @@ def settings_section(
     current_dimension_unit: str = (
         raw_dimension_unit if raw_dimension_unit in VALID_DIMENSION_UNITS else "mm"
     )
-    return div(class_="flex flex-col gap-4")[
-        page_heading(icon="settings-2", text="Settings", level=2),
+    return section(
+        class_="flex flex-col gap-4",
+        aria_labelledby="user-profile-settings-heading",
+    )[
+        page_heading(
+            icon="settings-2",
+            text="Settings",
+            level=2,
+            heading_id="user-profile-settings-heading",
+        ),
         div(class_="flex flex-col gap-4")[
             a(href="/user/me/security", class_="underline")[
                 "Password & sign-in providers"

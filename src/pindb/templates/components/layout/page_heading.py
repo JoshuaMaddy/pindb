@@ -13,12 +13,18 @@ def page_heading(
     extras: Content | None = None,
     level: int = 1,
     full_width: bool = False,
+    heading_id: str | None = None,
 ) -> Element:
-    """Icon + heading; optional extras sit after the title on large screens, below on small."""
+    """Icon + heading; optional extras sit after the title on large screens, below on small.
+
+    *heading_id* is applied to the ``h1``/``h2`` for ``aria-labelledby`` on a wrapping
+    ``section`` or similar.
+    """
+    heading_attrs: dict[str, object] = {"class_": "min-w-0 wrap-break-word"}
+    if heading_id is not None:
+        heading_attrs["id"] = heading_id
     heading_el: Element = (
-        h1(class_="min-w-0 wrap-break-word")[text]
-        if level == 1
-        else h2(class_="min-w-0 wrap-break-word")[text]
+        h1(**heading_attrs)[text] if level == 1 else h2(**heading_attrs)[text]
     )
     title_row: Element = div(class_="flex gap-2 items-baseline min-w-0")[
         i(data_lucide=icon, class_="shrink-0", aria_hidden="true"),

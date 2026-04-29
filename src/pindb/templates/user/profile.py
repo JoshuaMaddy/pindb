@@ -52,6 +52,7 @@ def user_profile_page(
                 page_heading(
                     icon="user",
                     text=username,
+                    heading_id="user-profile-heading",
                 ),
                 hr,
                 _favorites_section(

@@ -104,7 +104,7 @@ def security_page(
                 h1["Security settings"],
                 hr,
                 error_message(error),
-                p(class_="text-green-200")[success] if success else None,
+                p(class_="text-green-200", role="status")[success] if success else None,
                 ul(class_="text-error-main list-disc pl-5")[
                     [li[rule] for rule in password_errors]
                 ]
@@ -141,6 +141,7 @@ def security_page(
                         required=True,
                         autocomplete="new-password",
                         minlength=str(policy.min_length),
+                        aria_describedby="security-password-hint",
                     ),
                     label(for_="confirm_password")["Confirm new password"],
                     input(
@@ -150,8 +151,9 @@ def security_page(
                         required=True,
                         autocomplete="new-password",
                         minlength=str(policy.min_length),
+                        aria_describedby="security-password-hint",
                     ),
-                    div(class_="text-sm text-subtle")[
+                    div(id="security-password-hint", class_="text-sm text-subtle")[
                         ul(class_="list-disc pl-5")[
                             [li[bullet] for bullet in policy.bullets()]
                         ],

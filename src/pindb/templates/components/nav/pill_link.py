@@ -18,7 +18,9 @@ def pill_link(
     )[
         icon
         and i(
-            data_lucide=icon, class_=f"w-3 h-3 shrink-0 {color_classes} {hover_classes}"
+            data_lucide=icon,
+            class_=f"w-3 h-3 shrink-0 {color_classes} {hover_classes}",
+            aria_hidden="true",
         ),
         text,
     ]

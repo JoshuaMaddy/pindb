@@ -5,7 +5,7 @@ htpy page and fragment builders: `templates/components/listing/pagination_contro
 import math
 from urllib.parse import urlencode
 
-from htpy import Element, a, div, span
+from htpy import Element, a, div, nav, span
 
 
 def pagination_controls(
@@ -50,7 +50,10 @@ def pagination_controls(
             class_="px-2 py-1 rounded border border-lightest hover:border-accent",
         )[label]
 
-    return div(class_="flex items-center justify-center gap-2 text-sm mt-4 w-full")[
+    return nav(
+        class_="flex items-center justify-center gap-2 text-sm mt-4 w-full",
+        aria_label="Pagination",
+    )[
         _nav_link(
             label="← Prev",
             aria_label="Previous page",

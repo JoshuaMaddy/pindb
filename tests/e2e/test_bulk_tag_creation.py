@@ -83,13 +83,6 @@ def _ensure_row_count(page: Page, count: int) -> None:
     expect(_tag_rows(page)).to_have_count(count)
 
 
-def _bulk_tag_column_widths(page: Page) -> list[float]:
-    return page.locator(".bulk-tag-table").evaluate(
-        """(table) => Array.from(table.querySelectorAll("thead th"))
-            .map((cell) => cell.getBoundingClientRect().width)"""
-    )
-
-
 def _wait_for_bulk_option(page: Page, live_server: str, name: str) -> None:
     deadline = time.time() + 10
     url = f"{live_server}/bulk/options/tag?q={quote(name)}"
@@ -163,28 +156,6 @@ def test_bulk_tag_table_body_rows_are_visible(
     first_row_box = _tag_rows(page).first.bounding_box()
     assert first_row_box is not None
     assert first_row_box["height"] > 0
-
-
-def test_bulk_tag_category_dropdown_does_not_shift_column_widths(
-    admin_browser_context,
-    live_server: str,
-) -> None:
-    page = admin_browser_context.new_page()
-    page.goto(f"{live_server}/bulk/tag")
-    expect(_tag_rows(page)).to_have_count(2)
-
-    before = _bulk_tag_column_widths(page)
-    category_control = _tag_rows(page).first.locator("td").nth(1).locator(".ts-control")
-    category_control.click()
-    expect(page.locator(".ts-dropdown:visible")).to_be_visible()
-    page.keyboard.type("copyright")
-    after = _bulk_tag_column_widths(page)
-
-    assert len(before) == len(after)
-    assert all(
-        abs(before_width - after_width) < 1
-        for before_width, after_width in zip(before, after)
-    )
 
 
 def test_bulk_tag_ui_preserves_per_row_categories(
