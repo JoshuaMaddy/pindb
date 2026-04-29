@@ -35,6 +35,7 @@ from pindb.routes._pin_shared import (
     load_pin_relations,
     parse_grade_dicts,
 )
+from pindb.routes._urls import slugify_for_url
 from pindb.routes.edit._pending_helpers import replace_links, submit_pending_edit
 from pindb.search.update import sync_entity
 from pindb.templates.create_and_edit.pin import pin_form
@@ -255,7 +256,13 @@ async def post_edit_pin(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_pin", id=pin_id)),
+            redirect_url=str(
+                request.url_for(
+                    "get_pin",
+                    slug=slugify_for_url(name=fields.name, fallback="pin"),
+                    id=pin_id,
+                )
+            ),
             message="Pin updated.",
         )
     )

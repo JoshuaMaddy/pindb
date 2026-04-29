@@ -24,6 +24,7 @@ from markupsafe import Markup
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
+from pindb.routes._urls import pin_set_url, pin_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.empty_state import empty_state
@@ -159,7 +160,7 @@ def pin_set_edit_page(
         icon_button(
             icon="eye",
             title="View",
-            href=str(request.url_for("get_pin_set", id=pin_set.id)),
+            href=str(pin_set_url(request=request, pin_set=pin_set)),
         )
     ]
 
@@ -329,7 +330,7 @@ def _pin_card(request: Request, pin: Pin, set_id: int) -> Element:
         )[i(data_lucide="x", class_="w-3 h-3", aria_hidden="true")],
         a(
             href=str(
-                request.url_for("get_pin", id=pin.id).include_query_params(
+                pin_url(request=request, pin=pin).include_query_params(
                     back=str(request.url)
                 )
             ),

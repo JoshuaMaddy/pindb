@@ -20,6 +20,7 @@ from pindb.htmx_toast import (
 )
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
+from pindb.routes._urls import slugify_for_url
 from pindb.search.update import update_artist
 from pindb.templates.create_and_edit.artist import artist_form
 
@@ -84,7 +85,13 @@ def post_create_artist(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_artist", id=artist_id)),
+            redirect_url=str(
+                request.url_for(
+                    "get_artist",
+                    slug=slugify_for_url(name=name, fallback="artist"),
+                    id=artist_id,
+                )
+            ),
             message="Artist created.",
         )
     )

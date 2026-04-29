@@ -27,6 +27,7 @@ from pindb.database.tag import (
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._urls import slugify_for_url
 from pindb.routes.edit._pending_helpers import submit_pending_edit
 from pindb.search.update import sync_entity
 from pindb.templates.create_and_edit.tag import tag_form
@@ -157,7 +158,13 @@ def post_edit_tag(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_tag", id=tag_id)),
+            redirect_url=str(
+                request.url_for(
+                    "get_tag",
+                    slug=slugify_for_url(name=name, fallback="tag"),
+                    id=tag_id,
+                )
+            ),
             message="Tag updated.",
         )
     )

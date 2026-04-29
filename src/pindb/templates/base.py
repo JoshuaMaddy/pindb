@@ -6,7 +6,7 @@ import json
 from collections.abc import Sequence
 
 from fastapi import Request
-from htpy import BaseElement, body, div, head, html, link, meta, script
+from htpy import body, div, head, html, link, meta, script
 from htpy import main as main_el
 from htpy import title as title_el
 from markupsafe import Markup

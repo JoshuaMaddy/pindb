@@ -3,7 +3,7 @@ FastAPI routes: `routes/get/pin.py`.
 """
 
 from fastapi import Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import select
@@ -13,16 +13,24 @@ from pindb.auth import CurrentUser
 from pindb.database import Pin, PinSet, User, UserOwnedPin, UserWantedPin, session_maker
 from pindb.database.joins import user_favorite_pins
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
+from pindb.routes._urls import canonical_slug_redirect, slugify_for_url
 from pindb.templates.get.pin import pin_page
 
 router = APIRouter()
 
 
-@router.get(path="/pin/{id}", response_model=None)
+@router.get(path="/pin/{slug}/{id}", response_model=None, name="get_pin")
+@router.get(
+    path="/pin/{id}",
+    response_model=None,
+    name="get_pin_by_id",
+    include_in_schema=False,
+)
 def get_pin(
     request: Request,
     id: int,
     current_user: CurrentUser,
+    slug: str | None = None,
     version: str | None = Query(default=None),
 ) -> HtpyResponse | RedirectResponse:
     with session_maker() as session:
@@ -44,6 +52,15 @@ def get_pin(
 
         if not pin_obj:
             return RedirectResponse(url="/")
+
+        canonical_slug: str = slugify_for_url(name=pin_obj.name, fallback="pin")
+        if slug != canonical_slug:
+            return canonical_slug_redirect(
+                request=request,
+                route_name="get_pin",
+                canonical_slug=canonical_slug,
+                id=id,
+            )
 
         pending_chain_exists, viewing_pending = maybe_apply_pending_view(
             session=session,

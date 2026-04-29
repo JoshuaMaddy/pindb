@@ -15,6 +15,7 @@ from pindb.database import Pin, Tag, session_maker
 from pindb.database.joins import pins_tags
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.database.tag import resolve_implications
+from pindb.routes._urls import canonical_slug_redirect, slugify_for_url, tag_url
 from pindb.search.search import search_entity_options
 from pindb.search.update import TAGS_INDEX
 from pindb.templates.components.pins.paginated_pin_grid import (
@@ -88,11 +89,18 @@ def get_tag_relations(
     )
 
 
-@router.get(path="/tag/{id}", response_model=None)
+@router.get(path="/tag/{slug}/{id}", response_model=None, name="get_tag")
+@router.get(
+    path="/tag/{id}",
+    response_model=None,
+    name="get_tag_by_id",
+    include_in_schema=False,
+)
 def get_tag(
     request: Request,
     id: int,
     current_user: CurrentUser,
+    slug: str | None = None,
     page: int = Query(default=1, ge=1),
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
@@ -109,6 +117,15 @@ def get_tag(
 
         if not tag_obj:
             return RedirectResponse(url="/")
+
+        canonical_slug: str = slugify_for_url(name=tag_obj.name, fallback="tag")
+        if slug != canonical_slug:
+            return canonical_slug_redirect(
+                request=request,
+                route_name="get_tag",
+                canonical_slug=canonical_slug,
+                id=id,
+            )
 
         pending_chain_exists, viewing_pending = maybe_apply_pending_view(
             session=session,
@@ -146,7 +163,7 @@ def get_tag(
                         pins=pins,
                         total_count=total_count,
                         page=page,
-                        page_url=str(request.url_for("get_tag", id=id)),
+                        page_url=str(tag_url(request=request, tag=tag_obj)),
                         per_page=_PER_PAGE,
                     )
                 )

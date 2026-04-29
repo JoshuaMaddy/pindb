@@ -21,6 +21,7 @@ from htpy import (
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
+from pindb.routes._urls import pin_url
 from pindb.templates.base import html_base
 from pindb.templates.components.layout.card import card
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
@@ -33,7 +34,7 @@ def _masonry_pin_card(request: Request, pin: Pin) -> Element:
     artist_text: str | None = artists[0].name if artists else None
     return a(
         class_="masonry-pin-card pin-3d-card",
-        href=str(request.url_for("get_pin", id=pin.id)),
+        href=str(pin_url(request=request, pin=pin)),
         tabindex="-1",
         aria_hidden="true",
     )[

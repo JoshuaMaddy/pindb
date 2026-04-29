@@ -34,6 +34,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
+from pindb.routes._urls import artist_url, pin_set_url, pin_url, shop_url, tag_url
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.display.dropdown_panel import dropdown_panel
 from pindb.templates.components.display.icon_list_element import icon_list_item
@@ -160,7 +161,7 @@ def _shops(pin: Pin, request: Request) -> Element:
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_shop", id=shop.id)),
+                href=str(shop_url(request=request, shop=shop)),
                 text=("(P) " + shop.name) if shop.is_pending else shop.name,
             )
             for shop in sorted(pin.shops, key=lambda shop: shop.name)
@@ -177,7 +178,7 @@ def _artists(pin: Pin, request: Request) -> Element | None:
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_artist", id=artist.id)),
+                href=str(artist_url(request=request, artist=artist)),
                 text=("(P) " + artist.name) if artist.is_pending else artist.name,
             )
             for artist in sorted(pin.artists, key=lambda artist: artist.name)
@@ -208,7 +209,7 @@ def _variants(pin: Pin, request: Request) -> Element | None:
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_pin", id=variant.id)),
+                href=str(pin_url(request=request, pin=variant)),
                 text=("(P) " + variant.name) if variant.is_pending else variant.name,
             )
             for variant in sorted(pin.variants, key=lambda v: v.name)
@@ -225,7 +226,7 @@ def _unauthorized_copies(pin: Pin, request: Request) -> Element | None:
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_pin", id=copy.id)),
+                href=str(pin_url(request=request, pin=copy)),
                 text=("(P) " + copy.name) if copy.is_pending else copy.name,
             )
             for copy in sorted(pin.unauthorized_copies, key=lambda c: c.name)
@@ -317,7 +318,7 @@ def _pin_sets(
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_pin_set", id=ps.id)),
+                href=str(pin_set_url(request=request, pin_set=ps)),
                 text=("(P) " + titlecase(ps.name))
                 if ps.is_pending
                 else titlecase(ps.name),
@@ -334,7 +335,7 @@ def _tags(pin: Pin, request: Request) -> Element:
         heading_level=3,
         items=[
             pill_link(
-                href=str(request.url_for("get_tag", id=tag.id)),
+                href=str(tag_url(request=request, tag=tag)),
                 text=("(P) " + tag.display_name)
                 if tag.is_pending
                 else tag.display_name,

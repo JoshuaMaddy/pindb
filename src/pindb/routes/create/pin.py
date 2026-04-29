@@ -29,6 +29,7 @@ from pindb.routes._pin_shared import (
     load_pin_links,
     load_pin_relations,
 )
+from pindb.routes._urls import pin_url
 from pindb.search.update import update_pin
 from pindb.templates.create_and_edit.pin import pin_form
 
@@ -208,7 +209,9 @@ async def post_create_pin(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_pin", id=pin_id)),
+            redirect_url=str(pin_url(request=request, pin=created_pin))
+            if created_pin is not None
+            else str(request.url_for("get_pin_by_id", id=pin_id)),
             message="Pin created.",
         )
     )

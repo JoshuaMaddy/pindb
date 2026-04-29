@@ -22,6 +22,7 @@ from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
 from pindb.htmx_toast import hx_redirect_with_toast_headers
+from pindb.routes._urls import slugify_for_url
 
 
 def submit_pending_edit(
@@ -48,7 +49,12 @@ def submit_pending_edit(
     new_snapshot: dict[str, object] = dict(old_snapshot)
     new_snapshot.update(field_updates)
 
-    redirect_url = str(request.url_for(redirect_route, id=entity_id))
+    canonical_slug: str = slugify_for_url(
+        name=getattr(entity, "name", ""), fallback=entity_table.rstrip("s") or "entity"
+    )
+    redirect_url = str(
+        request.url_for(redirect_route, slug=canonical_slug, id=entity_id)
+    )
 
     patch = compute_patch(old_snapshot, new_snapshot)
     if not patch:

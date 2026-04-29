@@ -162,7 +162,7 @@ def post_unlink_provider(
                 select(UserAuthProvider).where(UserAuthProvider.user_id == user.id)
             ).all()
         )
-        target = next((l for l in links if l.provider is provider_enum), None)
+        target = next((link for link in links if link.provider is provider_enum), None)
         if target is None:
             return _render(
                 request,

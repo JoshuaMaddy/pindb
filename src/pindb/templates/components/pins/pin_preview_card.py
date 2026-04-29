@@ -6,6 +6,7 @@ from fastapi import Request
 from htpy import Element, a, div, i, span
 
 from pindb.database.pin import Pin
+from pindb.routes._urls import pin_url
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_front_image_alt
 
@@ -37,7 +38,7 @@ def pin_preview_card(
     )[
         a(
             href=str(
-                request.url_for("get_pin", id=pin.id).include_query_params(
+                pin_url(request=request, pin=pin).include_query_params(
                     back=str(request.url)
                 )
             ),
@@ -61,7 +62,7 @@ def pin_preview_card(
         a(
             class_="p-2 text-base-text no-underline flex flex-col gap-0.5",
             href=str(
-                request.url_for("get_pin", id=pin.id).include_query_params(
+                pin_url(request=request, pin=pin).include_query_params(
                     back=str(request.url)
                 )
             ),

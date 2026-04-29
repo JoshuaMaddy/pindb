@@ -31,6 +31,7 @@ from pindb.database.shop import Shop
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
+from pindb.routes._urls import artist_url, pin_url, shop_url
 from pindb.templates.base import html_base
 from pindb.templates.components.display.empty_state import empty_state
 from pindb.templates.components.layout.centered import centered_div
@@ -157,7 +158,7 @@ def _thumbnail(request: Request, pin: Pin) -> VoidElement:
 def _pin_button(request: Request, pin: Pin) -> Element:
     return pill_link(
         href=str(
-            request.url_for("get_pin", id=pin.id).include_query_params(
+            pin_url(request=request, pin=pin).include_query_params(
                 back=str(request.url)
             )
         ),
@@ -173,7 +174,7 @@ def _shop_links(request: Request, shops: set[Shop]) -> Element:
     )[
         [
             pill_link(
-                href=str(request.url_for("get_shop", id=shop.id)),
+                href=str(shop_url(request=request, shop=shop)),
                 text=("(P) " + shop.name) if shop.is_pending else shop.name,
             )
             for shop in sorted(shops, key=lambda shop: shop.name)
@@ -189,7 +190,7 @@ def _artist_links(request: Request, artists: set[Artist]) -> Element:
     )[
         [
             pill_link(
-                href=str(request.url_for("get_artist", id=artist.id)),
+                href=str(artist_url(request=request, artist=artist)),
                 text=("(P) " + artist.name) if artist.is_pending else artist.name,
             )
             for artist in sorted(artists, key=lambda artist: artist.name)

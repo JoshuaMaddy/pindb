@@ -10,6 +10,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
+from pindb.routes._urls import pin_set_url
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.empty_state import empty_state
 from pindb.templates.components.forms.icon_button import icon_button
@@ -119,7 +120,7 @@ def _sets_section(
         sets
         and [
             card(
-                href=request.url_for("get_pin_set", id=pin_set.id),
+                href=pin_set_url(request=request, pin_set=pin_set),
                 wrap_in_anchor=False,
                 content=div(class_="flex gap-2 w-full")[
                     thumbnail_grid(request, pin_set.pins),

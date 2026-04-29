@@ -5,7 +5,7 @@ htpy page and fragment builders: `templates/components/listing/pagination_contro
 import math
 from urllib.parse import urlencode
 
-from htpy import Element, a, div, nav, span
+from htpy import Element, a, nav, span
 
 
 def pagination_controls(

@@ -11,6 +11,7 @@ from titlecase import titlecase
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
+from pindb.routes._urls import pin_set_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.description_block import description_block
@@ -92,7 +93,7 @@ def pin_set_page(
                     pins=pins,
                     total_count=total_count,
                     page=page,
-                    page_url=str(request.url_for("get_pin_set", id=pin_set.id)),
+                    page_url=str(pin_set_url(request=request, pin_set=pin_set)),
                     per_page=per_page,
                 ),
             ],

@@ -9,6 +9,7 @@ from htpy import Element, a, br, code, div, fragment, h2
 
 from pindb.database import Shop, User
 from pindb.database.pin import Pin
+from pindb.routes._urls import shop_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
@@ -33,7 +34,7 @@ def shop_page(
     viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    canonical_url = str(request.url_for("get_shop", id=shop.id))
+    canonical_url = str(shop_url(request=request, shop=shop))
     pending_url = canonical_url + "?version=pending"
     return html_base(
         title=shop.name,
@@ -122,7 +123,7 @@ def shop_page(
                     pins=pins,
                     total_count=total_count,
                     page=page,
-                    page_url=str(request.url_for("get_shop", id=shop.id)),
+                    page_url=str(shop_url(request=request, shop=shop)),
                     per_page=per_page,
                 ),
             ],

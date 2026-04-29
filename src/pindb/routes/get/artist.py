@@ -14,6 +14,7 @@ from pindb.auth import CurrentUser
 from pindb.database import Artist, Pin, session_maker
 from pindb.database.joins import pins_artists
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
+from pindb.routes._urls import artist_url, canonical_slug_redirect, slugify_for_url
 from pindb.templates.components.pins.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
@@ -25,11 +26,18 @@ router = APIRouter()
 _PER_PAGE: int = 100
 
 
-@router.get(path="/artist/{id}", response_model=None)
+@router.get(path="/artist/{slug}/{id}", response_model=None, name="get_artist")
+@router.get(
+    path="/artist/{id}",
+    response_model=None,
+    name="get_artist_by_id",
+    include_in_schema=False,
+)
 def get_artist(
     request: Request,
     id: int,
     current_user: CurrentUser,
+    slug: str | None = None,
     page: int = Query(default=1, ge=1),
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
@@ -42,6 +50,15 @@ def get_artist(
 
         if not artist_obj:
             return RedirectResponse(url="/")
+
+        canonical_slug: str = slugify_for_url(name=artist_obj.name, fallback="artist")
+        if slug != canonical_slug:
+            return canonical_slug_redirect(
+                request=request,
+                route_name="get_artist",
+                canonical_slug=canonical_slug,
+                id=id,
+            )
 
         pending_chain_exists, viewing_pending = maybe_apply_pending_view(
             session=session,
@@ -79,7 +96,7 @@ def get_artist(
                         pins=pins,
                         total_count=total_count,
                         page=page,
-                        page_url=str(request.url_for("get_artist", id=id)),
+                        page_url=str(artist_url(request=request, artist=artist_obj)),
                         per_page=_PER_PAGE,
                     )
                 )

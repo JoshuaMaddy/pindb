@@ -5,7 +5,6 @@ FastAPI routes: `routes/list/pin_sets.py`.
 from typing import Sequence
 
 from fastapi import Query, Request
-from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select

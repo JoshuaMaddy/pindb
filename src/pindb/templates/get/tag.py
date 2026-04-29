@@ -11,6 +11,7 @@ from titlecase import titlecase
 from pindb.database import User
 from pindb.database.pin import Pin
 from pindb.database.tag import Tag
+from pindb.routes._urls import tag_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
@@ -36,7 +37,7 @@ _RELATION_CAP = 5
 def _relation_pills(tags: list[Tag], request: Request) -> list[Element]:
     return [
         pill_link(
-            href=str(request.url_for("get_tag", id=t.id)),
+            href=str(tag_url(request=request, tag=t)),
             text=("(P) " + t.display_name) if t.is_pending else t.display_name,
             icon=CATEGORY_ICONS.get(t.category, "tag"),
             color_classes=CATEGORY_COLORS.get(t.category, "bg-main text-base-text"),
@@ -129,7 +130,7 @@ def tag_page(
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     display_name = ("(P) " + tag.display_name) if tag.is_pending else tag.display_name
-    canonical_url = str(request.url_for("get_tag", id=tag.id))
+    canonical_url = str(tag_url(request=request, tag=tag))
     pending_url = canonical_url + "?version=pending"
     return html_base(
         title=tag.display_name,
@@ -240,7 +241,7 @@ def tag_page(
                     pins=pins,
                     total_count=total_count,
                     page=page,
-                    page_url=str(request.url_for("get_tag", id=tag.id)),
+                    page_url=str(tag_url(request=request, tag=tag)),
                     per_page=per_page,
                 ),
             ],

@@ -24,6 +24,28 @@ class TestGetPin:
         assert response.status_code == 200
         assert "Special Pikachu Pin" in response.text
 
+    def test_id_only_url_redirects_to_slugged_form(self, client, db_session):
+        pin = PinFactory(name="Special Pikachu Pin")
+        response = client.get(
+            f"/get/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
+            follow_redirects=False,
+        )
+        assert response.status_code == 301
+        assert response.headers["location"].endswith(
+            f"/get/pin/special_pikachu_pin/{pin.id}"  # ty:ignore[unresolved-attribute]
+        )
+
+    def test_wrong_slug_redirects_to_canonical(self, client, db_session):
+        pin = PinFactory(name="Special Pikachu Pin")
+        response = client.get(
+            f"/get/pin/wrong_slug/{pin.id}",  # ty:ignore[unresolved-attribute]
+            follow_redirects=False,
+        )
+        assert response.status_code == 301
+        assert response.headers["location"].endswith(
+            f"/get/pin/special_pikachu_pin/{pin.id}"  # ty:ignore[unresolved-attribute]
+        )
+
     def test_existing_pin_shows_shops(self, client, db_session):
         shop = ShopFactory(name="Pokemon Store")
         pin = PinFactory(shops={shop})

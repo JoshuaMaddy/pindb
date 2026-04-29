@@ -14,7 +14,6 @@ from htpy import (
     form,
     hr,
     i,
-    input,
     script,
 )
 from markupsafe import Markup

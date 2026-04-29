@@ -10,6 +10,7 @@ from htpy import Element, div, p, span
 from pindb.database.pin_set import PinSet
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
+from pindb.routes._urls import pin_set_url
 from pindb.templates.components.layout.card import card
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.entity_grid_card import entity_grid_card
@@ -29,7 +30,7 @@ def _grid_items(
     return [
         entity_grid_card(
             request=request,
-            href=str(request.url_for("get_pin_set", id=pin_set.id)),
+            href=str(pin_set_url(request=request, pin_set=pin_set)),
             pins=pin_set.pins,
             name=("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
         )
@@ -43,7 +44,7 @@ def _detailed_items(
 ) -> list[Element]:
     return [
         card(
-            href=request.url_for("get_pin_set", id=pin_set.id),
+            href=pin_set_url(request=request, pin_set=pin_set),
             content=div(class_="flex gap-2 w-full")[
                 thumbnail_grid(request=request, pins=pin_set),
                 div[

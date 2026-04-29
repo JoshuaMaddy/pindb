@@ -25,6 +25,7 @@ from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._urls import slugify_for_url
 from pindb.routes.edit._pending_helpers import (
     apply_simple_aliased_direct_edit,
     submit_simple_aliased_pending_edit,
@@ -135,7 +136,13 @@ def post_edit_artist(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_artist", id=artist_id)),
+            redirect_url=str(
+                request.url_for(
+                    "get_artist",
+                    slug=slugify_for_url(name=name, fallback="artist"),
+                    id=artist_id,
+                )
+            ),
             message="Artist updated.",
         )
     )

@@ -13,6 +13,7 @@ from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
+from pindb.routes._urls import pin_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
@@ -41,7 +42,7 @@ def pin_page(
     viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    canonical_url = str(request.url_for("get_pin", id=pin.id))
+    canonical_url = str(pin_url(request=request, pin=pin))
     pending_url = canonical_url + "?version=pending"
     return html_base(
         title=pin.name,

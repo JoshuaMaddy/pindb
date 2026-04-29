@@ -17,6 +17,7 @@ from pindb.htmx_toast import (
     unique_constraint_response,
 )
 from pindb.log import user_logger
+from pindb.routes._urls import slugify_for_url
 from pindb.search.update import update_tag
 from pindb.templates.create_and_edit.tag import tag_form
 
@@ -105,7 +106,13 @@ def post_create_tag(
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(
-            redirect_url=str(request.url_for("get_tag", id=tag_id)),
+            redirect_url=str(
+                request.url_for(
+                    "get_tag",
+                    slug=slugify_for_url(name=name, fallback="tag"),
+                    id=tag_id,
+                )
+            ),
             message="Tag created.",
         )
     )

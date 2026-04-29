@@ -5,7 +5,6 @@ FastAPI routes: `routes/list/tags.py`.
 from typing import Annotated, Sequence
 
 from fastapi import Query, Request
-from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
