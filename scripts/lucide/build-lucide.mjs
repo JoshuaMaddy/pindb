@@ -80,7 +80,7 @@ async function walkAndCollect(path, onIcon) {
 }
 
 async function parseTagBranding(icons) {
-  const p = join(ROOT, "src", "pindb", "templates", "components", "tag_branding.py");
+  const p = join(ROOT, "src", "pindb", "templates", "components", "tags", "tag_branding.py");
   try {
     const text = await readFile(p, "utf8");
     const re = /TagCategory\.\s*\w+:\s*"([a-z0-9-]+)"/g;
