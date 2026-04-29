@@ -23,12 +23,30 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.back_link import back_link
 from pindb.templates.components.pins.pin_image_carousel import pin_image_carousel
 from pindb.templates.components.pins.pin_lightbox import pin_lightbox
+from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
 from pindb.templates.get.pin_fragments import favorite_button, set_row
 
 __all__ = ["pin_page", "favorite_button", "set_row"]
+
+
+def _pin_share_description(pin: Pin) -> str:
+    """Build the OG/meta description: first shop and (optionally) first artist.
+
+    ``Pin.shops`` and ``Pin.artists`` are sets, so iteration order isn't
+    guaranteed; we sort by name for stable share previews.
+    """
+    first_shop = next(iter(sorted((s.name for s in pin.shops))), None)
+    first_artist = next(iter(sorted((a.name for a in pin.artists))), None)
+    if first_shop and first_artist:
+        return f"{first_shop} \u2022 by {first_artist}"
+    if first_shop:
+        return first_shop
+    if first_artist:
+        return f"by {first_artist}"
+    return pin.name
 
 
 def pin_page(
@@ -48,6 +66,13 @@ def pin_page(
         title=pin.name,
         request=request,
         template_js_extra=("pins/pin_swiper.js", "pins/pin_lightbox.js"),
+        head_content=opengraph_head(
+            title=f"PinDB: {pin.name}",
+            description=_pin_share_description(pin),
+            canonical_url=canonical_url,
+            image_url=str(request.url_for("get_image", guid=pin.front_image_guid)),
+            og_type="article",
+        ),
         body_content=fragment[
             _page_layout(
                 request=request,

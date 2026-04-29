@@ -1,0 +1,165 @@
+"""Open Graph / Twitter card image generator for entity pages.
+
+Renders a 1200x630 WebP composed on top of ``static/media/opengraph-image-blank.webp``
+(which already contains the "PinDB" wordmark): the entity name in white Roboto
+Bold below the wordmark, and up to four square pin thumbnails along the bottom.
+Empty slots are filled with ``#1E1E2E`` so layout stays balanced when an entity
+has fewer than four pins.
+
+Both the blank base and the Roboto Bold TTF live under tracked paths in
+``static/`` (``static/media/`` and ``static/fonts/``). They sit inside
+``static/`` to ride along with the existing static-asset bundling, but they
+are never referenced by the browser — Pillow loads them from the filesystem
+on the server. Avoid putting them under ``static/vendor/`` because that
+directory is wiped and rebuilt by ``npm run vendor:build`` from npm packages.
+"""
+
+from __future__ import annotations
+
+import io
+from functools import lru_cache
+from pathlib import Path
+from typing import Sequence
+
+from PIL import Image, ImageDraw, ImageFont
+
+_STATIC_DIR: Path = Path(__file__).resolve().parent / "static"
+_BLANK_TEMPLATE_PATH: Path = _STATIC_DIR / "media" / "opengraph-image-blank.webp"
+_FONT_PATH: Path = _STATIC_DIR / "fonts" / "Roboto-Bold.ttf"
+
+# Layout constants (image is 1200x630).
+_IMAGE_SIZE: tuple[int, int] = (1200, 630)
+# Catppuccin mocha "base" — also the requested fallback for empty pin slots.
+_EMPTY_SQUARE_FILL: tuple[int, int, int] = (0x1E, 0x1E, 0x2E)
+# Catppuccin mocha "text" — softer than pure white, matches the rest of the UI.
+_TITLE_TEXT_FILL: tuple[int, int, int] = (0xCD, 0xD6, 0xF4)
+
+_SQUARE_SIZE: int = 252
+_SQUARE_Y: int = 354
+_SQUARE_X_POSITIONS: tuple[int, int, int, int] = (30, 326, 622, 918)
+# ~20% of the square's width.
+_SQUARE_CORNER_RADIUS: int = 50
+
+# The "PinDB" wordmark on the base ends near y=156; leave a small gap, then
+# vertically center the entity-name text in the band above the squares.
+_TITLE_BAND_TOP: int = 168
+_TITLE_BAND_BOTTOM: int = _SQUARE_Y - 16  # 338
+_TITLE_MAX_WIDTH: int = 1100
+_TITLE_INITIAL_FONT_SIZE: int = 96
+_TITLE_MIN_FONT_SIZE: int = 40
+_TITLE_FONT_STEP: int = 4
+
+
+@lru_cache(maxsize=1)
+def _blank_template() -> Image.Image:
+    """Load the prebuilt 1200x630 base image once per process."""
+    return Image.open(_BLANK_TEMPLATE_PATH).convert("RGB")
+
+
+@lru_cache(maxsize=32)
+def _title_font(size: int) -> ImageFont.FreeTypeFont:
+    """Cache ``ImageFont`` instances keyed by pixel size."""
+    return ImageFont.truetype(str(_FONT_PATH), size=size)
+
+
+def _fit_title(
+    draw: ImageDraw.ImageDraw, text: str
+) -> tuple[ImageFont.FreeTypeFont, str]:
+    """Pick the largest font size that keeps *text* within ``_TITLE_MAX_WIDTH``.
+
+    Falls back to ellipsizing at the minimum supported size when even that
+    doesn't fit (very long entity names).
+    """
+    for size in range(
+        _TITLE_INITIAL_FONT_SIZE, _TITLE_MIN_FONT_SIZE - 1, -_TITLE_FONT_STEP
+    ):
+        font = _title_font(size)
+        width = draw.textlength(text, font=font)
+        if width <= _TITLE_MAX_WIDTH:
+            return font, text
+    font = _title_font(_TITLE_MIN_FONT_SIZE)
+    truncated = text
+    while truncated and draw.textlength(truncated + "…", font=font) > _TITLE_MAX_WIDTH:
+        truncated = truncated[:-1]
+    return font, (truncated + "…") if truncated else text[: max(1, len(text))]
+
+
+def _draw_title(canvas: Image.Image, name: str) -> None:
+    """Render *name* centered horizontally in the title band on *canvas*."""
+    draw = ImageDraw.Draw(canvas)
+    font, display_text = _fit_title(draw, name)
+    bbox = draw.textbbox((0, 0), display_text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    x = (canvas.width - text_width) // 2 - bbox[0]
+    band_height = _TITLE_BAND_BOTTOM - _TITLE_BAND_TOP
+    y = _TITLE_BAND_TOP + (band_height - text_height) // 2 - bbox[1]
+    draw.text((x, y), display_text, fill=_TITLE_TEXT_FILL, font=font)
+
+
+def _rounded_square_mask(size: int, radius: int) -> Image.Image:
+    """Build an alpha mask for a square with rounded corners."""
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, size - 1, size - 1), radius=radius, fill=255
+    )
+    return mask
+
+
+@lru_cache(maxsize=4)
+def _square_mask_cached(size: int, radius: int) -> Image.Image:
+    return _rounded_square_mask(size, radius)
+
+
+def _cover_fit(image: Image.Image, size: int) -> Image.Image:
+    """Resize *image* to ``size x size`` using object-fit-cover semantics."""
+    src = image.convert("RGB")
+    src_w, src_h = src.size
+    scale = max(size / src_w, size / src_h)
+    new_w = max(size, int(round(src_w * scale)))
+    new_h = max(size, int(round(src_h * scale)))
+    resized = src.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    left = (new_w - size) // 2
+    top = (new_h - size) // 2
+    return resized.crop((left, top, left + size, top + size))
+
+
+def _empty_square(size: int) -> Image.Image:
+    return Image.new("RGB", (size, size), _EMPTY_SQUARE_FILL)
+
+
+def _paste_square(canvas: Image.Image, square: Image.Image, x: int, y: int) -> None:
+    """Stamp *square* onto *canvas* with rounded-corner alpha clipping."""
+    mask = _square_mask_cached(square.width, _SQUARE_CORNER_RADIUS)
+    canvas.paste(square, (x, y), mask)
+
+
+def build_entity_og_image(name: str, pin_image_bytes: Sequence[bytes]) -> bytes:
+    """Render the OG card for an entity and return WebP bytes.
+
+    Args:
+        name: Entity display name. Drawn under the "PinDB" wordmark; auto-shrunk
+            and ellipsized if it would overflow the title band.
+        pin_image_bytes: Raw bytes for up to four representative pin images.
+            Extras are ignored; missing slots are filled with ``#1E1E2E``.
+
+    Returns:
+        Encoded WebP bytes (1200x630, sRGB).
+    """
+    canvas = _blank_template().copy()
+    _draw_title(canvas, name)
+
+    for slot_index, x in enumerate(_SQUARE_X_POSITIONS):
+        if slot_index < len(pin_image_bytes):
+            try:
+                with Image.open(io.BytesIO(pin_image_bytes[slot_index])) as src:
+                    square = _cover_fit(src, _SQUARE_SIZE)
+            except (OSError, ValueError):
+                square = _empty_square(_SQUARE_SIZE)
+        else:
+            square = _empty_square(_SQUARE_SIZE)
+        _paste_square(canvas, square, x, _SQUARE_Y)
+
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="WEBP", quality=85, method=4)
+    return buffer.getvalue()

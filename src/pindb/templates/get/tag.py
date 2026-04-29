@@ -24,6 +24,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.nav.pill_link import pill_link
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
+from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.components.tags.tag_branding import (
     CATEGORY_COLORS,
     CATEGORY_HOVER_CLASSES,
@@ -135,6 +136,14 @@ def tag_page(
     return html_base(
         title=tag.display_name,
         request=request,
+        head_content=opengraph_head(
+            title=f"PinDB: {tag.display_name}",
+            description=f"Pins tagged {tag.display_name} on PinDB.",
+            canonical_url=canonical_url,
+            image_url=str(
+                request.url_for("get_og_image", entity_type="tag", id=tag.id)
+            ),
+        ),
         body_content=centered_div(
             content=fragment[
                 bread_crumb(

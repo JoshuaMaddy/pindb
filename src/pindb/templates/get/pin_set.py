@@ -20,6 +20,7 @@ from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
+from pindb.templates.components.seo.opengraph import opengraph_head
 
 
 def pin_set_page(
@@ -35,10 +36,20 @@ def pin_set_page(
     can_delete: bool = user is not None and (
         pin_set.owner_id == user.id or user.is_admin
     )
+    canonical_url = str(pin_set_url(request=request, pin_set=pin_set))
+    share_description: str = pin_set.description or f"Pin set: {pin_set.name} on PinDB."
 
     return html_base(
         title=pin_set.name,
         request=request,
+        head_content=opengraph_head(
+            title=f"PinDB: {pin_set.name}",
+            description=share_description,
+            canonical_url=canonical_url,
+            image_url=str(
+                request.url_for("get_og_image", entity_type="pin_set", id=pin_set.id)
+            ),
+        ),
         body_content=centered_div(
             content=[
                 bread_crumb(
@@ -93,7 +104,7 @@ def pin_set_page(
                     pins=pins,
                     total_count=total_count,
                     page=page,
-                    page_url=str(pin_set_url(request=request, pin_set=pin_set)),
+                    page_url=canonical_url,
                     per_page=per_page,
                 ),
             ],

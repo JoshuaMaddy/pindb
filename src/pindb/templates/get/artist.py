@@ -21,6 +21,7 @@ from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
+from pindb.templates.components.seo.opengraph import opengraph_head
 
 
 def artist_page(
@@ -39,6 +40,14 @@ def artist_page(
     return html_base(
         title=artist.name,
         request=request,
+        head_content=opengraph_head(
+            title=f"PinDB: {artist.name}",
+            description=f"Pins by {artist.name} on PinDB.",
+            canonical_url=canonical_url,
+            image_url=str(
+                request.url_for("get_og_image", entity_type="artist", id=artist.id)
+            ),
+        ),
         body_content=centered_div(
             content=[
                 bread_crumb(

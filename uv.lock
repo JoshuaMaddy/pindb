@@ -1170,7 +1170,7 @@ wheels = [
 
 [[package]]
 name = "pindb"
-version = "0.1.6b0"
+version = "0.1.7b0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

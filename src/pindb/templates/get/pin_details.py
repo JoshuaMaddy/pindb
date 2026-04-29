@@ -257,20 +257,20 @@ def _grades(pin: Pin) -> Element | None:
             ),
             "Grades",
         ],
-        div(class_="border border-lightest w-full rounded")[
+        div(class_="border border-lightest rounded w-min overflow-clip")[
             table(
-                class_="border-collapse w-full",
+                class_="border-collapse",
                 aria_labelledby="pin-details-grades-heading",
             )[
                 thead(class_="border-b border-lightest bg-main")[
                     tr[
                         th(
                             scope="col",
-                            class_="text-left pl-2 w-min whitespace-nowrap",
+                            class_="text-left pl-4 w-min whitespace-nowrap",
                         )["Name"],
                         th(
                             scope="col",
-                            class_="text-right pr-2 pl-2 w-full",
+                            class_="text-right px-4",
                         )["Price"],
                     ]
                 ],
@@ -278,9 +278,9 @@ def _grades(pin: Pin) -> Element | None:
                     [
                         tr[
                             td(
-                                class_="px-2 border-r border-lightest w-min whitespace-nowrap"
+                                class_="px-4 border-r border-lightest w-min whitespace-nowrap"
                             )[grade.name],
-                            td(class_="text-right px-2 w-full")[
+                            td(class_="text-right px-4")[
                                 format_currency_code(
                                     amount=grade.price, code=pin.currency.code
                                 )
