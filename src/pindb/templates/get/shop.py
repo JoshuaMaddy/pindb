@@ -42,7 +42,7 @@ def shop_page(
         request=request,
         head_content=opengraph_head(
             title=f"Shop: {shop.name}",
-            description=f"Pins from {shop.name} on PinDB.",
+            description=f"View pins from {shop.name} on PinDB.",
             canonical_url=canonical_url,
             image_url=str(
                 request.url_for("get_og_image", entity_type="shop", id=shop.id)

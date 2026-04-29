@@ -123,11 +123,13 @@ def resolve_source_name(
 
 
 def source_redirect_route(source: BulkEditSource) -> str:
+    # Use the bare-id route variants so callers can pass `id=` only; the
+    # canonical slug redirect on the GET will rewrite to the slugged form.
     return {
-        BulkEditSource.pin_set: "get_pin_set",
-        BulkEditSource.artist: "get_artist",
-        BulkEditSource.shop: "get_shop",
-        BulkEditSource.tag: "get_tag",
+        BulkEditSource.pin_set: "get_pin_set_by_id",
+        BulkEditSource.artist: "get_artist_by_id",
+        BulkEditSource.shop: "get_shop_by_id",
+        BulkEditSource.tag: "get_tag_by_id",
     }[source]
 
 

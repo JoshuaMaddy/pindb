@@ -25,6 +25,15 @@ def _solid_pin(color: tuple[int, int, int]) -> bytes:
     return buffer.getvalue()
 
 
+def _transparent_pin(color: tuple[int, int, int]) -> bytes:
+    """A 400x400 PNG: opaque colored disk on a fully transparent background."""
+    img = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+    ImageDraw.Draw(img).ellipse((0, 0, 399, 399), fill=(*color, 255))
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def _decode(webp_bytes: bytes) -> Image.Image:
     return Image.open(io.BytesIO(webp_bytes)).convert("RGB")
 
@@ -71,3 +80,27 @@ def test_invalid_image_bytes_fall_back_to_empty_panel() -> None:
     out = build_entity_og_image("Broken Pin", [b"not-an-image"])
     image = _decode(out)
     assert image.getpixel((30 + 126, 354 + 126)) == (0x1E, 0x1E, 0x2E)
+
+
+def test_transparent_pin_composites_over_dark_panel() -> None:
+    """Transparent regions of a pin show the empty-panel fill, not the canvas."""
+    out = build_entity_og_image("Transparent Pin", [_transparent_pin((250, 0, 0))])
+    image = _decode(out)
+    # The disk is inscribed in a 400x400 source which gets cover-fit to
+    # 252x252; corner regions of that square fall outside the disk and were
+    # transparent in the source. They should be painted with the empty-panel
+    # color (#1E1E2E) rather than whatever the wordmark band held there.
+    # Sample at (60, 10) inside the slot — inside the rounded-corner mask
+    # (corner radius 50, so well within the rounded shape) but well outside
+    # the inscribed circle of radius 126. Slot 0 lives at (30, 354).
+    corner_pixel = image.getpixel((30 + 60, 354 + 10))
+    assert isinstance(corner_pixel, tuple) and len(corner_pixel) >= 3
+    cr, cg, cb = corner_pixel[0], corner_pixel[1], corner_pixel[2]
+    assert abs(cr - 0x1E) <= 5 and abs(cg - 0x1E) <= 5 and abs(cb - 0x2E) <= 5, (
+        f"transparent corner not painted with empty-panel fill: {(cr, cg, cb)}"
+    )
+    # Center of the same square still reflects the disk color (lossy WebP).
+    center_pixel = image.getpixel((30 + 126, 354 + 126))
+    assert isinstance(center_pixel, tuple) and len(center_pixel) >= 3
+    r, g, b = center_pixel[0], center_pixel[1], center_pixel[2]
+    assert abs(r - 250) < 15 and g < 30 and b < 30

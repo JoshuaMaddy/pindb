@@ -21,7 +21,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Sequence
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 _STATIC_DIR: Path = Path(__file__).resolve().parent / "static"
 _BLANK_TEMPLATE_PATH: Path = _STATIC_DIR / "media" / "opengraph-image-blank.webp"
@@ -112,8 +112,14 @@ def _square_mask_cached(size: int, radius: int) -> Image.Image:
 
 
 def _cover_fit(image: Image.Image, size: int) -> Image.Image:
-    """Resize *image* to ``size x size`` using object-fit-cover semantics."""
-    src = image.convert("RGB")
+    """Resize *image* to ``size x size`` using object-fit-cover semantics.
+
+    Preserves an alpha channel when the source has one — pin art is sometimes
+    die-cut against a transparent background, and we want those holes to
+    stay transparent so the caller can lay them over the dark "empty" panel.
+    """
+    has_alpha = image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info
+    src = image.convert("RGBA" if has_alpha else "RGB")
     src_w, src_h = src.size
     scale = max(size / src_w, size / src_h)
     new_w = max(size, int(round(src_w * scale)))
@@ -129,9 +135,21 @@ def _empty_square(size: int) -> Image.Image:
 
 
 def _paste_square(canvas: Image.Image, square: Image.Image, x: int, y: int) -> None:
-    """Stamp *square* onto *canvas* with rounded-corner alpha clipping."""
-    mask = _square_mask_cached(square.width, _SQUARE_CORNER_RADIUS)
-    canvas.paste(square, (x, y), mask)
+    """Stamp *square* onto *canvas* with rounded-corner alpha clipping.
+
+    When *square* has an alpha channel, paint the dark empty-panel fill
+    underneath first so transparent regions of the pin show that fill rather
+    than the wordmark band bleeding through.
+    """
+    rounded = _square_mask_cached(square.width, _SQUARE_CORNER_RADIUS)
+    if square.mode == "RGBA":
+        background = _empty_square(square.width)
+        canvas.paste(background, (x, y), rounded)
+        alpha = square.split()[3]
+        combined = ImageChops.multiply(alpha, rounded)
+        canvas.paste(square.convert("RGB"), (x, y), combined)
+        return
+    canvas.paste(square, (x, y), rounded)
 
 
 def build_entity_og_image(name: str, pin_image_bytes: Sequence[bytes]) -> bytes:

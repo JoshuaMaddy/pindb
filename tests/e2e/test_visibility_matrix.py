@@ -19,6 +19,7 @@ pending/rejected axis where editor and admin diverge from regular users.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -43,12 +44,14 @@ def _shop_detail_reachable(
     """Whether the shop detail page renders for this viewer.
 
     A hidden entity redirects to ``/`` (the route returns ``RedirectResponse``
-    rather than a 404). We detect that by landing URL.
+    rather than a 404). When the page is reachable, the bare-id URL is
+    rewritten by `canonical_slug_redirect` to ``/get/shop/{slug}/{id}``, so we
+    accept either form.
     """
     page = context.new_page()
     try:
         page.goto(f"{base_url}/get/shop/{shop_id}")
-        return page.url.rstrip("/").endswith(f"/get/shop/{shop_id}")
+        return bool(re.search(rf"/get/shop/(?:[^/]+/)?{shop_id}/?$", page.url))
     finally:
         page.close()
 

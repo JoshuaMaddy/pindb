@@ -138,7 +138,7 @@ def tag_page(
         request=request,
         head_content=opengraph_head(
             title=f"Tag: {tag.display_name}",
-            description=f"Pins tagged {tag.display_name} on PinDB.",
+            description=f"View pins tagged {tag.display_name} on PinDB.",
             canonical_url=canonical_url,
             image_url=str(
                 request.url_for("get_og_image", entity_type="tag", id=tag.id)

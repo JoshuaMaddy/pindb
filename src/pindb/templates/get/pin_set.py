@@ -37,7 +37,7 @@ def pin_set_page(
         pin_set.owner_id == user.id or user.is_admin
     )
     canonical_url = str(pin_set_url(request=request, pin_set=pin_set))
-    share_description: str = pin_set.description or f"Pin set: {pin_set.name} on PinDB."
+    share_description: str = pin_set.description or f"View {pin_set.name} on PinDB."
 
     return html_base(
         title=pin_set.name,
