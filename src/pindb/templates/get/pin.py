@@ -67,7 +67,7 @@ def pin_page(
         request=request,
         template_js_extra=("pins/pin_swiper.js", "pins/pin_lightbox.js"),
         head_content=opengraph_head(
-            title=f"PinDB: {pin.name}",
+            title=f"Pin: {pin.name}",
             description=_pin_share_description(pin),
             canonical_url=canonical_url,
             image_url=str(request.url_for("get_image", guid=pin.front_image_guid)),

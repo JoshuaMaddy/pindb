@@ -43,7 +43,7 @@ def pin_set_page(
         title=pin_set.name,
         request=request,
         head_content=opengraph_head(
-            title=f"PinDB: {pin_set.name}",
+            title=f"Pin Set: {pin_set.name}",
             description=share_description,
             canonical_url=canonical_url,
             image_url=str(

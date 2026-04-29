@@ -41,7 +41,7 @@ def shop_page(
         title=shop.name,
         request=request,
         head_content=opengraph_head(
-            title=f"PinDB: {shop.name}",
+            title=f"Shop: {shop.name}",
             description=f"Pins from {shop.name} on PinDB.",
             canonical_url=canonical_url,
             image_url=str(

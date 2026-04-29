@@ -41,7 +41,7 @@ def artist_page(
         title=artist.name,
         request=request,
         head_content=opengraph_head(
-            title=f"PinDB: {artist.name}",
+            title=f"Artist: {artist.name}",
             description=f"Pins by {artist.name} on PinDB.",
             canonical_url=canonical_url,
             image_url=str(
