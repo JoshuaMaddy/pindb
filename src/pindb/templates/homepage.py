@@ -15,6 +15,7 @@ from htpy import (
     input,
     link,
     nav,
+    p,
     script,
     span,
 )
@@ -78,11 +79,14 @@ def _masonry_bg(request: Request, pins: list[Pin]) -> Element:
     ]
 
 
-def _homepage_center(request: Request) -> Element:
+def _homepage_center(request: Request, pin_count: int) -> Element:
     return div(id="homepage-center")[
         div(id="homepage-card")[
             h1(class_="text-center text-accent")["PinDB"],
             h2(class_="text-center")["A database for all things pins."],
+            p(class_="text-center mt-1 text-lightest-hover")[
+                f"{pin_count:,} pins and counting!"
+            ],
             form(
                 id="homepage-search",
                 action=str(request.url_for("get_search_pin")),
@@ -144,7 +148,7 @@ def _head_extras() -> Fragment:
     ]
 
 
-def homepage(request: Request, pins: list[Pin]) -> Element:
+def homepage(request: Request, pins: list[Pin], pin_count: int) -> Element:
     return html_base(
         title="Home",
         request=request,
@@ -152,6 +156,6 @@ def homepage(request: Request, pins: list[Pin]) -> Element:
         body_content=fragment[
             _masonry_bg(request=request, pins=pins),
             div(id="pindb-cursor-glow", aria_hidden="true"),
-            _homepage_center(request=request),
+            _homepage_center(request=request, pin_count=pin_count),
         ],
     )

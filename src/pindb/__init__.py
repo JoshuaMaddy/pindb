@@ -157,6 +157,7 @@ async def _htmx_validation_handler(
 @app.get(path="/")
 async def root(request: Request):
     async with async_session_maker() as db:
+        pin_count: int = (await db.scalar(select(func.count(Pin.id)))) or 0
         r = await db.scalars(
             select(Pin)
             .where(Pin.front_image_guid.is_not(None))
@@ -168,7 +169,9 @@ async def root(request: Request):
             )
         )
         pins = r.all()
-        return HtpyResponse(homepage(request=request, pins=[*pins]))
+        return HtpyResponse(
+            homepage(request=request, pins=[*pins], pin_count=pin_count)
+        )
 
 
 app.include_router(health.router)
