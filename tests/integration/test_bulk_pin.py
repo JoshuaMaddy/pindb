@@ -9,21 +9,15 @@ from sqlalchemy import select
 
 from pindb.database import Pin
 from pindb.models.acquisition_type import AcquisitionType
+from tests.integration.helpers.authz import assert_admin_only_get_loose_anon
 
 
 @pytest.mark.integration
 class TestBulkPinAuthorization:
-    def test_guest_rejected(self, anon_client):
-        response = anon_client.get("/bulk/pin")
-        assert response.status_code in (401, 403)
-
-    def test_regular_user_rejected(self, auth_client):
-        response = auth_client.get("/bulk/pin")
-        assert response.status_code == 403
-
-    def test_editor_rejected(self, editor_client):
-        response = editor_client.get("/bulk/pin")
-        assert response.status_code == 403
+    def test_non_admin_rejected(self, anon_client, auth_client, editor_client) -> None:
+        assert_admin_only_get_loose_anon(
+            "/bulk/pin", anon_client, auth_client, editor_client
+        )
 
     def test_admin_allowed(self, admin_client):
         response = admin_client.get("/bulk/pin")

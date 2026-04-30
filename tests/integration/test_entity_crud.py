@@ -1,5 +1,5 @@
 """Happy-path create + edit flows for the supporting entity types (shop,
-artist, tag). Pin CRUD is covered separately in `test_pin_crud.py`."""
+artist, tag). Pin routes are covered in ``test_routes_pin.py``."""
 
 from __future__ import annotations
 
@@ -13,14 +13,13 @@ from pindb.database.tag import TagCategory
 from tests.factories.artist import ArtistFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
-
-_PENDING_OPTS = {"include_pending": True}
+from tests.integration.helpers.pending import INCLUDE_PENDING_ONLY
 
 
 def _refetch(db_session, model, id):
     db_session.expire_all()
     return db_session.scalar(
-        select(model).where(model.id == id).execution_options(**_PENDING_OPTS)
+        select(model).where(model.id == id).execution_options(**INCLUDE_PENDING_ONLY)
     )
 
 

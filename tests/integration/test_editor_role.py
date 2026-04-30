@@ -1,14 +1,11 @@
 """Editor role semantics: pending creation, visibility, assert_editor_can_edit."""
 
-from typing import Any
-
 import pytest
 from sqlalchemy import select
 
 from pindb.database import Shop
 from tests.factories.shop import ShopFactory
-
-_PENDING_OPTS: Any = {"include_pending": True, "include_deleted": True}
+from tests.integration.helpers.pending import INCLUDE_PENDING_AND_DELETED
 
 
 @pytest.mark.integration
@@ -34,7 +31,7 @@ class TestEditorCreatesPendingEntity:
         shop = db_session.scalar(
             select(Shop)
             .where(Shop.name == "Editor Pending Shop")
-            .execution_options(**_PENDING_OPTS)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert shop is not None
         assert shop.approved_at is None
@@ -52,7 +49,7 @@ class TestEditorCreatesPendingEntity:
         shop = db_session.scalar(
             select(Shop)
             .where(Shop.name == "Admin Approved Shop")
-            .execution_options(**_PENDING_OPTS)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert shop is not None
         assert shop.approved_at is not None

@@ -21,12 +21,6 @@ not share ports, databases, or browsers.
 from __future__ import annotations
 
 import os
-import shutil
-import socket
-import subprocess
-import sys
-import tempfile
-import time
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import Any
@@ -34,7 +28,10 @@ from typing import Any
 import httpx
 import pytest
 
-_REPO_ROOT = Path(__file__).parent.parent.parent
+pytest_plugins = (
+    "tests.e2e.fixtures.live_server",
+    "tests.e2e.fixtures.db_isolation",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -54,36 +51,6 @@ def pytest_collection_modifyitems(config, items):
         except ValueError:
             continue
         item.add_marker(pytest.mark.e2e)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def _wait_for_http(url: str, timeout: float = 30.0) -> None:
-    deadline = time.time() + timeout
-    last_err: Exception | None = None
-    while time.time() < deadline:
-        try:
-            response = httpx.get(url, timeout=2.0)
-            if response.status_code < 500:
-                return
-        except Exception as err:
-            last_err = err
-        time.sleep(0.25)
-    raise RuntimeError(f"Timed out waiting for {url}: {last_err!r}")
-
-
-# ---------------------------------------------------------------------------
-# Session-scoped containers
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +91,8 @@ def _close_pages_opened_during_test(browser) -> Iterator[None]:
     ``page.close()``. Over a full session this accumulates dozens of open
     chromium pages, which degrades both the browser (slow navigations) and the
     live uvicorn server (long-idle HTMX connections). The cumulative slowdown
-    was the root cause of the ``test_pending_chain`` / ``test_pending_cascade``
+    was the root cause of the ``pending/test_edit_chain.py`` slow tests /
+    pending-cascade flows
     failures that pushed those tests out of CI.
 
     This autouse fixture snapshots each context's ``pages`` list before the
@@ -164,155 +132,6 @@ def _patch_browser_new_context(browser):
         yield
     finally:
         browser.new_context = original  # type: ignore[method-assign]
-
-
-@pytest.fixture(scope="session")
-def e2e_pg_container():
-    from testcontainers.postgres import PostgresContainer
-
-    with PostgresContainer("postgres:17-alpine") as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def e2e_meili_container():
-    from datetime import timedelta
-
-    from testcontainers.core.container import DockerContainer
-    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
-
-    container = (
-        DockerContainer("getmeili/meilisearch:v1.11")
-        .with_env("MEILI_MASTER_KEY", "e2e-meili-key")
-        .with_env("MEILI_ENV", "development")
-        .with_exposed_ports(7700)
-        .waiting_for(
-            LogMessageWaitStrategy("Server listening").with_startup_timeout(
-                timedelta(seconds=30)
-            )
-        )
-    )
-    container.start()
-    try:
-        yield container
-    finally:
-        container.stop()
-
-
-@pytest.fixture(scope="session")
-def e2e_image_dir() -> Generator[Path, None, None]:
-    path = Path(tempfile.mkdtemp(prefix="pindb_e2e_images_"))
-    try:
-        yield path
-    finally:
-        shutil.rmtree(path, ignore_errors=True)
-
-
-# ---------------------------------------------------------------------------
-# Session-scoped uvicorn subprocess
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def live_server(
-    e2e_pg_container, e2e_meili_container, e2e_image_dir
-) -> Generator[str, None, None]:
-    """Launch the app in a uvicorn subprocess and yield its base URL."""
-    port = _free_port()
-    base_url = f"http://127.0.0.1:{port}"
-
-    pg_url = e2e_pg_container.get_connection_url().replace(
-        "postgresql+psycopg2://", "postgresql+psycopg://"
-    )
-    async_pg_url = pg_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
-    meili_host = e2e_meili_container.get_container_host_ip()
-    meili_port = e2e_meili_container.get_exposed_port(7700)
-    meili_url = f"http://{meili_host}:{meili_port}"
-
-    env = {
-        **os.environ,
-        "DATABASE_CONNECTION": async_pg_url,
-        "DATABASE_CONNECTION_SYNC": pg_url,
-        "MEILISEARCH_KEY": "e2e-meili-key",
-        "MEILISEARCH_URL": meili_url,
-        "MEILISEARCH_INDEX": "pins_e2e",
-        "SECRET_KEY": "e2e-secret-key-for-playwright-tests-only",
-        "IMAGE_DIRECTORY": str(e2e_image_dir),
-        "IMAGE_BACKEND": "filesystem",
-        "BASE_URL": base_url,
-        "SEARCH_SYNC_INTERVAL_MINUTES": "60",
-        "ALLOW_TEST_OAUTH_PROVIDER": "true",
-        # Explicit — pytest-env propagation through the subprocess env is
-        # unreliable (CI env differed from local). The e2e suite talks to
-        # uvicorn over http://127.0.0.1, so Secure session cookies are dropped
-        # by httpx + Playwright and every authed request returns 401.
-        "SESSION_COOKIE_SECURE": "false",
-        "CSRF_ENFORCE_ORIGIN": "false",
-        "CONTACT_EMAIL": "e2e@example.test",
-        # Disable per-IP rate limits: all e2e traffic shares 127.0.0.1 so the
-        # signup (10/hour) and login (10/minute) windows close almost
-        # immediately, cascading into bogus 401s on downstream requests.
-        "RATE_LIMIT_ENABLED": "false",
-    }
-    show_server_logs = os.environ.get("E2E_SHOW_SERVER_LOGS", "0") == "1"
-    uvicorn_log_level = os.environ.get("E2E_UVICORN_LOG_LEVEL", "warning")
-
-    # Fixtures and helpers use os.environ["DATABASE_CONNECTION"] for direct
-    # psycopg access; pytest-env still has the integration placeholder unless
-    # we mirror the container URL into the test process.
-    prev_db = os.environ.get("DATABASE_CONNECTION")
-    prev_db_sync = os.environ.get("DATABASE_CONNECTION_SYNC")
-    os.environ["DATABASE_CONNECTION"] = pg_url
-    os.environ["DATABASE_CONNECTION_SYNC"] = pg_url
-    try:
-        # Run migrations synchronously first, so the app starts against a ready DB.
-        subprocess.run(
-            ["uv", "run", "alembic", "upgrade", "head"],
-            env=env,
-            check=True,
-            cwd=str(_REPO_ROOT),
-        )
-
-        # Discard, don't capture — a PIPE that nobody drains fills its
-        # ~64KB buffer and then blocks uvicorn on every log write, which
-        # shows up downstream as random httpx.ReadTimeout /
-        # expect_navigation timeouts in long test runs.
-        proc = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                "pindb:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(port),
-                "--log-level",
-                uvicorn_log_level,
-            ],
-            env=env,
-            cwd=str(_REPO_ROOT),
-            stdout=None if show_server_logs else subprocess.DEVNULL,
-            stderr=None if show_server_logs else subprocess.DEVNULL,
-        )
-        try:
-            _wait_for_http(f"{base_url}/", timeout=60)
-            yield base_url
-        finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-    finally:
-        if prev_db is None:
-            os.environ.pop("DATABASE_CONNECTION", None)
-        else:
-            os.environ["DATABASE_CONNECTION"] = prev_db
-        if prev_db_sync is None:
-            os.environ.pop("DATABASE_CONNECTION_SYNC", None)
-        else:
-            os.environ["DATABASE_CONNECTION_SYNC"] = prev_db_sync
 
 
 # ---------------------------------------------------------------------------
@@ -491,133 +310,6 @@ def editor_browser_context(browser, live_server):
 
 
 # ---------------------------------------------------------------------------
-# Direct DB helpers + per-test truncation
-# ---------------------------------------------------------------------------
-
-# Tables to truncate between tests, in dependency order. We deliberately
-# preserve `users`, `user_sessions`, and `user_auth_providers` so the
-# session-scoped admin/editor users (and their cookies) survive across tests;
-# everything else is per-test state.
-_TRUNCATE_TABLES: tuple[str, ...] = (
-    "change_log",
-    "pending_edits",
-    "user_favorite_pin_sets",
-    "user_favorite_pins",
-    "user_owned_pins",
-    "user_wanted_pins",
-    "pin_set_memberships",
-    "pins_grades",
-    "pins_links",
-    "pins_tags",
-    "pins_artists",
-    "pins_shops",
-    "pin_sets_links",
-    "artists_links",
-    "shops_links",
-    "tag_implications",
-    "tag_aliases",
-    "shop_aliases",
-    "artist_aliases",
-    "links",
-    "grades",
-    "pins",
-    "pin_sets",
-    "tags",
-    "artists",
-    "shops",
-)
-
-
-def _pg_dsn() -> str:
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    return pg_url.replace("+psycopg", "")
-
-
-@pytest.fixture(scope="session")
-def _e2e_pg_conn(live_server):
-    """One shared psycopg connection per xdist worker.
-
-    `db_handle` and `_truncate_e2e_state` previously opened a fresh connection
-    on every test. With ~50 tests × N workers the handshake churn was about
-    20-50 ms per test. Sharing one connection (each test owns a distinct
-    cursor; autocommit is handled per call) removes that overhead.
-    """
-    import psycopg
-
-    conn = psycopg.connect(_pg_dsn())
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-@pytest.fixture
-def db_handle(_e2e_pg_conn) -> Callable[..., list[tuple]]:
-    """Tiny SQL execute helper.
-
-    Returns a callable: `db_handle(sql, params=())` → list of result tuples.
-    """
-    import psycopg
-
-    def _exec(sql: str, params: tuple[object, ...] = ()) -> list[tuple]:
-        with _e2e_pg_conn.cursor() as cur:
-            cur.execute(sql, params)
-            try:
-                rows = cur.fetchall()
-            except psycopg.ProgrammingError:
-                rows = []
-        _e2e_pg_conn.commit()
-        return rows
-
-    return _exec
-
-
-@pytest.fixture(autouse=True)
-def _truncate_e2e_state(_e2e_pg_conn) -> Iterator[None]:
-    """Wipe entity rows after each e2e test for true isolation.
-
-    Users + sessions are preserved so pre-authenticated browser contexts
-    and httpx clients keep working across tests.
-    """
-    yield
-
-    import time
-
-    import psycopg
-    from psycopg import sql as pgsql
-
-    truncate_sql = pgsql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
-        pgsql.SQL(", ").join(pgsql.Identifier(t) for t in _TRUNCATE_TABLES)
-    )
-
-    # The app subprocess may still hold AccessShareLock from in-flight requests
-    # (Playwright fires background fetches mid-teardown). Without lock_timeout,
-    # TRUNCATE deadlocks against those, leaves conn in INERROR, and every
-    # subsequent test on this worker cascades with InFailedSqlTransaction.
-    last_exc: Exception | None = None
-    for attempt in range(5):
-        try:
-            _e2e_pg_conn.rollback()
-            with _e2e_pg_conn.cursor() as cur:
-                cur.execute("SET LOCAL lock_timeout = '3s'")
-                cur.execute(truncate_sql)
-            _e2e_pg_conn.commit()
-            return
-        except (
-            psycopg.errors.LockNotAvailable,
-            psycopg.errors.DeadlockDetected,
-        ) as exc:
-            last_exc = exc
-            _e2e_pg_conn.rollback()
-            time.sleep(0.2 * (attempt + 1))
-        except psycopg.Error:
-            _e2e_pg_conn.rollback()
-            raise
-    if last_exc is not None:
-        raise last_exc
-
-
-# ---------------------------------------------------------------------------
 # HTTP-driven setup helpers (much faster than driving the UI)
 # ---------------------------------------------------------------------------
 
@@ -693,7 +385,7 @@ def admin_http_client(
 def anon_http_client(live_server) -> Generator[httpx.Client, None, None]:
     """Unauthenticated httpx client bound to the live server.
 
-    Used by the httpx-based ``test_ui_content`` assertions (navbar
+    Used by the httpx-based ``ui/test_*.py`` assertions (navbar
     visibility, page titles, auth guards) that only need the rendered HTML
     and don't exercise client-side scripts.
     """
@@ -818,36 +510,14 @@ def make_tag(
     return _make
 
 
-def _tiny_png() -> bytes:
-    """Smallest valid PNG Pillow will open (1x1 black pixel).
-
-    Inlined here so ``make_pin`` doesn't cross the
-    ``tests/e2e/test_pin_creation.py`` import boundary.
-    """
-    import struct
-    import zlib
-
-    sig = b"\x89PNG\r\n\x1a\n"
-
-    def chunk(typ: bytes, data: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(data))
-            + typ
-            + data
-            + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
-        )
-
-    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
-    idat = zlib.compress(b"\x00\x00\x00\x00")
-    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
-
-
 @pytest.fixture
 def make_pin(
     admin_http_client, editor_http_client, db_handle, make_shop
 ) -> Callable[..., dict[str, Any]]:
     """Create an approved pin via HTTP with a real (1x1) PNG attached."""
     import io
+
+    from tests.helpers.binary_fixtures import tiny_png_bytes
 
     def _make(
         name: str = "SeedPin",
@@ -859,7 +529,7 @@ def make_pin(
         shop = make_shop(shop_name or f"{name}Shop", approved=True)
 
         files = {
-            "front_image": ("front.png", io.BytesIO(_tiny_png()), "image/png"),
+            "front_image": ("front.png", io.BytesIO(tiny_png_bytes()), "image/png"),
         }
         data: dict[str, str | list[str]] = {
             "name": name,

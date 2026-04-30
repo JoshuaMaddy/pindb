@@ -10,6 +10,12 @@ The suite is organised into three layers that trade fidelity for speed:
 
 By default `pyproject.toml` sets `-m "not e2e"`, so `uv run pytest` runs only unit + integration.
 
+### Integration file naming (convention for new tests)
+
+Prefer **URL-mirror names** — `test_routes_<segment>.py` aligned with the route tree (for example `test_routes_pin.py`, `test_routes_misc.py`). Older modules may still use domain-style names (`test_admin_routes.py`, `test_pending_approval.py`); rename only when you are already touching a file.
+
+Shared route-test helpers live under `tests/integration/helpers/` (`authz.py`, `pending.py`, `pin_payloads.py`). Cross-layer binaries (e.g. minimal PNG bytes) live under `tests/helpers/`.
+
 ## Running the layers
 
 ### Unit only
@@ -64,7 +70,7 @@ Pure-python tests for small helpers (`model_utils`, `search` parsers, etc.).
 No DB, no network, no file I/O beyond tempfiles.
 
 ### Integration
-All integration tests use the shared `tests/conftest.py`, which provides:
+All integration tests use the shared `tests/conftest.py`, which registers fixture plugins under `tests/fixtures/` (`database`, `search`, `app_lifecycle`, `clients`, `users`, `images`, `autouse`) after bootstrap imports in `tests/fixtures/core.py`. Together they provide:
 
 - A session-scoped Postgres 17 testcontainer + Alembic-migrated schema.
 - Per-test transaction isolation via a single connection + savepoint.
@@ -97,15 +103,24 @@ then launches uvicorn in a subprocess. Seeded user fixtures
 `admin_browser_context` / `editor_browser_context`) sign up a fresh account
 over HTTP and promote it to admin/editor with direct SQL.
 
-Six e2e files cover different concerns. **Per-test isolation** is provided
-by `_truncate_e2e_state` (autouse in `tests/e2e/conftest.py`), which
-truncates every entity table after each test while preserving the
-`users`/`user_sessions` rows that back the pre-authenticated browser
-contexts. **HTTP setup helpers** (`make_shop`, `make_artist`, `make_tag`)
-let tests provision approved/pending entities without driving the UI;
-**page objects** (`tests/e2e/_pages.py`) wrap the noisier selectors so
-test bodies focus on behaviour. The session-scoped `db_handle` fixture
-returns a small `(sql, params) -> rows` helper backed by psycopg.
+Specs are grouped under **`tests/e2e/<area>/test_*.py`** (flat `test_*.py` at
+the e2e root is avoided). **Per-test isolation** is `_truncate_e2e_state`
+(autouse in `tests/e2e/fixtures/db_isolation.py`). **`live_server`** and
+containers live in `tests/e2e/fixtures/live_server.py`. Playwright/session
+fixtures remain in `tests/e2e/conftest.py`.
+
+**HTTP setup helpers** (`make_shop`, `make_artist`, `make_tag`, `make_pin`),
+**page objects** (`tests/e2e/_pages.py`), and **`db_handle`** behave as before.
+
+| Package | Purpose |
+|---------|---------|
+| `tests/e2e/flows/` | Short cross-cutting flows (auth session, admin shop create, pending-edit approve, collection POST, pending shop approve smoke) |
+| `tests/e2e/ui/` | Navbar, auth errors, 404s, pending queue/edit Playwright checks, theme switcher, guards + `<title>` (httpx uses `ui/http.py`) |
+| `tests/e2e/pins/` | Image round-trip, cascade approval + queue hints, create-pin page smoke, full-field HTTP create, client-side form validation (`pins/_helpers.py`) |
+| `tests/e2e/entities/` | Shop/artist/tag create forms |
+| `tests/e2e/pending/` | Edit chains, visibility matrix, concurrent edits |
+| `tests/e2e/tags/` | Bulk tag creation UI |
+| `tests/e2e/auth/` | OAuth + password policy flows |
 
 Available browser-context fixtures:
  - `admin_browser_context` — logged-in admin
@@ -115,52 +130,7 @@ Available browser-context fixtures:
  - `regular_user_browser_context` — logged-in user with no roles
  - `anon_browser_context` — fresh, unauthenticated context
 
-`tests/e2e/test_flows.py` — five representative end-to-end flows:
- 1. signup + login + logout round-trip
- 2. admin-side shop creation
- 3. editor's pending-edit approved by an admin
- 4. regular user's collection add/remove
- 5. pending-cascade smoke test on approval
-
-`tests/e2e/test_ui_content.py` — content & behaviour assertions for what
-the user actually sees in the browser:
- - role-gated navbar visibility (anon vs editor vs admin)
- - login / signup error messaging
- - 404 rendering for missing images and edit routes
- - pending-approval queue: visible heading, table rows, submitter
-   metadata, action buttons
- - pending-edit banner appears on canonical entity views for
-   editors/admins and is hidden from anonymous viewers
- - reject-edits flow removes the row from the queue and leaves
-   canonical untouched
- - HTMX-driven theme switcher updates `<html>` className and persists
-   across reload
- - 401/403 enforcement at the browser level for protected routes
- - top-level page titles (`<title>` element)
-
-`tests/e2e/test_pending_chain.py` — multi-step pending-edit chain flows
-across two editor browser contexts plus admin: chain build-up, in-order
-collapse on `approve-edits`, reject keeps chain reachable but invisible,
-delete wipes the chain hard, banner-link navigation to the pending view.
-
-`tests/e2e/test_visibility_matrix.py` — cross-role visibility for
-approved / pending / rejected entities, asserting list-page visibility
-and detail-page status codes for anon / regular user / editor / admin.
-
-`tests/e2e/test_pin_creation.py` — pin creation via HTTP (the form is
-heavily Alpine-driven) covering image upload + thumbnail round-trip,
-cascade-on-approval (pending shop + artist), missing-image 404, and
-browser-level smoke checks on the create-pin page.
-
-`tests/e2e/test_concurrent.py` — interleaved edits across two browser
-contexts: simultaneous independent edits both land on the chain;
-admin's direct canonical edit during a pending chain doesn't conflict;
-approve-edits after an unrelated admin change doesn't clobber it; the
-pending-edit banner disappears once the chain is approved.
-
-The flow + UI-content tests verify routing, HTMX hydration, and the
-visible surface. The chain / visibility / cascade / concurrent tests
-exercise the cross-component state machines (pending → approved → public
-visibility, multi-actor edit chains, cascading approval transactions)
-end-to-end through the real DB and uvicorn server. Deep
-business-logic coverage of single units lives in the integration layer.
+Flow and UI modules verify routing, HTMX hydration, and visible surface.
+Pending / visibility / cascade / concurrent specs exercise cross-component
+state machines end-to-end through the real DB and uvicorn. Deep business-logic
+for single units stays in the integration layer.

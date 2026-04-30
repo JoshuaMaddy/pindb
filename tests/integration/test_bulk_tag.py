@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.database import Tag, TagCategory
+from tests.integration.helpers.authz import assert_editor_or_admin_get_loose_anon
 
 
 def _row(name, category="general", **extra):
@@ -26,13 +27,8 @@ def _row(name, category="general", **extra):
 
 @pytest.mark.integration
 class TestBulkTagAuthorization:
-    def test_guest_rejected(self, anon_client):
-        response = anon_client.get("/bulk/tag")
-        assert response.status_code in (401, 403)
-
-    def test_regular_user_rejected(self, auth_client):
-        response = auth_client.get("/bulk/tag")
-        assert response.status_code == 403
+    def test_guest_and_regular_user_rejected(self, anon_client, auth_client) -> None:
+        assert_editor_or_admin_get_loose_anon("/bulk/tag", anon_client, auth_client)
 
     def test_editor_allowed(self, editor_client):
         response = editor_client.get("/bulk/tag")

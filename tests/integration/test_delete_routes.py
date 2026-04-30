@@ -17,6 +17,7 @@ from tests.factories.artist import ArtistFactory
 from tests.factories.pin import PinFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
+from tests.integration.helpers.authz import assert_admin_only_post_loose_anon
 
 _INCLUDE_DELETED = {"include_deleted": True}
 
@@ -81,46 +82,21 @@ class TestDeleteRoutesSuccess:
         assert refreshed.deleted_by_id == admin_user.id
 
 
+_DELETE_PATHS = (
+    "/delete/pin/1",
+    "/delete/shop/1",
+    "/delete/artist/1",
+    "/delete/tag/1",
+)
+
+
 @pytest.mark.integration
 class TestDeleteRoutesAuthorization:
-    @pytest.mark.parametrize(
-        "path",
-        [
-            "/delete/pin/1",
-            "/delete/shop/1",
-            "/delete/artist/1",
-            "/delete/tag/1",
-        ],
-    )
-    def test_guest_rejected(self, anon_client, path):
-        response = anon_client.post(path, follow_redirects=False)
-        assert response.status_code in (401, 403)
-
-    @pytest.mark.parametrize(
-        "path",
-        [
-            "/delete/pin/1",
-            "/delete/shop/1",
-            "/delete/artist/1",
-            "/delete/tag/1",
-        ],
-    )
-    def test_regular_user_rejected(self, auth_client, path):
-        response = auth_client.post(path, follow_redirects=False)
-        assert response.status_code == 403
-
-    @pytest.mark.parametrize(
-        "path",
-        [
-            "/delete/pin/1",
-            "/delete/shop/1",
-            "/delete/artist/1",
-            "/delete/tag/1",
-        ],
-    )
-    def test_editor_rejected(self, editor_client, path):
-        response = editor_client.post(path, follow_redirects=False)
-        assert response.status_code == 403
+    @pytest.mark.parametrize("path", _DELETE_PATHS)
+    def test_non_admin_rejected(
+        self, anon_client, auth_client, editor_client, path: str
+    ) -> None:
+        assert_admin_only_post_loose_anon(path, anon_client, auth_client, editor_client)
 
 
 @pytest.mark.integration

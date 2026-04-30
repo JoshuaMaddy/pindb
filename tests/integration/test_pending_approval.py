@@ -1,7 +1,5 @@
 """Tests for /admin/pending/** — queue, approve/reject/delete, cascade on Pin approval."""
 
-from typing import Any
-
 import pytest
 from sqlalchemy import select
 
@@ -10,20 +8,14 @@ from tests.factories.artist import ArtistFactory
 from tests.factories.pin import PinFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
-
-_PENDING_OPTS: Any = {"include_pending": True, "include_deleted": True}
+from tests.integration.helpers.authz import assert_admin_only_get
+from tests.integration.helpers.pending import INCLUDE_PENDING_AND_DELETED
 
 
 @pytest.mark.integration
 class TestPendingQueueAccess:
-    def test_unauthenticated_returns_401(self, client):
-        assert client.get("/admin/pending").status_code == 401
-
-    def test_regular_user_returns_403(self, auth_client):
-        assert auth_client.get("/admin/pending").status_code == 403
-
-    def test_editor_returns_403(self, editor_client):
-        assert editor_client.get("/admin/pending").status_code == 403
+    def test_pending_queue_requires_admin(self, client, auth_client, editor_client):
+        assert_admin_only_get("/admin/pending", client, auth_client, editor_client)
 
     def test_admin_returns_200(self, admin_client):
         assert admin_client.get("/admin/pending").status_code == 200
@@ -56,7 +48,9 @@ class TestApproveEndpoints:
 
         db_session.expire_all()
         refreshed = db_session.scalar(
-            select(Shop).where(Shop.id == shop_id).execution_options(**_PENDING_OPTS)
+            select(Shop)
+            .where(Shop.id == shop_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert refreshed is not None
         assert refreshed.approved_at is not None
@@ -109,15 +103,19 @@ class TestApproveEndpoints:
 
         db_session.expire_all()
         pin_after = db_session.scalar(
-            select(Pin).where(Pin.id == pin_id).execution_options(**_PENDING_OPTS)
+            select(Pin)
+            .where(Pin.id == pin_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         shop_after = db_session.scalar(
-            select(Shop).where(Shop.id == shop_id).execution_options(**_PENDING_OPTS)
+            select(Shop)
+            .where(Shop.id == shop_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         artist_after = db_session.scalar(
             select(Artist)
             .where(Artist.id == artist_id)
-            .execution_options(**_PENDING_OPTS)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert pin_after is not None and pin_after.approved_at is not None
         assert shop_after is not None and shop_after.approved_at is not None
@@ -137,7 +135,9 @@ class TestRejectEndpoint:
 
         db_session.expire_all()
         refreshed = db_session.scalar(
-            select(Shop).where(Shop.id == shop_id).execution_options(**_PENDING_OPTS)
+            select(Shop)
+            .where(Shop.id == shop_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert refreshed is not None
         assert refreshed.rejected_at is not None
@@ -172,7 +172,9 @@ class TestDeletePendingEndpoint:
 
         db_session.expire_all()
         refreshed = db_session.scalar(
-            select(Shop).where(Shop.id == shop_id).execution_options(**_PENDING_OPTS)
+            select(Shop)
+            .where(Shop.id == shop_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert refreshed is not None
         assert refreshed.deleted_at is not None
@@ -186,7 +188,9 @@ class TestDeletePendingEndpoint:
         admin_client.post(f"/admin/pending/delete/tag/{tag_id}", follow_redirects=False)
         db_session.expire_all()
         refreshed = db_session.scalar(
-            select(Tag).where(Tag.id == tag_id).execution_options(**_PENDING_OPTS)
+            select(Tag)
+            .where(Tag.id == tag_id)
+            .execution_options(**INCLUDE_PENDING_AND_DELETED)
         )
         assert refreshed is not None
         assert refreshed.deleted_at is not None

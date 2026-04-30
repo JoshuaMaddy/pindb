@@ -1,8 +1,4 @@
-"""Browser e2e for pin create/edit client-side validation (`pin_creation.js`).
-
-Asserts inline hints + disabled submit styling; does not replace HTTP-level
-pin creation tests.
-"""
+"""Browser e2e for pin create/edit client-side validation (`pin_creation.js`)."""
 
 from __future__ import annotations
 
@@ -12,7 +8,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
-from tests.e2e.test_pin_creation import _png_bytes
+from tests.e2e.pins._helpers import png_bytes
 
 
 def _browser(role: str, admin_browser_context, editor_browser_context):
@@ -20,11 +16,6 @@ def _browser(role: str, admin_browser_context, editor_browser_context):
 
 
 def _set_tomselect_values(page: Page, select_id: str, values: list[str]) -> None:
-    """Programmatically set Tom Select values (multi = many ids; single = one value).
-
-    Entity dropdowns use async ``load()``; values may not exist in Tom Select's
-    option map until we ``addOption`` (mirrors choosing a search result).
-    """
     page.evaluate(
         """([sid, vals]) => {
             const el = document.getElementById(sid);
@@ -47,7 +38,6 @@ def _set_tomselect_values(page: Page, select_id: str, values: list[str]) -> None
 
 
 def _pin_form_dispatch_refresh(page: Page) -> None:
-    """Bubble input/change so client validation re-runs after programmatic edits."""
     page.evaluate(
         """() => {
           const f = document.getElementById('pin-form');
@@ -59,7 +49,6 @@ def _pin_form_dispatch_refresh(page: Page) -> None:
 
 
 def _wait_for_grade_inputs_ready(page: Page) -> None:
-    """Alpine injects default grade row (`Normal`) after startup."""
     page.wait_for_function(
         """() => {
           const inputs = document.querySelectorAll(
@@ -140,7 +129,7 @@ class TestPinFormClientValidation:
         page.fill("#name", "Client Validation Ready Pin")
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp.write(_png_bytes())
+            tmp.write(png_bytes())
             tmp_path = tmp.name
         try:
             page.set_input_files("#front_image", tmp_path)

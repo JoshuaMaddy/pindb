@@ -12,7 +12,7 @@ The matrix:
 | editor | visible  | visible | hidden   |
 | admin  | visible  | visible | visible  |
 
-Soft-delete state is exercised in test_pending_chain (delete-edits +
+Soft-delete state is exercised in ``pending/test_edit_chain.py`` (delete-edits +
 delete-pending paths) and the integration suite; we focus here on the
 pending/rejected axis where editor and admin diverge from regular users.
 """

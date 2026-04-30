@@ -1,15 +1,31 @@
-"""Integration tests for pin GET routes and auth enforcement on create/edit/delete.
+"""Integration tests for pin GET/create/edit/delete routes and auth enforcement.
 
 Role model under test:
-- `/create/*` requires the `editor` dependency (editor OR admin).
-- `/delete/*` requires admin. It's POST, not GET, and returns a 303 redirect.
-- `/edit/*` requires editor (ownership enforced by `assert_editor_can_edit`).
+- ``/create/*`` requires the ``editor`` dependency (editor OR admin).
+- ``/delete/*`` requires admin. It's POST, not GET, and returns a 303 redirect.
+- ``/edit/*`` requires editor (ownership enforced by ``assert_editor_can_edit``).
 """
 
-import pytest
+from __future__ import annotations
 
+from typing import Any, cast
+
+import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from pindb.database import Pin, UserOwnedPin, UserWantedPin
+from pindb.database.artist import Artist
+from pindb.database.joins import user_favorite_pins
+from pindb.database.pin_set import PinSet
+from pindb.database.shop import Shop
+from pindb.database.tag import Tag
+from tests.factories.artist import ArtistFactory
 from tests.factories.pin import PinFactory
+from tests.factories.pin_set import PersonalPinSetFactory
 from tests.factories.shop import ShopFactory
+from tests.factories.tag import TagFactory
+from tests.integration.helpers.pin_payloads import pin_form_data
 
 
 @pytest.mark.integration
@@ -126,6 +142,22 @@ class TestDuplicatePin:
         assert "Source Pin To Duplicate" in body
         assert "Duplicator Shop" in body
 
+    def test_duplicate_prefills_tags_without_server_error(
+        self, editor_client, db_session, admin_user
+    ):
+        tag = TagFactory(name="dup_tag_prefill", approved=True, created_by=admin_user)
+        source = PinFactory(name="Source With Tags")
+        source.explicit_tags.add(tag)  # ty:ignore[unresolved-attribute]
+        db_session.flush()
+
+        response = editor_client.get(
+            f"/create/pin?duplicate_from={source.id}"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        body = response.text
+        assert "Source With Tags" in body
+        assert f'value="{tag.id}"' in body  # ty:ignore[unresolved-attribute]
+
     def test_duplicate_requires_editor(self, auth_client, db_session):
         source = PinFactory()
         response = auth_client.get(
@@ -185,23 +217,15 @@ class TestDeletePinAuthEnforcement:
         assert response.status_code == 403
 
     def test_admin_delete_soft_deletes(self, admin_client, db_session):
-        from sqlalchemy import select
-
-        from pindb.database import Pin
-
         pin = PinFactory()
         pin_id = pin.id  # ty:ignore[unresolved-attribute]
         response = admin_client.post(f"/delete/pin/{pin_id}", follow_redirects=False)
         assert response.status_code == 303
 
-        # Route committed its savepoint; our session hasn't seen that yet.
         db_session.expire_all()
 
-        # Soft delete: row still exists, hidden from default queries
         visible = db_session.scalar(select(Pin).where(Pin.id == pin_id))
         assert visible is None
-
-        from typing import Any
 
         opts: Any = {"include_deleted": True, "include_pending": True}
         raw = db_session.scalar(
@@ -209,3 +233,147 @@ class TestDeletePinAuthEnforcement:
         )
         assert raw is not None
         assert raw.deleted_at is not None
+
+
+@pytest.mark.integration
+class TestPinWriteRoutes:
+    def test_create_pin_post_persists_relations(
+        self, admin_client, db_session, png_upload
+    ):
+        shop = cast(Shop, ShopFactory())
+        tag = cast(Tag, TagFactory())
+        artist = cast(Artist, ArtistFactory())
+        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=None))
+        variant = cast(Pin, PinFactory())
+        copy_pin = cast(Pin, PinFactory())
+
+        response = admin_client.post(
+            "/create/pin",
+            data=pin_form_data(
+                name="Created Through Route",
+                shop_ids=[shop.id],
+                tag_ids=[tag.id],
+                artist_ids=[artist.id],
+                pin_sets_ids=[pin_set.id],
+                variant_pin_ids=[variant.id],
+                unauthorized_copy_pin_ids=[copy_pin.id],
+            ),
+            files={"front_image": png_upload},
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+        assert "HX-Redirect" in response.headers
+
+        created = db_session.scalar(
+            select(Pin)
+            .where(Pin.name == "Created Through Route")
+            .options(
+                selectinload(Pin.shops),
+                selectinload(Pin.explicit_tags),
+                selectinload(Pin.artists),
+                selectinload(Pin.sets),
+                selectinload(Pin.links),
+                selectinload(Pin.variants),
+                selectinload(Pin.unauthorized_copies),
+            )
+            .execution_options(include_pending=True)
+        )
+        assert created is not None
+        assert any(loaded_shop.id == shop.id for loaded_shop in created.shops)
+        assert any(loaded_tag.id == tag.id for loaded_tag in created.explicit_tags)
+        assert any(loaded_artist.id == artist.id for loaded_artist in created.artists)
+        assert any(loaded_set.id == pin_set.id for loaded_set in created.sets)
+        assert any(loaded_pin.id == variant.id for loaded_pin in created.variants)
+        assert any(
+            loaded_pin.id == copy_pin.id for loaded_pin in created.unauthorized_copies
+        )
+        assert len(created.links) == 2
+
+    def test_edit_pin_post_updates_fields_and_skips_self_variant(
+        self, admin_client, db_session, admin_user
+    ):
+        source_pin = cast(
+            Pin,
+            PinFactory(name="Before Edit", approved=True, created_by=admin_user),
+        )
+        new_shop = cast(Shop, ShopFactory())
+        new_tag = cast(Tag, TagFactory())
+        new_artist = cast(Artist, ArtistFactory())
+        new_set = cast(PinSet, PersonalPinSetFactory(owner_id=None))
+        related_pin = cast(Pin, PinFactory())
+        source_pin_id = source_pin.id
+
+        response = admin_client.post(
+            f"/edit/pin/{source_pin_id}",
+            data=pin_form_data(
+                name="After Edit",
+                shop_ids=[new_shop.id],
+                tag_ids=[new_tag.id],
+                artist_ids=[new_artist.id],
+                pin_sets_ids=[new_set.id],
+                variant_pin_ids=[source_pin_id, related_pin.id],
+            ),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+        assert "HX-Redirect" in response.headers
+
+        db_session.expire_all()
+        refreshed = db_session.scalar(
+            select(Pin)
+            .where(Pin.id == source_pin_id)
+            .options(
+                selectinload(Pin.shops),
+                selectinload(Pin.explicit_tags),
+                selectinload(Pin.artists),
+                selectinload(Pin.sets),
+                selectinload(Pin.variants),
+            )
+            .execution_options(include_pending=True)
+        )
+        assert refreshed is not None
+        assert refreshed.name == "After Edit"
+        assert any(loaded_shop.id == new_shop.id for loaded_shop in refreshed.shops)
+        assert any(
+            loaded_tag.id == new_tag.id for loaded_tag in refreshed.explicit_tags
+        )
+        assert any(
+            loaded_artist.id == new_artist.id for loaded_artist in refreshed.artists
+        )
+        assert any(loaded_set.id == new_set.id for loaded_set in refreshed.sets)
+        assert all(loaded_pin.id != source_pin_id for loaded_pin in refreshed.variants)
+        assert any(loaded_pin.id == related_pin.id for loaded_pin in refreshed.variants)
+
+
+@pytest.mark.integration
+class TestGetPinForAuthenticatedUser:
+    def test_get_pin_loads_user_collection_context(
+        self, auth_client, db_session, test_user, admin_user
+    ):
+        pin = cast(
+            Pin,
+            PinFactory(name="User Context Pin", approved=True, created_by=admin_user),
+        )
+        pin_id = pin.id
+        personal_set = cast(PinSet, PersonalPinSetFactory(owner_id=test_user.id))
+        db_session.execute(
+            user_favorite_pins.insert().values(user_id=test_user.id, pin_id=pin_id)
+        )
+        db_session.add(
+            UserOwnedPin(
+                user_id=test_user.id,
+                pin_id=pin_id,
+                grade_id=None,
+                quantity=2,
+                tradeable_quantity=1,
+            )
+        )
+        db_session.add(
+            UserWantedPin(user_id=test_user.id, pin_id=pin_id, grade_id=None)
+        )
+        db_session.flush()
+
+        response = auth_client.get(f"/get/pin/{pin_id}")
+        assert response.status_code == 200
+        assert "User Context Pin" in response.text
+        assert str(personal_set.name) in response.text

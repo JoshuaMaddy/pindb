@@ -65,6 +65,7 @@ async def get_create_pin(
                 .where(Pin.id == duplicate_from)
                 .options(
                     selectinload(Pin.shops),
+                    selectinload(Pin.tags),
                     selectinload(Pin.explicit_tags),
                     selectinload(Pin.artists),
                     selectinload(Pin.sets),
