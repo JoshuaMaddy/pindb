@@ -36,13 +36,17 @@ class Configuration(BaseSettings):
     @model_validator(mode="after")
     def _database_sync_default(self) -> "Configuration":
         if not self.database_connection_sync.strip():
-            u = self.database_connection
+            database_connection = self.database_connection
             sync = (
-                u.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
-                if "asyncpg" in u
-                else u
+                database_connection.replace(
+                    "postgresql+asyncpg",
+                    "postgresql+psycopg",
+                    1,
+                )
+                if "asyncpg" in database_connection
+                else database_connection
             )
-            return self.model_copy(update={"database_connection_sync": sync})
+            self.database_connection_sync = sync
         return self
 
     @model_validator(mode="after")
