@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pindb.database import async_session_maker
+from pindb.database.joins import pins_tags
 from pindb.database.tag import Tag, TagCategory
 from pindb.model_utils import empty_str_to_none
 from pindb.models.list_view import EntityListView
@@ -39,13 +40,17 @@ async def get_list_tags(
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_tags"))
 
-    order_by = (
-        Tag.created_at.desc()
-        if sort == SortOrder.newest
-        else Tag.created_at.asc()
-        if sort == SortOrder.oldest
-        else Tag.name.asc()
-    )
+    if sort == SortOrder.newest:
+        order_parts = (Tag.created_at.desc(),)
+    elif sort == SortOrder.oldest:
+        order_parts = (Tag.created_at.asc(),)
+    else:
+        pin_count_sq = (
+            select(func.count())
+            .select_from(pins_tags)
+            .where(pins_tags.c.tag_id == Tag.id)
+        ).scalar_subquery()
+        order_parts = ((pin_count_sq == 0).asc(), Tag.name.asc())
 
     async with async_session_maker() as session:
         if q:
@@ -59,7 +64,7 @@ async def get_list_tags(
             tags: Sequence[Tag] = tags_list_result
         else:
             total_count = await session.scalar(select(func.count(Tag.id))) or 0
-            stmt = select(Tag).options(selectinload(Tag.pins)).order_by(order_by)
+            stmt = select(Tag).options(selectinload(Tag.pins)).order_by(*order_parts)
             if category:
                 stmt = stmt.where(Tag.category == category)
             tags = (

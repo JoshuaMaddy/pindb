@@ -139,6 +139,7 @@ async def _upsert_tag_node(
     node: TagUpsertNode,
     visiting: set[str],
     touched: set[int],
+    resolved_by_name: dict[str, Tag],
 ) -> Tag:
     name_key = normalize_tag_name(node.name)
     if not name_key:
@@ -163,8 +164,40 @@ async def _upsert_tag_node(
                     node=child,
                     visiting=visiting,
                     touched=touched,
+                    resolved_by_name=resolved_by_name,
                 )
             )
+
+        if name_key in resolved_by_name:
+            tag = resolved_by_name[name_key]
+            old_implication_ids: set[int] = {implied.id for implied in tag.implications}
+            merged_implied: set[Tag] = set(tag.implications) | set(implied_tags)
+            new_implication_ids: set[int] = {t.id for t in merged_implied}
+            newly_added_ids: set[int] = new_implication_ids - old_implication_ids
+            if newly_added_ids:
+                tag.implications = merged_implied
+                await session.flush()
+                await cascade_new_implications_to_pins(
+                    tag=tag,
+                    newly_added_ids=newly_added_ids,
+                    implied_tags=merged_implied,
+                    session=session,
+                )
+                LOGGER.info(
+                    "bulk-upsert: session short-circuit tag id=%d name=%r "
+                    "implications=+%d (total %d)",
+                    tag.id,
+                    name_key,
+                    len(newly_added_ids),
+                    len(merged_implied),
+                )
+            else:
+                LOGGER.debug(
+                    "bulk-upsert: session short-circuit noop tag id=%d name=%r",
+                    tag.id,
+                    name_key,
+                )
+            return tag
 
         tag: Tag | None = await session.scalar(
             select(Tag)
@@ -214,6 +247,7 @@ async def _upsert_tag_node(
             added_alias_count,
             len(tag.aliases),
         )
+        resolved_by_name[name_key] = tag
         touched.add(tag.id)
         return tag
     finally:
@@ -270,6 +304,7 @@ async def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
         )
 
     touched: set[int] = set()
+    resolved_by_name: dict[str, Tag] = {}
     root_ids: list[int] = []
     async with async_session_maker.begin() as session:
         for root in body.tags:
@@ -279,6 +314,7 @@ async def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
                 node=root,
                 visiting=visiting,
                 touched=touched,
+                resolved_by_name=resolved_by_name,
             )
             root_ids.append(tag.id)
         await _check_no_cycles(touched_root_ids=root_ids, session=session)
