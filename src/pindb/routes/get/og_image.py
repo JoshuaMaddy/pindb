@@ -127,24 +127,31 @@ async def _sample_user_pin_thumbnails(
     session: AsyncSession, user_id: int, entity_type: str
 ) -> list[bytes]:
     """Sample up to eight random pins from a user's collection, wants, or trades."""
+    # Postgres rejects ORDER BY random() on SELECT DISTINCT unless the sort
+    # expressions appear in the select list; shuffle outside DISTINCT via subquery.
     if entity_type == "user_wants":
-        query = (
+        distinct_guids = (
             select(Pin.front_image_guid)
             .join(UserWantedPin, Pin.id == UserWantedPin.pin_id)
             .where(UserWantedPin.user_id == user_id)
             .distinct()
-            .order_by(func.random())
-            .limit(_USER_PIN_SAMPLE_SIZE)
         )
     else:
-        base = (
+        distinct_guids = (
             select(Pin.front_image_guid)
             .join(UserOwnedPin, Pin.id == UserOwnedPin.pin_id)
             .where(UserOwnedPin.user_id == user_id)
         )
         if entity_type == "user_trades":
-            base = base.where(UserOwnedPin.tradeable_quantity > 0)
-        query = base.distinct().order_by(func.random()).limit(_USER_PIN_SAMPLE_SIZE)
+            distinct_guids = distinct_guids.where(UserOwnedPin.tradeable_quantity > 0)
+        distinct_guids = distinct_guids.distinct()
+
+    sq = distinct_guids.subquery()
+    query = (
+        select(sq.c.front_image_guid)
+        .order_by(func.random())
+        .limit(_USER_PIN_SAMPLE_SIZE)
+    )
 
     rows: Sequence[Row[tuple[UUID]]] = (await session.execute(query)).all()
 
