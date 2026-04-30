@@ -5,6 +5,8 @@ Generates a 1200x630 Open Graph WebP for:
 
 * **tag / shop / artist / pin_set** — composed on ``opengraph-image-blank.webp``
   with the entity name and up to four random pin thumbnails.
+* **user lists** (collection / wants / trades) — eight thumbnails in two rows on a
+  flat panel background; slot compositing matches entity cards.
 * **pin** — front image scaled with ``contain`` on the site ``bg-darker`` shell
   color (same 1200x630 aspect as other share cards).
 
@@ -210,8 +212,7 @@ async def get_og_image(entity_type: str, id: int) -> Response:
 
     if entity_type in ("user_collection", "user_wants", "user_trades"):
         async with async_session_maker() as session:
-            user = await session.get(User, id)
-            if user is None:
+            if await session.get(User, id) is None:
                 raise HTTPException(status_code=404, detail="Entity not found")
             pin_images = await _sample_user_pin_thumbnails(session, id, entity_type)
         webp_bytes = build_user_list_og_image(pin_image_bytes=pin_images)

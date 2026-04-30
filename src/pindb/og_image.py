@@ -3,7 +3,11 @@
 **Entity** (tag / shop / artist / pin_set) cards are a 1200x630 WebP composed on
 ``static/media/opengraph-image-blank.webp`` (includes the "PinDB" wordmark):
 the entity name in Roboto Bold below the wordmark, and up to four square pin
-thumbnails along the bottom. Empty slots use ``#1E1E2E``.
+thumbnails along the bottom.
+
+**User list** (collection / wants / trades) cards use the same thumbnail slot
+compositing — rounded squares on a ``#1E1E2E`` canvas with eight slots in two
+rows — so empty slots and transparent pin art match entity cards.
 
 **Pin** cards use the same canvas size with the site ``bg-darker`` fill and the
 front image ``contain``-fitted and centered.
@@ -44,9 +48,7 @@ _SQUARE_X_POSITIONS: tuple[int, int, int, int] = (30, 326, 622, 918)
 # ~20% of the square's width.
 _SQUARE_CORNER_RADIUS: int = 50
 
-# User list OG cards: 2×4 grid of thumbnails, no text, plain dark background.
-# Same square size and x-positions as entity cards; two rows fit in 630px with
-# 30px outer margin (top/bottom) and 66px gap between rows.
+# User list OG: 2×4 grid; same square size and x-positions as entity row.
 _USER_GRID_ROW_Y: tuple[int, int] = (30, 348)  # 30 + 252 + 66 = 348; 348+252+30=630
 
 # The "PinDB" wordmark on the base ends near y=156; leave a small gap, then
@@ -146,19 +148,30 @@ def _empty_square(size: int) -> Image.Image:
 def _paste_square(canvas: Image.Image, square: Image.Image, x: int, y: int) -> None:
     """Stamp *square* onto *canvas* with rounded-corner alpha clipping.
 
-    When *square* has an alpha channel, paint the dark empty-panel fill
-    underneath first so transparent regions of the pin show that fill rather
-    than the wordmark band bleeding through.
+    Always paints the dark empty-panel fill (``#1E1E2E``) into the slot first so
+    transparent pin regions and the curved slot corners never show the canvas
+    beneath (wordmark on entity cards, or arbitrary OG backgrounds).
     """
     rounded = _square_mask_cached(square.width, _SQUARE_CORNER_RADIUS)
+    panel = _empty_square(square.width)
+    canvas.paste(panel, (x, y), rounded)
     if square.mode == "RGBA":
-        background = _empty_square(square.width)
-        canvas.paste(background, (x, y), rounded)
         alpha = square.split()[3]
         combined = ImageChops.multiply(alpha, rounded)
         canvas.paste(square.convert("RGB"), (x, y), combined)
         return
     canvas.paste(square, (x, y), rounded)
+
+
+def _pin_square_from_bytes(pin_image_bytes: bytes | None) -> Image.Image:
+    """Decode pin thumbnail bytes to a square tile, or an empty panel tile."""
+    if not pin_image_bytes:
+        return _empty_square(_SQUARE_SIZE)
+    try:
+        with Image.open(io.BytesIO(pin_image_bytes)) as src:
+            return _cover_fit(src, _SQUARE_SIZE)
+    except (OSError, ValueError):
+        return _empty_square(_SQUARE_SIZE)
 
 
 def _contain_fit_within(image: Image.Image, max_w: int, max_h: int) -> Image.Image:
@@ -217,6 +230,9 @@ def build_pin_og_image(pin_image_bytes: bytes) -> bytes:
 def build_user_list_og_image(pin_image_bytes: Sequence[bytes]) -> bytes:
     """Render a 2×4 thumbnail grid OG card for user pin list pages.
 
+    Uses the same rounded-slot compositing as ``build_entity_og_image`` (panel
+    fill under transparent art).
+
     Args:
         pin_image_bytes: Raw bytes for up to eight representative pin images.
             Extras are ignored; missing slots are filled with ``#1E1E2E``.
@@ -230,14 +246,8 @@ def build_user_list_og_image(pin_image_bytes: Sequence[bytes]) -> bytes:
     slot = 0
     for y in _USER_GRID_ROW_Y:
         for x in _SQUARE_X_POSITIONS:
-            if slot < len(pin_image_bytes):
-                try:
-                    with Image.open(io.BytesIO(pin_image_bytes[slot])) as src:
-                        square = _cover_fit(src, _SQUARE_SIZE)
-                except (OSError, ValueError):
-                    square = _empty_square(_SQUARE_SIZE)
-            else:
-                square = _empty_square(_SQUARE_SIZE)
+            raw = pin_image_bytes[slot] if slot < len(pin_image_bytes) else None
+            square = _pin_square_from_bytes(raw)
             _paste_square(canvas, square, x, y)
             slot += 1
 
@@ -262,14 +272,8 @@ def build_entity_og_image(name: str, pin_image_bytes: Sequence[bytes]) -> bytes:
     _draw_title(canvas, name)
 
     for slot_index, x in enumerate(_SQUARE_X_POSITIONS):
-        if slot_index < len(pin_image_bytes):
-            try:
-                with Image.open(io.BytesIO(pin_image_bytes[slot_index])) as src:
-                    square = _cover_fit(src, _SQUARE_SIZE)
-            except (OSError, ValueError):
-                square = _empty_square(_SQUARE_SIZE)
-        else:
-            square = _empty_square(_SQUARE_SIZE)
+        raw = pin_image_bytes[slot_index] if slot_index < len(pin_image_bytes) else None
+        square = _pin_square_from_bytes(raw)
         _paste_square(canvas, square, x, _SQUARE_Y)
 
     buffer = io.BytesIO()
