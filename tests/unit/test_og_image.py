@@ -13,7 +13,7 @@ import io
 
 from PIL import Image, ImageDraw
 
-from pindb.og_image import build_entity_og_image
+from pindb.og_image import build_entity_og_image, build_pin_og_image
 
 
 def _solid_pin(color: tuple[int, int, int]) -> bytes:
@@ -104,3 +104,54 @@ def test_transparent_pin_composites_over_dark_panel() -> None:
     assert isinstance(center_pixel, tuple) and len(center_pixel) >= 3
     r, g, b = center_pixel[0], center_pixel[1], center_pixel[2]
     assert abs(r - 250) < 15 and g < 30 and b < 30
+
+
+def _pin_og_bg_rgb() -> tuple[int, int, int]:
+    """``bg-darker`` / ``--color-pin-base-550`` (see ``og_image._PIN_OG_BACKGROUND``)."""
+    return (18, 18, 28)
+
+
+def test_pin_og_is_1200x630() -> None:
+    out = build_pin_og_image(_solid_pin((100, 150, 200)))
+    image = _decode(out)
+    assert image.size == (1200, 630)
+
+
+def test_pin_og_wide_image_has_vertical_letterboxing() -> None:
+    """A wide strip is scaled to full width; top/bottom show the shell background."""
+    img = Image.new("RGB", (1200, 200), (200, 50, 50))
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP")
+    out = build_pin_og_image(buf.getvalue())
+    image = _decode(out)
+    bg = _pin_og_bg_rgb()
+    top_mid = image.getpixel((600, 8))
+    assert isinstance(top_mid, tuple) and len(top_mid) >= 3
+    tr, tg, tb = top_mid[0], top_mid[1], top_mid[2]
+    assert all(abs(c - bg[i]) <= 8 for i, c in enumerate((tr, tg, tb))), top_mid
+
+
+def test_pin_og_tall_image_has_horizontal_pillarboxing() -> None:
+    """A tall strip is scaled to full height; sides show the shell background."""
+    img = Image.new("RGB", (200, 900), (50, 200, 50))
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP")
+    out = build_pin_og_image(buf.getvalue())
+    image = _decode(out)
+    bg = _pin_og_bg_rgb()
+    left_mid = image.getpixel((8, 315))
+    assert isinstance(left_mid, tuple) and len(left_mid) >= 3
+    lr, lg, lb = left_mid[0], left_mid[1], left_mid[2]
+    assert all(abs(c - bg[i]) <= 8 for i, c in enumerate((lr, lg, lb))), left_mid
+
+
+def test_pin_og_invalid_bytes_is_flat_background() -> None:
+    out = build_pin_og_image(b"not-an-image")
+    image = _decode(out)
+    assert image.size == (1200, 630)
+    px = image.getpixel((10, 10))
+    assert isinstance(px, tuple) and len(px) >= 3
+    er, eg, eb = _pin_og_bg_rgb()
+    r, g, b = px[0], px[1], px[2]
+    # Output is lossy WebP even for a flat field; stay near the shell RGB.
+    assert abs(r - er) <= 5 and abs(g - eg) <= 5 and abs(b - eb) <= 5

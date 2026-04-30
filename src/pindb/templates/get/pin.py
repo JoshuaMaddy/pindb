@@ -70,7 +70,9 @@ def pin_page(
             title=f"Pin: {pin.name}",
             description=_pin_share_description(pin),
             canonical_url=canonical_url,
-            image_url=str(request.url_for("get_image", guid=pin.front_image_guid)),
+            image_url=str(
+                request.url_for("get_og_image", entity_type="pin", id=pin.id)
+            ),
             og_type="article",
         ),
         body_content=fragment[

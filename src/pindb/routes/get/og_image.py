@@ -1,15 +1,16 @@
 """
 FastAPI routes: `routes/get/og_image.py`.
 
-Generates a 1200x630 Open Graph card for ``tag`` / ``shop`` / ``artist`` /
-``pin_set`` pages. The card is composed at request time on top of the prebuilt
-``opengraph-image-blank.webp`` base, with the entity name and up to four
-randomly-sampled pin thumbnails. Pin pages don't use this route — they expose
-the pin's own front image directly via ``/get/image/{guid}``.
+Generates a 1200x630 Open Graph WebP for:
 
-Cached for one hour: the random pin sample is allowed to drift over time, but
-short-lived caching keeps social-media scrapers from hammering the renderer
-between previews.
+* **tag / shop / artist / pin_set** — composed on ``opengraph-image-blank.webp``
+  with the entity name and up to four random pin thumbnails.
+* **pin** — front image scaled with ``contain`` on the site ``bg-darker`` shell
+  color (same 1200x630 aspect as other share cards).
+
+Cached for one hour: the random pin sample on entity cards is allowed to drift
+over time; short-lived caching keeps social-media scrapers from hammering the
+renderer between previews.
 """
 
 from typing import Sequence
@@ -42,7 +43,7 @@ from pindb.file_handler import (
     load_image,
     thumbnail_storage_key,
 )
-from pindb.og_image import build_entity_og_image
+from pindb.og_image import build_entity_og_image, build_pin_og_image
 
 router = APIRouter()
 
@@ -50,6 +51,9 @@ router = APIRouter()
 # the OG card. Must be one of THUMBNAIL_SIZES.
 _PIN_THUMB_WIDTH: int = 400
 assert _PIN_THUMB_WIDTH in THUMBNAIL_SIZES
+# Pin share cards use a larger thumb before downscaling to 1200x630.
+_PIN_OG_SOURCE_WIDTH: int = 600
+assert _PIN_OG_SOURCE_WIDTH in THUMBNAIL_SIZES
 
 _OG_CACHE_CONTROL: str = "public, max-age=3600"
 _PIN_SAMPLE_SIZE: int = 4
@@ -111,6 +115,20 @@ async def _sample_pin_thumbnails(
     return images
 
 
+def _load_pin_image_bytes(guid: UUID) -> bytes | None:
+    """Load front-image bytes for OG rendering (thumbnail preferred, then original)."""
+    guid_str = str(guid)
+    ensure_sized_thumbnail_on_disk(guid_str, _PIN_OG_SOURCE_WIDTH)
+    key = thumbnail_storage_key(guid_str, _PIN_OG_SOURCE_WIDTH)
+    path = image_file_path(key)
+    if path is not None:
+        return path.read_bytes()
+    data = load_image(key)
+    if data is not None:
+        return data
+    return load_image(guid_str)
+
+
 @router.get(
     path="/og-image/{entity_type}/{id}",
     response_model=None,
@@ -118,6 +136,21 @@ async def _sample_pin_thumbnails(
 )
 async def get_og_image(entity_type: str, id: int) -> Response:
     """Return a 1200x630 WebP OG card for the requested entity."""
+    if entity_type == "pin":
+        async with async_session_maker() as session:
+            pin = await session.get(Pin, id)
+            if pin is None:
+                raise HTTPException(status_code=404, detail="Entity not found")
+            raw = _load_pin_image_bytes(pin.front_image_guid)
+        if raw is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+        webp_bytes = build_pin_og_image(raw)
+        return Response(
+            content=webp_bytes,
+            media_type="image/webp",
+            headers={"Cache-Control": _OG_CACHE_CONTROL},
+        )
+
     if entity_type not in ("tag", "shop", "artist", "pin_set"):
         raise HTTPException(status_code=404, detail="Unsupported entity type")
 

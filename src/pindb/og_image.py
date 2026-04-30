@@ -1,10 +1,12 @@
-"""Open Graph / Twitter card image generator for entity pages.
+"""Open Graph / Twitter card image generator for entity and pin pages.
 
-Renders a 1200x630 WebP composed on top of ``static/media/opengraph-image-blank.webp``
-(which already contains the "PinDB" wordmark): the entity name in white Roboto
-Bold below the wordmark, and up to four square pin thumbnails along the bottom.
-Empty slots are filled with ``#1E1E2E`` so layout stays balanced when an entity
-has fewer than four pins.
+**Entity** (tag / shop / artist / pin_set) cards are a 1200x630 WebP composed on
+``static/media/opengraph-image-blank.webp`` (includes the "PinDB" wordmark):
+the entity name in Roboto Bold below the wordmark, and up to four square pin
+thumbnails along the bottom. Empty slots use ``#1E1E2E``.
+
+**Pin** cards use the same canvas size with the site ``bg-darker`` fill and the
+front image ``contain``-fitted and centered.
 
 Both the blank base and the Roboto Bold TTF live under tracked paths in
 ``static/`` (``static/media/`` and ``static/fonts/``). They sit inside
@@ -31,6 +33,8 @@ _FONT_PATH: Path = _STATIC_DIR / "fonts" / "Roboto-Bold.ttf"
 _IMAGE_SIZE: tuple[int, int] = (1200, 630)
 # Catppuccin mocha "base" — also the requested fallback for empty pin slots.
 _EMPTY_SQUARE_FILL: tuple[int, int, int] = (0x1E, 0x1E, 0x2E)
+# ``bg-darker`` / ``--color-pin-base-550`` from ``static/input.css`` (mocha default).
+_PIN_OG_BACKGROUND: tuple[int, int, int] = (18, 18, 28)
 # Catppuccin mocha "text" — softer than pure white, matches the rest of the UI.
 _TITLE_TEXT_FILL: tuple[int, int, int] = (0xCD, 0xD6, 0xF4)
 
@@ -150,6 +154,59 @@ def _paste_square(canvas: Image.Image, square: Image.Image, x: int, y: int) -> N
         canvas.paste(square.convert("RGB"), (x, y), combined)
         return
     canvas.paste(square, (x, y), rounded)
+
+
+def _contain_fit_within(image: Image.Image, max_w: int, max_h: int) -> Image.Image:
+    """Resize *image* so it fits entirely inside ``max_w`` x ``max_h`` (object-fit: contain).
+
+    Preserves alpha when present. Does not mutate the source.
+    """
+    has_alpha = image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info
+    src = image.convert("RGBA" if has_alpha else "RGB")
+    src_w, src_h = src.size
+    if src_w <= 0 or src_h <= 0:
+        return src
+    scale = min(max_w / src_w, max_h / src_h)
+    new_w = max(1, int(round(src_w * scale)))
+    new_h = max(1, int(round(src_h * scale)))
+    return src.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+
+def build_pin_og_image(pin_image_bytes: bytes) -> bytes:
+    """Render a 1200x630 share image: pin art contain-fit on the app shell background.
+
+    The background matches the default theme ``bg-darker`` surface (purple-gray).
+    The pin is scaled with ``contain`` semantics inside the full OG rectangle
+    (standard 1.91:1 bounds) and centered.
+
+    Args:
+        pin_image_bytes: Raw bytes for the pin's front image (any supported format).
+
+    Returns:
+        Encoded WebP bytes (1200x630, sRGB). On decode failure, a flat background
+        image is returned so callers can still emit a valid response.
+    """
+    w, h = _IMAGE_SIZE
+    canvas = Image.new("RGB", (w, h), _PIN_OG_BACKGROUND)
+    try:
+        with Image.open(io.BytesIO(pin_image_bytes)) as src:
+            fitted = _contain_fit_within(src, w, h)
+    except (OSError, ValueError):
+        buffer = io.BytesIO()
+        canvas.save(buffer, format="WEBP", quality=85, method=4)
+        return buffer.getvalue()
+
+    fw, fh = fitted.size
+    x0 = (w - fw) // 2
+    y0 = (h - fh) // 2
+    if fitted.mode == "RGBA":
+        canvas.paste(fitted, (x0, y0), fitted)
+    else:
+        canvas.paste(fitted, (x0, y0))
+
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="WEBP", quality=85, method=4)
+    return buffer.getvalue()
 
 
 def build_entity_og_image(name: str, pin_image_bytes: Sequence[bytes]) -> bytes:

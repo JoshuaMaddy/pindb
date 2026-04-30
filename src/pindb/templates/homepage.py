@@ -83,9 +83,9 @@ def _homepage_center(request: Request, pin_count: int) -> Element:
     return div(id="homepage-center")[
         div(id="homepage-card")[
             h1(class_="text-center text-accent")["PinDB"],
-            h2(class_="text-center")["A database for all things pins."],
-            p(class_="text-center mt-1 text-lightest-hover")[
-                f"{pin_count:,} pins and counting!"
+            div[
+                h2(class_="text-center")["A database for all things pins."],
+                p(class_="text-center")[f"{pin_count:,} pins and counting!"],
             ],
             form(
                 id="homepage-search",

@@ -4,16 +4,15 @@ All entity types render the same five OG properties (``title``, ``description``,
 ``url``, ``image``, ``type``), an optional ``site_name``, and a Twitter
 ``summary_large_image`` card with the same image. Pin pages pass the pin's own
 front image; tag/shop/artist/pin_set pages pass the dynamically composed
-``/get/og-image/{type}/{id}`` URL.
+``/get/og-image/{type}/{id}`` URL (``pin`` uses the pin's primary key).
 """
 
 from __future__ import annotations
 
 from htpy import Fragment, fragment, link, meta
 
-# Generated cards are always 1200x630 WebP. For tag/shop/artist/pin_set pages
-# the route emits exactly that; for pin pages the front image may be any size,
-# but the dimensions hint is still useful to most scrapers.
+# Generated cards are always 1200x630 WebP. Tag/shop/artist/pin_set/pin OG
+# routes emit exactly that size for consistent scraper hints.
 _OG_IMAGE_WIDTH: str = "1200"
 _OG_IMAGE_HEIGHT: str = "630"
 
