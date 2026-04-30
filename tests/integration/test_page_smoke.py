@@ -17,6 +17,7 @@ from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PinSetFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 
 class SmokeEntity(Protocol):
@@ -45,11 +46,12 @@ class TestPublicPageSmoke:
 
         assert response.status_code == 200
 
-    def test_user_profile_page_returns_200(self, anon_client, test_user):
-        response = anon_client.get(f"/user/{test_user.username}")
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_user_profile_page_returns_200(self, anon_client, subject_user):
+        response = anon_client.get(f"/user/{subject_user.username}")
 
         assert response.status_code == 200
-        assert test_user.username in response.text
+        assert subject_user.username in response.text
 
     @pytest.mark.parametrize(
         ("entity_key", "path_for_entity", "expected_text"),

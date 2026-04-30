@@ -12,6 +12,7 @@ from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PersonalPinSetFactory, PinSetFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 NormalizedEntity: TypeAlias = Artist | Pin | PinSet | Shop | Tag
 
@@ -28,8 +29,9 @@ def _assert_normalized_name(
 
 @pytest.mark.integration
 class TestGeneratedNormalizedName:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_all_supported_entities_generate_normalized_name(
-        self, db_session, admin_user, test_user
+        self, db_session, admin_user, subject_user
     ):
         entities = [
             cast(
@@ -50,9 +52,9 @@ class TestGeneratedNormalizedName:
                 NormalizedEntity,
                 PersonalPinSetFactory(
                     name="Fancy Personal Set",
-                    owner_id=test_user.id,
+                    owner_id=subject_user.id,
                     approved=True,
-                    created_by=test_user,
+                    created_by=subject_user,
                 ),
             ),
             cast(
@@ -152,14 +154,15 @@ class TestCreateNameCheck:
         assert response.status_code == 200
         assert response.text == ""
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_global_pin_set_scope_ignores_personal_sets(
-        self, admin_client, admin_user, test_user
+        self, admin_client, admin_user, subject_user
     ):
         PersonalPinSetFactory(
             name="Shared Set",
-            owner_id=test_user.id,
+            owner_id=subject_user.id,
             approved=True,
-            created_by=test_user,
+            created_by=subject_user,
         )
 
         response = admin_client.get(
@@ -173,8 +176,14 @@ class TestCreateNameCheck:
 
 @pytest.mark.integration
 class TestPersonalSetNameCheck:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_personal_scope_checks_only_current_user(
-        self, auth_client, db_session, test_user, other_editor_user, admin_user
+        self,
+        auth_client_as_subject,
+        db_session,
+        subject_user,
+        other_editor_user,
+        admin_user,
     ):
         PinSetFactory(name="Current Name", approved=True, created_by=admin_user)
         PersonalPinSetFactory(
@@ -184,7 +193,7 @@ class TestPersonalSetNameCheck:
             created_by=other_editor_user,
         )
 
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             "/user/me/sets/check-name",
             params={"name": "Current Name"},
         )
@@ -193,13 +202,13 @@ class TestPersonalSetNameCheck:
 
         PersonalPinSetFactory(
             name="Current Name",
-            owner_id=test_user.id,
+            owner_id=subject_user.id,
             approved=True,
-            created_by=test_user,
+            created_by=subject_user,
         )
         db_session.expire_all()
 
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             "/user/me/sets/check-name",
             params={"name": "current name"},
         )
@@ -207,18 +216,21 @@ class TestPersonalSetNameCheck:
         assert response.status_code == 200
         assert "current name already exists!" in response.text
 
-    def test_exclude_id_ignores_current_personal_set(self, auth_client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_exclude_id_ignores_current_personal_set(
+        self, auth_client_as_subject, subject_user
+    ):
         pin_set = cast(
             PinSet,
             PersonalPinSetFactory(
                 name="Personal Set",
-                owner_id=test_user.id,
+                owner_id=subject_user.id,
                 approved=True,
-                created_by=test_user,
+                created_by=subject_user,
             ),
         )
 
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             "/user/me/sets/check-name",
             params={"name": "personal set", "exclude_id": pin_set.id},
         )

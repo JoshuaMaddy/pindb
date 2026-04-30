@@ -44,6 +44,11 @@ _SQUARE_X_POSITIONS: tuple[int, int, int, int] = (30, 326, 622, 918)
 # ~20% of the square's width.
 _SQUARE_CORNER_RADIUS: int = 50
 
+# User list OG cards: 2×4 grid of thumbnails, no text, plain dark background.
+# Same square size and x-positions as entity cards; two rows fit in 630px with
+# 30px outer margin (top/bottom) and 66px gap between rows.
+_USER_GRID_ROW_Y: tuple[int, int] = (30, 348)  # 30 + 252 + 66 = 348; 348+252+30=630
+
 # The "PinDB" wordmark on the base ends near y=156; leave a small gap, then
 # vertically center the entity-name text in the band above the squares.
 _TITLE_BAND_TOP: int = 168
@@ -203,6 +208,38 @@ def build_pin_og_image(pin_image_bytes: bytes) -> bytes:
         canvas.paste(fitted, (x0, y0), fitted)
     else:
         canvas.paste(fitted, (x0, y0))
+
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="WEBP", quality=85, method=4)
+    return buffer.getvalue()
+
+
+def build_user_list_og_image(pin_image_bytes: Sequence[bytes]) -> bytes:
+    """Render a 2×4 thumbnail grid OG card for user pin list pages.
+
+    Args:
+        pin_image_bytes: Raw bytes for up to eight representative pin images.
+            Extras are ignored; missing slots are filled with ``#1E1E2E``.
+
+    Returns:
+        Encoded WebP bytes (1200x630, sRGB).
+    """
+    w, h = _IMAGE_SIZE
+    canvas = Image.new("RGB", (w, h), _EMPTY_SQUARE_FILL)
+
+    slot = 0
+    for y in _USER_GRID_ROW_Y:
+        for x in _SQUARE_X_POSITIONS:
+            if slot < len(pin_image_bytes):
+                try:
+                    with Image.open(io.BytesIO(pin_image_bytes[slot])) as src:
+                        square = _cover_fit(src, _SQUARE_SIZE)
+                except (OSError, ValueError):
+                    square = _empty_square(_SQUARE_SIZE)
+            else:
+                square = _empty_square(_SQUARE_SIZE)
+            _paste_square(canvas, square, x, y)
+            slot += 1
 
     buffer = io.BytesIO()
     canvas.save(buffer, format="WEBP", quality=85, method=4)

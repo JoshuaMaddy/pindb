@@ -11,6 +11,7 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
 from pindb.database import PinSet, User, async_session_maker
@@ -152,6 +153,7 @@ async def get_user_profile(
                 await db.scalars(
                     select(PinSet)
                     .where(PinSet.owner_id == user.id)
+                    .options(selectinload(PinSet.pins))
                     .order_by(PinSet.name)
                 )
             ).all()

@@ -13,18 +13,22 @@ from pindb.database.joins import pin_set_memberships
 from pindb.database.pin import Pin
 from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PersonalPinSetFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 user_sets_module = importlib.import_module("pindb.routes.user.sets")
 
 
 @pytest.mark.integration
 class TestUserSetEditAndNameChecks:
-    def test_personal_set_name_check_detects_conflict(self, auth_client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_personal_set_name_check_detects_conflict(
+        self, auth_client_as_subject, subject_user
+    ):
         existing = cast(
             PinSet,
-            PersonalPinSetFactory(owner_id=test_user.id, name="Conflict Name"),
+            PersonalPinSetFactory(owner_id=subject_user.id, name="Conflict Name"),
         )
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             "/user/me/sets/check-name",
             params={
                 "name": "conflict name",
@@ -33,23 +37,26 @@ class TestUserSetEditAndNameChecks:
         )
         assert response.status_code == 200
 
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             "/user/me/sets/check-name",
             params={"name": "Conflict Name"},
         )
         assert response.status_code == 200
         assert "already exists" in response.text.lower()
 
-    def test_set_edit_page_and_update_flow(self, auth_client, db_session, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_set_edit_page_and_update_flow(
+        self, auth_client_as_subject, db_session, subject_user
+    ):
         pin_set = cast(
             PinSet,
-            PersonalPinSetFactory(owner_id=test_user.id, name="Before Set Name"),
+            PersonalPinSetFactory(owner_id=subject_user.id, name="Before Set Name"),
         )
-        response = auth_client.get(f"/user/sets/{pin_set.id}/edit")
+        response = auth_client_as_subject.get(f"/user/sets/{pin_set.id}/edit")
         assert response.status_code == 200
         assert "Before Set Name" in response.text
 
-        update = auth_client.post(
+        update = auth_client_as_subject.post(
             f"/user/sets/{pin_set.id}/edit",
             data={"name": "After Set Name", "description": "updated"},
             follow_redirects=False,
@@ -65,12 +72,13 @@ class TestUserSetEditAndNameChecks:
 
 @pytest.mark.integration
 class TestUserSetHtmxMembershipBranches:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_add_pin_hx_search_row_branch(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
-        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=test_user.id))
+        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=subject_user.id))
         pin = cast(Pin, PinFactory(approved=True, created_by=admin_user))
-        response = auth_client.post(
+        response = auth_client_as_subject.post(
             f"/user/sets/{pin_set.id}/pins/{pin.id}",
             headers={"HX-Request": "true", "HX-Target": f"search-row-{pin.id}"},
         )
@@ -85,10 +93,11 @@ class TestUserSetHtmxMembershipBranches:
         ).first()
         assert exists is not None
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_remove_pin_hx_pin_row_branch(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
-        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=test_user.id))
+        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=subject_user.id))
         pin = cast(Pin, PinFactory(approved=True, created_by=admin_user))
         db_session.execute(
             pin_set_memberships.insert().values(
@@ -99,7 +108,7 @@ class TestUserSetHtmxMembershipBranches:
         )
         db_session.flush()
 
-        response = auth_client.request(
+        response = auth_client_as_subject.request(
             method="DELETE",
             url=f"/user/sets/{pin_set.id}/pins/{pin.id}",
             headers={"HX-Request": "true", "HX-Target": f"pin-row-{pin.id}"},
@@ -107,10 +116,11 @@ class TestUserSetHtmxMembershipBranches:
         assert response.status_code == 200
         assert "hx-swap-oob" in response.text
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_search_pins_for_set_route_uses_search_results(
-        self, auth_client, monkeypatch, test_user, admin_user
+        self, auth_client_as_subject, monkeypatch, subject_user, admin_user
     ):
-        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=test_user.id))
+        pin_set = cast(PinSet, PersonalPinSetFactory(owner_id=subject_user.id))
         result_pin = cast(
             Pin,
             PinFactory(name="Search Candidate", approved=True, created_by=admin_user),
@@ -122,7 +132,7 @@ class TestUserSetHtmxMembershipBranches:
             return [result_pin]
 
         monkeypatch.setattr(user_sets_module, "search_pin", fake_search_pin)
-        response = auth_client.get(
+        response = auth_client_as_subject.get(
             f"/user/sets/{pin_set.id}/pin-search",
             params={"q": "search candidate"},
         )

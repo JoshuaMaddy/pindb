@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from pindb.auth import verify_password
 from pindb.database.user import User
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 STRONG = "Correct-Horse-Battery-42!"
 ALSO_STRONG = "Velvet-Orbit-Maple-91!"
@@ -41,8 +42,9 @@ class TestSignupPolicy:
 
 @pytest.mark.integration
 class TestChangePassword:
-    def test_happy_path(self, auth_client, test_user, db_session):
-        response = auth_client.post(
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_happy_path(self, auth_client_as_subject, subject_user, db_session):
+        response = auth_client_as_subject.post(
             "/user/me/password",
             data={
                 "current_password": "testpassword",
@@ -54,13 +56,16 @@ class TestChangePassword:
         assert response.status_code == 303
 
         db_session.expire_all()
-        user = db_session.scalars(select(User).where(User.id == test_user.id)).first()
+        user = db_session.scalars(
+            select(User).where(User.id == subject_user.id)
+        ).first()
         assert user is not None
         assert user.hashed_password is not None
         assert verify_password(ALSO_STRONG, user.hashed_password)
 
-    def test_wrong_current_password(self, auth_client):
-        response = auth_client.post(
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_wrong_current_password(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post(
             "/user/me/password",
             data={
                 "current_password": "wrong-current",
@@ -71,8 +76,9 @@ class TestChangePassword:
         assert response.status_code == 400
         assert "current password" in response.text.lower()
 
-    def test_weak_new_password(self, auth_client):
-        response = auth_client.post(
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_weak_new_password(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post(
             "/user/me/password",
             data={
                 "current_password": "testpassword",
@@ -83,8 +89,9 @@ class TestChangePassword:
         assert response.status_code == 400
         assert "password" in response.text.lower()
 
-    def test_mismatched_confirmation(self, auth_client):
-        response = auth_client.post(
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_mismatched_confirmation(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post(
             "/user/me/password",
             data={
                 "current_password": "testpassword",

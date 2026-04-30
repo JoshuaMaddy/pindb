@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 
 def _patch_google(monkeypatch, userinfo: dict[str, Any]) -> None:
@@ -29,29 +30,36 @@ def _patch_google(monkeypatch, userinfo: dict[str, Any]) -> None:
 
 @pytest.mark.integration
 class TestLinkProvider:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_link_flow_attaches_provider(
-        self, auth_client, test_user, db_session, monkeypatch
+        self, auth_client_as_subject, subject_user, db_session, monkeypatch
     ):
         _patch_google(
             monkeypatch,
             {
                 "sub": "google-link-me",
-                "email": "test@example.com",
+                "email": subject_user.email,
                 "email_verified": True,
                 "name": "Tester",
             },
         )
 
         # Step 1: hit /auth/google?link=1 which sets the link-intent cookie.
-        start = auth_client.get("/auth/google?link=1", follow_redirects=False)
+        start = auth_client_as_subject.get(
+            "/auth/google?link=1", follow_redirects=False
+        )
         assert start.status_code == 303
         assert "pindb_oauth_link" in start.cookies
 
         # Step 2: callback — because we're logged in and link intent is set,
-        # the provider should be attached to test_user and we're sent to
+        # the provider should be attached to the logged-in subject user and we're sent to
         # /user/me/security, NOT logged out as a different user.
-        auth_client.cookies.set("pindb_oauth_link", start.cookies["pindb_oauth_link"])
-        callback = auth_client.get("/auth/google/callback", follow_redirects=False)
+        auth_client_as_subject.cookies.set(
+            "pindb_oauth_link", start.cookies["pindb_oauth_link"]
+        )
+        callback = auth_client_as_subject.get(
+            "/auth/google/callback", follow_redirects=False
+        )
         assert callback.status_code == 303
         assert callback.headers["location"] == "/user/me/security"
 
@@ -62,17 +70,18 @@ class TestLinkProvider:
             )
         ).first()
         assert link is not None
-        assert link.user_id == test_user.id
+        assert link.user_id == subject_user.id
 
 
 @pytest.mark.integration
 class TestUnlinkProvider:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_unlink_succeeds_when_password_set(
-        self, auth_client, test_user, db_session
+        self, auth_client_as_subject, subject_user, db_session
     ):
         db_session.add(
             UserAuthProvider(
-                user_id=test_user.id,
+                user_id=subject_user.id,
                 provider=OAuthProvider.discord,
                 provider_user_id="discord-1",
                 provider_email="x@x.test",
@@ -81,12 +90,14 @@ class TestUnlinkProvider:
         )
         db_session.flush()
 
-        response = auth_client.post("/user/me/unlink/discord", follow_redirects=False)
+        response = auth_client_as_subject.post(
+            "/user/me/unlink/discord", follow_redirects=False
+        )
         assert response.status_code == 303
 
         remaining = db_session.scalars(
             select(UserAuthProvider).where(
-                UserAuthProvider.user_id == test_user.id,
+                UserAuthProvider.user_id == subject_user.id,
                 UserAuthProvider.provider == OAuthProvider.discord,
             )
         ).first()

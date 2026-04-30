@@ -15,6 +15,7 @@ from sqlalchemy import select
 from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.database import Shop
 from tests.factories.shop import ShopFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 
 @pytest.fixture
@@ -71,10 +72,11 @@ class TestSoftDeleteFilter:
         assert "Rejected Shop" not in names
         assert "Deleted Shop" not in names
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_regular_user_hides_pending(
-        self, db_session, test_user, approved_shop, pending_shop
+        self, db_session, subject_user, approved_shop, pending_shop
     ):
-        set_audit_user(test_user.id)
+        set_audit_user(subject_user.id)
         set_audit_user_flags(is_admin=False, is_editor=False)
 
         names = _names(db_session)

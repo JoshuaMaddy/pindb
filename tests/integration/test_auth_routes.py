@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from pindb.database.user import User
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 STRONG_PASSWORD = "Correct-Horse-Battery-42!"
 
@@ -72,12 +73,13 @@ class TestPostSignup:
         assert response.status_code == 400
         assert "password" in response.text.lower()
 
-    def test_duplicate_username_returns_400(self, client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_duplicate_username_returns_400(self, client, subject_user):
         response = client.post(
             "/auth/signup",
             data={
-                "username": "testuser",  # already exists via test_user fixture
-                "email": "other@example.com",
+                "username": subject_user.username,
+                "email": f"other-{subject_user.username}@example.com",
                 "password": STRONG_PASSWORD,
             },
         )
@@ -85,12 +87,13 @@ class TestPostSignup:
         # Unified message avoids leaking whether username vs email clashed.
         assert "aren" in response.text.lower() and "available" in response.text.lower()
 
-    def test_duplicate_email_returns_400(self, client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_duplicate_email_returns_400(self, client, subject_user):
         response = client.post(
             "/auth/signup",
             data={
-                "username": "brandnewuser",
-                "email": "test@example.com",  # already exists via test_user fixture
+                "username": f"brandnew_{subject_user.username}",
+                "email": subject_user.email,
                 "password": STRONG_PASSWORD,
             },
         )
@@ -100,27 +103,33 @@ class TestPostSignup:
 
 @pytest.mark.integration
 class TestPostLogin:
-    def test_correct_credentials_redirects(self, client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_correct_credentials_redirects(self, client, subject_user):
         response = client.post(
             "/auth/login",
-            data={"username": "testuser", "password": "testpassword"},
+            data={"username": subject_user.username, "password": "testpassword"},
             follow_redirects=False,
         )
         assert response.status_code == 303
         assert response.headers["location"] == "/"
 
-    def test_correct_credentials_sets_cookie(self, client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_correct_credentials_sets_cookie(self, client, subject_user):
         response = client.post(
             "/auth/login",
-            data={"username": "testuser", "password": "testpassword"},
+            data={"username": subject_user.username, "password": "testpassword"},
             follow_redirects=False,
         )
         assert "session" in response.cookies
 
-    def test_wrong_password_returns_401(self, client, test_user):
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_wrong_password_returns_401(self, client, subject_user):
         response = client.post(
             "/auth/login",
-            data={"username": "testuser", "password": "wrongpassword"},
+            data={
+                "username": subject_user.username,
+                "password": "wrongpassword",
+            },
         )
         assert response.status_code == 401
 
@@ -134,12 +143,14 @@ class TestPostLogin:
 
 @pytest.mark.integration
 class TestPostLogout:
-    def test_logout_redirects(self, auth_client):
-        response = auth_client.post("/auth/logout", follow_redirects=False)
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_logout_redirects(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post("/auth/logout", follow_redirects=False)
         assert response.status_code == 303
 
-    def test_logout_clears_session_cookie(self, auth_client):
-        response = auth_client.post("/auth/logout", follow_redirects=False)
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_logout_clears_session_cookie(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post("/auth/logout", follow_redirects=False)
         # The cookie should be deleted (empty value or expired)
         session_cookie = response.cookies.get("session")
         assert session_cookie is None or session_cookie == ""

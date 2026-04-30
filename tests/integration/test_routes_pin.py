@@ -25,6 +25,7 @@ from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PersonalPinSetFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 from tests.integration.helpers.pin_payloads import pin_form_data
 
 
@@ -79,7 +80,7 @@ class TestCreatePinAuthEnforcement:
         assert response.status_code == 401
 
     def test_regular_user_get_returns_403(self, auth_client):
-        """`test_user` is a plain authenticated user — not editor or admin."""
+        """Subject user is a plain authenticated user — not editor or admin."""
         response = auth_client.get("/create/pin")
         assert response.status_code == 403
 
@@ -347,21 +348,22 @@ class TestPinWriteRoutes:
 
 @pytest.mark.integration
 class TestGetPinForAuthenticatedUser:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_get_pin_loads_user_collection_context(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin = cast(
             Pin,
             PinFactory(name="User Context Pin", approved=True, created_by=admin_user),
         )
         pin_id = pin.id
-        personal_set = cast(PinSet, PersonalPinSetFactory(owner_id=test_user.id))
+        personal_set = cast(PinSet, PersonalPinSetFactory(owner_id=subject_user.id))
         db_session.execute(
-            user_favorite_pins.insert().values(user_id=test_user.id, pin_id=pin_id)
+            user_favorite_pins.insert().values(user_id=subject_user.id, pin_id=pin_id)
         )
         db_session.add(
             UserOwnedPin(
-                user_id=test_user.id,
+                user_id=subject_user.id,
                 pin_id=pin_id,
                 grade_id=None,
                 quantity=2,
@@ -369,11 +371,11 @@ class TestGetPinForAuthenticatedUser:
             )
         )
         db_session.add(
-            UserWantedPin(user_id=test_user.id, pin_id=pin_id, grade_id=None)
+            UserWantedPin(user_id=subject_user.id, pin_id=pin_id, grade_id=None)
         )
         db_session.flush()
 
-        response = auth_client.get(f"/get/pin/{pin_id}")
+        response = auth_client_as_subject.get(f"/get/pin/{pin_id}")
         assert response.status_code == 200
         assert "User Context Pin" in response.text
         assert str(personal_set.name) in response.text

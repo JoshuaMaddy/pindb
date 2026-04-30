@@ -21,6 +21,7 @@ from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PinSetFactory
 from tests.factories.shop import ShopFactory
 from tests.factories.tag import TagFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 
 @pytest.mark.integration
@@ -173,11 +174,12 @@ class TestPinGridEagerLoading:
         assert "Set Grid Shop" in response.text
         assert "Set Grid Artist" in response.text
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_user_profile_preview_renders_pin_grid_with_shop_and_artist(
         self,
-        auth_client,
+        auth_client_as_subject,
         db_session,
-        test_user,
+        subject_user,
         admin_user,
     ):
         shop = cast(
@@ -204,13 +206,13 @@ class TestPinGridEagerLoading:
         )
         db_session.execute(
             user_favorite_pins.insert().values(
-                user_id=test_user.id,
+                user_id=subject_user.id,
                 pin_id=pin.id,
             )
         )
         db_session.flush()
 
-        response = auth_client.get(f"/user/{test_user.username}")
+        response = auth_client_as_subject.get(f"/user/{subject_user.username}")
 
         assert response.status_code == 200
         assert "Profile Grid Pin" in response.text

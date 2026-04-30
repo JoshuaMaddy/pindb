@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from pindb.database.joins import user_favorite_pin_sets, user_favorite_pins
 from tests.factories.pin import PinFactory
 from tests.factories.pin_set import PersonalPinSetFactory
+from tests.fixtures.users import SUBJECT_USER_PARAMS
 
 
 def _pin_fav_count(db_session, user_id, pin_id):
@@ -35,38 +36,41 @@ def _set_fav_count(db_session, user_id, set_id):
 
 @pytest.mark.integration
 class TestFavoritePin:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_favorite_then_unfavorite(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin = PinFactory(approved=True, created_by=admin_user)
         pin_id = pin.id  # ty:ignore[unresolved-attribute]
 
-        fav = auth_client.post(f"/user/favorites/pins/{pin_id}")
+        fav = auth_client_as_subject.post(f"/user/favorites/pins/{pin_id}")
         assert fav.status_code in (200, 204)
         db_session.expire_all()
-        assert _pin_fav_count(db_session, test_user.id, pin_id) == 1
+        assert _pin_fav_count(db_session, subject_user.id, pin_id) == 1
 
-        unfav = auth_client.delete(f"/user/favorites/pins/{pin_id}")
+        unfav = auth_client_as_subject.delete(f"/user/favorites/pins/{pin_id}")
         assert unfav.status_code in (200, 204)
         db_session.expire_all()
-        assert _pin_fav_count(db_session, test_user.id, pin_id) == 0
+        assert _pin_fav_count(db_session, subject_user.id, pin_id) == 0
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_favorite_is_idempotent(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin = PinFactory(approved=True, created_by=admin_user)
         pin_id = pin.id  # ty:ignore[unresolved-attribute]
 
-        auth_client.post(f"/user/favorites/pins/{pin_id}")
-        auth_client.post(f"/user/favorites/pins/{pin_id}")
+        auth_client_as_subject.post(f"/user/favorites/pins/{pin_id}")
+        auth_client_as_subject.post(f"/user/favorites/pins/{pin_id}")
         db_session.expire_all()
-        assert _pin_fav_count(db_session, test_user.id, pin_id) == 1
+        assert _pin_fav_count(db_session, subject_user.id, pin_id) == 1
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_unfavorite_missing_is_idempotent(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin = PinFactory(approved=True, created_by=admin_user)
-        response = auth_client.delete(f"/user/favorites/pins/{pin.id}")  # ty:ignore[unresolved-attribute]
+        response = auth_client_as_subject.delete(f"/user/favorites/pins/{pin.id}")  # ty:ignore[unresolved-attribute]
         assert response.status_code in (200, 204)
 
     def test_guest_rejected(self, anon_client):
@@ -76,29 +80,31 @@ class TestFavoritePin:
 
 @pytest.mark.integration
 class TestFavoritePinSet:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_favorite_then_unfavorite_set(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin_set = PersonalPinSetFactory(owner_id=admin_user.id, name="Curated")
         set_id = pin_set.id  # ty:ignore[unresolved-attribute]
 
-        fav = auth_client.post(f"/user/favorites/sets/{set_id}")
+        fav = auth_client_as_subject.post(f"/user/favorites/sets/{set_id}")
         assert fav.status_code in (200, 204, 303)
         db_session.expire_all()
-        assert _set_fav_count(db_session, test_user.id, set_id) == 1
+        assert _set_fav_count(db_session, subject_user.id, set_id) == 1
 
-        unfav = auth_client.delete(f"/user/favorites/sets/{set_id}")
+        unfav = auth_client_as_subject.delete(f"/user/favorites/sets/{set_id}")
         assert unfav.status_code in (200, 204, 303)
         db_session.expire_all()
-        assert _set_fav_count(db_session, test_user.id, set_id) == 0
+        assert _set_fav_count(db_session, subject_user.id, set_id) == 0
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
     def test_favorite_set_is_idempotent(
-        self, auth_client, db_session, test_user, admin_user
+        self, auth_client_as_subject, db_session, subject_user, admin_user
     ):
         pin_set = PersonalPinSetFactory(owner_id=admin_user.id, name="Curated")
         set_id = pin_set.id  # ty:ignore[unresolved-attribute]
 
-        auth_client.post(f"/user/favorites/sets/{set_id}")
-        auth_client.post(f"/user/favorites/sets/{set_id}")
+        auth_client_as_subject.post(f"/user/favorites/sets/{set_id}")
+        auth_client_as_subject.post(f"/user/favorites/sets/{set_id}")
         db_session.expire_all()
-        assert _set_fav_count(db_session, test_user.id, set_id) == 1
+        assert _set_fav_count(db_session, subject_user.id, set_id) == 1
