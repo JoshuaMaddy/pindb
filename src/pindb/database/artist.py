@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
 from sqlalchemy import Computed, ForeignKey, Index, UniqueConstraint
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
-    Session,
     mapped_column,
     object_session,
     relationship,
@@ -114,11 +114,11 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             yield "links", self.links, set()
 
 
-def replace_artist_aliases(
-    artist: Artist, aliases: Iterable[str], session: Session
+async def replace_artist_aliases(
+    artist: Artist, aliases: Iterable[str], session: AsyncSession
 ) -> None:
     """Replace persisted aliases for ``artist`` (see ``replace_tag_aliases``)."""
-    replace_aliases(
+    await replace_aliases(
         owner=artist,
         alias_cls=ArtistAlias,
         raw_aliases=aliases,

@@ -25,7 +25,7 @@ from sqlalchemy.orm import selectinload
 from titlecase import titlecase
 
 from pindb.auth import AdminUser, EditorUser
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_edit_utils import (
     compute_patch,
@@ -66,20 +66,22 @@ _PIN_SELECTINLOADS = (
     selectinload(Pin.links),
     selectinload(Pin.grades),
     selectinload(Pin.currency),
+    selectinload(Pin.variants),
+    selectinload(Pin.unauthorized_copies),
 )
 
 
 @router.get("/from/{source_type}/{source_id}", response_model=None)
-def get_bulk_edit_entity(
+async def get_bulk_edit_entity(
     request: Request,
     source_type: BulkEditSource,
     source_id: int,
     current_user: EditorUser,
 ) -> HTMLResponse:
-    with session_maker() as session:
-        pin_ids = resolve_pin_ids(session, source_type, source_id)
-        source_name = resolve_source_name(session, source_type, source_id)
-        tags: Sequence[Tag] = session.scalars(select(Tag)).all()
+    async with async_session_maker() as session:
+        pin_ids = await resolve_pin_ids(session, source_type, source_id)
+        source_name = await resolve_source_name(session, source_type, source_id)
+        tags: Sequence[Tag] = (await session.scalars(select(Tag))).all()
 
         options_base_url: str = str(
             request.url_for("get_entity_options", entity_type="placeholder")
@@ -109,15 +111,15 @@ def get_bulk_edit_entity(
 
 
 @router.get("/from/search", response_model=None)
-def get_bulk_edit_search(
+async def get_bulk_edit_search(
     request: Request,
     current_user: AdminUser,
     q: str = "",
 ) -> HTMLResponse:
-    with session_maker() as session:
-        pins = search_pin(query=q, session=session) or []
+    async with async_session_maker() as session:
+        pins = await search_pin(query=q, session=session) or []
         pin_count = len(pins)
-        tags: Sequence[Tag] = session.scalars(select(Tag)).all()
+        tags: Sequence[Tag] = (await session.scalars(select(Tag))).all()
 
         options_base_url: str = str(
             request.url_for("get_entity_options", entity_type="placeholder")
@@ -142,7 +144,7 @@ def get_bulk_edit_search(
 
 
 @router.post("/apply", response_model=None)
-def post_bulk_edit_apply(
+async def post_bulk_edit_apply(
     request: Request,
     current_user: EditorUser,
     source_type: BulkEditSource | None = None,
@@ -208,20 +210,24 @@ def post_bulk_edit_apply(
     bulk_id: UUID = uuid4()
     submitted_tags: set[int] = set(tag_ids)
 
-    with session_maker.begin() as session:
+    async with async_session_maker.begin() as session:
         if search_query is not None:
-            pins_found = search_pin(query=search_query, session=session) or []
+            pins_found = await search_pin(query=search_query, session=session) or []
             pin_id_list: list[int] = [pin.id for pin in pins_found]
         else:
             assert source_type is not None and source_id is not None
-            pin_id_list = resolve_pin_ids(session, source_type, source_id)
+            pin_id_list = await resolve_pin_ids(session, source_type, source_id)
 
         if not pin_id_list:
             return RedirectResponse(url=redirect_url, status_code=303)
 
         pins: list[Pin] = list(
-            session.scalars(
-                select(Pin).where(Pin.id.in_(pin_id_list)).options(*_PIN_SELECTINLOADS)
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(pin_id_list))
+                    .options(*_PIN_SELECTINLOADS)
+                )
             ).all()
         )
 
@@ -238,7 +244,7 @@ def post_bulk_edit_apply(
         )
 
         for pin in pins:
-            _apply_to_pin(
+            await _apply_to_pin(
                 session=session,
                 pin=pin,
                 field_updates=field_updates,
@@ -254,7 +260,7 @@ def post_bulk_edit_apply(
     return RedirectResponse(url=redirect_url + f"?bulk={bulk_id}", status_code=303)
 
 
-def _apply_to_pin(
+async def _apply_to_pin(
     *,
     session,
     pin: Pin,
@@ -274,7 +280,7 @@ def _apply_to_pin(
     )
 
     if use_pending_flow:
-        chain = get_edit_chain(session, "pins", pin.id)
+        chain = await get_edit_chain(session, "pins", pin.id)
         old_snapshot = get_effective_snapshot(pin, chain)
         new_snapshot = dict(old_snapshot)
         new_snapshot.update(snapshot_scalar_updates(field_updates))
@@ -283,7 +289,7 @@ def _apply_to_pin(
         patch = compute_patch(old_snapshot, new_snapshot)
         if not patch:
             return
-        head = get_head_edit(session, "pins", pin.id)
+        head = await get_head_edit(session, "pins", pin.id)
         session.add(
             PendingEdit(
                 entity_type="pins",
@@ -299,4 +305,4 @@ def _apply_to_pin(
     # Direct write path (admin or search source).
     apply_bulk_scalars(pin, field_updates)
     if tag_change_requested and new_tag_ids != current_tag_ids:
-        apply_pin_tags(pin.id, new_tag_ids, session)
+        await apply_pin_tags(pin.id, new_tag_ids, session)

@@ -17,9 +17,10 @@ from htpy.starlette import HtpyResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Tag, TagCategory, session_maker
+from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.tag import normalize_tag_name, replace_tag_aliases
 from pindb.log import user_logger
 from pindb.routes.bulk._tag_helpers import (
@@ -74,7 +75,7 @@ class BulkTagResult(BaseModel):
 
 
 @router.get(path="/tag")
-def get_bulk_tag(request: Request) -> HtpyResponse:
+async def get_bulk_tag(request: Request) -> HtpyResponse:
     options_base_url: str = str(
         request.url_for("get_bulk_options", entity_type="placeholder")
     ).removesuffix("/placeholder")
@@ -148,7 +149,7 @@ async def post_bulk_tags(
     # mid-statement). Those stale entries then poison the next row's flush
     # via NULL `change_log.entity_id`. Pre-checking sidesteps the whole mess.
     created_tag_ids: list[int] = []
-    with session_maker.begin() as outer_session:
+    async with async_session_maker.begin() as outer_session:
         name_to_index: dict[str, int] = {
             name: idx for idx, name in enumerate(normalized_names) if name
         }
@@ -171,7 +172,7 @@ async def post_bulk_tags(
             # or rejected). The partial unique index on tags.name only covers
             # `WHERE deleted_at IS NULL`, so a soft-deleted tag with the same
             # name is fine to reuse — that's why we don't pass include_deleted.
-            existing_collision = outer_session.scalar(
+            existing_collision = await outer_session.scalar(
                 select(Tag.id)
                 .where(Tag.name == row_name)
                 .execution_options(include_pending=True)
@@ -190,9 +191,11 @@ async def post_bulk_tags(
                 for impl_name in normalized_impls[index]:
                     sibling_id = in_batch_created.get(name_to_index.get(impl_name, -1))
                     if sibling_id is not None:
-                        implication_tags.add(outer_session.get_one(Tag, sibling_id))
+                        implication_tags.add(
+                            await outer_session.get_one(Tag, sibling_id)
+                        )
                         continue
-                    existing_impl = outer_session.scalar(
+                    existing_impl = await outer_session.scalar(
                         select(Tag)
                         .where(Tag.name == impl_name)
                         .execution_options(include_pending=True)
@@ -200,9 +203,9 @@ async def post_bulk_tags(
                     if existing_impl is None:
                         existing_impl = Tag(name=impl_name)
                         outer_session.add(existing_impl)
-                        outer_session.flush()
+                        await outer_session.flush()
                         existing_impl.bulk_id = bulk_id
-                        outer_session.flush()
+                        await outer_session.flush()
                     implication_tags.add(existing_impl)
 
                 tag = Tag(
@@ -211,11 +214,11 @@ async def post_bulk_tags(
                     category=row.category,
                 )
                 outer_session.add(tag)
-                outer_session.flush()
+                await outer_session.flush()
                 tag.bulk_id = bulk_id
                 tag.implications = implication_tags
-                replace_tag_aliases(tag, row.aliases, outer_session)
-                outer_session.flush()
+                await replace_tag_aliases(tag, row.aliases, outer_session)
+                await outer_session.flush()
 
                 in_batch_created[index] = tag.id
                 created_tag_ids.append(tag.id)
@@ -236,12 +239,16 @@ async def post_bulk_tags(
 
     # ---------- Post-write Meili sync (DB session is now closed) ----------
     if created_tag_ids:
-        with session_maker() as read_session:
-            persisted = read_session.scalars(
-                select(Tag).where(Tag.id.in_(created_tag_ids))
+        async with async_session_maker() as read_session:
+            persisted = (
+                await read_session.scalars(
+                    select(Tag)
+                    .where(Tag.id.in_(created_tag_ids))
+                    .options(selectinload(Tag.aliases))
+                )
             ).all()
             for tag in persisted:
-                update_tag(tag=tag)
+                await update_tag(tag=tag)
 
     created = sum(1 for r in results if r.success)
     failed_count = sum(1 for r in results if not r.success)

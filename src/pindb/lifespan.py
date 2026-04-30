@@ -4,12 +4,12 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from sqlalchemy import select
 
 from pindb.config import CONFIGURATION
-from pindb.database import seed_currencies, session_maker
+from pindb.database import async_engine, async_session_maker, seed_currencies
 from pindb.database.user import User
 from pindb.log import setup_rich_logger
 from pindb.search.update import setup_index, update_all
@@ -17,19 +17,18 @@ from pindb.search.update import setup_index, update_all
 LOGGER = logging.getLogger("pindb.lifespan")
 
 
-def _ensure_admins() -> None:
+async def _ensure_admins() -> None:
     """Promote configured usernames to admin on startup when not already admin."""
     usernames = CONFIGURATION.bootstrap_admin_username_list
     if not usernames:
         return
-    with session_maker.begin() as db:
+    async with async_session_maker.begin() as db:
         for username in usernames:
-            user: User | None = db.scalars(
-                select(User).where(User.username == username)
-            ).first()
+            res = await db.execute(select(User).where(User.username == username))
+            user: User | None = res.scalars().first()
             if user is not None and not user.is_admin:
                 user.is_admin = True
-                LOGGER.info(f"Granted admin to user '{username}'.")
+                LOGGER.info("Granted admin to user '%s'.", username)
 
 
 @asynccontextmanager
@@ -43,17 +42,17 @@ async def lifespan(app: FastAPI):
         None: Control after startup hooks; shuts down the APScheduler on exit.
     """
     setup_rich_logger()
-    seed_currencies()
-    _ensure_admins()
-    setup_index()
-    update_all()
+    await seed_currencies()
+    await _ensure_admins()
+    await setup_index()
+    await update_all()
     # Only the dedicated scheduler container runs the recurring sync to avoid
     # duplicate jobs when multiple web replicas are up during a blue/green swap.
-    scheduler: BackgroundScheduler | None = None
+    scheduler: AsyncIOScheduler | None = None
     if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
-        scheduler = BackgroundScheduler()
+        scheduler = AsyncIOScheduler()
         scheduler.add_job(
-            func=update_all,
+            update_all,
             trigger="interval",
             minutes=CONFIGURATION.search_sync_interval_minutes,
         )
@@ -61,4 +60,6 @@ async def lifespan(app: FastAPI):
 
     yield
     if scheduler is not None:
-        scheduler.shutdown()
+        scheduler.shutdown(wait=True)
+    await CONFIGURATION.aclose_meili()
+    await async_engine.dispose()

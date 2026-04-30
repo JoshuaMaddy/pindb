@@ -301,7 +301,7 @@ class TestBulkEditEntryButtons:
 
 @pytest.mark.integration
 class TestTagMode:
-    def test_replace_overwrites_explicit_tags(
+    async def test_replace_overwrites_explicit_tags(
         self, admin_client, db_session, admin_user
     ):
         artist = ArtistFactory(approved=True, created_by=admin_user)
@@ -311,7 +311,7 @@ class TestTagMode:
         _link_pin_to_artist(db_session, pin.id, artist.id)
         from pindb.database.tag import apply_pin_tags
 
-        apply_pin_tags(pin.id, [old_tag.id], db_session)
+        await apply_pin_tags(pin.id, [old_tag.id], db_session)
         db_session.flush()
 
         response = admin_client.post(
@@ -332,7 +332,7 @@ class TestTagMode:
         tag_names = {t.name for t in refreshed.explicit_tags}
         assert tag_names == {"new-tag"}
 
-    def test_remove_drops_tags_only(self, admin_client, db_session, admin_user):
+    async def test_remove_drops_tags_only(self, admin_client, db_session, admin_user):
         artist = ArtistFactory(approved=True, created_by=admin_user)
         keep_tag = TagFactory(name="keep-tag", created_by=admin_user)
         drop_tag = TagFactory(name="drop-tag", created_by=admin_user)
@@ -340,7 +340,7 @@ class TestTagMode:
         _link_pin_to_artist(db_session, pin.id, artist.id)
         from pindb.database.tag import apply_pin_tags
 
-        apply_pin_tags(pin.id, [keep_tag.id, drop_tag.id], db_session)
+        await apply_pin_tags(pin.id, [keep_tag.id, drop_tag.id], db_session)
         db_session.flush()
 
         response = admin_client.post(

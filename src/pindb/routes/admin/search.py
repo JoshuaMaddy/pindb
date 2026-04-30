@@ -11,6 +11,6 @@ router = APIRouter()
 
 
 @router.post("/search/sync")
-def sync_search_index() -> HTMLResponse:
-    update_all()
+async def sync_search_index() -> HTMLResponse:
+    await update_all()
     return HTMLResponse(content="Search index sync triggered.")

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-import meilisearch
+from meilisearch_python_sdk import AsyncClient
 from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -34,6 +34,18 @@ class Configuration(BaseSettings):
     r2_public_url: str | None = Field(default=None)
 
     @model_validator(mode="after")
+    def _database_sync_default(self) -> "Configuration":
+        if not self.database_connection_sync.strip():
+            u = self.database_connection
+            sync = (
+                u.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
+                if "asyncpg" in u
+                else u
+            )
+            return self.model_copy(update={"database_connection_sync": sync})
+        return self
+
+    @model_validator(mode="after")
     def _check_backend_config(self) -> "Configuration":
         if self.image_backend == "filesystem" and self.image_directory is None:
             raise ValueError("image_directory required when image_backend=filesystem")
@@ -52,8 +64,14 @@ class Configuration(BaseSettings):
                 raise ValueError(f"R2 backend missing config: {', '.join(missing)}")
         return self
 
-    # Postgres
+    # Postgres: async app uses postgresql+asyncpg; sync URL for Alembic/CLI
+    # (psycopg3). If ``database_connection_sync`` is empty, it defaults to
+    # ``database_connection`` with the async driver swapped to psycopg.
     database_connection: str
+    database_connection_sync: str = Field(
+        default="",
+        description="Sync SQLAlchemy URL (postgresql+psycopg). Empty = derive from database_connection.",
+    )
 
     # Meilisearch
     meilisearch_key: str
@@ -61,18 +79,23 @@ class Configuration(BaseSettings):
     meilisearch_index: str = Field(default="pins")
     search_sync_interval_minutes: int = Field(default=5)
 
-    __meili_client: meilisearch.Client | None = None
+    _meili_client: AsyncClient | None = None
 
     @property
-    def meili_client(self) -> meilisearch.Client:
-        """Lazily construct a singleton Meilisearch client for ``meilisearch_url``."""
-        if self.__meili_client is None:
-            self.__meili_client = meilisearch.Client(
+    def meili_client(self) -> AsyncClient:
+        """Lazily construct a singleton Meilisearch ``AsyncClient`` (await I/O)."""
+        if self._meili_client is None:
+            self._meili_client = AsyncClient(
                 url=self.meilisearch_url,
                 api_key=self.meilisearch_key,
             )
+        return self._meili_client
 
-        return self.__meili_client
+    async def aclose_meili(self) -> None:
+        """Close the Meili HTTP client (call from app shutdown)."""
+        if self._meili_client is not None:
+            await self._meili_client.aclose()
+            self._meili_client = None
 
     # Auth
     secret_key: str

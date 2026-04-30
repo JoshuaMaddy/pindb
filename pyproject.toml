@@ -15,7 +15,8 @@ dependencies = [
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
     "markdown-it-py>=4.0.0",
-    "meilisearch>=0.38.0",
+    "meilisearch-python-sdk>=7.0.0",
+    "asyncpg>=0.31.0",
     "nh3>=0.3.4",
     "boto3>=1.38.0",
     "pillow>=12.0.0",
@@ -37,9 +38,11 @@ dev = [
     "ipykernel>=6.30.1",
     "pindb",
     "pytest>=8.4.1",
+    "pytest-asyncio>=1.3.0",
     "pytest-env>=1.1.3",
     "pytest-playwright>=0.5.0",
     "pytest-xdist>=3.8.0",
+    "rich>=15.0.0",
     "testcontainers[postgres]>=4.8.0",
 ]
 
@@ -47,11 +50,14 @@ dev = [
 # e2e tests require Playwright browsers + Docker (Postgres + Meilisearch
 # testcontainers). Skip them locally with `pytest -m "not e2e"` if the host
 # lacks those; CI runs the full suite.
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "-p", "pytest_asyncio"]
 pythonpath = "src"
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 env = [
-    "DATABASE_CONNECTION=postgresql+psycopg://placeholder:placeholder@localhost/placeholder",
+    "DATABASE_CONNECTION=postgresql+asyncpg://placeholder:placeholder@localhost/placeholder",
+    "DATABASE_CONNECTION_SYNC=postgresql+psycopg://placeholder:placeholder@localhost/placeholder",
     "MEILISEARCH_KEY=test-meili-key",
     "MEILISEARCH_URL=http://localhost:7700",
     "SECRET_KEY=test-secret-key-for-pytest-only",

@@ -98,6 +98,7 @@ def _wait_for_http(url: str, timeout: float = 30.0) -> None:
 # `timeout=...` kwargs.
 _DEFAULT_ACTION_TIMEOUT_MS = 5_000
 _DEFAULT_EXPECT_TIMEOUT_MS = 5_000
+_HTTP_TIMEOUT = httpx.Timeout(15.0)
 
 
 def _configure_context_timeouts(context) -> None:
@@ -223,13 +224,15 @@ def live_server(
     pg_url = e2e_pg_container.get_connection_url().replace(
         "postgresql+psycopg2://", "postgresql+psycopg://"
     )
+    async_pg_url = pg_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
     meili_host = e2e_meili_container.get_container_host_ip()
     meili_port = e2e_meili_container.get_exposed_port(7700)
     meili_url = f"http://{meili_host}:{meili_port}"
 
     env = {
         **os.environ,
-        "DATABASE_CONNECTION": pg_url,
+        "DATABASE_CONNECTION": async_pg_url,
+        "DATABASE_CONNECTION_SYNC": pg_url,
         "MEILISEARCH_KEY": "e2e-meili-key",
         "MEILISEARCH_URL": meili_url,
         "MEILISEARCH_INDEX": "pins_e2e",
@@ -258,7 +261,9 @@ def live_server(
     # psycopg access; pytest-env still has the integration placeholder unless
     # we mirror the container URL into the test process.
     prev_db = os.environ.get("DATABASE_CONNECTION")
+    prev_db_sync = os.environ.get("DATABASE_CONNECTION_SYNC")
     os.environ["DATABASE_CONNECTION"] = pg_url
+    os.environ["DATABASE_CONNECTION_SYNC"] = pg_url
     try:
         # Run migrations synchronously first, so the app starts against a ready DB.
         subprocess.run(
@@ -304,6 +309,10 @@ def live_server(
             os.environ.pop("DATABASE_CONNECTION", None)
         else:
             os.environ["DATABASE_CONNECTION"] = prev_db
+        if prev_db_sync is None:
+            os.environ.pop("DATABASE_CONNECTION_SYNC", None)
+        else:
+            os.environ["DATABASE_CONNECTION_SYNC"] = prev_db_sync
 
 
 # ---------------------------------------------------------------------------
@@ -664,7 +673,9 @@ def admin_http_client(
     live_server, _http_setup_users
 ) -> Generator[httpx.Client, None, None]:
     """One logged-in admin httpx client per worker (avoids burning /auth/login rate limits)."""
-    client = httpx.Client(base_url=live_server, follow_redirects=False)
+    client = httpx.Client(
+        base_url=live_server, follow_redirects=False, timeout=_HTTP_TIMEOUT
+    )
     login = client.post(
         "/auth/login",
         data={"username": "e2e_admin_pw", "password": _E2E_ADMIN_PASSWORD},
@@ -686,7 +697,9 @@ def anon_http_client(live_server) -> Generator[httpx.Client, None, None]:
     visibility, page titles, auth guards) that only need the rendered HTML
     and don't exercise client-side scripts.
     """
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
+    with httpx.Client(
+        base_url=live_server, follow_redirects=False, timeout=_HTTP_TIMEOUT
+    ) as client:
         yield client
 
 
@@ -695,7 +708,9 @@ def editor_http_client(
     live_server, _http_setup_users
 ) -> Generator[httpx.Client, None, None]:
     """One logged-in editor httpx client per worker."""
-    client = httpx.Client(base_url=live_server, follow_redirects=False)
+    client = httpx.Client(
+        base_url=live_server, follow_redirects=False, timeout=_HTTP_TIMEOUT
+    )
     login = client.post(
         "/auth/login",
         data={"username": "e2e_editor_pw", "password": _E2E_EDITOR_PASSWORD},

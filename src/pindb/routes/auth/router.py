@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.auth import (
     CurrentUser,
@@ -36,7 +36,7 @@ from pindb.auth import (
     verify_password,
 )
 from pindb.config import CONFIGURATION
-from pindb.database import UserSession, session_maker
+from pindb.database import UserSession, async_session_maker
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import PasswordPolicyError, validate_password
@@ -71,9 +71,9 @@ def _serializer(salt: str) -> URLSafeTimedSerializer:
 # ---------------------------------------------------------------------------
 
 
-def _create_session(user_id: int) -> str:
+async def _create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
-    with session_maker.begin() as db:
+    async with async_session_maker.begin() as db:
         db.add(
             UserSession(
                 token=token,
@@ -91,24 +91,28 @@ def _sanitize_username_hint(hint: str) -> str:
     return cleaned or "user"
 
 
-def _suggest_username(db: Session, hint: str) -> str:
+async def _suggest_username(db: AsyncSession, hint: str) -> str:
     """Suggest a unique username: hint, or hint + 4 random digits if taken.
 
     Picks up to 8 random suffixes before falling back to larger numbers.
     """
     base = _sanitize_username_hint(hint)
-    if not db.scalars(select(User.id).where(User.username == base)).first():
+    if (await db.scalars(select(User.id).where(User.username == base))).first() is None:
         return base
 
     for _ in range(8):
         candidate = f"{base}{_rng.randint(1000, 9999)}"
-        if not db.scalars(select(User.id).where(User.username == candidate)).first():
+        if (
+            await db.scalars(select(User.id).where(User.username == candidate))
+        ).first() is None:
             return candidate
 
     # Fallback: widen the number space.
     for _ in range(16):
         candidate = f"{base}{_rng.randint(10_000, 999_999)}"
-        if not db.scalars(select(User.id).where(User.username == candidate)).first():
+        if (
+            await db.scalars(select(User.id).where(User.username == candidate))
+        ).first() is None:
             return candidate
 
     raise RuntimeError("Unable to find a free username after many attempts")
@@ -174,7 +178,7 @@ def _render_login(
 
 
 @router.get("/signup", response_model=None)
-def get_signup(request: Request) -> HTMLResponse:
+async def get_signup(request: Request) -> HTMLResponse:
     return _render_signup(request)
 
 
@@ -183,7 +187,7 @@ def get_signup(request: Request) -> HTMLResponse:
     response_model=None,
     dependencies=[Depends(rate_limit("10/hour"))],
 )
-def post_signup(
+async def post_signup(
     request: Request,
     username: Annotated[str, Form()],
     email: Annotated[str, Form()],
@@ -201,10 +205,10 @@ def post_signup(
 
     # Unified error for both clashes to prevent user / email enumeration.
     signup_clash = "Those sign-up details aren't available."
-    with session_maker.begin() as db:
-        if db.scalars(select(User).where(User.username == username)).first():
+    async with async_session_maker.begin() as db:
+        if (await db.scalars(select(User).where(User.username == username))).first():
             return _render_signup(request, error=signup_clash, status_code=400)
-        if db.scalars(select(User).where(User.email == email)).first():
+        if (await db.scalars(select(User).where(User.email == email))).first():
             return _render_signup(request, error=signup_clash, status_code=400)
         user = User(
             username=username,
@@ -212,17 +216,17 @@ def post_signup(
             hashed_password=hash_password(password),
         )
         db.add(user)
-        db.flush()
+        await db.flush()
         user_id = user.id
 
-    token: str = _create_session(user_id)
+    token: str = await _create_session(user_id)
     response = RedirectResponse(url="/", status_code=303)
     set_session_cookie(response, token)
     return response
 
 
 @router.get("/login", response_model=None)
-def get_login(
+async def get_login(
     request: Request,
     error: str | None = None,
 ) -> HTMLResponse:
@@ -234,14 +238,14 @@ def get_login(
     response_model=None,
     dependencies=[Depends(rate_limit("10/minute"))],
 )
-def post_login(
+async def post_login(
     request: Request,
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker() as db:
-        user: User | None = db.scalars(
-            select(User).where(User.username == username)
+    async with async_session_maker() as db:
+        user: User | None = (
+            await db.scalars(select(User).where(User.username == username))
         ).first()
 
     if user is None or user.hashed_password is None:
@@ -257,20 +261,20 @@ def post_login(
             request, error="Invalid username or password.", status_code=401
         )
 
-    token: str = _create_session(user.id)
+    token: str = await _create_session(user.id)
     response = RedirectResponse(url="/", status_code=303)
     set_session_cookie(response, token)
     return response
 
 
 @router.post("/logout", response_model=None)
-def post_logout(request: Request) -> RedirectResponse:
+async def post_logout(request: Request) -> RedirectResponse:
     token: str | None = request.cookies.get("session")
     if token:
-        with session_maker.begin() as db:
-            user_session: UserSession | None = db.get(UserSession, token)
+        async with async_session_maker.begin() as db:
+            user_session: UserSession | None = await db.get(UserSession, token)
             if user_session:
-                db.delete(user_session)
+                await db.delete(user_session)
 
     response = RedirectResponse(url="/", status_code=303)
     clear_session_cookie(response)
@@ -349,21 +353,25 @@ def _clear_stashed_identity(response: Response) -> None:
     response.delete_cookie(_ONBOARDING_COOKIE)
 
 
-def _find_user_by_provider(
-    db: Session, provider: OAuthProvider, provider_user_id: str
+async def _find_user_by_provider(
+    db: AsyncSession, provider: OAuthProvider, provider_user_id: str
 ) -> User | None:
-    link = db.scalars(
-        select(UserAuthProvider).where(
-            UserAuthProvider.provider == provider,
-            UserAuthProvider.provider_user_id == provider_user_id,
+    link = (
+        await db.scalars(
+            select(UserAuthProvider).where(
+                UserAuthProvider.provider == provider,
+                UserAuthProvider.provider_user_id == provider_user_id,
+            )
         )
     ).first()
     if link is None:
         return None
-    return db.get(User, link.user_id)
+    return await db.get(User, link.user_id)
 
 
-def _link_identity_to_user(db: Session, user: User, identity: OAuthIdentity) -> None:
+def _link_identity_to_user(
+    db: AsyncSession, user: User, identity: OAuthIdentity
+) -> None:
     db.add(
         UserAuthProvider(
             user_id=user.id,
@@ -376,8 +384,8 @@ def _link_identity_to_user(db: Session, user: User, identity: OAuthIdentity) -> 
     )
 
 
-def _redirect_with_session(user_id: int, url: str = "/") -> RedirectResponse:
-    token = _create_session(user_id)
+async def _redirect_with_session(user_id: int, url: str = "/") -> RedirectResponse:
+    token = await _create_session(user_id)
     response = RedirectResponse(url=url, status_code=303)
     set_session_cookie(response, token)
     return response
@@ -391,7 +399,7 @@ async def _oauth_authorize(
     if not provider_enabled(provider):
         raise HTTPException(status_code=404, detail="Provider not configured")
     redirect_uri = f"{CONFIGURATION.base_url}/auth/{provider.value}/callback"
-    client = get_client(provider)
+    client = await get_client(provider)
     response = await client.authorize_redirect(request, redirect_uri)
     if link:
         _set_link_intent(response)
@@ -407,10 +415,10 @@ async def _oauth_callback(
         raise HTTPException(status_code=404, detail="Provider not configured")
 
     identity = await fetch_identity(provider, request)
-    return process_identity(request, identity, current_user)
+    return await process_identity(request, identity, current_user)
 
 
-def process_identity(
+async def process_identity(
     request: Request,
     identity: OAuthIdentity,
     current_user: User | None,
@@ -434,8 +442,8 @@ def process_identity(
 
     # -- Link-to-current-user branch -----------------------------------------
     if link_intent and current_user is not None:
-        with session_maker.begin() as db:
-            existing = _find_user_by_provider(
+        async with async_session_maker.begin() as db:
+            existing = await _find_user_by_provider(
                 db, identity.provider, identity.provider_user_id
             )
             if existing is not None and existing.id != current_user.id:
@@ -446,7 +454,7 @@ def process_identity(
                     status_code=409,
                 )
             if existing is None:
-                user = db.get(User, current_user.id)
+                user = await db.get(User, current_user.id)
                 assert user is not None
                 _link_identity_to_user(db, user, identity)
         # Already logged in — just redirect to the security page with the
@@ -455,21 +463,20 @@ def process_identity(
         return response
 
     # -- Already-linked branch -----------------------------------------------
-    with session_maker() as db:
-        linked_user = _find_user_by_provider(
+    linked_user: User | None = None
+    async with async_session_maker() as db:
+        linked_user = await _find_user_by_provider(
             db, identity.provider, identity.provider_user_id
         )
-        if linked_user is not None:
-            user_id = linked_user.id
 
     if linked_user is not None:
-        return _redirect_with_session(user_id)
+        return await _redirect_with_session(linked_user.id)
 
     # -- Email-matches-existing-user branch ---------------------------------
     if identity.email:
-        with session_maker.begin() as db:
-            email_user = db.scalars(
-                select(User).where(User.email == identity.email)
+        async with async_session_maker.begin() as db:
+            email_user = (
+                await db.scalars(select(User).where(User.email == identity.email))
             ).first()
             if email_user is not None:
                 if identity.email_verified:
@@ -488,7 +495,7 @@ def process_identity(
             else:
                 user_id = None
         if identity.email_verified and user_id is not None:
-            return _redirect_with_session(user_id)
+            return await _redirect_with_session(user_id)
 
     # -- New-user onboarding branch -----------------------------------------
     response = RedirectResponse(url="/auth/oauth/onboarding", status_code=303)
@@ -544,13 +551,13 @@ async def meta_callback(request: Request, current_user: CurrentUser) -> Response
 
 
 @router.get("/oauth/onboarding", response_model=None)
-def get_oauth_onboarding(request: Request) -> HTMLResponse | RedirectResponse:
+async def get_oauth_onboarding(request: Request) -> HTMLResponse | RedirectResponse:
     identity = _load_stashed_identity(request)
     if identity is None:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    with session_maker() as db:
-        suggested = _suggest_username(db, identity.username_hint)
+    async with async_session_maker() as db:
+        suggested = await _suggest_username(db, identity.username_hint)
 
     return HTMLResponse(
         content=str(
@@ -565,7 +572,7 @@ def get_oauth_onboarding(request: Request) -> HTMLResponse | RedirectResponse:
 
 
 @router.post("/oauth/onboarding", response_model=None)
-def post_oauth_onboarding(
+async def post_oauth_onboarding(
     request: Request,
     username: Annotated[str, Form()],
 ) -> HTMLResponse | RedirectResponse:
@@ -579,11 +586,11 @@ def post_oauth_onboarding(
             request, identity, username, "Please choose a username."
         )
 
-    with session_maker.begin() as db:
+    async with async_session_maker.begin() as db:
         # Recheck uniqueness — someone could have grabbed the name between
         # GET and POST.
-        if db.scalars(select(User).where(User.username == username)).first():
-            suggested = _suggest_username(db, identity.username_hint)
+        if (await db.scalars(select(User).where(User.username == username))).first():
+            suggested = await _suggest_username(db, identity.username_hint)
             return HTMLResponse(
                 content=str(
                     oauth_onboarding_page(
@@ -602,11 +609,11 @@ def post_oauth_onboarding(
 
         user = User(username=username, email=identity.email)
         db.add(user)
-        db.flush()
+        await db.flush()
         _link_identity_to_user(db, user, identity)
         user_id = user.id
 
-    token = _create_session(user_id)
+    token = await _create_session(user_id)
     response = RedirectResponse(url="/", status_code=303)
     set_session_cookie(response, token)
     _clear_stashed_identity(response)

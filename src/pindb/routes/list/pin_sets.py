@@ -10,7 +10,7 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.models.list_view import EntityListView
@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 @router.get(path="/pin_sets")
-def get_list_pin_sets(
+async def get_list_pin_sets(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
@@ -41,9 +41,9 @@ def get_list_pin_sets(
         else PinSet.name.asc()
     )
 
-    with session_maker() as session:
+    async with async_session_maker() as session:
         if q:
-            all_results, total_count = search_pin_sets(
+            all_results, total_count = await search_pin_sets(
                 query=q,
                 session=session,
                 offset=offset,
@@ -56,21 +56,23 @@ def get_list_pin_sets(
             total_count = len(pin_sets)
         else:
             total_count = (
-                session.scalar(
+                await session.scalar(
                     select(func.count(PinSet.id))
                     .outerjoin(User, PinSet.owner_id == User.id)
                     .where(PinSet.owner_id.is_(None))
                 )
                 or 0
             )
-            pin_sets = session.scalars(
-                select(PinSet)
-                .outerjoin(User, PinSet.owner_id == User.id)
-                .where(PinSet.owner_id.is_(None))
-                .options(selectinload(PinSet.pins))
-                .order_by(order_by)
-                .limit(DEFAULT_PER_PAGE)
-                .offset(offset)
+            pin_sets = (
+                await session.scalars(
+                    select(PinSet)
+                    .outerjoin(User, PinSet.owner_id == User.id)
+                    .where(PinSet.owner_id.is_(None))
+                    .options(selectinload(PinSet.pins))
+                    .order_by(order_by)
+                    .limit(DEFAULT_PER_PAGE)
+                    .offset(offset)
+                )
             ).all()
 
         if request.headers.get("HX-Request"):

@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from rich.repr import Result
+from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column, relationship
 
@@ -32,7 +33,9 @@ class UserAuthProvider(AuditMixin, MappedAsDataclass, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    provider: Mapped[OAuthProvider]
+    provider: Mapped[OAuthProvider] = mapped_column(
+        SQLAlchemyEnum(OAuthProvider, native_enum=False)
+    )
     provider_user_id: Mapped[str]
     provider_email: Mapped[str | None] = mapped_column(default=None)
     provider_username: Mapped[str | None] = mapped_column(default=None)

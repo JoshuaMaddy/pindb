@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Shop, session_maker
+from pindb.database import Shop, async_session_maker
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
@@ -38,13 +38,13 @@ LOGGER = user_logger("pindb.routes.edit.shop")
 
 
 @router.get(path="/shop/{id}", response_model=None)
-def get_edit_shop(
+async def get_edit_shop(
     request: Request,
     id: int,
     current_user: EditorUser,
 ) -> HTMLResponse:
-    with session_maker() as session:
-        shop: Shop | None = session.scalar(
+    async with async_session_maker() as session:
+        shop: Shop | None = await session.scalar(
             select(Shop)
             .where(Shop.id == id)
             .options(selectinload(Shop.links), selectinload(Shop.aliases))
@@ -56,11 +56,11 @@ def get_edit_shop(
         assert_editor_can_edit(shop, current_user)
 
         if needs_pending_edit(shop, current_user):
-            chain = get_edit_chain(session, "shops", id)
+            chain = await get_edit_chain(session, "shops", id)
             if chain:
                 effective = get_effective_snapshot(shop, chain)
                 with session.no_autoflush:
-                    apply_snapshot_in_memory(shop, effective, session)
+                    await apply_snapshot_in_memory(shop, effective, session)
 
         return HTMLResponse(
             content=str(
@@ -74,7 +74,7 @@ def get_edit_shop(
 
 
 @router.post(path="/shop/{id}", response_model=None)
-def post_edit_shop(
+async def post_edit_shop(
     request: Request,
     id: int,
     current_user: EditorUser,
@@ -91,8 +91,8 @@ def post_edit_shop(
     ] = None,
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        shop: Shop | None = session.scalar(
+    async with async_session_maker.begin() as session:
+        shop: Shop | None = await session.scalar(
             select(Shop)
             .where(Shop.id == id)
             .options(selectinload(Shop.links), selectinload(Shop.aliases))
@@ -105,7 +105,7 @@ def post_edit_shop(
 
         if needs_pending_edit(shop, current_user):
             LOGGER.info("Submitting pending edit for shop id=%d name=%r", id, name)
-            return submit_simple_aliased_pending_edit(
+            return await submit_simple_aliased_pending_edit(
                 session=session,
                 entity=shop,
                 entity_table="shops",
@@ -120,7 +120,7 @@ def post_edit_shop(
             )
 
         LOGGER.info("Editing shop id=%d name=%r", id, name)
-        apply_simple_aliased_direct_edit(
+        await apply_simple_aliased_direct_edit(
             entity=shop,
             name=name,
             description=description,
@@ -130,10 +130,10 @@ def post_edit_shop(
             session=session,
         )
 
-        session.flush()
+        await session.flush()
         shop_id: int = shop.id
 
-    sync_entity(EntityType.shop, shop_id)
+    await sync_entity(EntityType.shop, shop_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

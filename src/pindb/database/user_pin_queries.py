@@ -7,7 +7,8 @@ shapes only live in one place.
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from pindb.database.joins import user_favorite_pins
 from pindb.database.pin import Pin
@@ -19,10 +20,10 @@ from pindb.database.user_wanted_pin import UserWantedPin
 # ---------------------------------------------------------------------------
 
 
-def count_favorites(*, session: Session, user_id: int) -> int:
+async def count_favorites(*, session: AsyncSession, user_id: int) -> int:
     """Return how many pins the user has favorited."""
     return (
-        session.scalar(
+        await session.scalar(
             select(func.count())
             .select_from(user_favorite_pins)
             .where(user_favorite_pins.c.user_id == user_id)
@@ -31,9 +32,9 @@ def count_favorites(*, session: Session, user_id: int) -> int:
     )
 
 
-def get_favorite_pins(
+async def get_favorite_pins(
     *,
-    session: Session,
+    session: AsyncSession,
     user_id: int,
     limit: int,
     offset: int = 0,
@@ -53,7 +54,7 @@ def get_favorite_pins(
             selectinload(Pin.shops),
             selectinload(Pin.artists),
         )
-    return list(session.scalars(statement).all())
+    return list((await session.scalars(statement)).all())
 
 
 # ---------------------------------------------------------------------------
@@ -61,19 +62,21 @@ def get_favorite_pins(
 # ---------------------------------------------------------------------------
 
 
-def count_owned(*, session: Session, user_id: int, tradeable_only: bool = False) -> int:
+async def count_owned(
+    *, session: AsyncSession, user_id: int, tradeable_only: bool = False
+) -> int:
     """Count distinct pins owned (optionally only those with trade stock)."""
     statement = select(func.count(func.distinct(UserOwnedPin.pin_id))).where(
         UserOwnedPin.user_id == user_id
     )
     if tradeable_only:
         statement = statement.where(UserOwnedPin.tradeable_quantity > 0)
-    return session.scalar(statement) or 0
+    return await session.scalar(statement) or 0
 
 
-def get_owned_entries(
+async def get_owned_entries(
     *,
-    session: Session,
+    session: AsyncSession,
     user_id: int,
     limit: int,
     offset: int = 0,
@@ -95,7 +98,7 @@ def get_owned_entries(
     if tradeable_only:
         pin_ids_statement = pin_ids_statement.where(UserOwnedPin.tradeable_quantity > 0)
 
-    pin_ids = list(session.scalars(pin_ids_statement))
+    pin_ids = list(await session.scalars(pin_ids_statement))
     if not pin_ids:
         return []
 
@@ -118,9 +121,11 @@ def get_owned_entries(
         )
 
     return list(
-        session.scalars(
-            entries_statement.options(pin_loader, selectinload(UserOwnedPin.grade))
-        )
+        (
+            await session.scalars(
+                entries_statement.options(pin_loader, selectinload(UserOwnedPin.grade))
+            )
+        ).all()
     )
 
 
@@ -129,10 +134,10 @@ def get_owned_entries(
 # ---------------------------------------------------------------------------
 
 
-def count_wanted(*, session: Session, user_id: int) -> int:
+async def count_wanted(*, session: AsyncSession, user_id: int) -> int:
     """Count distinct pins on the user's want list."""
     return (
-        session.scalar(
+        await session.scalar(
             select(func.count(func.distinct(UserWantedPin.pin_id))).where(
                 UserWantedPin.user_id == user_id
             )
@@ -141,9 +146,9 @@ def count_wanted(*, session: Session, user_id: int) -> int:
     )
 
 
-def get_wanted_entries(
+async def get_wanted_entries(
     *,
-    session: Session,
+    session: AsyncSession,
     user_id: int,
     limit: int,
     offset: int = 0,
@@ -151,14 +156,16 @@ def get_wanted_entries(
 ) -> list[UserWantedPin]:
     """Return want-list rows for a page of distinct pins."""
     pin_ids = list(
-        session.scalars(
-            select(UserWantedPin.pin_id)
-            .distinct()
-            .where(UserWantedPin.user_id == user_id)
-            .order_by(UserWantedPin.pin_id)
-            .limit(limit)
-            .offset(offset)
-        )
+        (
+            await session.scalars(
+                select(UserWantedPin.pin_id)
+                .distinct()
+                .where(UserWantedPin.user_id == user_id)
+                .order_by(UserWantedPin.pin_id)
+                .limit(limit)
+                .offset(offset)
+            )
+        ).all()
     )
     if not pin_ids:
         return []
@@ -171,13 +178,15 @@ def get_wanted_entries(
         )
 
     return list(
-        session.scalars(
-            select(UserWantedPin)
-            .where(
-                UserWantedPin.user_id == user_id,
-                UserWantedPin.pin_id.in_(pin_ids),
+        (
+            await session.scalars(
+                select(UserWantedPin)
+                .where(
+                    UserWantedPin.user_id == user_id,
+                    UserWantedPin.pin_id.in_(pin_ids),
+                )
+                .options(pin_loader, selectinload(UserWantedPin.grade))
+                .order_by(UserWantedPin.pin_id, UserWantedPin.grade_id)
             )
-            .options(pin_loader, selectinload(UserWantedPin.grade))
-            .order_by(UserWantedPin.pin_id, UserWantedPin.grade_id)
-        )
+        ).all()
     )

@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import CurrentUser
-from pindb.database import Pin, Shop, session_maker
+from pindb.database import Pin, Shop, async_session_maker
 from pindb.database.joins import pins_shops
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.routes._urls import canonical_slug_redirect, shop_url, slugify_for_url
@@ -33,7 +33,7 @@ _PER_PAGE: int = 100
     name="get_shop_by_id",
     include_in_schema=False,
 )
-def get_shop(
+async def get_shop(
     request: Request,
     id: int,
     current_user: CurrentUser,
@@ -41,8 +41,8 @@ def get_shop(
     page: int = Query(default=1, ge=1),
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker() as session:
-        shop_obj: Shop | None = session.scalar(
+    async with async_session_maker() as session:
+        shop_obj: Shop | None = await session.scalar(
             select(Shop)
             .where(Shop.id == id)
             .options(selectinload(Shop.links), selectinload(Shop.aliases))
@@ -60,7 +60,7 @@ def get_shop(
                 id=id,
             )
 
-        pending_chain_exists, viewing_pending = maybe_apply_pending_view(
+        pending_chain_exists, viewing_pending = await maybe_apply_pending_view(
             session=session,
             entity=shop_obj,
             entity_table="shops",
@@ -71,7 +71,7 @@ def get_shop(
         offset: int = (page - 1) * _PER_PAGE
 
         total_count: int = (
-            session.scalar(
+            await session.scalar(
                 select(func.count(Pin.id))
                 .join(pins_shops, Pin.id == pins_shops.c.pin_id)
                 .where(pins_shops.c.shop_id == shop_obj.id)
@@ -79,13 +79,15 @@ def get_shop(
             or 0
         )
 
-        pins: Sequence[Pin] = session.scalars(
-            select(Pin)
-            .join(pins_shops, Pin.id == pins_shops.c.pin_id)
-            .where(pins_shops.c.shop_id == shop_obj.id)
-            .order_by(Pin.name.asc())
-            .limit(_PER_PAGE)
-            .offset(offset)
+        pins: Sequence[Pin] = (
+            await session.scalars(
+                select(Pin)
+                .join(pins_shops, Pin.id == pins_shops.c.pin_id)
+                .where(pins_shops.c.shop_id == shop_obj.id)
+                .order_by(Pin.name.asc())
+                .limit(_PER_PAGE)
+                .offset(offset)
+            )
         ).all()
 
         if request.headers.get("HX-Target") == _SECTION_ID:

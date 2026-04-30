@@ -1,9 +1,15 @@
 """Meilisearch query helpers and Pydantic wrappers for API responses."""
 
-from meilisearch.index import Index
+from __future__ import annotations
+
+import re
+
+from meilisearch_python_sdk import AsyncIndex
+from meilisearch_python_sdk.models.search import SearchResults
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist
@@ -12,11 +18,13 @@ from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag, TagCategory
 
-PIN_INDEX: Index = CONFIGURATION.meili_client.index(uid=CONFIGURATION.meilisearch_index)
-TAGS_INDEX: Index = CONFIGURATION.meili_client.index(uid="tags")
-ARTISTS_INDEX: Index = CONFIGURATION.meili_client.index(uid="artists")
-SHOPS_INDEX: Index = CONFIGURATION.meili_client.index(uid="shops")
-PIN_SETS_INDEX: Index = CONFIGURATION.meili_client.index(uid="pin_sets")
+PIN_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(
+    uid=CONFIGURATION.meilisearch_index
+)
+TAGS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="tags")
+ARTISTS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="artists")
+SHOPS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="shops")
+PIN_SETS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="pin_sets")
 
 
 def meilisearch_hit_dicts(raw: dict[str, object]) -> list[dict[str, object]]:
@@ -33,10 +41,10 @@ def meilisearch_hit_dicts(raw: dict[str, object]) -> list[dict[str, object]]:
 
 def meilisearch_total_hits(raw: dict[str, object], *, hit_count: int) -> int:
     """Best-effort total from Meilisearch response keys, falling back to ``hit_count``."""
-    estimated = raw.get("estimatedTotalHits")
+    estimated = raw.get("estimatedTotalHits", raw.get("estimated_total_hits"))
     if isinstance(estimated, int):
         return estimated
-    total_hits_value = raw.get("totalHits")
+    total_hits_value = raw.get("totalHits", raw.get("total_hits"))
     if isinstance(total_hits_value, int):
         return total_hits_value
     return hit_count
@@ -51,10 +59,22 @@ def _hit_ids_from_documents(hits: list[dict[str, object]]) -> list[int]:
         elif isinstance(raw_id, str):
             ids.append(int(raw_id))
         else:
+            msg = f"Meilisearch hit id must be int or str, got {type(raw_id)}"
             raise TypeError(
-                f"Meilisearch hit id must be int or str, got {type(raw_id)}"
+                msg,
             )
     return ids
+
+
+def _search_results_to_raw(sr: SearchResults | object) -> dict[str, object]:
+    if isinstance(sr, dict):
+        return {str(k): v for k, v in sr.items()}
+    dump = (
+        sr.model_dump(mode="python", by_alias=True)
+        if isinstance(sr, SearchResults)
+        else {}
+    )
+    return {str(k): v for k, v in dump.items()}
 
 
 class PinSearchHit(BaseModel):
@@ -82,9 +102,7 @@ class PinSearchResult(BaseModel):
 
     @classmethod
     def from_raw(cls, raw: dict[str, object]) -> "PinSearchResult":
-        import re
 
-        # Meilisearch returns camelCase keys; convert to snake_case for Pydantic
         def to_snake(s: str) -> str:
             return re.sub(r"(?<=[a-z])(?=[A-Z])", "_", s).lower()
 
@@ -92,121 +110,125 @@ class PinSearchResult(BaseModel):
         return cls.model_validate(normalized)
 
 
-def search_pin(query: str, session: Session) -> list[Pin] | None:
+async def search_pin(query: str, session: AsyncSession) -> list[Pin] | None:
     """Search pins in Meilisearch and hydrate ORM rows in hit order (with shops/artists)."""
-    raw: dict[str, object] = PIN_INDEX.search(query=query)  # type: ignore[assignment]
-    result: PinSearchResult = PinSearchResult.from_raw(raw)
+    search_results: SearchResults = await PIN_INDEX.search(query=query)  # type: ignore[assignment]
+    raw = _search_results_to_raw(search_results)
+    result = PinSearchResult.from_raw(raw)
 
     if not result.hits:
         return None
 
     pin_ids: list[int] = [hit.id for hit in result.hits]
 
-    pins_by_id: dict[int, Pin] = {
-        pin.id: pin
-        for pin in session.scalars(
-            statement=select(Pin)
-            .where(Pin.id.in_(other=pin_ids))
+    rows = (
+        await session.scalars(
+            select(Pin)
+            .where(Pin.id.in_(pin_ids))
             .options(selectinload(Pin.shops), selectinload(Pin.artists))
-        ).all()
-    }
+        )
+    ).all()
+    pins_by_id: dict[int, Pin] = {pin.id: pin for pin in rows}
     return [pins_by_id[pid] for pid in pin_ids if pid in pins_by_id]
 
 
-def _search_index(
-    index: Index,
+async def _search_index(
+    index: AsyncIndex,
     query: str,
     offset: int = 0,
     limit: int = 100,
     filter_str: str | None = None,
 ) -> tuple[list[int], int]:
     """Return (ids in meili result order, estimated_total_hits)."""
-    opt_params: dict[str, object] = {"offset": offset, "limit": limit}
-    if filter_str:
-        opt_params["filter"] = filter_str
-    raw: dict[str, object] = index.search(query=query, opt_params=opt_params)  # type: ignore[assignment]
+    if filter_str is not None:
+        raw_sr = await index.search(
+            query, offset=offset, limit=limit, filter=filter_str
+        )
+    else:
+        raw_sr = await index.search(query, offset=offset, limit=limit)
+    raw = _search_results_to_raw(raw_sr)
     hits = meilisearch_hit_dicts(raw)
     total = meilisearch_total_hits(raw, hit_count=len(hits))
     ids = _hit_ids_from_documents(hits)
     return ids, total
 
 
-def search_tags(
+async def search_tags(
     query: str,
-    session: Session,
+    session: AsyncSession,
     category: TagCategory | None = None,
     offset: int = 0,
     limit: int = 100,
 ) -> tuple[list[Tag], int]:
     filter_str: str | None = f'category = "{category.value}"' if category else None
-    ids, total = _search_index(TAGS_INDEX, query, offset, limit, filter_str)
+    ids, total = await _search_index(TAGS_INDEX, query, offset, limit, filter_str)
     if not ids:
         return [], total
-    tags_by_id: dict[int, Tag] = {
-        t.id: t
-        for t in session.scalars(
+    rows = (
+        await session.scalars(
             select(Tag).where(Tag.id.in_(ids)).options(selectinload(Tag.pins))
-        ).all()
-    }
+        )
+    ).all()
+    tags_by_id: dict[int, Tag] = {t.id: t for t in rows}
     return [tags_by_id[i] for i in ids if i in tags_by_id], total
 
 
-def search_artists(
+async def search_artists(
     query: str,
-    session: Session,
+    session: AsyncSession,
     offset: int = 0,
     limit: int = 100,
 ) -> tuple[list[Artist], int]:
-    ids, total = _search_index(ARTISTS_INDEX, query, offset, limit)
+    ids, total = await _search_index(ARTISTS_INDEX, query, offset, limit)
     if not ids:
         return [], total
-    artists_by_id: dict[int, Artist] = {
-        a.id: a
-        for a in session.scalars(
+    rows = (
+        await session.scalars(
             select(Artist).where(Artist.id.in_(ids)).options(selectinload(Artist.pins))
-        ).all()
-    }
+        )
+    ).all()
+    artists_by_id: dict[int, Artist] = {a.id: a for a in rows}
     return [artists_by_id[i] for i in ids if i in artists_by_id], total
 
 
-def search_shops(
+async def search_shops(
     query: str,
-    session: Session,
+    session: AsyncSession,
     offset: int = 0,
     limit: int = 100,
 ) -> tuple[list[Shop], int]:
-    ids, total = _search_index(SHOPS_INDEX, query, offset, limit)
+    ids, total = await _search_index(SHOPS_INDEX, query, offset, limit)
     if not ids:
         return [], total
-    shops_by_id: dict[int, Shop] = {
-        s.id: s
-        for s in session.scalars(
+    rows = (
+        await session.scalars(
             select(Shop).where(Shop.id.in_(ids)).options(selectinload(Shop.pins))
-        ).all()
-    }
+        )
+    ).all()
+    shops_by_id: dict[int, Shop] = {s.id: s for s in rows}
     return [shops_by_id[i] for i in ids if i in shops_by_id], total
 
 
-def search_pin_sets(
+async def search_pin_sets(
     query: str,
-    session: Session,
+    session: AsyncSession,
     offset: int = 0,
     limit: int = 100,
 ) -> tuple[list[PinSet], int]:
-    ids, total = _search_index(PIN_SETS_INDEX, query, offset, limit)
+    ids, total = await _search_index(PIN_SETS_INDEX, query, offset, limit)
     if not ids:
         return [], total
-    pin_sets_by_id: dict[int, PinSet] = {
-        ps.id: ps
-        for ps in session.scalars(
+    rows = (
+        await session.scalars(
             select(PinSet).where(PinSet.id.in_(ids)).options(selectinload(PinSet.pins))
-        ).all()
-    }
+        )
+    ).all()
+    pin_sets_by_id: dict[int, PinSet] = {ps.id: ps for ps in rows}
     return [pin_sets_by_id[i] for i in ids if i in pin_sets_by_id], total
 
 
-def search_entity_options(
-    index: Index,
+async def search_entity_options(
+    index: AsyncIndex,
     query: str,
     limit: int = 50,
 ) -> list[dict[str, str]]:
@@ -215,9 +237,10 @@ def search_entity_options(
     Hits come directly from meili (no DB roundtrip). is_pending is stored
     in the document so the (P) prefix can be applied without a DB query.
     """
-    raw: dict[str, object] = index.search(query=query, opt_params={"limit": limit})  # type: ignore[assignment]
+    raw_sr = await index.search(query, limit=limit)  # type: ignore[call-arg]
+    raw = _search_results_to_raw(raw_sr)
     hits = meilisearch_hit_dicts(raw)
-    results = []
+    results: list[dict[str, str]] = []
     for hit in hits:
         text = str(hit.get("display_name") or hit["name"])
         item: dict[str, str] = {

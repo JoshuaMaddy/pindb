@@ -17,13 +17,18 @@ import secrets
 import subprocess
 from collections.abc import Generator
 from contextlib import asynccontextmanager
+from csv import DictReader
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Connection, Engine, create_engine, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
+from sqlalchemy.sql.dml import Delete, Insert, Update
 
 # Ensure the image directory exists before pindb is imported (CONFIGURATION reads it)
 os.makedirs(os.environ.get("IMAGE_DIRECTORY", "/tmp/pindb_test_images"), exist_ok=True)
@@ -47,6 +52,62 @@ _search_update = importlib.import_module("pindb.search.update")
 _search_search = importlib.import_module("pindb.search.search")
 
 _REPO_ROOT = Path(__file__).parent.parent
+_CURRENCY_ROWS: list[dict[str, int | str]] | None = None
+
+
+def _is_unit_or_e2e_test(request: pytest.FixtureRequest) -> bool:
+    return "tests" in request.node.path.parts and (
+        "unit" in request.node.path.parts or "e2e" in request.node.path.parts
+    )
+
+
+def _currency_rows() -> list[dict[str, int | str]]:
+    global _CURRENCY_ROWS
+    if _CURRENCY_ROWS is None:
+        currencies_path = (
+            _REPO_ROOT / "src" / "pindb" / "database" / "data" / "currencies.csv"
+        )
+        with currencies_path.open(newline="") as currencies_file:
+            _CURRENCY_ROWS = [
+                {
+                    "id": int(row["id"]),
+                    "name": row["name"],
+                    "code": row["code"],
+                }
+                for row in DictReader(currencies_file)
+            ]
+    return _CURRENCY_ROWS
+
+
+class AutoCommitSession(Session):
+    """Test session that makes fixture ``flush()`` calls visible to async routes."""
+
+    _committing: bool = False
+    _needs_commit: bool = False
+
+    def commit(self) -> None:
+        self._committing = True
+        try:
+            super().commit()
+            self._needs_commit = False
+        finally:
+            self._committing = False
+
+    def flush(self, objects=None) -> None:  # type: ignore[no-untyped-def]
+        had_changes = bool(self.new or self.dirty or self.deleted)
+        super().flush(objects=objects)
+        if (
+            (had_changes or self._needs_commit)
+            and self.in_transaction()
+            and not self._committing
+        ):
+            self.commit()
+
+    def execute(self, statement, *args, **kwargs):  # type: ignore[no-untyped-def]
+        result = super().execute(statement, *args, **kwargs)
+        if isinstance(statement, (Delete, Insert, Update)):
+            self._needs_commit = True
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -72,9 +133,14 @@ def test_engine(pg_container) -> Generator[Engine, None, None]:
     url: str = pg_container.get_connection_url().replace(
         "postgresql+psycopg2://", "postgresql+psycopg://"
     )
+    async_url: str = url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
     engine = create_engine(url, echo=False)
 
-    env = {**os.environ, "DATABASE_CONNECTION": url}
+    env = {
+        **os.environ,
+        "DATABASE_CONNECTION": async_url,
+        "DATABASE_CONNECTION_SYNC": url,
+    }
     subprocess.run(
         ["uv", "run", "alembic", "upgrade", "head"],
         env=env,
@@ -86,21 +152,44 @@ def test_engine(pg_container) -> Generator[Engine, None, None]:
     engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def test_async_engine(test_engine: Engine) -> Generator[AsyncEngine, None, None]:
+    """Async engine pointed at the same testcontainer database as ``test_engine``."""
+    import asyncio
+
+    sync_url = test_engine.url.render_as_string(hide_password=False)
+    async_url = sync_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
+
+    yield async_engine
+    asyncio.run(async_engine.dispose())
+
+
 # ---------------------------------------------------------------------------
 # Function-scoped: connection with outer transaction (rolls back after each test)
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def db_connection(test_engine):
+def db_connection(test_engine: Engine) -> Generator[Connection, None, None]:
     """
-    Open a single connection with a transaction that is NEVER committed.
-    Everything written during the test is rolled back at teardown.
+    Open a single sync connection for direct DB setup/assertions in tests.
     """
     with test_engine.connect() as connection:
-        transaction = connection.begin()
         yield connection
-        transaction.rollback()
+
+
+@pytest.fixture(scope="session")
+def truncate_sql() -> str:
+    """Precomputed cleanup SQL for integration tests."""
+    from pindb.database.base import Base
+
+    table_names = [
+        table.name
+        for table in reversed(Base.metadata.sorted_tables)
+        if table.name != "alembic_version"
+    ]
+    return f"TRUNCATE TABLE {', '.join(table_names)} RESTART IDENTITY CASCADE"
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +199,7 @@ def db_connection(test_engine):
 
 
 @pytest.fixture(autouse=True)
-def patch_session_maker(db_connection):
+def patch_session_maker(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """
     Reconfigure the shared session_maker instance in-place.
 
@@ -122,17 +211,34 @@ def patch_session_maker(db_connection):
     On success the savepoint is released; on error it rolls back to it.
     The outer test transaction is never committed, so all writes vanish.
     """
+    if _is_unit_or_e2e_test(request=request):
+        yield
+        return
+
+    db_connection: Connection = request.getfixturevalue("db_connection")
+    test_async_engine: AsyncEngine = request.getfixturevalue("test_async_engine")
+    cleanup_sql: str = request.getfixturevalue("truncate_sql")
+
     original_kw = dict(_pindb_db.session_maker.kw)
+    original_class = _pindb_db.session_maker.class_
+    original_async_kw = dict(_pindb_db.async_session_maker.kw)
 
     _pindb_db.session_maker.configure(
         bind=db_connection,
-        join_transaction_mode="create_savepoint",
     )
+    _pindb_db.session_maker.class_ = AutoCommitSession
+    _pindb_db.async_session_maker.configure(bind=test_async_engine)
 
     yield
 
     _pindb_db.session_maker.kw.clear()
     _pindb_db.session_maker.kw.update(original_kw)
+    _pindb_db.session_maker.class_ = original_class
+    _pindb_db.async_session_maker.kw.clear()
+    _pindb_db.async_session_maker.kw.update(original_async_kw)
+
+    db_connection.execute(text(cleanup_sql))
+    db_connection.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -148,21 +254,37 @@ def patch_meilisearch(monkeypatch) -> MagicMock:
     Add @pytest.mark.meili to use a real Meilisearch container instead.
     """
     mock_index = MagicMock()
-    mock_index.search.return_value = {
-        "hits": [],
-        "offset": 0,
-        "limit": 20,
-        "estimatedTotalHits": 0,
-        "processingTimeMs": 1,
-        "query": "",
-    }
-    mock_index.add_documents.return_value = MagicMock(task_uid=1)
-    mock_index.delete_document.return_value = MagicMock(task_uid=2)
-    mock_index.delete_documents.return_value = MagicMock(task_uid=3)
-    mock_index.get_documents.return_value = MagicMock(results=[], total=0)
-    mock_index.update_searchable_attributes.return_value = MagicMock(task_uid=4)
-
-    monkeypatch.setattr(_search_update, "PIN_INDEX", mock_index)
+    mock_index.search = AsyncMock(
+        return_value={
+            "hits": [],
+            "offset": 0,
+            "limit": 20,
+            "estimatedTotalHits": 0,
+            "processingTimeMs": 1,
+            "query": "",
+        }
+    )
+    mock_index.add_documents = AsyncMock(return_value=MagicMock(task_uid=1))
+    mock_index.delete_document = AsyncMock(return_value=MagicMock(task_uid=2))
+    mock_index.delete_documents = AsyncMock(return_value=MagicMock(task_uid=3))
+    mock_index.get_documents = AsyncMock(return_value=MagicMock(results=[], total=0))
+    mock_index.update_searchable_attributes = AsyncMock(
+        return_value=MagicMock(task_uid=4)
+    )
+    mock_index.update_filterable_attributes = AsyncMock(
+        return_value=MagicMock(task_uid=5)
+    )
+    if hasattr(_search_update, "PIN_INDEX"):
+        monkeypatch.setattr(_search_update, "PIN_INDEX", mock_index)
+    for name in (
+        "_pin_index",
+        "_tags_index",
+        "_artists_index",
+        "_shops_index",
+        "_pin_sets_index",
+    ):
+        if hasattr(_search_update, name):
+            monkeypatch.setattr(_search_update, name, lambda: mock_index)
     monkeypatch.setattr(_search_search, "PIN_INDEX", mock_index)
     # Also stub the secondary indexes used by update_all / bulk options.
     for name in ("TAGS_INDEX", "ARTISTS_INDEX", "SHOPS_INDEX", "PIN_SETS_INDEX"):
@@ -187,6 +309,21 @@ def patch_meilisearch(monkeypatch) -> MagicMock:
             monkeypatch.setattr(_bulk_pin, "TAGS_INDEX", mock_index)
     except ImportError:
         pass
+
+    for module_name in ("pindb.routes.get.options", "pindb.routes.get.tag"):
+        try:
+            module = importlib.import_module(module_name)
+            for name in (
+                "PIN_INDEX",
+                "TAGS_INDEX",
+                "ARTISTS_INDEX",
+                "SHOPS_INDEX",
+                "PIN_SETS_INDEX",
+            ):
+                if hasattr(module, name):
+                    monkeypatch.setattr(module, name, mock_index)
+        except ImportError:
+            pass
 
     return mock_index
 
@@ -258,10 +395,14 @@ def db_session(patch_session_maker) -> Generator[Session, None, None]:
 @pytest.fixture
 def seed_currencies(db_session: Session) -> None:
     """Seed currencies into the test DB (mirrors lifespan behaviour)."""
-    from pindb.database import seed_currencies as _seed
+    from pindb.database.currency import Currency
 
-    _seed()
-    db_session.flush()
+    db_session.execute(
+        pg_insert(Currency)
+        .values(_currency_rows())
+        .on_conflict_do_nothing(index_elements=[Currency.id])
+    )
+    db_session.commit()
 
 
 @pytest.fixture
@@ -478,8 +619,13 @@ def _reset_audit_context():
 
 
 @pytest.fixture(autouse=True)
-def bind_factories(db_session: Session):
+def bind_factories(request: pytest.FixtureRequest):
     """Wire all factory_boy factories to the current test's session."""
+    if _is_unit_or_e2e_test(request=request):
+        yield
+        return
+
+    db_session: Session = request.getfixturevalue("db_session")
     try:
         import tests.factories.base as _base
 

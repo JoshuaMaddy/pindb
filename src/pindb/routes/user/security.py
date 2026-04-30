@@ -2,8 +2,8 @@
 
 Routes:
   * ``GET  /user/me/security`` — page with password form + provider list
-  * ``POST /user/me/password`` — change password (requires current when set)
-  * ``POST /user/me/unlink/{provider}`` — detach a provider; refuses if it
+  * ``POST  /user/me/password`` — change password (requires current when set)
+  * ``POST  /user/me/unlink/{provider}`` — detach a provider; refuses if it
     would leave the user with no way to log in.
 
 The ``link`` action reuses ``/auth/{provider}?link=1`` which sets a
@@ -25,7 +25,7 @@ from pindb.auth import (
     hash_password,
     verify_password,
 )
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.session import UserSession
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
@@ -41,11 +41,13 @@ def _enabled_providers() -> list[OAuthProvider]:
     return [p for p in OAuthProvider if provider_enabled(p)]
 
 
-def _load_user_providers(user_id: int) -> list[UserAuthProvider]:
-    with session_maker() as db:
+async def _load_user_providers(user_id: int) -> list[UserAuthProvider]:
+    async with async_session_maker() as db:
         links = list(
-            db.scalars(
-                select(UserAuthProvider).where(UserAuthProvider.user_id == user_id)
+            (
+                await db.scalars(
+                    select(UserAuthProvider).where(UserAuthProvider.user_id == user_id)
+                )
             ).all()
         )
         for link in links:
@@ -54,13 +56,13 @@ def _load_user_providers(user_id: int) -> list[UserAuthProvider]:
 
 
 @router.get("/security", response_model=None)
-def get_security(
+async def get_security(
     request: Request,
     current_user: AuthenticatedUser,
     error: str | None = None,
     success: str | None = None,
 ) -> HTMLResponse:
-    links = _load_user_providers(current_user.id)
+    links = await _load_user_providers(current_user.id)
     return HTMLResponse(
         content=str(
             security_page(
@@ -80,7 +82,7 @@ def get_security(
     response_model=None,
     dependencies=[Depends(rate_limit("5/minute"))],
 )
-def post_change_password(
+async def post_change_password(
     request: Request,
     current_user: AuthenticatedUser,
     new_password: Annotated[str, Form()],
@@ -88,10 +90,10 @@ def post_change_password(
     current_password: Annotated[str | None, Form()] = None,
 ) -> Response:
     if new_password != confirm_password:
-        return _render(request, current_user, error="New passwords do not match.")
+        return await _render(request, current_user, error="New passwords do not match.")
 
-    with session_maker() as db:
-        user = db.get(User, current_user.id)
+    async with async_session_maker() as db:
+        user = await db.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         has_existing_password = user.hashed_password is not None
@@ -101,16 +103,16 @@ def post_change_password(
     if has_existing_password:
         if not current_password or not verify_password(
             plain=current_password,
-            hashed=_fetch_hashed_password(current_user.id) or "",
+            hashed=(await _fetch_hashed_password(current_user.id)) or "",
         ):
-            return _render(
+            return await _render(
                 request, current_user, error="Current password is incorrect."
             )
 
     try:
         validate_password(new_password, username=username, email=email)
     except PasswordPolicyError as exc:
-        return _render(
+        return await _render(
             request,
             current_user,
             error="Password does not meet the policy.",
@@ -118,8 +120,8 @@ def post_change_password(
         )
 
     current_token = request.cookies.get(SESSION_COOKIE)
-    with session_maker.begin() as db:
-        user = db.get(User, current_user.id)
+    async with async_session_maker.begin() as db:
+        user = await db.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         user.hashed_password = hash_password(new_password)
@@ -128,21 +130,21 @@ def post_change_password(
         stmt = delete(UserSession).where(UserSession.user_id == current_user.id)
         if current_token is not None:
             stmt = stmt.where(UserSession.token != current_token)
-        db.execute(stmt)
+        await db.execute(stmt)
 
     return RedirectResponse(
         url="/user/me/security?success=Password+updated", status_code=303
     )
 
 
-def _fetch_hashed_password(user_id: int) -> str | None:
-    with session_maker() as db:
-        user = db.get(User, user_id)
+async def _fetch_hashed_password(user_id: int) -> str | None:
+    async with async_session_maker() as db:
+        user = await db.get(User, user_id)
         return user.hashed_password if user is not None else None
 
 
 @router.post("/unlink/{provider}", response_model=None)
-def post_unlink_provider(
+async def post_unlink_provider(
     request: Request,
     current_user: AuthenticatedUser,
     provider: str,
@@ -152,19 +154,21 @@ def post_unlink_provider(
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown provider")
 
-    with session_maker.begin() as db:
-        user = db.get(User, current_user.id)
+    async with async_session_maker.begin() as db:
+        user = await db.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
         links = list(
-            db.scalars(
-                select(UserAuthProvider).where(UserAuthProvider.user_id == user.id)
+            (
+                await db.scalars(
+                    select(UserAuthProvider).where(UserAuthProvider.user_id == user.id)
+                )
             ).all()
         )
         target = next((link for link in links if link.provider is provider_enum), None)
         if target is None:
-            return _render(
+            return await _render(
                 request,
                 current_user,
                 error=f"No {provider_enum.value} account is linked.",
@@ -172,7 +176,7 @@ def post_unlink_provider(
 
         leaves_no_login = user.hashed_password is None and len(links) <= 1
         if leaves_no_login:
-            return _render(
+            return await _render(
                 request,
                 current_user,
                 error=(
@@ -181,7 +185,7 @@ def post_unlink_provider(
                 ),
             )
 
-        db.delete(target)
+        await db.delete(target)
 
     return RedirectResponse(
         url=f"/user/me/security?success=Unlinked+{provider_enum.value}",
@@ -189,14 +193,14 @@ def post_unlink_provider(
     )
 
 
-def _render(
+async def _render(
     request: Request,
     current_user: User,
     *,
     error: str | None = None,
     password_errors: list[str] | None = None,
 ) -> HTMLResponse:
-    links = _load_user_providers(current_user.id)
+    links = await _load_user_providers(current_user.id)
     return HTMLResponse(
         content=str(
             security_page(

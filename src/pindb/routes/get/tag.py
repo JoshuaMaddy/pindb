@@ -11,13 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import CurrentUser
-from pindb.database import Pin, Tag, session_maker
+from pindb.database import Pin, Tag, async_session_maker
 from pindb.database.joins import pins_tags
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.database.tag import resolve_implications
 from pindb.routes._urls import canonical_slug_redirect, slugify_for_url, tag_url
-from pindb.search.search import search_entity_options
-from pindb.search.update import TAGS_INDEX
+from pindb.search.search import TAGS_INDEX, search_entity_options
 from pindb.templates.components.pins.paginated_pin_grid import (
     _SECTION_ID,
     paginated_pin_grid,
@@ -34,46 +33,48 @@ _PER_PAGE: int = 100
 
 
 @router.get(path="/tag-options")
-def get_tag_options(
+async def get_tag_options(
     q: str = Query(default=""),
     exclude_id: int | None = Query(default=None),
 ) -> JSONResponse:
-    results = search_entity_options(TAGS_INDEX, q)
+    results = await search_entity_options(TAGS_INDEX, q)
     if exclude_id is not None:
         results = [r for r in results if r["value"] != str(exclude_id)]
     return JSONResponse(content=results)
 
 
 @router.get(path="/tag-implication-preview")
-def get_tag_implication_preview(
+async def get_tag_implication_preview(
     tag_ids: list[int] = Query(default_factory=list),
 ) -> HTMLResponse:
     if not tag_ids:
         return HTMLResponse(content="")
-    with session_maker() as session:
+    async with async_session_maker() as session:
         selected = set(
-            session.scalars(
-                select(Tag)
-                .where(Tag.id.in_(tag_ids))
-                .options(selectinload(Tag.implications))
+            (
+                await session.scalars(
+                    select(Tag)
+                    .where(Tag.id.in_(tag_ids))
+                    .options(selectinload(Tag.implications))
+                )
             ).all()
         )
-        resolved = resolve_implications(selected, session)
+        resolved = await resolve_implications(selected, session)
     return HTMLResponse(
         content=str(tag_implication_preview(set(resolved.keys()), selected))
     )
 
 
 @router.get(path="/tag/{id}/relations/{direction}", response_model=None)
-def get_tag_relations(
+async def get_tag_relations(
     request: Request,
     id: int,
     direction: str,
 ) -> HTMLResponse:
     if direction not in ("implications", "implied_by"):
         return HTMLResponse("")
-    with session_maker() as session:
-        tag_obj: Tag | None = session.scalar(
+    async with async_session_maker() as session:
+        tag_obj: Tag | None = await session.scalar(
             select(Tag)
             .where(Tag.id == id)
             .options(
@@ -96,7 +97,7 @@ def get_tag_relations(
     name="get_tag_by_id",
     include_in_schema=False,
 )
-def get_tag(
+async def get_tag(
     request: Request,
     id: int,
     current_user: CurrentUser,
@@ -104,8 +105,8 @@ def get_tag(
     page: int = Query(default=1, ge=1),
     version: str | None = Query(default=None),
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker() as session:
-        tag_obj: Tag | None = session.scalar(
+    async with async_session_maker() as session:
+        tag_obj: Tag | None = await session.scalar(
             select(Tag)
             .where(Tag.id == id)
             .options(
@@ -127,7 +128,7 @@ def get_tag(
                 id=id,
             )
 
-        pending_chain_exists, viewing_pending = maybe_apply_pending_view(
+        pending_chain_exists, viewing_pending = await maybe_apply_pending_view(
             session=session,
             entity=tag_obj,
             entity_table="tags",
@@ -138,7 +139,7 @@ def get_tag(
         offset: int = (page - 1) * _PER_PAGE
 
         total_count: int = (
-            session.scalar(
+            await session.scalar(
                 select(func.count(Pin.id))
                 .join(pins_tags, Pin.id == pins_tags.c.pin_id)
                 .where(pins_tags.c.tag_id == tag_obj.id)
@@ -146,13 +147,15 @@ def get_tag(
             or 0
         )
 
-        pins: Sequence[Pin] = session.scalars(
-            select(Pin)
-            .join(pins_tags, Pin.id == pins_tags.c.pin_id)
-            .where(pins_tags.c.tag_id == tag_obj.id)
-            .order_by(Pin.name.asc())
-            .limit(_PER_PAGE)
-            .offset(offset)
+        pins: Sequence[Pin] = (
+            await session.scalars(
+                select(Pin)
+                .join(pins_tags, Pin.id == pins_tags.c.pin_id)
+                .where(pins_tags.c.tag_id == tag_obj.id)
+                .order_by(Pin.name.asc())
+                .limit(_PER_PAGE)
+                .offset(offset)
+            )
         ).all()
 
         if request.headers.get("HX-Target") == _SECTION_ID:

@@ -13,7 +13,7 @@ from fastapi.routing import APIRouter
 from sqlalchemy import select
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
-from pindb.database import PinSet, User, session_maker
+from pindb.database import PinSet, User, async_session_maker
 from pindb.database.erasure import erase_user_account
 from pindb.database.user_pin_queries import (
     count_favorites,
@@ -43,12 +43,12 @@ PROFILE_PREVIEW_LIMIT: int = 10
 
 
 @router.get("/me", response_model=None)
-def get_me(current_user: AuthenticatedUser) -> RedirectResponse:
+async def get_me(current_user: AuthenticatedUser) -> RedirectResponse:
     return RedirectResponse(url=f"/user/{current_user.username}", status_code=303)
 
 
 @router.post("/me/settings", response_model=None)
-def update_user_settings(
+async def update_user_settings(
     current_user: AuthenticatedUser,
     theme: Annotated[str | None, Form()] = None,
     dimension_unit: Annotated[str | None, Form()] = None,
@@ -59,8 +59,8 @@ def update_user_settings(
         raise HTTPException(status_code=422, detail="Invalid theme")
     if dimension_unit is not None and dimension_unit not in VALID_DIMENSION_UNITS:
         raise HTTPException(status_code=422, detail="Invalid dimension_unit")
-    with session_maker.begin() as db:
-        user = db.get(User, current_user.id)
+    async with async_session_maker.begin() as db:
+        user = await db.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         if theme is not None:
@@ -71,18 +71,18 @@ def update_user_settings(
 
 
 @router.post("/me/delete-account", response_model=None, name="delete_own_account")
-def delete_own_account(
+async def delete_own_account(
     current_user: AuthenticatedUser,
     confirm_username: Annotated[str, Form()],
 ) -> RedirectResponse:
     """GDPR account erasure initiated by the logged-in user."""
     if confirm_username != current_user.username:
         raise HTTPException(status_code=400, detail="Username does not match")
-    with session_maker.begin() as session:
-        user: User | None = session.get(User, current_user.id)
+    async with async_session_maker.begin() as session:
+        user: User | None = await session.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        erase_user_account(session=session, user_id=current_user.id)
+        await erase_user_account(session=session, user_id=current_user.id)
     response = RedirectResponse(url="/", status_code=303)
     clear_session_cookie(response)
     return response
@@ -100,35 +100,37 @@ router.include_router(lists_router)
 
 
 @router.get("/{username}", response_model=None, name="get_user_profile")
-def get_user_profile(
+async def get_user_profile(
     request: Request,
     username: str,
     current_user: CurrentUser,
 ) -> HTMLResponse:
-    with session_maker() as db:
-        user: User | None = db.scalars(
-            select(User).where(User.username == username)
+    async with async_session_maker() as db:
+        user: User | None = (
+            await db.scalars(select(User).where(User.username == username))
         ).first()
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        favorite_count = count_favorites(session=db, user_id=user.id)
-        favorite_pins = get_favorite_pins(
+        favorite_count = await count_favorites(session=db, user_id=user.id)
+        favorite_pins = await get_favorite_pins(
             session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
         )
 
-        owned_count = count_owned(session=db, user_id=user.id)
-        owned_pins = get_owned_entries(
+        owned_count = await count_owned(session=db, user_id=user.id)
+        owned_pins = await get_owned_entries(
             session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
         )
 
-        wanted_count = count_wanted(session=db, user_id=user.id)
-        wanted_pins = get_wanted_entries(
+        wanted_count = await count_wanted(session=db, user_id=user.id)
+        wanted_pins = await get_wanted_entries(
             session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
         )
 
-        tradeable_count = count_owned(session=db, user_id=user.id, tradeable_only=True)
-        tradeable_entries = get_owned_entries(
+        tradeable_count = await count_owned(
+            session=db, user_id=user.id, tradeable_only=True
+        )
+        tradeable_entries = await get_owned_entries(
             session=db,
             user_id=user.id,
             limit=PROFILE_PREVIEW_LIMIT,
@@ -136,8 +138,12 @@ def get_user_profile(
         )
 
         personal_sets: list[PinSet] = list(
-            db.scalars(
-                select(PinSet).where(PinSet.owner_id == user.id).order_by(PinSet.name)
+            (
+                await db.scalars(
+                    select(PinSet)
+                    .where(PinSet.owner_id == user.id)
+                    .order_by(PinSet.name)
+                )
             ).all()
         )
 

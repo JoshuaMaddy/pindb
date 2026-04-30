@@ -10,7 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import CurrentUser
-from pindb.database import Pin, PinSet, User, UserOwnedPin, UserWantedPin, session_maker
+from pindb.database import (
+    Pin,
+    PinSet,
+    User,
+    UserOwnedPin,
+    UserWantedPin,
+    async_session_maker,
+)
 from pindb.database.joins import user_favorite_pins
 from pindb.database.pending_edit_utils import maybe_apply_pending_view
 from pindb.routes._urls import canonical_slug_redirect, slugify_for_url
@@ -26,15 +33,15 @@ router = APIRouter()
     name="get_pin_by_id",
     include_in_schema=False,
 )
-def get_pin(
+async def get_pin(
     request: Request,
     id: int,
     current_user: CurrentUser,
     slug: str | None = None,
     version: str | None = Query(default=None),
 ) -> HtpyResponse | RedirectResponse:
-    with session_maker() as session:
-        pin_obj: Pin | None = session.scalar(
+    async with async_session_maker() as session:
+        pin_obj: Pin | None = await session.scalar(
             select(Pin)
             .where(Pin.id == id)
             .options(
@@ -62,7 +69,7 @@ def get_pin(
                 id=id,
             )
 
-        pending_chain_exists, viewing_pending = maybe_apply_pending_view(
+        pending_chain_exists, viewing_pending = await maybe_apply_pending_view(
             session=session,
             entity=pin_obj,
             entity_table="pins",
@@ -76,39 +83,47 @@ def get_pin(
         wanted_entries: list[UserWantedPin] = []
 
         if current_user is not None:
-            user: User | None = session.get(User, current_user.id)
+            user: User | None = await session.get(User, current_user.id)
             if user is not None:
                 is_favorited = bool(
-                    session.execute(
-                        select(user_favorite_pins).where(
-                            user_favorite_pins.c.user_id == current_user.id,
-                            user_favorite_pins.c.pin_id == id,
+                    (
+                        await session.execute(
+                            select(user_favorite_pins).where(
+                                user_favorite_pins.c.user_id == current_user.id,
+                                user_favorite_pins.c.pin_id == id,
+                            )
                         )
                     ).first()
                 )
                 user_sets = list(
-                    session.scalars(
-                        select(PinSet).where(PinSet.owner_id == current_user.id)
+                    (
+                        await session.scalars(
+                            select(PinSet).where(PinSet.owner_id == current_user.id)
+                        )
                     ).all()
                 )
                 owned_entries = list(
-                    session.scalars(
-                        select(UserOwnedPin)
-                        .where(
-                            UserOwnedPin.user_id == current_user.id,
-                            UserOwnedPin.pin_id == id,
+                    (
+                        await session.scalars(
+                            select(UserOwnedPin)
+                            .where(
+                                UserOwnedPin.user_id == current_user.id,
+                                UserOwnedPin.pin_id == id,
+                            )
+                            .options(selectinload(UserOwnedPin.grade))
                         )
-                        .options(selectinload(UserOwnedPin.grade))
                     ).all()
                 )
                 wanted_entries = list(
-                    session.scalars(
-                        select(UserWantedPin)
-                        .where(
-                            UserWantedPin.user_id == current_user.id,
-                            UserWantedPin.pin_id == id,
+                    (
+                        await session.scalars(
+                            select(UserWantedPin)
+                            .where(
+                                UserWantedPin.user_id == current_user.id,
+                                UserWantedPin.pin_id == id,
+                            )
+                            .options(selectinload(UserWantedPin.grade))
                         )
-                        .options(selectinload(UserWantedPin.grade))
                     ).all()
                 )
 

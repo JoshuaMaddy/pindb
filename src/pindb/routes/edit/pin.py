@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.currency import Currency
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
@@ -60,13 +60,13 @@ _PIN_SELECTINLOADS = (
 
 
 @router.get(path="/pin/{id}", response_model=None)
-def get_edit_pin(
+async def get_edit_pin(
     request: Request,
     id: int,
     current_user: EditorUser,
 ) -> HtpyResponse:
-    with session_maker() as session:
-        pin: Pin | None = session.scalar(
+    async with async_session_maker() as session:
+        pin: Pin | None = await session.scalar(
             select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
         )
 
@@ -76,14 +76,14 @@ def get_edit_pin(
         assert_editor_can_edit(pin, current_user)
 
         if needs_pending_edit(pin, current_user):
-            chain = get_edit_chain(session, "pins", id)
+            chain = await get_edit_chain(session, "pins", id)
             if chain:
                 effective = get_effective_snapshot(pin, chain)
                 with session.no_autoflush:
-                    apply_snapshot_in_memory(pin, effective, session)
+                    await apply_snapshot_in_memory(pin, effective, session)
 
-        currencies: Sequence[Currency] = session.scalars(
-            statement=select(Currency)
+        currencies: Sequence[Currency] = (
+            await session.scalars(statement=select(Currency))
         ).all()
 
         options_base_url: str = str(
@@ -132,8 +132,8 @@ async def post_edit_pin(
     if back_image:
         back_image_guid = await save_image(file=back_image)
 
-    with session_maker.begin() as session:
-        pin: Pin | None = session.scalar(
+    async with async_session_maker.begin() as session:
+        pin: Pin | None = await session.scalar(
             select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
         )
         if not pin:
@@ -145,13 +145,13 @@ async def post_edit_pin(
             LOGGER.info(
                 "Submitting pending edit for pin id=%d name=%r", id, fields.name
             )
-            chain = get_edit_chain(session, "pins", id)
+            chain = await get_edit_chain(session, "pins", id)
             old_snapshot: dict[str, object] = get_effective_snapshot(pin, chain)
 
             grades_list = parse_grade_dicts(fields.grade_names, fields.grade_prices)
             grades_list.sort(key=lambda grade: grade["name"])  # type: ignore[arg-type, return-value]
 
-            return submit_pending_edit(
+            return await submit_pending_edit(
                 session=session,
                 entity=pin,
                 entity_table="pins",
@@ -201,19 +201,21 @@ async def post_edit_pin(
 
         # Direct edit — admin, or editor on their own pending-new entry.
         LOGGER.info("Editing pin id=%d name=%r", id, fields.name)
-        pin_shops, pin_sets, pin_artists = load_pin_relations(
+        pin_shops, pin_sets, pin_artists = await load_pin_relations(
             session=session,
             shop_ids=fields.shop_ids,
             pin_sets_ids=fields.pin_sets_ids,
             artist_ids=fields.artist_ids,
         )
-        variant_pins, unauthorized_copy_pins = load_pin_links(
+        variant_pins, unauthorized_copy_pins = await load_pin_links(
             session=session,
             self_pin_id=id,
             variant_pin_ids=fields.variant_pin_ids,
             unauthorized_copy_pin_ids=fields.unauthorized_copy_pin_ids,
         )
-        currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
+        currency: Currency = await session.get_one(
+            entity=Currency, ident=fields.currency_id
+        )
 
         pin.name = fields.name
         pin.description = fields.description
@@ -235,24 +237,24 @@ async def post_edit_pin(
         if back_image_guid:
             pin.back_image_guid = back_image_guid
 
-        replace_links(entity=pin, urls=fields.links, session=session)
+        await replace_links(entity=pin, urls=fields.links, session=session)
 
-        upsert_grades(
+        await upsert_grades(
             pin=pin,
             grades=parse_grade_dicts(fields.grade_names, fields.grade_prices),
             session=session,
         )
 
-        apply_pin_tags(pin.id, fields.tag_ids, session)
+        await apply_pin_tags(pin.id, fields.tag_ids, session)
         sync_symmetric_pin_links(
             pin=pin,
             variants=variant_pins,
             unauthorized_copies=unauthorized_copy_pins,
         )
-        session.flush()
+        await session.flush()
         pin_id: int = pin.id
 
-    sync_entity(EntityType.pin, pin_id)
+    await sync_entity(EntityType.pin, pin_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

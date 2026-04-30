@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 
 from pindb.auth import require_admin
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.routes.admin import search, tag_bulk, users
 from pindb.routes.admin._pending_count import count_pending
 from pindb.routes.admin.tag_bulk import (
@@ -22,9 +22,9 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 
 
 @router.get("")
-def get_admin_panel(request: Request) -> HTMLResponse:
-    with session_maker() as session:
-        pending_count = count_pending(session)
+async def get_admin_panel(request: Request) -> HTMLResponse:
+    async with async_session_maker() as session:
+        pending_count = await count_pending(session)
     return HTMLResponse(
         content=str(admin_panel_page(request=request, pending_count=pending_count))
     )

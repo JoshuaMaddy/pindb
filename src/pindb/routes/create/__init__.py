@@ -14,7 +14,7 @@ router = APIRouter(prefix="/create", dependencies=[Depends(require_editor)])
 
 
 @router.get(path="/")
-def get_create_index(request: Request) -> HtpyResponse:
+async def get_create_index(request: Request) -> HtpyResponse:
     return HtpyResponse(create_index(request=request))
 
 

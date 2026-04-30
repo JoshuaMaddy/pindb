@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Tag, TagCategory, session_maker
+from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
@@ -38,13 +38,13 @@ LOGGER = user_logger("pindb.routes.edit.tag")
 
 
 @router.get(path="/tag/{id}", response_model=None)
-def get_edit_tag(
+async def get_edit_tag(
     request: Request,
     id: int,
     current_user: EditorUser,
 ) -> HTMLResponse:
-    with session_maker() as session:
-        tag: Tag | None = session.scalar(
+    async with async_session_maker() as session:
+        tag: Tag | None = await session.scalar(
             select(Tag)
             .where(Tag.id == id)
             .options(selectinload(Tag.implications), selectinload(Tag.aliases))
@@ -56,11 +56,11 @@ def get_edit_tag(
         assert_editor_can_edit(tag, current_user)
 
         if needs_pending_edit(tag, current_user):
-            chain = get_edit_chain(session, "tags", id)
+            chain = await get_edit_chain(session, "tags", id)
             if chain:
                 effective = get_effective_snapshot(tag, chain)
                 with session.no_autoflush:
-                    apply_snapshot_in_memory(tag, effective, session)
+                    await apply_snapshot_in_memory(tag, effective, session)
 
         options_url = str(request.url_for("get_tag_options")) + f"?exclude_id={id}"
 
@@ -77,7 +77,7 @@ def get_edit_tag(
 
 
 @router.post(path="/tag/{id}", response_model=None)
-def post_edit_tag(
+async def post_edit_tag(
     request: Request,
     id: int,
     current_user: EditorUser,
@@ -87,8 +87,8 @@ def post_edit_tag(
     implication_ids: list[int] = Form(default_factory=list),
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        tag: Tag | None = session.scalar(
+    async with async_session_maker.begin() as session:
+        tag: Tag | None = await session.scalar(
             select(Tag)
             .where(Tag.id == id)
             .options(selectinload(Tag.implications), selectinload(Tag.aliases))
@@ -101,7 +101,7 @@ def post_edit_tag(
 
         if needs_pending_edit(tag, current_user):
             LOGGER.info("Submitting pending edit for tag id=%d name=%r", id, name)
-            return submit_pending_edit(
+            return await submit_pending_edit(
                 session=session,
                 entity=tag,
                 entity_table="tags",
@@ -128,8 +128,8 @@ def post_edit_tag(
         old_implication_ids: set[int] = {
             implied_tag.id for implied_tag in tag.implications
         }
-        implied_tags: Sequence[Tag] = session.scalars(
-            select(Tag).where(Tag.id.in_(implication_ids))
+        implied_tags: Sequence[Tag] = (
+            await session.scalars(select(Tag).where(Tag.id.in_(implication_ids)))
         ).all()
         tag.implications = set(implied_tags)
 
@@ -137,9 +137,9 @@ def post_edit_tag(
         newly_added_ids: set[int] = new_implication_ids - old_implication_ids
         removed_ids: set[int] = old_implication_ids - new_implication_ids
 
-        session.flush()  # write tag_implications changes before cascading
+        await session.flush()  # write tag_implications changes before cascading
 
-        cascade_new_implications_to_pins(
+        await cascade_new_implications_to_pins(
             tag=tag,
             newly_added_ids=newly_added_ids,
             implied_tags=implied_tags,
@@ -147,14 +147,14 @@ def post_edit_tag(
         )
 
         if removed_ids:
-            _cascade_remove_implied(tag.id, removed_ids, session)
+            await _cascade_remove_implied(tag.id, removed_ids, session)
 
-        replace_tag_aliases(tag=tag, aliases=aliases, session=session)
+        await replace_tag_aliases(tag=tag, aliases=aliases, session=session)
 
-        session.flush()
+        await session.flush()
         tag_id: int = tag.id
 
-    sync_entity(EntityType.tag, tag_id)
+    await sync_entity(EntityType.tag, tag_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

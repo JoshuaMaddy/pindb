@@ -14,7 +14,8 @@ from typing import Any, Sequence
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, attributes
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import attributes
 
 from pindb.database.artist import Artist
 from pindb.database.currency import Currency
@@ -150,29 +151,31 @@ def apply_patch(snapshot: dict[str, Any], patch: dict[str, Any]) -> dict[str, An
 # ---------------------------------------------------------------------------
 
 
-def get_edit_chain(
-    session: Session, entity_type: str, entity_id: int
+async def get_edit_chain(
+    session: AsyncSession, entity_type: str, entity_id: int
 ) -> list[PendingEdit]:
     """Unapproved, unrejected pending edits for an entity, oldest first."""
     return list(
-        session.scalars(
-            select(PendingEdit)
-            .where(
-                PendingEdit.entity_type == entity_type,
-                PendingEdit.entity_id == entity_id,
-                PendingEdit.approved_at.is_(None),
-                PendingEdit.rejected_at.is_(None),
+        (
+            await session.scalars(
+                select(PendingEdit)
+                .where(
+                    PendingEdit.entity_type == entity_type,
+                    PendingEdit.entity_id == entity_id,
+                    PendingEdit.approved_at.is_(None),
+                    PendingEdit.rejected_at.is_(None),
+                )
+                .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
             )
-            .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
         ).all()
     )
 
 
-def get_head_edit(
-    session: Session, entity_type: str, entity_id: int
+async def get_head_edit(
+    session: AsyncSession, entity_type: str, entity_id: int
 ) -> PendingEdit | None:
     """Most recent unapproved edit for an entity, or None."""
-    return session.scalar(
+    return await session.scalar(
         select(PendingEdit)
         .where(
             PendingEdit.entity_type == entity_type,
@@ -194,14 +197,16 @@ def get_effective_snapshot(
     return snapshot
 
 
-def has_pending_edits(session: Session, entity_type: str, entity_id: int) -> bool:
+async def has_pending_edits(
+    session: AsyncSession, entity_type: str, entity_id: int
+) -> bool:
     """Return whether any unapproved ``PendingEdit`` exists for the entity."""
-    return get_head_edit(session, entity_type, entity_id) is not None
+    return await get_head_edit(session, entity_type, entity_id) is not None
 
 
-def maybe_apply_pending_view(
+async def maybe_apply_pending_view(
     *,
-    session: Session,
+    session: AsyncSession,
     entity: Pin | Artist | Shop | Tag,
     entity_table: str,
     current_user: object,
@@ -219,15 +224,15 @@ def maybe_apply_pending_view(
     )
     viewing_pending = version == "pending" and can_see_pending
 
-    pending_chain_exists = can_see_pending and has_pending_edits(
+    pending_chain_exists = can_see_pending and await has_pending_edits(
         session, entity_table, entity.id
     )
 
     if viewing_pending and pending_chain_exists:
-        chain = get_edit_chain(session, entity_table, entity.id)
+        chain = await get_edit_chain(session, entity_table, entity.id)
         effective = get_effective_snapshot(entity, chain)
         with session.no_autoflush:
-            apply_snapshot_in_memory(entity, effective, session)
+            await apply_snapshot_in_memory(entity, effective, session)
 
     return pending_chain_exists, viewing_pending
 
@@ -241,10 +246,10 @@ def _parse_date(value: str | None) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
-def apply_snapshot_in_memory(
+async def apply_snapshot_in_memory(
     entity: Pin | Artist | Shop | Tag,
     snapshot: dict[str, Any],
-    session: Session,
+    session: AsyncSession,
 ) -> None:
     """Mutate an ORM entity in-memory to reflect a snapshot.
 
@@ -253,19 +258,19 @@ def apply_snapshot_in_memory(
     they should not be flushed.
     """
     if isinstance(entity, Pin):
-        _apply_pin_snapshot_in_memory(entity, snapshot, session)
+        await _apply_pin_snapshot_in_memory(entity, snapshot, session)
     elif isinstance(entity, Artist):
         _apply_artist_snapshot_in_memory(entity, snapshot)
     elif isinstance(entity, Shop):
         _apply_shop_snapshot_in_memory(entity, snapshot)
     elif isinstance(entity, Tag):
-        _apply_tag_snapshot_in_memory(entity, snapshot, session)
+        await _apply_tag_snapshot_in_memory(entity, snapshot, session)
     else:
         raise TypeError(f"No in-memory apply for {type(entity).__name__}")
 
 
-def _apply_pin_snapshot_in_memory(
-    pin: Pin, snapshot: dict[str, Any], session: Session
+async def _apply_pin_snapshot_in_memory(
+    pin: Pin, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
     pin.name = snapshot["name"]
     pin.acquisition_type = AcquisitionType(snapshot["acquisition_type"])
@@ -284,7 +289,7 @@ def _apply_pin_snapshot_in_memory(
 
     currency_id: int = snapshot["currency_id"]
     if pin.currency_id != currency_id:
-        currency = session.get(Currency, currency_id)
+        currency = await session.get(Currency, currency_id)
         if currency is not None:
             pin.currency = currency
             pin.currency_id = currency_id
@@ -295,35 +300,43 @@ def _apply_pin_snapshot_in_memory(
     )
 
     pin.shops = set(
-        session.scalars(
-            select(Shop)
-            .where(Shop.id.in_(snapshot["shop_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Shop)
+                .where(Shop.id.in_(snapshot["shop_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
     explicit_tag_objs = set(
-        session.scalars(
-            select(Tag)
-            .where(Tag.id.in_(snapshot["tag_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Tag)
+                .where(Tag.id.in_(snapshot["tag_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
-    resolved_tags = resolve_implications(explicit_tag_objs, session)
+    resolved_tags = await resolve_implications(explicit_tag_objs, session)
     attributes.set_committed_value(pin, "explicit_tags", explicit_tag_objs)
     attributes.set_committed_value(pin, "tags", set(resolved_tags.keys()))
     pin.artists = set(
-        session.scalars(
-            select(Artist)
-            .where(Artist.id.in_(snapshot["artist_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Artist)
+                .where(Artist.id.in_(snapshot["artist_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
     if snapshot.get("pin_set_ids"):
         pin.sets = set(
-            session.scalars(
-                select(PinSet)
-                .where(PinSet.id.in_(snapshot["pin_set_ids"]))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(PinSet)
+                    .where(PinSet.id.in_(snapshot["pin_set_ids"]))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
     else:
@@ -333,10 +346,12 @@ def _apply_pin_snapshot_in_memory(
     copy_ids = snapshot.get("unauthorized_copy_pin_ids") or []
     pin_variants_set: set[Pin] = (
         set(
-            session.scalars(
-                select(Pin)
-                .where(Pin.id.in_(variant_ids))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(variant_ids))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
         if variant_ids
@@ -344,10 +359,12 @@ def _apply_pin_snapshot_in_memory(
     )
     pin_copies_set: set[Pin] = (
         set(
-            session.scalars(
-                select(Pin)
-                .where(Pin.id.in_(copy_ids))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(copy_ids))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
         if copy_ids
@@ -377,17 +394,19 @@ def _apply_shop_snapshot_in_memory(shop: Shop, snapshot: dict[str, Any]) -> None
     shop.links = {Link(path=path) for path in snapshot["links"]}
 
 
-def _apply_tag_snapshot_in_memory(
-    tag: Tag, snapshot: dict[str, Any], session: Session
+async def _apply_tag_snapshot_in_memory(
+    tag: Tag, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
     tag.name = snapshot["name"]
     tag.description = snapshot["description"]
     tag.category = TagCategory(snapshot["category"])
     tag.implications = set(
-        session.scalars(
-            select(Tag)
-            .where(Tag.id.in_(snapshot["implication_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Tag)
+                .where(Tag.id.in_(snapshot["implication_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
     attributes.set_committed_value(
@@ -402,10 +421,10 @@ def _apply_tag_snapshot_in_memory(
 # ---------------------------------------------------------------------------
 
 
-def apply_snapshot_to_entity(
+async def apply_snapshot_to_entity(
     entity: Pin | Artist | Shop | Tag,
     snapshot: dict[str, Any],
-    session: Session,
+    session: AsyncSession,
 ) -> None:
     """Write snapshot values to the canonical entity as a real update.
 
@@ -413,26 +432,28 @@ def apply_snapshot_to_entity(
     replacement the same way the edit routes do.
     """
     if isinstance(entity, Pin):
-        _approve_pin_snapshot(entity, snapshot, session)
+        await _approve_pin_snapshot(entity, snapshot, session)
     elif isinstance(entity, Artist):
-        _approve_artist_snapshot(entity, snapshot, session)
+        await _approve_artist_snapshot(entity, snapshot, session)
     elif isinstance(entity, Shop):
-        _approve_shop_snapshot(entity, snapshot, session)
+        await _approve_shop_snapshot(entity, snapshot, session)
     elif isinstance(entity, Tag):
-        _approve_tag_snapshot(entity, snapshot, session)
+        await _approve_tag_snapshot(entity, snapshot, session)
     else:
         raise TypeError(f"No approval apply for {type(entity).__name__}")
 
 
-def _replace_links(
-    entity: Pin | Artist | Shop, new_urls: list[str], session: Session
+async def _replace_links(
+    entity: Pin | Artist | Shop, new_urls: list[str], session: AsyncSession
 ) -> None:
     for old_link in list(entity.links):
-        session.delete(old_link)
+        await session.delete(old_link)
     entity.links = {Link(path=url) for url in new_urls}
 
 
-def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) -> None:
+async def _approve_pin_snapshot(
+    pin: Pin, snapshot: dict[str, Any], session: AsyncSession
+) -> None:
     pin.name = snapshot["name"]
     pin.acquisition_type = AcquisitionType(snapshot["acquisition_type"])
     pin.limited_edition = snapshot["limited_edition"]
@@ -448,7 +469,7 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
     pin.description = snapshot["description"]
     pin.sku = snapshot["sku"]
 
-    currency = session.get_one(Currency, snapshot["currency_id"])
+    currency = await session.get_one(entity=Currency, ident=snapshot["currency_id"])
     pin.currency = currency
     pin.currency_id = currency.id
 
@@ -458,26 +479,32 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
     )
 
     pin.shops = set(
-        session.scalars(
-            select(Shop)
-            .where(Shop.id.in_(snapshot["shop_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Shop)
+                .where(Shop.id.in_(snapshot["shop_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
-    apply_pin_tags(pin.id, snapshot["tag_ids"], session)
+    await apply_pin_tags(pin.id, snapshot["tag_ids"], session)
     pin.artists = set(
-        session.scalars(
-            select(Artist)
-            .where(Artist.id.in_(snapshot["artist_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Artist)
+                .where(Artist.id.in_(snapshot["artist_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
     if snapshot.get("pin_set_ids"):
         pin.sets = set(
-            session.scalars(
-                select(PinSet)
-                .where(PinSet.id.in_(snapshot["pin_set_ids"]))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(PinSet)
+                    .where(PinSet.id.in_(snapshot["pin_set_ids"]))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
     else:
@@ -487,10 +514,12 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
     copy_ids = snapshot.get("unauthorized_copy_pin_ids") or []
     approved_variants: set[Pin] = (
         set(
-            session.scalars(
-                select(Pin)
-                .where(Pin.id.in_(variant_ids))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(variant_ids))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
         if variant_ids
@@ -498,10 +527,12 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
     )
     approved_copies: set[Pin] = (
         set(
-            session.scalars(
-                select(Pin)
-                .where(Pin.id.in_(copy_ids))
-                .execution_options(include_pending=True)
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(copy_ids))
+                    .execution_options(include_pending=True)
+                )
             ).all()
         )
         if copy_ids
@@ -513,51 +544,55 @@ def _approve_pin_snapshot(pin: Pin, snapshot: dict[str, Any], session: Session) 
         unauthorized_copies=approved_copies,
     )
 
-    _replace_links(pin, snapshot["links"], session)
-    upsert_grades(pin=pin, grades=snapshot["grades"], session=session)
+    await _replace_links(pin, snapshot["links"], session)
+    await upsert_grades(pin=pin, grades=snapshot["grades"], session=session)
 
 
-def _approve_artist_snapshot(
-    artist: Artist, snapshot: dict[str, Any], session: Session
+async def _approve_artist_snapshot(
+    artist: Artist, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
     artist.name = snapshot["name"]
     artist.description = snapshot["description"]
     artist.active = snapshot["active"]
-    _replace_links(artist, snapshot["links"], session)
+    await _replace_links(artist, snapshot["links"], session)
 
 
-def _approve_shop_snapshot(
-    shop: Shop, snapshot: dict[str, Any], session: Session
+async def _approve_shop_snapshot(
+    shop: Shop, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
     shop.name = snapshot["name"]
     shop.description = snapshot["description"]
     shop.active = snapshot["active"]
-    _replace_links(shop, snapshot["links"], session)
+    await _replace_links(shop, snapshot["links"], session)
 
 
-def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) -> None:
+async def _approve_tag_snapshot(
+    tag: Tag, snapshot: dict[str, Any], session: AsyncSession
+) -> None:
     tag.name = snapshot["name"]
     tag.description = snapshot["description"]
     tag.category = TagCategory(snapshot["category"])
 
     old_implication_ids: set[int] = {implied_tag.id for implied_tag in tag.implications}
     implied_tags = set(
-        session.scalars(
-            select(Tag)
-            .where(Tag.id.in_(snapshot["implication_ids"]))
-            .execution_options(include_pending=True)
+        (
+            await session.scalars(
+                select(Tag)
+                .where(Tag.id.in_(snapshot["implication_ids"]))
+                .execution_options(include_pending=True)
+            )
         ).all()
     )
     tag.implications = implied_tags
-    replace_tag_aliases(tag=tag, aliases=snapshot["aliases"], session=session)
+    await replace_tag_aliases(tag=tag, aliases=snapshot["aliases"], session=session)
 
     new_implication_ids: set[int] = {implied_tag.id for implied_tag in implied_tags}
     newly_added_ids: set[int] = new_implication_ids - old_implication_ids
     removed_ids: set[int] = old_implication_ids - new_implication_ids
 
-    session.flush()  # persist tag_implications changes before cascading
+    await session.flush()  # persist tag_implications changes before cascading
 
-    cascade_new_implications_to_pins(
+    await cascade_new_implications_to_pins(
         tag=tag,
         newly_added_ids=newly_added_ids,
         implied_tags=implied_tags,
@@ -565,4 +600,4 @@ def _approve_tag_snapshot(tag: Tag, snapshot: dict[str, Any], session: Session) 
     )
 
     if removed_ids:
-        _cascade_remove_implied(tag.id, removed_ids, session)
+        await _cascade_remove_implied(tag.id, removed_ids, session)

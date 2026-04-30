@@ -6,7 +6,8 @@ from typing import Annotated
 from fastapi import Form
 from pydantic import BeforeValidator
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from pindb.database.artist import Artist
 from pindb.database.pin import Pin
@@ -103,29 +104,29 @@ class PinFormParams:
         self.links = links
 
 
-def load_pin_relations(
+async def load_pin_relations(
     *,
-    session: Session,
+    session: AsyncSession,
     shop_ids: list[int],
     pin_sets_ids: list[int],
     artist_ids: list[int],
 ) -> tuple[set[Shop], set[PinSet], set[Artist]]:
     """Resolve M2M id lists to model sets in one session pass."""
     pin_shops: set[Shop] = set(
-        session.scalars(select(Shop).where(Shop.id.in_(shop_ids))).all()
+        (await session.scalars(select(Shop).where(Shop.id.in_(shop_ids)))).all()
     )
     pin_sets: set[PinSet] = set(
-        session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids))).all()
+        (await session.scalars(select(PinSet).where(PinSet.id.in_(pin_sets_ids)))).all()
     )
     pin_artists: set[Artist] = set(
-        session.scalars(select(Artist).where(Artist.id.in_(artist_ids))).all()
+        (await session.scalars(select(Artist).where(Artist.id.in_(artist_ids)))).all()
     )
     return pin_shops, pin_sets, pin_artists
 
 
-def load_pin_links(
+async def load_pin_links(
     *,
-    session: Session,
+    session: AsyncSession,
     self_pin_id: int | None,
     variant_pin_ids: list[int],
     unauthorized_copy_pin_ids: list[int],
@@ -139,12 +140,34 @@ def load_pin_links(
     variant_ids = [pid for pid in variant_pin_ids if pid != self_pin_id]
     copy_ids = [pid for pid in unauthorized_copy_pin_ids if pid != self_pin_id]
     variants: set[Pin] = (
-        set(session.scalars(select(Pin).where(Pin.id.in_(variant_ids))).all())
+        set(
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(variant_ids))
+                    .options(
+                        selectinload(Pin.variants),
+                        selectinload(Pin.unauthorized_copies),
+                    )
+                )
+            ).all()
+        )
         if variant_ids
         else set()
     )
     copies: set[Pin] = (
-        set(session.scalars(select(Pin).where(Pin.id.in_(copy_ids))).all())
+        set(
+            (
+                await session.scalars(
+                    select(Pin)
+                    .where(Pin.id.in_(copy_ids))
+                    .options(
+                        selectinload(Pin.variants),
+                        selectinload(Pin.unauthorized_copies),
+                    )
+                )
+            ).all()
+        )
         if copy_ids
         else set()
     )

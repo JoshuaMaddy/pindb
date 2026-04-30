@@ -12,7 +12,7 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from pindb.database import Artist, Shop, session_maker
+from pindb.database import Artist, Shop, async_session_maker
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.link import Link
@@ -39,13 +39,13 @@ LOGGER = user_logger("pindb.routes.create.pin")
 
 
 @router.get(path="/pin")
-def get_create_pin(
+async def get_create_pin(
     request: Request,
     duplicate_from: int | None = Query(default=None),
 ) -> HtpyResponse:
-    with session_maker() as session:
-        currencies: Sequence[Currency] = session.scalars(
-            statement=select(Currency)
+    async with async_session_maker() as session:
+        currencies: Sequence[Currency] = (
+            await session.scalars(statement=select(Currency))
         ).all()
 
         options_base_url: str = str(
@@ -60,7 +60,7 @@ def get_create_pin(
         prefill_variants: list[Pin] = []
         prefill_copies: list[Pin] = []
         if duplicate_from is not None:
-            duplicate_source = session.scalar(
+            duplicate_source = await session.scalar(
                 select(Pin)
                 .where(Pin.id == duplicate_from)
                 .options(
@@ -137,20 +137,22 @@ async def post_create_pin(
     if back_image:
         back_image_guid = await save_image(file=back_image)
 
-    with session_maker.begin() as session:
-        pin_shops, pin_sets, pin_artists = load_pin_relations(
+    async with async_session_maker.begin() as session:
+        pin_shops, pin_sets, pin_artists = await load_pin_relations(
             session=session,
             shop_ids=fields.shop_ids,
             pin_sets_ids=fields.pin_sets_ids,
             artist_ids=fields.artist_ids,
         )
-        variant_pins, unauthorized_copy_pins = load_pin_links(
+        variant_pins, unauthorized_copy_pins = await load_pin_links(
             session=session,
             self_pin_id=None,
             variant_pin_ids=fields.variant_pin_ids,
             unauthorized_copy_pin_ids=fields.unauthorized_copy_pin_ids,
         )
-        currency: Currency = session.get_one(entity=Currency, ident=fields.currency_id)
+        currency: Currency = await session.get_one(
+            entity=Currency, ident=fields.currency_id
+        )
         new_links: set[Link] = (
             {Link(path=link) for link in fields.links} if fields.links else set[Link]()
         )
@@ -183,8 +185,8 @@ async def post_create_pin(
         )
 
         session.add(instance=new_pin)
-        session.flush()
-        apply_pin_tags(new_pin.id, fields.tag_ids, session)
+        await session.flush()
+        await apply_pin_tags(new_pin.id, fields.tag_ids, session)
         sync_symmetric_pin_links(
             pin=new_pin,
             variants=variant_pins,
@@ -192,8 +194,8 @@ async def post_create_pin(
         )
         pin_id: int = new_pin.id
 
-    with session_maker() as session:
-        created_pin: Pin | None = session.scalar(
+    async with async_session_maker() as session:
+        created_pin: Pin | None = await session.scalar(
             select(Pin)
             .where(Pin.id == pin_id)
             .options(
@@ -203,7 +205,7 @@ async def post_create_pin(
             )
         )
     if created_pin is not None:
-        update_pin(pin=created_pin)
+        await update_pin(pin=created_pin)
 
     LOGGER.info("Created pin id=%d name=%r", pin_id, fields.name)
 

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/list")
 
 
 @router.get(path="/")
-def get_list_index(request: Request) -> HtpyResponse:
+async def get_list_index(request: Request) -> HtpyResponse:
     return HtpyResponse(list_index_page(request=request))
 
 

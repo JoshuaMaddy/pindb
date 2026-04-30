@@ -11,9 +11,10 @@ from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from pindb.database import Tag, TagCategory, session_maker
+from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.joins import tag_implications
 from pindb.database.tag import (
     TagAlias,
@@ -99,7 +100,9 @@ def _merge_tag_fields(
         )
 
 
-def _add_new_aliases(*, tag: Tag, node: TagUpsertNode, session: Session) -> int:
+async def _add_new_aliases(
+    *, tag: Tag, node: TagUpsertNode, session: AsyncSession
+) -> int:
     """Insert any aliases from the payload that aren't already on the tag.
 
     Add-only. Returns the number of aliases inserted. Avoids the delete+reinsert
@@ -126,13 +129,13 @@ def _add_new_aliases(*, tag: Tag, node: TagUpsertNode, session: Session) -> int:
     for normalized in to_add:
         tag.aliases.append(TagAlias(alias=normalized))
     if to_add:
-        session.flush()
+        await session.flush()
     return len(to_add)
 
 
-def _upsert_tag_node(
+async def _upsert_tag_node(
     *,
-    session: Session,
+    session: AsyncSession,
     node: TagUpsertNode,
     visiting: set[str],
     touched: set[int],
@@ -155,7 +158,7 @@ def _upsert_tag_node(
                 continue
             seen_child.add(child_key)
             implied_tags.append(
-                _upsert_tag_node(
+                await _upsert_tag_node(
                     session=session,
                     node=child,
                     visiting=visiting,
@@ -163,7 +166,7 @@ def _upsert_tag_node(
                 )
             )
 
-        tag: Tag | None = session.scalar(
+        tag: Tag | None = await session.scalar(
             select(Tag)
             .where(Tag.name == name_key)
             .options(selectinload(Tag.implications), selectinload(Tag.aliases))
@@ -176,7 +179,7 @@ def _upsert_tag_node(
                 category=node.category,
             )
             session.add(tag)
-            session.flush()
+            await session.flush()
         else:
             _merge_tag_fields(tag=tag, node=node)
 
@@ -188,17 +191,17 @@ def _upsert_tag_node(
         new_implication_ids: set[int] = {t.id for t in merged_implied}
         newly_added_ids: set[int] = new_implication_ids - old_implication_ids
 
-        session.flush()
+        await session.flush()
 
         if newly_added_ids:
-            cascade_new_implications_to_pins(
+            await cascade_new_implications_to_pins(
                 tag=tag,
                 newly_added_ids=newly_added_ids,
                 implied_tags=merged_implied,
                 session=session,
             )
 
-        added_alias_count = _add_new_aliases(tag=tag, node=node, session=session)
+        added_alias_count = await _add_new_aliases(tag=tag, node=node, session=session)
 
         action = "created" if created else "merged"
         LOGGER.info(
@@ -217,7 +220,7 @@ def _upsert_tag_node(
         visiting.discard(name_key)
 
 
-def _check_no_cycles(touched_root_ids: list[int], session: Session) -> None:
+async def _check_no_cycles(touched_root_ids: list[int], session: AsyncSession) -> None:
     """Run the BFS implication closure from each root; raises 400 on revisit.
 
     Catches cycles created by mixing payload edges with pre-existing DB edges
@@ -227,15 +230,19 @@ def _check_no_cycles(touched_root_ids: list[int], session: Session) -> None:
     """
     if not touched_root_ids:
         return
-    roots = session.scalars(select(Tag).where(Tag.id.in_(touched_root_ids))).all()
+    roots = (
+        await session.scalars(select(Tag).where(Tag.id.in_(touched_root_ids)))
+    ).all()
     for root in roots:
         seen: set[int] = {root.id}
         stack: list[int] = [root.id]
         while stack:
             current_id = stack.pop()
-            child_ids = session.scalars(
-                select(tag_implications.c.implied_tag_id).where(
-                    tag_implications.c.tag_id == current_id
+            child_ids = (
+                await session.scalars(
+                    select(tag_implications.c.implied_tag_id).where(
+                        tag_implications.c.tag_id == current_id
+                    )
                 )
             ).all()
             for child_id in child_ids:
@@ -254,7 +261,7 @@ def _check_no_cycles(touched_root_ids: list[int], session: Session) -> None:
                 stack.append(child_id)
 
 
-def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
+async def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
     """Apply upserts in one transaction; refresh Meilisearch for touched tags."""
     if not body.tags:
         raise HTTPException(
@@ -264,33 +271,35 @@ def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
 
     touched: set[int] = set()
     root_ids: list[int] = []
-    with session_maker.begin() as session:
+    async with async_session_maker.begin() as session:
         for root in body.tags:
             visiting: set[str] = set()
-            tag = _upsert_tag_node(
+            tag = await _upsert_tag_node(
                 session=session,
                 node=root,
                 visiting=visiting,
                 touched=touched,
             )
             root_ids.append(tag.id)
-        _check_no_cycles(touched_root_ids=root_ids, session=session)
+        await _check_no_cycles(touched_root_ids=root_ids, session=session)
 
     unique_sorted = sorted(touched)
 
     tags_to_index: list[Tag] = []
     if unique_sorted:
-        with session_maker() as session:
+        async with async_session_maker() as session:
             tags_to_index = list(
-                session.scalars(
-                    select(Tag)
-                    .where(Tag.id.in_(unique_sorted))
-                    .options(selectinload(Tag.aliases))
+                (
+                    await session.scalars(
+                        select(Tag)
+                        .where(Tag.id.in_(unique_sorted))
+                        .options(selectinload(Tag.aliases))
+                    )
                 ).all()
             )
     if tags_to_index:
         try:
-            update_tags(tags_to_index)
+            await update_tags(tags_to_index)
         except Exception:
             LOGGER.warning(
                 "bulk-upsert: Meilisearch update failed for %d tag(s); "
@@ -313,7 +322,7 @@ def _format_validation_error(exc: ValidationError) -> str:
 
 
 @router.get("/tags/bulk")
-def get_admin_bulk_tags(request: Request) -> HtpyResponse:
+async def get_admin_bulk_tags(request: Request) -> HtpyResponse:
     return HtpyResponse(bulk_tags_page(request=request))
 
 
@@ -371,7 +380,7 @@ async def post_admin_bulk_tags(
             status_code=400,
         )
     try:
-        result = run_bulk_tag_upsert(body)
+        result = await run_bulk_tag_upsert(body)
     except HTTPException as exc:
         return HtpyResponse(
             bulk_tags_page(
@@ -389,12 +398,12 @@ async def post_admin_bulk_tags(
 
 
 @router.post("/tags/bulk-upsert")
-def post_admin_tags_bulk_upsert(body: BulkTagUpsertBody) -> JSONResponse:
+async def post_admin_tags_bulk_upsert(body: BulkTagUpsertBody) -> JSONResponse:
     """Merge or create tags from a recursive JSON tree (name, category, aliases, implications).
 
     Existing tags gain new aliases and new implications; scalar fields are filled when empty
     (description) or still default (category). New implications use the same ``pins_tags``
     cascade as the tag edit form. Admin-only.
     """
-    result = run_bulk_tag_upsert(body)
+    result = await run_bulk_tag_upsert(body)
     return JSONResponse(content=result.model_dump(mode="json"))

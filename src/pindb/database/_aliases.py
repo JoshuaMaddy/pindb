@@ -8,19 +8,21 @@ first, then attach replacements.
 
 from __future__ import annotations
 
+from inspect import isawaitable
 from typing import Any, Callable, Iterable, TypeVar
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 AliasT = TypeVar("AliasT")
 
 
-def replace_aliases(
+async def replace_aliases(
     *,
     owner: Any,
     alias_cls: type[AliasT],
     raw_aliases: Iterable[str],
-    session: Session,
+    session: AsyncSession | Session,
     normalizer: Callable[[str], str] | None = None,
 ) -> None:
     """Replace ``owner.aliases`` with deduped, cleaned ``alias_cls`` instances.
@@ -37,6 +39,10 @@ def replace_aliases(
         seen.add(value)
         cleaned.append(value)
     for existing in list(owner.aliases):
-        session.delete(existing)
-    session.flush()
+        result = session.delete(existing)
+        if isawaitable(result):
+            await result
+    result = session.flush()
+    if isawaitable(result):
+        await result
     owner.aliases = [alias_cls(alias=value) for value in cleaned]

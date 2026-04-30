@@ -3,17 +3,17 @@ FastAPI routes: `routes/admin/_pending_count.py`.
 """
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database import Artist, Pin, PinSet, Shop, Tag
 from pindb.database.pending_edit import PendingEdit
 
 
-def count_pending(session: Session) -> int:
+async def count_pending(session: AsyncSession) -> int:
     opts: dict[str, bool] = {"include_pending": True}
     total = 0
     for model in [Pin, Shop, Artist, Tag, PinSet]:
-        count = session.scalar(
+        count = await session.scalar(
             select(func.count())
             .select_from(model)
             .where(
@@ -34,6 +34,8 @@ def count_pending(session: Session) -> int:
         .distinct()
         .subquery()
     )
-    edit_group_count = session.scalar(select(func.count()).select_from(edit_group_subq))
+    edit_group_count = await session.scalar(
+        select(func.count()).select_from(edit_group_subq)
+    )
     total += edit_group_count or 0
     return total

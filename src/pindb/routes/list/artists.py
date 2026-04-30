@@ -10,7 +10,7 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from pindb.database import Artist, session_maker
+from pindb.database import Artist, async_session_maker
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.search.search import search_artists
@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 @router.get(path="/artists")
-def get_list_artists(
+async def get_list_artists(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
@@ -39,9 +39,9 @@ def get_list_artists(
         else Artist.name.asc()
     )
 
-    with session_maker() as session:
+    async with async_session_maker() as session:
         if q:
-            artists_result, total_count = search_artists(
+            artists_result, total_count = await search_artists(
                 query=q,
                 session=session,
                 offset=offset,
@@ -49,13 +49,15 @@ def get_list_artists(
             )
             artists: Sequence[Artist] = artists_result
         else:
-            total_count = session.scalar(select(func.count(Artist.id))) or 0
-            artists = session.scalars(
-                select(Artist)
-                .options(selectinload(Artist.pins))
-                .order_by(order_by)
-                .limit(DEFAULT_PER_PAGE)
-                .offset(offset)
+            total_count = await session.scalar(select(func.count(Artist.id))) or 0
+            artists = (
+                await session.scalars(
+                    select(Artist)
+                    .options(selectinload(Artist.pins))
+                    .order_by(order_by)
+                    .limit(DEFAULT_PER_PAGE)
+                    .offset(offset)
+                )
             ).all()
 
         if request.headers.get("HX-Request"):

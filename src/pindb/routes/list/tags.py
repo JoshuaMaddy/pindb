@@ -11,7 +11,7 @@ from pydantic import BeforeValidator
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.tag import Tag, TagCategory
 from pindb.model_utils import empty_str_to_none
 from pindb.models.list_view import EntityListView
@@ -24,7 +24,7 @@ router = APIRouter()
 
 
 @router.get(path="/tags")
-def get_list_tags(
+async def get_list_tags(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
@@ -47,9 +47,9 @@ def get_list_tags(
         else Tag.name.asc()
     )
 
-    with session_maker() as session:
+    async with async_session_maker() as session:
         if q:
-            tags_list_result, total_count = search_tags(
+            tags_list_result, total_count = await search_tags(
                 query=q,
                 session=session,
                 category=category,
@@ -58,11 +58,13 @@ def get_list_tags(
             )
             tags: Sequence[Tag] = tags_list_result
         else:
-            total_count = session.scalar(select(func.count(Tag.id))) or 0
+            total_count = await session.scalar(select(func.count(Tag.id))) or 0
             stmt = select(Tag).options(selectinload(Tag.pins)).order_by(order_by)
             if category:
                 stmt = stmt.where(Tag.category == category)
-            tags = session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset)).all()
+            tags = (
+                await session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset))
+            ).all()
 
         if request.headers.get("HX-Request"):
             return HtpyResponse(

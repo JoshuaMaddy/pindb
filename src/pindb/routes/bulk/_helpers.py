@@ -12,7 +12,7 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database.artist import Artist
 from pindb.database.joins import (
@@ -58,47 +58,55 @@ BULK_SCALAR_FIELDS: tuple[str, ...] = (
 )
 
 
-def resolve_pin_ids(
-    session: Session,
+async def resolve_pin_ids(
+    session: AsyncSession,
     source: BulkEditSource,
     source_id: int,
 ) -> list[int]:
     """Return the pin ids for the given entity source, in a stable order."""
     if source == BulkEditSource.pin_set:
         return list(
-            session.scalars(
-                select(pin_set_memberships.c.pin_id)
-                .where(pin_set_memberships.c.set_id == source_id)
-                .order_by(pin_set_memberships.c.position.asc())
+            (
+                await session.scalars(
+                    select(pin_set_memberships.c.pin_id)
+                    .where(pin_set_memberships.c.set_id == source_id)
+                    .order_by(pin_set_memberships.c.position.asc())
+                )
             ).all()
         )
     if source == BulkEditSource.artist:
         return list(
-            session.scalars(
-                select(pins_artists.c.pin_id).where(
-                    pins_artists.c.artists_id == source_id
+            (
+                await session.scalars(
+                    select(pins_artists.c.pin_id).where(
+                        pins_artists.c.artists_id == source_id
+                    )
                 )
             ).all()
         )
     if source == BulkEditSource.shop:
         return list(
-            session.scalars(
-                select(pins_shops.c.pin_id).where(pins_shops.c.shop_id == source_id)
+            (
+                await session.scalars(
+                    select(pins_shops.c.pin_id).where(pins_shops.c.shop_id == source_id)
+                )
             ).all()
         )
     if source == BulkEditSource.tag:
         return list(
-            session.scalars(
-                select(pins_tags.c.pin_id)
-                .where(pins_tags.c.tag_id == source_id)
-                .distinct()
+            (
+                await session.scalars(
+                    select(pins_tags.c.pin_id)
+                    .where(pins_tags.c.tag_id == source_id)
+                    .distinct()
+                )
             ).all()
         )
     raise ValueError(f"Unknown bulk edit source: {source}")
 
 
-def resolve_source_name(
-    session: Session,
+async def resolve_source_name(
+    session: AsyncSession,
     source: BulkEditSource,
     source_id: int,
 ) -> str:
@@ -114,7 +122,7 @@ def resolve_source_name(
         model = Tag
     else:
         raise ValueError(f"Unknown bulk edit source: {source}")
-    entity = session.get(model, source_id)
+    entity = await session.get(model, source_id)  # type: ignore[arg-type]
     if entity is None:
         return f"#{source_id}"
     if isinstance(entity, Tag):

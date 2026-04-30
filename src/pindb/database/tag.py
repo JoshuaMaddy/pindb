@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable
+from inspect import isawaitable
+from typing import TYPE_CHECKING, Any, Iterable, cast
 
 from rich.repr import Result
 from sqlalchemy import (
@@ -20,6 +21,8 @@ from sqlalchemy import (
     Enum as SQLAlchemyEnum,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import ScalarResult
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -38,6 +41,16 @@ from pindb.database.pending_mixin import PendingMixin
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
+
+
+async def _tag_scalars(
+    *, session: AsyncSession | Session, statement: Any
+) -> list["Tag"]:
+    scalars_result = session.scalars(statement)
+    if isawaitable(scalars_result):
+        scalars_result = await scalars_result
+    typed_result = cast(ScalarResult["Tag"], scalars_result)
+    return list(typed_result.all())
 
 
 class TagCategory(str, Enum):
@@ -77,9 +90,11 @@ def normalize_tag_name(name: str) -> str:
     return name.strip().lower().replace(" ", "_")
 
 
-def replace_tag_aliases(tag: Tag, aliases: Iterable[str], session: Session) -> None:
+async def replace_tag_aliases(
+    tag: Tag, aliases: Iterable[str], session: AsyncSession
+) -> None:
     """Replace persisted aliases for ``tag`` (normalized to e621 form)."""
-    replace_aliases(
+    await replace_aliases(
         owner=tag,
         alias_cls=TagAlias,
         raw_aliases=aliases,
@@ -191,8 +206,8 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             yield "implied_by", self.implied_by, set()
 
 
-def resolve_implications(
-    initial: Iterable[Tag], session: Session
+async def resolve_implications(
+    initial: Iterable[Tag], session: AsyncSession | Session
 ) -> dict[Tag, Tag | None]:
     """BFS transitive closure of tag implications. Returns mapping of tag → direct source (None = explicit). Cycle-safe."""
     init_list = list(initial)
@@ -204,11 +219,15 @@ def resolve_implications(
         if tag.id in seen_ids:
             continue
         seen_ids.add(tag.id)
-        implied = session.scalars(
+        scalars_result = session.scalars(
             select(Tag)
             .join(tag_implications, Tag.id == tag_implications.c.implied_tag_id)
             .where(tag_implications.c.tag_id == tag.id)
-        ).all()
+        )
+        if isawaitable(scalars_result):
+            scalars_result = await scalars_result
+        typed_result = cast(ScalarResult["Tag"], scalars_result)
+        implied = typed_result.all()
         for t in implied:
             if t.id not in seen_ids:
                 if t not in result:
@@ -217,33 +236,42 @@ def resolve_implications(
     return result
 
 
-def apply_pin_tags(
+async def apply_pin_tags(
     pin_id: int,
     explicit_tag_ids: Iterable[int],
-    session: Session,
+    session: AsyncSession | Session,
 ) -> None:
     """Replace all pins_tags rows for a pin. Explicit tags get NULL implied_by; implied tags get their direct source."""
-    session.execute(delete(pins_tags).where(pins_tags.c.pin_id == pin_id))
-    explicit_tags = set(
-        session.scalars(select(Tag).where(Tag.id.in_(list(explicit_tag_ids)))).all()
+    execute_result = session.execute(
+        delete(pins_tags).where(pins_tags.c.pin_id == pin_id)
     )
-    resolved = resolve_implications(explicit_tags, session)
+    if isawaitable(execute_result):
+        await execute_result
+    explicit_tags = set(
+        await _tag_scalars(
+            session=session,
+            statement=select(Tag).where(Tag.id.in_(list(explicit_tag_ids))),
+        )
+    )
+    resolved = await resolve_implications(explicit_tags, session)
     for tag, source in resolved.items():
-        session.execute(
+        execute_result = session.execute(
             insert(pins_tags).values(
                 pin_id=pin_id,
                 tag_id=tag.id,
                 implied_by_tag_id=source.id if source else None,
             )
         )
+        if isawaitable(execute_result):
+            await execute_result
 
 
-def cascade_new_implications_to_pins(
+async def cascade_new_implications_to_pins(
     *,
     tag: Tag,
     newly_added_ids: set[int],
     implied_tags: Iterable[Tag],
-    session: Session,
+    session: AsyncSession,
 ) -> None:
     """Insert implied pins_tags rows for ``tag``'s newly added implications.
 
@@ -256,12 +284,12 @@ def cascade_new_implications_to_pins(
     newly_added_tags: list[Tag] = [
         implied_tag for implied_tag in implied_tags if implied_tag.id in newly_added_ids
     ]
-    all_new_implied: dict[Tag, Tag | None] = resolve_implications(
+    all_new_implied: dict[Tag, Tag | None] = await resolve_implications(
         initial=newly_added_tags,
         session=session,
     )
     for implied_tag, source_tag in all_new_implied.items():
-        session.execute(
+        await session.execute(
             pg_insert(pins_tags)
             .from_select(
                 ["pin_id", "tag_id", "implied_by_tag_id"],
@@ -277,25 +305,29 @@ def cascade_new_implications_to_pins(
         )
 
 
-def _cascade_remove_implied(
-    parent_tag_id: int, removed_child_ids: set[int], session: Session
+async def _cascade_remove_implied(
+    parent_tag_id: int, removed_child_ids: set[int], session: AsyncSession
 ) -> None:
     """Re-sync affected pins after implication removal. Correctly handles multi-path implications."""
     affected_pin_ids: set[int] = set()
     for child_tag_id in removed_child_ids:
-        pin_ids = session.scalars(
-            select(pins_tags.c.pin_id).where(
-                pins_tags.c.tag_id == child_tag_id,
-                pins_tags.c.implied_by_tag_id == parent_tag_id,
+        pin_ids = (
+            await session.scalars(
+                select(pins_tags.c.pin_id).where(
+                    pins_tags.c.tag_id == child_tag_id,
+                    pins_tags.c.implied_by_tag_id == parent_tag_id,
+                )
             )
         ).all()
         affected_pin_ids.update(pin_ids)
 
     for pin_id in affected_pin_ids:
-        explicit_tag_ids = session.scalars(
-            select(pins_tags.c.tag_id).where(
-                pins_tags.c.pin_id == pin_id,
-                pins_tags.c.implied_by_tag_id.is_(None),
+        explicit_tag_ids = (
+            await session.scalars(
+                select(pins_tags.c.tag_id).where(
+                    pins_tags.c.pin_id == pin_id,
+                    pins_tags.c.implied_by_tag_id.is_(None),
+                )
             )
         ).all()
-        apply_pin_tags(pin_id, set(explicit_tag_ids), session)
+        await apply_pin_tags(pin_id, set(explicit_tag_ids), session)

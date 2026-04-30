@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import func, select
 
-from pindb.database import Pin, session_maker
+from pindb.database import Pin, async_session_maker
 from pindb.database.joins import pin_set_memberships
 from pindb.database.pin_set import PinSet
 from pindb.routes._urls import canonical_slug_redirect, pin_set_url, slugify_for_url
@@ -29,15 +29,15 @@ router = APIRouter()
     name="get_pin_set_by_id",
     include_in_schema=False,
 )
-def get_pin_set(
+async def get_pin_set(
     request: Request,
     id: int,
     slug: str | None = None,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=100, ge=10, le=100),
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker() as session:
-        pin_set_obj: PinSet | None = session.get(entity=PinSet, ident=id)
+    async with async_session_maker() as session:
+        pin_set_obj: PinSet | None = await session.get(entity=PinSet, ident=id)
 
         if not pin_set_obj:
             return RedirectResponse(url="/")
@@ -54,7 +54,7 @@ def get_pin_set(
         offset: int = (page - 1) * per_page
 
         total_count: int = (
-            session.scalar(
+            await session.scalar(
                 select(func.count(Pin.id))
                 .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
                 .where(pin_set_memberships.c.set_id == id)
@@ -62,13 +62,15 @@ def get_pin_set(
             or 0
         )
 
-        pins: Sequence[Pin] = session.scalars(
-            select(Pin)
-            .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
-            .where(pin_set_memberships.c.set_id == id)
-            .order_by(pin_set_memberships.c.position.asc())
-            .limit(per_page)
-            .offset(offset)
+        pins: Sequence[Pin] = (
+            await session.scalars(
+                select(Pin)
+                .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
+                .where(pin_set_memberships.c.set_id == id)
+                .order_by(pin_set_memberships.c.position.asc())
+                .limit(per_page)
+                .offset(offset)
+            )
         ).all()
 
         if request.headers.get("HX-Target") == _SECTION_ID:

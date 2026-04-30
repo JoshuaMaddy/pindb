@@ -38,7 +38,7 @@ _INDEX_MAP = {
 
 
 @router.get(path="/options/{entity_type}")
-def get_entity_options(
+async def get_entity_options(
     entity_type: EntityType,
     q: str = Query(default=""),
     exclude: int | None = Query(default=None),
@@ -46,7 +46,7 @@ def get_entity_options(
     if entity_type not in _ALLOWED_ENTITY_TYPES:
         return JSONResponse(content=[])
     index = _INDEX_MAP[entity_type]
-    results = search_entity_options(index=index, query=q)
+    results = await search_entity_options(index=index, query=q)
     if exclude is not None:
         exclude_str = str(exclude)
         results = [item for item in results if item["value"] != exclude_str]

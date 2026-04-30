@@ -17,7 +17,7 @@ from fastapi.responses import Response
 from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.config import CONFIGURATION
 from pindb.database import UserSession
-from pindb.database import session_maker as db_session_maker
+from pindb.database import async_session_maker as db_async_session_maker
 from pindb.database.user import User
 
 _hasher = PasswordHasher()
@@ -115,7 +115,7 @@ def clear_session_cookie(response: Response) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_user_from_token(
+async def _resolve_user_from_token(
     token: str,
     *,
     prune_expired: bool = False,
@@ -127,23 +127,23 @@ def _resolve_user_from_token(
     clause instead.
     """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    with db_session_maker() as session:
-        user_session: UserSession | None = session.get(UserSession, token)
+    async with db_async_session_maker() as session:
+        user_session: UserSession | None = await session.get(UserSession, token)
         if user_session is None:
             return None
         if user_session.expires_at < now:
             if prune_expired:
-                session.delete(user_session)
-                session.commit()
+                await session.delete(user_session)
+                await session.commit()
             return None
-        user: User | None = session.get(User, user_session.user_id)
+        user: User | None = await session.get(User, user_session.user_id)
         if user is None:
             return None
         session.expunge(user)
         return user
 
 
-def get_current_user(request: Request) -> User | None:
+async def get_current_user(request: Request) -> User | None:
     """Load the user for the ``session`` cookie, pruning expired session rows.
 
     Args:
@@ -155,7 +155,7 @@ def get_current_user(request: Request) -> User | None:
     token: str | None = request.cookies.get(SESSION_COOKIE)
     if not token:
         return None
-    return _resolve_user_from_token(token, prune_expired=True)
+    return await _resolve_user_from_token(token, prune_expired=True)
 
 
 CurrentUser = Annotated[User | None, Depends(get_current_user)]
@@ -234,7 +234,7 @@ async def attach_user_middleware(
     request.state.user = None
 
     if token:
-        request.state.user = _resolve_user_from_token(token)
+        request.state.user = await _resolve_user_from_token(token)
 
     current_user = request.state.user
     request.state.theme = current_user.theme if current_user is not None else "mocha"

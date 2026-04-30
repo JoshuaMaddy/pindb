@@ -10,7 +10,7 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from pindb.database import Shop, session_maker
+from pindb.database import Shop, async_session_maker
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.search.search import search_shops
@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 @router.get(path="/shops")
-def get_list_shops(
+async def get_list_shops(
     request: Request,
     page: int = Query(default=1, ge=1),
     view: EntityListView = Query(default=EntityListView.grid),
@@ -39,9 +39,9 @@ def get_list_shops(
         else Shop.name.asc()
     )
 
-    with session_maker() as session:
+    async with async_session_maker() as session:
         if q:
-            shops_result, total_count = search_shops(
+            shops_result, total_count = await search_shops(
                 query=q,
                 session=session,
                 offset=offset,
@@ -49,13 +49,15 @@ def get_list_shops(
             )
             shops: Sequence[Shop] = shops_result
         else:
-            total_count = session.scalar(select(func.count(Shop.id))) or 0
-            shops = session.scalars(
-                select(Shop)
-                .options(selectinload(Shop.pins))
-                .order_by(order_by)
-                .limit(DEFAULT_PER_PAGE)
-                .offset(offset)
+            total_count = await session.scalar(select(func.count(Shop.id))) or 0
+            shops = (
+                await session.scalars(
+                    select(Shop)
+                    .options(selectinload(Shop.pins))
+                    .order_by(order_by)
+                    .limit(DEFAULT_PER_PAGE)
+                    .offset(offset)
+                )
             ).all()
 
         if request.headers.get("HX-Request"):

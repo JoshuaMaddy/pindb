@@ -4,16 +4,17 @@ All four routes share a single profile-user lookup + pagination wrapper; the
 per-list count and entry queries live in ``database/user_pin_queries``.
 """
 
-from typing import Callable, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from htpy import Element
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from pindb.database import User, session_maker
+from pindb.database import User, async_session_maker
 from pindb.database.user_pin_queries import (
     count_favorites,
     count_owned,
@@ -41,31 +42,31 @@ def _resolved_view(view: str) -> ViewMode:
     return "table" if view == "table" else "grid"
 
 
-def _load_profile_user(*, session: Session, username: str) -> User:
-    user: User | None = session.scalars(
-        select(User).where(User.username == username)
+async def _load_profile_user(*, session: AsyncSession, username: str) -> User:
+    user: User | None = (
+        await session.scalars(select(User).where(User.username == username))
     ).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
-def _render_pin_list(
+async def _render_pin_list(
     *,
     request: Request,
     username: str,
     page: int,
     view: str,
-    fetch: Callable[[Session, User, int, int], tuple[int, _T]],
+    fetch: Callable[[AsyncSession, User, int, int], Awaitable[tuple[int, _T]]],
     render: Callable[[Request, User, _T, int, int, ViewMode], Element],
 ) -> HTMLResponse:
     page = max(1, page)
     resolved_view = _resolved_view(view)
     offset = (page - 1) * PAGE_SIZE
 
-    with session_maker() as session:
-        user = _load_profile_user(session=session, username=username)
-        total, payload = fetch(session, user, PAGE_SIZE, offset)
+    async with async_session_maker() as session:
+        user = await _load_profile_user(session=session, username=username)
+        total, payload = await fetch(session, user, PAGE_SIZE, offset)
 
     return HTMLResponse(
         content=str(render(request, user, payload, total, page, resolved_view))
@@ -73,16 +74,18 @@ def _render_pin_list(
 
 
 @router.get("/{username}/favorites", response_model=None, name="user_favorites_list")
-def user_favorites_list(
+async def user_favorites_list(
     request: Request,
     username: str,
     page: int = 1,
     view: str = "grid",
 ) -> HTMLResponse:
-    def fetch(session: Session, user: User, limit: int, offset: int):
+    async def fetch(
+        session: AsyncSession, user: User, limit: int, offset: int
+    ) -> tuple[int, list]:
         return (
-            count_favorites(session=session, user_id=user.id),
-            get_favorite_pins(
+            await count_favorites(session=session, user_id=user.id),
+            await get_favorite_pins(
                 session=session,
                 user_id=user.id,
                 limit=limit,
@@ -91,7 +94,7 @@ def user_favorites_list(
             ),
         )
 
-    return _render_pin_list(
+    return await _render_pin_list(
         request=request,
         username=username,
         page=page,
@@ -109,16 +112,18 @@ def user_favorites_list(
 
 
 @router.get("/{username}/collection", response_model=None, name="user_collection_list")
-def user_collection_list(
+async def user_collection_list(
     request: Request,
     username: str,
     page: int = 1,
     view: str = "grid",
 ) -> HTMLResponse:
-    def fetch(session: Session, user: User, limit: int, offset: int):
+    async def fetch(
+        session: AsyncSession, user: User, limit: int, offset: int
+    ) -> tuple[int, list]:
         return (
-            count_owned(session=session, user_id=user.id),
-            get_owned_entries(
+            await count_owned(session=session, user_id=user.id),
+            await get_owned_entries(
                 session=session,
                 user_id=user.id,
                 limit=limit,
@@ -127,7 +132,7 @@ def user_collection_list(
             ),
         )
 
-    return _render_pin_list(
+    return await _render_pin_list(
         request=request,
         username=username,
         page=page,
@@ -147,16 +152,18 @@ def user_collection_list(
 
 
 @router.get("/{username}/wants", response_model=None, name="user_wants_list")
-def user_wants_list(
+async def user_wants_list(
     request: Request,
     username: str,
     page: int = 1,
     view: str = "grid",
 ) -> HTMLResponse:
-    def fetch(session: Session, user: User, limit: int, offset: int):
+    async def fetch(
+        session: AsyncSession, user: User, limit: int, offset: int
+    ) -> tuple[int, list]:
         return (
-            count_wanted(session=session, user_id=user.id),
-            get_wanted_entries(
+            await count_wanted(session=session, user_id=user.id),
+            await get_wanted_entries(
                 session=session,
                 user_id=user.id,
                 limit=limit,
@@ -165,7 +172,7 @@ def user_wants_list(
             ),
         )
 
-    return _render_pin_list(
+    return await _render_pin_list(
         request=request,
         username=username,
         page=page,
@@ -183,16 +190,18 @@ def user_wants_list(
 
 
 @router.get("/{username}/trades", response_model=None, name="user_trades_list")
-def user_trades_list(
+async def user_trades_list(
     request: Request,
     username: str,
     page: int = 1,
     view: str = "grid",
 ) -> HTMLResponse:
-    def fetch(session: Session, user: User, limit: int, offset: int):
+    async def fetch(
+        session: AsyncSession, user: User, limit: int, offset: int
+    ) -> tuple[int, list]:
         return (
-            count_owned(session=session, user_id=user.id, tradeable_only=True),
-            get_owned_entries(
+            await count_owned(session=session, user_id=user.id, tradeable_only=True),
+            await get_owned_entries(
                 session=session,
                 user_id=user.id,
                 limit=limit,
@@ -202,7 +211,7 @@ def user_trades_list(
             ),
         )
 
-    return _render_pin_list(
+    return await _render_pin_list(
         request=request,
         username=username,
         page=page,

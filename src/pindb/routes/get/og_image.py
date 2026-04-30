@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from fastapi.responses import Response
 from fastapi.routing import APIRouter
 from sqlalchemy import Row, Table, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database import (
     Artist,
@@ -27,7 +27,7 @@ from pindb.database import (
     PinSet,
     Shop,
     Tag,
-    session_maker,
+    async_session_maker,
 )
 from pindb.database.joins import (
     pin_set_memberships,
@@ -55,8 +55,8 @@ _OG_CACHE_CONTROL: str = "public, max-age=3600"
 _PIN_SAMPLE_SIZE: int = 4
 
 
-def _entity_lookup(
-    session: Session, entity_type: str, entity_id: int
+async def _entity_lookup(
+    session: AsyncSession, entity_type: str, entity_id: int
 ) -> tuple[str, Table, str] | None:
     """Resolve ``entity_type`` to ``(name, join_table, pin_id_col)`` or ``None``.
 
@@ -64,31 +64,33 @@ def _entity_lookup(
     filter (soft-deleted, unapproved-for-guests, etc.).
     """
     if entity_type == "tag":
-        tag = session.get(Tag, entity_id)
+        tag = await session.get(Tag, entity_id)
         return (tag.display_name, pins_tags, "tag_id") if tag else None
     if entity_type == "shop":
-        shop = session.get(Shop, entity_id)
+        shop = await session.get(Shop, entity_id)
         return (shop.name, pins_shops, "shop_id") if shop else None
     if entity_type == "artist":
-        artist = session.get(Artist, entity_id)
+        artist = await session.get(Artist, entity_id)
         return (artist.name, pins_artists, "artists_id") if artist else None
     if entity_type == "pin_set":
-        pin_set = session.get(PinSet, entity_id)
+        pin_set = await session.get(PinSet, entity_id)
         return (pin_set.name, pin_set_memberships, "set_id") if pin_set else None
     return None
 
 
-def _sample_pin_thumbnails(
-    session: Session, join_table: Table, pin_id_col: str, entity_id: int
+async def _sample_pin_thumbnails(
+    session: AsyncSession, join_table: Table, pin_id_col: str, entity_id: int
 ) -> list[bytes]:
     """Pick up to four random visible pins and load their 400-px thumbnails."""
     fk_col = join_table.c[pin_id_col]
-    rows: Sequence[Row[tuple[UUID]]] = session.execute(
-        select(Pin.front_image_guid)
-        .join(join_table, Pin.id == join_table.c.pin_id)
-        .where(fk_col == entity_id)
-        .order_by(func.random())
-        .limit(_PIN_SAMPLE_SIZE)
+    rows: Sequence[Row[tuple[UUID]]] = (
+        await session.execute(
+            select(Pin.front_image_guid)
+            .join(join_table, Pin.id == join_table.c.pin_id)
+            .where(fk_col == entity_id)
+            .order_by(func.random())
+            .limit(_PIN_SAMPLE_SIZE)
+        )
     ).all()
 
     images: list[bytes] = []
@@ -114,17 +116,17 @@ def _sample_pin_thumbnails(
     response_model=None,
     name="get_og_image",
 )
-def get_og_image(entity_type: str, id: int) -> Response:
+async def get_og_image(entity_type: str, id: int) -> Response:
     """Return a 1200x630 WebP OG card for the requested entity."""
     if entity_type not in ("tag", "shop", "artist", "pin_set"):
         raise HTTPException(status_code=404, detail="Unsupported entity type")
 
-    with session_maker() as session:
-        resolved = _entity_lookup(session, entity_type, id)
+    async with async_session_maker() as session:
+        resolved = await _entity_lookup(session, entity_type, id)
         if resolved is None:
             raise HTTPException(status_code=404, detail="Entity not found")
         name, join_table, pin_id_col = resolved
-        pin_images = _sample_pin_thumbnails(session, join_table, pin_id_col, id)
+        pin_images = await _sample_pin_thumbnails(session, join_table, pin_id_col, id)
 
     webp_bytes = build_entity_og_image(name=name, pin_image_bytes=pin_images)
     return Response(

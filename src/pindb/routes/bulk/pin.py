@@ -12,7 +12,7 @@ from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.auth import require_admin
 from pindb.database import (
@@ -20,7 +20,7 @@ from pindb.database import (
     PinSet,
     Shop,
     Tag,
-    session_maker,
+    async_session_maker,
 )
 from pindb.database.currency import Currency
 from pindb.database.entity_type import EntityType
@@ -33,8 +33,11 @@ from pindb.log import user_logger
 from pindb.model_utils import parse_magnitude_mm
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
-from pindb.search.search import meilisearch_hit_dicts
-from pindb.search.update import TAGS_INDEX
+from pindb.search.search import (
+    TAGS_INDEX,
+    _search_results_to_raw,
+    meilisearch_hit_dicts,
+)
 from pindb.templates.bulk.pin import bulk_pin_page
 
 LOGGER = user_logger("pindb.routes.bulk.pin")
@@ -101,21 +104,21 @@ class BulkPinResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _get_or_create(
-    session: Session,
+async def _get_or_create(
+    session: AsyncSession,
     model: type[_NameOnly],
     name: str,
     bulk_id: UUID | None = None,
 ) -> _NameOnly:
     resolved = normalize_tag_name(name) if model is Tag else name
-    entity = session.scalar(select(model).where(model.name == resolved))
+    entity = await session.scalar(select(model).where(model.name == resolved))
     if not entity:
         entity = model(name=resolved)
         session.add(entity)
-        session.flush()
+        await session.flush()
         if bulk_id is not None:
             entity.bulk_id = bulk_id  # type: ignore[assignment]
-            session.flush()
+            await session.flush()
     return entity
 
 
@@ -125,31 +128,56 @@ def _get_or_create(
 
 
 @router.get(path="/options/{entity_type}")
-def get_bulk_options(
+async def get_bulk_options(
     entity_type: EntityType,
     q: str = Query(default=""),
     exclude_name: str | None = Query(default=None),
 ) -> JSONResponse:
     if entity_type == EntityType.tag:
-        raw: dict[str, object] = TAGS_INDEX.search(query=q, opt_params={"limit": 50})  # type: ignore[assignment]
-        tag_hits = meilisearch_hit_dicts(raw)
-        return JSONResponse(
-            content=[
-                {
-                    "value": str(hit["name"]),
-                    "text": ("(P) " + str(hit.get("display_name") or hit["name"]))
-                    if hit.get("is_pending")
-                    else str(hit.get("display_name") or hit["name"]),
-                    "category": str(hit.get("category", "")),
-                }
-                for hit in tag_hits
-                if exclude_name is None or str(hit.get("name")) != exclude_name
-            ]
+        raw_sr = await TAGS_INDEX.search(
+            query=q,
+            limit=50,
         )
+        raw = _search_results_to_raw(raw_sr)
+        tag_hits = meilisearch_hit_dicts(raw)
+        tag_options = [
+            {
+                "value": str(hit["name"]),
+                "text": ("(P) " + str(hit.get("display_name") or hit["name"]))
+                if hit.get("is_pending")
+                else str(hit.get("display_name") or hit["name"]),
+                "category": str(hit.get("category", "")),
+            }
+            for hit in tag_hits
+            if exclude_name is None or str(hit.get("name")) != exclude_name
+        ]
+        seen_names = {option["value"] for option in tag_options}
+        async with async_session_maker() as session:
+            db_tags = (
+                await session.scalars(
+                    select(Tag).where(Tag.name.ilike(f"%{q}%")).limit(50)
+                )
+            ).all()
+        for tag in db_tags:
+            if tag.name == exclude_name or tag.name in seen_names:
+                continue
+            tag_options.append(
+                {
+                    "value": tag.name,
+                    "text": ("(P) " + tag.name) if tag.is_pending else tag.name,
+                    "category": tag.category.value,
+                }
+            )
+            seen_names.add(tag.name)
+            if len(tag_options) >= 50:
+                break
+        return JSONResponse(content=tag_options)
     model = entity_type.model
-    with session_maker() as session:
-        rows = session.scalars(
-            statement=select(model).where(model.name.ilike(f"%{q}%")).limit(50)
+    async with async_session_maker() as session:
+        rows = (
+            await session.scalars(
+                select(model).where(model.name.ilike(f"%{q}%")).limit(50)
+            )
         ).all()
     return JSONResponse(
         content=[
@@ -161,15 +189,13 @@ def get_bulk_options(
 
 
 @router.get(path="/pin", dependencies=[Depends(require_admin)])
-def get_bulk_pin(request: Request) -> HtpyResponse:
+async def get_bulk_pin(request: Request) -> HtpyResponse:
     options_base_url: str = str(
         request.url_for("get_bulk_options", entity_type="placeholder")
     ).removesuffix("/placeholder")
 
-    with session_maker() as session:
-        currencies: Sequence[Currency] = session.scalars(
-            statement=select(Currency)
-        ).all()
+    async with async_session_maker() as session:
+        currencies: Sequence[Currency] = (await session.scalars(select(Currency))).all()
 
         return HtpyResponse(
             bulk_pin_page(
@@ -198,36 +224,36 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     bulk_id: UUID = uuid4()
     LOGGER.info("Bulk-creating %d pins bulk_id=%s", len(body.pins), bulk_id)
 
-    with session_maker.begin() as session:
+    async with async_session_maker.begin() as session:
         for index, row in enumerate(body.pins):
             try:
-                currency: Currency = session.get_one(
+                currency: Currency = await session.get_one(
                     entity=Currency, ident=row.currency_id
                 )
 
                 shops: set[Shop] = {
-                    _get_or_create(
+                    await _get_or_create(
                         session=session, model=Shop, name=name, bulk_id=bulk_id
                     )
                     for name in row.shop_names
                     if name
                 }
                 explicit_tags: set[Tag] = {
-                    _get_or_create(
+                    await _get_or_create(
                         session=session, model=Tag, name=name, bulk_id=bulk_id
                     )
                     for name in row.tag_names
                     if name
                 }
                 artists: set[Artist] = {
-                    _get_or_create(
+                    await _get_or_create(
                         session=session, model=Artist, name=name, bulk_id=bulk_id
                     )
                     for name in row.artist_names
                     if name
                 }
                 pin_sets: set[PinSet] = {
-                    _get_or_create(
+                    await _get_or_create(
                         session=session, model=PinSet, name=name, bulk_id=bulk_id
                     )
                     for name in row.pin_set_names
@@ -267,9 +293,11 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
                 )
 
                 session.add(new_pin)
-                session.flush()
+                await session.flush()
                 new_pin.bulk_id = bulk_id
-                apply_pin_tags(new_pin.id, {tag.id for tag in explicit_tags}, session)
+                await apply_pin_tags(
+                    new_pin.id, {tag.id for tag in explicit_tags}, session
+                )
 
                 results.append(
                     PinRowResult(

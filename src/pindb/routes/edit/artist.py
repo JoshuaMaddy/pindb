@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
-from pindb.database import Artist, session_maker
+from pindb.database import Artist, async_session_maker
 from pindb.database.artist import replace_artist_aliases
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
@@ -39,13 +39,13 @@ LOGGER = user_logger("pindb.routes.edit.artist")
 
 
 @router.get(path="/artist/{id}", response_model=None)
-def get_edit_artist(
+async def get_edit_artist(
     request: Request,
     id: int,
     current_user: EditorUser,
 ) -> HtpyResponse:
-    with session_maker() as session:
-        artist: Artist | None = session.scalar(
+    async with async_session_maker() as session:
+        artist: Artist | None = await session.scalar(
             select(Artist)
             .where(Artist.id == id)
             .options(selectinload(Artist.links), selectinload(Artist.aliases))
@@ -57,11 +57,11 @@ def get_edit_artist(
         assert_editor_can_edit(artist, current_user)
 
         if needs_pending_edit(artist, current_user):
-            chain = get_edit_chain(session, "artists", id)
+            chain = await get_edit_chain(session, "artists", id)
             if chain:
                 effective = get_effective_snapshot(artist, chain)
                 with session.no_autoflush:
-                    apply_snapshot_in_memory(artist, effective, session)
+                    await apply_snapshot_in_memory(artist, effective, session)
 
         return HtpyResponse(
             artist_form(
@@ -73,7 +73,7 @@ def get_edit_artist(
 
 
 @router.post(path="/artist/{id}", response_model=None)
-def post_edit_artist(
+async def post_edit_artist(
     request: Request,
     id: int,
     current_user: EditorUser,
@@ -90,8 +90,8 @@ def post_edit_artist(
     ] = None,
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
-    with session_maker.begin() as session:
-        artist: Artist | None = session.scalar(
+    async with async_session_maker.begin() as session:
+        artist: Artist | None = await session.scalar(
             select(Artist)
             .where(Artist.id == id)
             .options(selectinload(Artist.links), selectinload(Artist.aliases))
@@ -104,7 +104,7 @@ def post_edit_artist(
 
         if needs_pending_edit(artist, current_user):
             LOGGER.info("Submitting pending edit for artist id=%d name=%r", id, name)
-            return submit_simple_aliased_pending_edit(
+            return await submit_simple_aliased_pending_edit(
                 session=session,
                 entity=artist,
                 entity_table="artists",
@@ -119,7 +119,7 @@ def post_edit_artist(
             )
 
         LOGGER.info("Editing artist id=%d name=%r", id, name)
-        apply_simple_aliased_direct_edit(
+        await apply_simple_aliased_direct_edit(
             entity=artist,
             name=name,
             description=description,
@@ -129,10 +129,10 @@ def post_edit_artist(
             session=session,
         )
 
-        session.flush()
+        await session.flush()
         artist_id: int = artist.id
 
-    sync_entity(EntityType.artist, artist_id)
+    await sync_entity(EntityType.artist, artist_id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

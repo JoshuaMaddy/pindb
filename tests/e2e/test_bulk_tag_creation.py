@@ -86,12 +86,18 @@ def _ensure_row_count(page: Page, count: int) -> None:
 def _wait_for_bulk_option(page: Page, live_server: str, name: str) -> None:
     deadline = time.time() + 10
     url = f"{live_server}/bulk/options/tag?q={quote(name)}"
+    last_response: str = "<no response>"
     while time.time() < deadline:
         response = page.request.get(url)
-        if response.ok and any(option["value"] == name for option in response.json()):
-            return
+        last_response = f"{response.status}: {response.text()[:500]}"
+        if response.ok:
+            options = response.json()
+            if any(option["value"] == name for option in options):
+                return
         time.sleep(0.25)
-    raise AssertionError(f"bulk tag option {name!r} was not indexed in time")
+    raise AssertionError(
+        f"bulk tag option {name!r} was not indexed in time; last={last_response!r}"
+    )
 
 
 def _tag_categories(

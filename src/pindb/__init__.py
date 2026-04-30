@@ -29,7 +29,7 @@ from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
 from pindb.config import CONFIGURATION  # noqa: E402
 from pindb.csrf import csrf_origin_middleware  # noqa: E402
-from pindb.database import session_maker  # noqa: E402
+from pindb.database import async_session_maker  # noqa: E402
 from pindb.database.pin import Pin  # noqa: E402
 from pindb.htmx_toast import htmx_error_toast  # noqa: E402
 from pindb.http_caching import (  # noqa: E402
@@ -155,22 +155,20 @@ async def _htmx_validation_handler(
 
 
 @app.get(path="/")
-def root(request: Request):
-    with session_maker() as db:
-        pins = [
-            pin
-            for pin in db.scalars(
-                select(Pin)
-                .where(Pin.front_image_guid.is_not(None))
-                .order_by(func.random())
-                .limit(60)
-                .options(
-                    selectinload(Pin.shops),
-                    selectinload(Pin.artists),
-                )
+async def root(request: Request):
+    async with async_session_maker() as db:
+        r = await db.scalars(
+            select(Pin)
+            .where(Pin.front_image_guid.is_not(None))
+            .order_by(func.random())
+            .limit(60)
+            .options(
+                selectinload(Pin.shops),
+                selectinload(Pin.artists),
             )
-        ]
-        return HtpyResponse(homepage(request=request, pins=pins))
+        )
+        pins = r.all()
+        return HtpyResponse(homepage(request=request, pins=[*pins]))
 
 
 app.include_router(health.router)

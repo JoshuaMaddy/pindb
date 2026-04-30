@@ -5,18 +5,18 @@ path (database/pending_edit_utils.py) so the logic stays in one place.
 """
 
 from sqlalchemy import update
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database.grade import Grade
 from pindb.database.pin import Pin
 from pindb.database.user_owned_pin import UserOwnedPin
 
 
-def upsert_grades(
+async def upsert_grades(
     *,
     pin: Pin,
     grades: list[dict[str, object]],
-    session: Session,
+    session: AsyncSession,
 ) -> None:
     """Match incoming grade dicts by name: update prices on existing grades,
     add new ones, and soft-remove old ones (nullifying grade_id on
@@ -39,12 +39,12 @@ def upsert_grades(
             next_grades.add(Grade(name=name, price=price))
 
     for removed_grade in pin.grades - next_grades:
-        session.execute(
+        await session.execute(
             update(UserOwnedPin)
             .where(UserOwnedPin.grade_id == removed_grade.id)
             .values(grade_id=None)
         )
-        session.delete(removed_grade)
+        await session.delete(removed_grade)
 
     pin.grades = next_grades
 

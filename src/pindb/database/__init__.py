@@ -1,12 +1,16 @@
-"""SQLAlchemy engine, ``session_maker``, ORM exports, and currency seeding."""
+"""SQLAlchemy engines, session makers, ORM exports, and currency seeding."""
 
 from pathlib import Path
 
 import polars as pl
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker as SessionMaker
-from sqlalchemy.orm.session import Session, sessionmaker
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import Session, sessionmaker
 
 from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist, ArtistAlias
@@ -30,6 +34,10 @@ from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 
 __all__: list[str] = [
+    "async_engine",
+    "async_session_maker",
+    "engine",
+    "session_maker",
     "seed_currencies",
     "Artist",
     "ArtistAlias",
@@ -56,16 +64,28 @@ __all__: list[str] = [
     "UserWantedPin",
 ]
 
-# Create engine
-__engine: Engine = create_engine(CONFIGURATION.database_connection)
+# Async engine (application + async tests)
+async_engine: AsyncEngine = create_async_engine(
+    CONFIGURATION.database_connection,
+    pool_pre_ping=True,
+)
+async_session_maker: async_sessionmaker[AsyncSession] = async_sessionmaker(
+    bind=async_engine, class_=AsyncSession, expire_on_commit=False
+)
 
-# Expose sessionmaker
-session_maker: sessionmaker[Session] = SessionMaker(
-    bind=__engine, expire_on_commit=False
+# Sync engine/session maker kept for Alembic-style utilities and tests that need
+# direct DB inspection while the application routes use async sessions.
+engine: Engine = create_engine(
+    CONFIGURATION.database_connection_sync,
+    pool_pre_ping=True,
+)
+session_maker: sessionmaker[Session] = sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
 )
 
 
-def seed_currencies() -> None:
+async def seed_currencies() -> None:
     """Insert ISO currency rows from ``database/data/currencies.csv`` if missing.
 
     Idempotent: skips rows whose primary key already exists.
@@ -74,11 +94,11 @@ def seed_currencies() -> None:
         Path(__file__).parent / "data" / "currencies.csv"
     )
 
-    with session_maker.begin() as session:
+    async with async_session_maker.begin() as session:
         for row in currencies_df.rows(named=True):
-            currency: Currency | None = session.get(entity=Currency, ident=row["id"])
+            currency: Currency | None = await session.get(Currency, row["id"])
             if currency:
                 continue
 
             currency = Currency(**row)
-            session.add(instance=currency)
+            session.add(currency)

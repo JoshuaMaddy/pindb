@@ -49,7 +49,7 @@ class TestTagAliases:
         assert refreshed is not None
         assert {a.alias for a in refreshed.aliases} == {"synonym", "nickname"}
 
-    def test_replace_tag_aliases_keeps_same_strings_without_conflict(
+    async def test_replace_tag_aliases_keeps_same_strings_without_conflict(
         self, db_session, admin_user
     ):
         """Regression: re-saving unchanged aliases must not hit uq_tag_aliases_tag_id_alias."""
@@ -63,7 +63,7 @@ class TestTagAliases:
             ),
         )
         db_session.flush()
-        replace_tag_aliases(
+        await replace_tag_aliases(
             tag=tag,
             aliases=["pippi", "piepi", "ピッピ"],
             session=db_session,
@@ -97,7 +97,7 @@ class TestTagAliases:
 
 @pytest.mark.integration
 class TestImplicationClosure:
-    def test_transitive_closure_follows_chain(self, db_session, admin_user):
+    async def test_transitive_closure_follows_chain(self, db_session, admin_user):
         """a → b → c: resolving from {a} yields {a, b, c}."""
         tag_a = TagFactory(name="a", approved=True, created_by=admin_user)
         tag_b = TagFactory(name="b", approved=True, created_by=admin_user)
@@ -106,13 +106,13 @@ class TestImplicationClosure:
         tag_b.implications = {tag_c}  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
-        resolved = resolve_implications([tag_a], db_session)  # ty:ignore[invalid-argument-type]
+        resolved = await resolve_implications([tag_a], db_session)  # ty:ignore[invalid-argument-type]
         assert {t.name for t in resolved} == {"a", "b", "c"}
         # Source tracking: a is explicit (None), b implied by a, c implied by b.
         sources = {t.name: (src.name if src else None) for t, src in resolved.items()}
         assert sources == {"a": None, "b": "a", "c": "b"}
 
-    def test_cycle_is_safe(self, db_session, admin_user):
+    async def test_cycle_is_safe(self, db_session, admin_user):
         """a → b → a must not infinite-loop."""
         tag_a = TagFactory(name="a", approved=True, created_by=admin_user)
         tag_b = TagFactory(name="b", approved=True, created_by=admin_user)
@@ -120,13 +120,13 @@ class TestImplicationClosure:
         tag_b.implications = {tag_a}  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
-        resolved = resolve_implications([tag_a], db_session)  # ty:ignore[invalid-argument-type]
+        resolved = await resolve_implications([tag_a], db_session)  # ty:ignore[invalid-argument-type]
         assert {t.name for t in resolved} == {"a", "b"}
 
 
 @pytest.mark.integration
 class TestApplyPinTags:
-    def test_explicit_and_implied_rows_written(self, db_session, admin_user):
+    async def test_explicit_and_implied_rows_written(self, db_session, admin_user):
         pin = PinFactory(approved=True, created_by=admin_user)
         db_session.flush()
 
@@ -135,7 +135,7 @@ class TestApplyPinTags:
         parent.implications = {child}  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
-        apply_pin_tags(pin.id, {parent.id}, db_session)  # ty:ignore[unresolved-attribute]
+        await apply_pin_tags(pin.id, {parent.id}, db_session)  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
         rows = db_session.execute(
@@ -148,15 +148,15 @@ class TestApplyPinTags:
         assert by_tag[parent.id] is None  # explicit  # ty:ignore[unresolved-attribute]
         assert by_tag[child.id] == parent.id  # ty:ignore[unresolved-attribute]
 
-    def test_reapplying_replaces_previous_rows(self, db_session, admin_user):
+    async def test_reapplying_replaces_previous_rows(self, db_session, admin_user):
         pin = PinFactory(approved=True, created_by=admin_user)
         tag_one = TagFactory(name="first", approved=True, created_by=admin_user)
         tag_two = TagFactory(name="second", approved=True, created_by=admin_user)
         db_session.flush()
 
-        apply_pin_tags(pin.id, {tag_one.id}, db_session)  # ty:ignore[unresolved-attribute]
+        await apply_pin_tags(pin.id, {tag_one.id}, db_session)  # ty:ignore[unresolved-attribute]
         db_session.flush()
-        apply_pin_tags(pin.id, {tag_two.id}, db_session)  # ty:ignore[unresolved-attribute]
+        await apply_pin_tags(pin.id, {tag_two.id}, db_session)  # ty:ignore[unresolved-attribute]
         db_session.flush()
 
         rows = (

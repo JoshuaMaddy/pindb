@@ -66,7 +66,7 @@ async def register(request: Request) -> dict[str, Any]:
 
 
 @router.get("/start", response_model=None)
-def start(
+async def start(
     request: Request,
     current_user: CurrentUser,
     identity_id: str,
@@ -76,7 +76,7 @@ def start(
     from pindb.routes.auth.router import process_identity
 
     identity = consume_identity(identity_id)
-    return process_identity(
+    return await process_identity(
         request,
         identity,
         current_user,

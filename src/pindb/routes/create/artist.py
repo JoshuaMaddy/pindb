@@ -11,7 +11,7 @@ from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
-from pindb.database import Artist, ArtistAlias, session_maker
+from pindb.database import Artist, ArtistAlias, async_session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import (
     hx_redirect_with_toast_headers,
@@ -30,7 +30,7 @@ LOGGER = user_logger("pindb.routes.create.artist")
 
 
 @router.get(path="/artist")
-def get_create_artist(request: Request) -> HtpyResponse:
+async def get_create_artist(request: Request) -> HtpyResponse:
     return HtpyResponse(
         artist_form(
             post_url=request.url_for("post_create_artist"),
@@ -40,7 +40,7 @@ def get_create_artist(request: Request) -> HtpyResponse:
 
 
 @router.post(path="/artist")
-def post_create_artist(
+async def post_create_artist(
     request: Request,
     name: str = Form(),
     description: Annotated[
@@ -57,7 +57,7 @@ def post_create_artist(
 ) -> HTMLResponse:
     LOGGER.info("Creating artist name=%r aliases=%s", name, aliases)
     try:
-        with session_maker.begin() as session:
+        async with async_session_maker.begin() as session:
             new_links: set[Link] = (
                 {Link(path=link) for link in links} if links else set[Link]()
             )
@@ -69,17 +69,17 @@ def post_create_artist(
             )
 
             session.add(instance=artist)
-            session.flush()
+            await session.flush()
 
             artist.aliases = [ArtistAlias(alias=a) for a in aliases if a.strip()]
-            session.flush()
+            await session.flush()
             artist_id: int = artist.id
     except IntegrityError as exc:
         if not is_unique_violation(exc):
             raise
         return unique_constraint_response(request=request)
 
-    update_artist(artist=artist)
+    await update_artist(artist=artist)
 
     LOGGER.info("Created artist id=%d name=%r", artist_id, name)
 

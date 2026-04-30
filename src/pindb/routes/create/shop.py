@@ -11,7 +11,7 @@ from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
-from pindb.database import Shop, ShopAlias, session_maker
+from pindb.database import Shop, ShopAlias, async_session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import (
     hx_redirect_with_toast_headers,
@@ -30,7 +30,7 @@ LOGGER = user_logger("pindb.routes.create.shop")
 
 
 @router.get(path="/shop")
-def get_create_shop(request: Request) -> HtpyResponse:
+async def get_create_shop(request: Request) -> HtpyResponse:
     return HtpyResponse(
         shop_form(
             post_url=request.url_for("post_create_shop"),
@@ -40,7 +40,7 @@ def get_create_shop(request: Request) -> HtpyResponse:
 
 
 @router.post(path="/shop")
-def post_create_shop(
+async def post_create_shop(
     request: Request,
     name: str = Form(),
     description: Annotated[
@@ -57,7 +57,7 @@ def post_create_shop(
 ) -> HTMLResponse:
     LOGGER.info("Creating shop name=%r aliases=%s", name, aliases)
     try:
-        with session_maker.begin() as session:
+        async with async_session_maker.begin() as session:
             new_links: set[Link] = (
                 {Link(path=link) for link in links} if links else set[Link]()
             )
@@ -69,17 +69,17 @@ def post_create_shop(
             )
 
             session.add(instance=shop)
-            session.flush()
+            await session.flush()
 
             shop.aliases = [ShopAlias(alias=a) for a in aliases if a.strip()]
-            session.flush()
+            await session.flush()
             shop_id: int = shop.id
     except IntegrityError as exc:
         if not is_unique_violation(exc):
             raise
         return unique_constraint_response(request=request)
 
-    update_shop(shop=shop)
+    await update_shop(shop=shop)
 
     LOGGER.info("Created shop id=%d name=%r", shop_id, name)
 

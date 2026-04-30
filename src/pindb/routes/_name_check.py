@@ -5,7 +5,7 @@ from enum import StrEnum
 from fastapi.responses import HTMLResponse
 from htpy import p
 from sqlalchemy import Select, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database import Artist, Pin, PinSet, Shop, Tag
 from pindb.database.tag import normalize_tag_name
@@ -43,9 +43,9 @@ def empty_name_check_response() -> HTMLResponse:
     return HTMLResponse(content="")
 
 
-def normalized_name_exists(
+async def normalized_name_exists(
     *,
-    session: Session,
+    session: AsyncSession,
     kind: NameCheckKind,
     normalized_name: str,
     exclude_id: int | None = None,
@@ -103,4 +103,4 @@ def normalized_name_exists(
     statement = statement.limit(1)
     if include_pending:
         statement = statement.execution_options(include_pending=True)
-    return session.scalar(statement=statement) is not None
+    return (await session.scalar(statement=statement)) is not None

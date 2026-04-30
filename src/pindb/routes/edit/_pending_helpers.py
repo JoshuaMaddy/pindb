@@ -2,11 +2,12 @@
 FastAPI routes: `routes/edit/_pending_helpers.py`.
 """
 
-from typing import Any, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database.artist import Artist
 from pindb.database.link import Link
@@ -25,9 +26,9 @@ from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.routes._urls import slugify_for_url
 
 
-def submit_pending_edit(
+async def submit_pending_edit(
     *,
-    session: Session,
+    session: AsyncSession,
     entity: Pin | Artist | Shop | Tag,
     entity_table: str,
     entity_id: int,
@@ -43,7 +44,7 @@ def submit_pending_edit(
     a plain HX-Redirect when there is nothing to save, or one with
     ``?version=pending`` when a new pending edit was queued.
     """
-    chain = get_edit_chain(session, entity_table, entity_id)
+    chain = await get_edit_chain(session, entity_table, entity_id)
     old_snapshot: dict[str, object] = get_effective_snapshot(entity, chain)
 
     new_snapshot: dict[str, object] = dict(old_snapshot)
@@ -65,7 +66,7 @@ def submit_pending_edit(
             )
         )
 
-    head = get_head_edit(session, entity_table, entity_id)
+    head = await get_head_edit(session, entity_table, entity_id)
     session.add(
         PendingEdit(
             entity_type=entity_table,
@@ -84,11 +85,11 @@ def submit_pending_edit(
     )
 
 
-def replace_links(
+async def replace_links(
     *,
     entity: object,
     urls: Iterable[str] | None,
-    session: Session,
+    session: AsyncSession,
 ) -> None:
     """Delete existing Link rows on ``entity`` and replace them with one per url.
 
@@ -96,15 +97,15 @@ def replace_links(
     """
     existing_links: list[Link] = list(getattr(entity, "links"))
     for old_link in existing_links:
-        session.delete(old_link)
+        await session.delete(old_link)
 
     new_links: set[Link] = {Link(url) for url in (urls or [])}
     setattr(entity, "links", new_links)
 
 
-def submit_simple_aliased_pending_edit(
+async def submit_simple_aliased_pending_edit(
     *,
-    session: Session,
+    session: AsyncSession,
     entity: Artist | Shop,
     entity_table: str,
     entity_id: int,
@@ -117,7 +118,7 @@ def submit_simple_aliased_pending_edit(
     redirect_route: str,
 ) -> HTMLResponse:
     """Pending-edit submission for entities with name/description/links/aliases."""
-    return submit_pending_edit(
+    return await submit_pending_edit(
         session=session,
         entity=entity,
         entity_table=entity_table,
@@ -134,18 +135,18 @@ def submit_simple_aliased_pending_edit(
     )
 
 
-def apply_simple_aliased_direct_edit(
+async def apply_simple_aliased_direct_edit(
     *,
     entity: Artist | Shop,
     name: str,
     description: str | None,
     links: list[str] | None,
     aliases: list[str],
-    replace_aliases_fn: Callable[[Any, Iterable[str], Session], None],
-    session: Session,
+    replace_aliases_fn: Callable[[Any, Iterable[str], AsyncSession], Awaitable[None]],
+    session: AsyncSession,
 ) -> None:
     """In-place write for name/description/links/aliases (admin path)."""
     entity.name = name
     entity.description = description
-    replace_links(entity=entity, urls=links, session=session)
-    replace_aliases_fn(entity, aliases, session)
+    await replace_links(entity=entity, urls=links, session=session)
+    await replace_aliases_fn(entity, aliases, session)

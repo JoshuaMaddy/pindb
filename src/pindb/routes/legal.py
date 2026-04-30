@@ -14,15 +14,15 @@ router = APIRouter()
 
 
 @router.get(path="/about")
-def get_about(request: Request) -> HtpyResponse:
+async def get_about(request: Request) -> HtpyResponse:
     return HtpyResponse(about_page(request=request))
 
 
 @router.get(path="/privacy")
-def get_privacy(request: Request) -> HtpyResponse:
+async def get_privacy(request: Request) -> HtpyResponse:
     return HtpyResponse(privacy_page(request=request))
 
 
 @router.get(path="/terms")
-def get_terms(request: Request) -> HtpyResponse:
+async def get_terms(request: Request) -> HtpyResponse:
     return HtpyResponse(terms_page(request=request))

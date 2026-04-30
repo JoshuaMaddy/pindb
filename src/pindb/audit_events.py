@@ -1,6 +1,6 @@
 """SQLAlchemy session hooks for audit timestamps, change history, and row visibility.
 
-Registers three listeners on ``Session``:
+Registers three listeners on SQLAlchemy's sync ``Session`` class:
 
 * ``before_flush`` — fills ``AuditMixin`` timestamps and user ids, queues
   ``ChangeLog`` work, and auto-approves ``PendingMixin`` rows created by admins.
@@ -257,7 +257,10 @@ def _filter_deleted(execute_state: ORMExecuteState) -> None:
 
 
 def register_audit_events() -> None:
-    """Attach audit and visibility listeners to every ``Session`` (call once at import)."""
-    event.listen(Session, "before_flush", _before_flush)
-    event.listen(Session, "after_flush", _after_flush)
-    event.listen(Session, "do_orm_execute", _filter_deleted)
+    """Attach audit and visibility listeners to every ORM session."""
+    if not event.contains(Session, "before_flush", _before_flush):
+        event.listen(Session, "before_flush", _before_flush)
+    if not event.contains(Session, "after_flush", _after_flush):
+        event.listen(Session, "after_flush", _after_flush)
+    if not event.contains(Session, "do_orm_execute", _filter_deleted):
+        event.listen(Session, "do_orm_execute", _filter_deleted)

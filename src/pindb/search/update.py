@@ -1,15 +1,19 @@
 """Meilisearch index lifecycle: settings, bulk sync from Postgres, add/delete helpers."""
 
+from __future__ import annotations
+
 import logging
 from typing import Iterable, Protocol, Sequence
 
-from meilisearch.index import Index
-from meilisearch.models.document import DocumentsResults
+from meilisearch_python_sdk import AsyncIndex
+from meilisearch_python_sdk.errors import MeilisearchApiError
+from meilisearch_python_sdk.models.settings import FilterableAttributes
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from pindb.config import CONFIGURATION
-from pindb.database import session_maker
+from pindb.database import async_session_maker
 from pindb.database.artist import Artist
 from pindb.database.entity_type import EntityType
 from pindb.database.pin import Pin
@@ -19,19 +23,33 @@ from pindb.database.tag import Tag
 
 LOGGER: logging.Logger = logging.getLogger(name="pindb.search.update")
 
-PIN_INDEX: Index = CONFIGURATION.meili_client.index(uid=CONFIGURATION.meilisearch_index)
-TAGS_INDEX: Index = CONFIGURATION.meili_client.index(uid="tags")
-ARTISTS_INDEX: Index = CONFIGURATION.meili_client.index(uid="artists")
-SHOPS_INDEX: Index = CONFIGURATION.meili_client.index(uid="shops")
-PIN_SETS_INDEX: Index = CONFIGURATION.meili_client.index(uid="pin_sets")
+
+def _pin_index() -> AsyncIndex:
+    return CONFIGURATION.meili_client.index(uid=CONFIGURATION.meilisearch_index)
 
 
-INDEX_BY_ENTITY_TYPE: dict[EntityType, Index] = {
-    EntityType.pin: PIN_INDEX,
-    EntityType.tag: TAGS_INDEX,
-    EntityType.artist: ARTISTS_INDEX,
-    EntityType.shop: SHOPS_INDEX,
-    EntityType.pin_set: PIN_SETS_INDEX,
+def _tags_index() -> AsyncIndex:
+    return CONFIGURATION.meili_client.index(uid="tags")
+
+
+def _artists_index() -> AsyncIndex:
+    return CONFIGURATION.meili_client.index(uid="artists")
+
+
+def _shops_index() -> AsyncIndex:
+    return CONFIGURATION.meili_client.index(uid="shops")
+
+
+def _pin_sets_index() -> AsyncIndex:
+    return CONFIGURATION.meili_client.index(uid="pin_sets")
+
+
+INDEX_BY_ENTITY_TYPE: dict[EntityType, AsyncIndex] = {
+    EntityType.pin: _pin_index(),
+    EntityType.tag: _tags_index(),
+    EntityType.artist: _artists_index(),
+    EntityType.shop: _shops_index(),
+    EntityType.pin_set: _pin_sets_index(),
 }
 
 
@@ -46,24 +64,22 @@ class _Indexable(Protocol):
 # ---------------------------------------------------------------------------
 
 
-def _create_index(
-    uid: str, searchable: list[str], filterable: list[str] | None = None
-) -> Index:
-    index: Index = CONFIGURATION.meili_client.index(uid=uid)
-    try:
-        CONFIGURATION.meili_client.create_index(uid=uid, options={"primaryKey": "id"})
-    except Exception:
-        pass
-    index.update_searchable_attributes(searchable)
+async def _create_index(
+    uid: str, searchable: list[str], filterable: Sequence[str] | None = None
+) -> AsyncIndex:
+    client = CONFIGURATION.meili_client
+    index = await client.get_or_create_index(uid, primary_key="id")
+    await index.update_searchable_attributes(searchable)
     if filterable:
-        index.update_filterable_attributes(filterable)
+        filterable_attributes: list[str | FilterableAttributes] = list(filterable)
+        await index.update_filterable_attributes(filterable_attributes)
     return index
 
 
-def setup_index() -> None:
+async def setup_index() -> None:
     """Create indexes if needed and apply searchable/filterable attribute settings."""
     LOGGER.info("Configuring Meilisearch indexes.")
-    _create_index(
+    await _create_index(
         uid=CONFIGURATION.meilisearch_index,
         searchable=[
             "name",
@@ -76,14 +92,14 @@ def setup_index() -> None:
             "description",
         ],
     )
-    _create_index(
+    await _create_index(
         uid="tags",
         searchable=["display_name", "name", "aliases", "category"],
         filterable=["category"],
     )
-    _create_index(uid="artists", searchable=["name", "aliases", "description"])
-    _create_index(uid="shops", searchable=["name", "aliases", "description"])
-    _create_index(uid="pin_sets", searchable=["name", "description"])
+    await _create_index(uid="artists", searchable=["name", "aliases", "description"])
+    await _create_index(uid="shops", searchable=["name", "aliases", "description"])
+    await _create_index(uid="pin_sets", searchable=["name", "description"])
 
 
 # ---------------------------------------------------------------------------
@@ -91,19 +107,22 @@ def setup_index() -> None:
 # ---------------------------------------------------------------------------
 
 
-def update_one(entity_type: EntityType, entity: _Indexable) -> None:
-    INDEX_BY_ENTITY_TYPE[entity_type].add_documents(documents=[entity.document()])
+async def update_one(entity_type: EntityType, entity: _Indexable) -> None:
+    index = INDEX_BY_ENTITY_TYPE[entity_type]
+    await index.add_documents(documents=[entity.document()])
 
 
-def update_many(entity_type: EntityType, entities: Iterable[_Indexable]) -> None:
+async def update_many(entity_type: EntityType, entities: Iterable[_Indexable]) -> None:
     documents = [entity.document() for entity in entities]
-    LOGGER.info(f"Updating {len(documents)} {entity_type.slug} documents")
-    INDEX_BY_ENTITY_TYPE[entity_type].add_documents(documents=documents)
+    LOGGER.info("Updating %s %s documents", len(documents), entity_type.slug)
+    index = INDEX_BY_ENTITY_TYPE[entity_type]
+    await index.add_documents(documents=documents)
 
 
-def delete_one(entity_type: EntityType, entity_id: int) -> None:
-    LOGGER.info(f"Deleting {entity_type.slug} ID {entity_id} from index.")
-    INDEX_BY_ENTITY_TYPE[entity_type].delete_document(entity_id)
+async def delete_one(entity_type: EntityType, entity_id: int) -> None:
+    LOGGER.info("Deleting %s ID %s from index.", entity_type.slug, entity_id)
+    index = INDEX_BY_ENTITY_TYPE[entity_type]
+    await index.delete_document(str(entity_id))
 
 
 # ---------------------------------------------------------------------------
@@ -111,65 +130,65 @@ def delete_one(entity_type: EntityType, entity_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def update_pin(pin: Pin) -> None:
-    LOGGER.info(f"Updating Pin with ID: {pin.id}")
-    update_one(EntityType.pin, pin)
+async def update_pin(pin: Pin) -> None:
+    LOGGER.info("Updating Pin with ID: %s", pin.id)
+    await update_one(EntityType.pin, pin)
 
 
-def update_pins(pins: Iterable[Pin]) -> None:
-    update_many(EntityType.pin, pins)
+async def update_pins(pins: Iterable[Pin]) -> None:
+    await update_many(EntityType.pin, pins)
 
 
-def delete_pin(pin_id: int) -> None:
-    delete_one(EntityType.pin, pin_id)
+async def delete_pin(pin_id: int) -> None:
+    await delete_one(EntityType.pin, pin_id)
 
 
-def update_tag(tag: Tag) -> None:
-    update_one(EntityType.tag, tag)
+async def update_tag(tag: Tag) -> None:
+    await update_one(EntityType.tag, tag)
 
 
-def update_tags(tags: Iterable[Tag]) -> None:
-    update_many(EntityType.tag, tags)
+async def update_tags(tags: Iterable[Tag]) -> None:
+    await update_many(EntityType.tag, tags)
 
 
-def delete_tag(tag_id: int) -> None:
-    delete_one(EntityType.tag, tag_id)
+async def delete_tag(tag_id: int) -> None:
+    await delete_one(EntityType.tag, tag_id)
 
 
-def update_artist(artist: Artist) -> None:
-    update_one(EntityType.artist, artist)
+async def update_artist(artist: Artist) -> None:
+    await update_one(EntityType.artist, artist)
 
 
-def update_artists(artists: Iterable[Artist]) -> None:
-    update_many(EntityType.artist, artists)
+async def update_artists(artists: Iterable[Artist]) -> None:
+    await update_many(EntityType.artist, artists)
 
 
-def delete_artist(artist_id: int) -> None:
-    delete_one(EntityType.artist, artist_id)
+async def delete_artist(artist_id: int) -> None:
+    await delete_one(EntityType.artist, artist_id)
 
 
-def update_shop(shop: Shop) -> None:
-    update_one(EntityType.shop, shop)
+async def update_shop(shop: Shop) -> None:
+    await update_one(EntityType.shop, shop)
 
 
-def update_shops(shops: Iterable[Shop]) -> None:
-    update_many(EntityType.shop, shops)
+async def update_shops(shops: Iterable[Shop]) -> None:
+    await update_many(EntityType.shop, shops)
 
 
-def delete_shop(shop_id: int) -> None:
-    delete_one(EntityType.shop, shop_id)
+async def delete_shop(shop_id: int) -> None:
+    await delete_one(EntityType.shop, shop_id)
 
 
-def update_pin_set(pin_set: PinSet) -> None:
-    update_one(EntityType.pin_set, pin_set)
+async def update_pin_set(pin_set: PinSet) -> None:
+    await update_one(EntityType.pin_set, pin_set)
 
 
-def update_pin_sets(pin_sets: Iterable[PinSet]) -> None:
-    update_many(EntityType.pin_set, pin_sets)
+async def update_pin_sets(pin_sets: Iterable[PinSet]) -> None:
+    await update_many(EntityType.pin_set, pin_sets)
 
 
-def delete_pin_set(pin_set_id: int) -> None:
-    delete_one(EntityType.pin_set, pin_set_id)
+async def delete_pin_set(pin_set_id: int) -> None:
+    await delete_one(EntityType.pin_set, pin_set_id)
 
 
 # ---------------------------------------------------------------------------
@@ -177,42 +196,44 @@ def delete_pin_set(pin_set_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _get_all_meili_ids(index: Index) -> set[int]:
-    from meilisearch.errors import MeilisearchApiError
-
+async def _get_all_meili_ids(index: AsyncIndex) -> set[int]:
     ids: set[int] = set()
     limit = 1000
     offset = 0
     while True:
         try:
-            result: DocumentsResults = index.get_documents(
-                {"fields": ["id"], "limit": limit, "offset": offset}
+            result = await index.get_documents(
+                fields=["id"],
+                limit=limit,
+                offset=offset,
             )
         except MeilisearchApiError as error:
-            if error.code == "index_not_found":
+            if error.code and "index_not_found" in str(error.code).lower():
                 return ids
             raise
         for document in result.results:
-            ids.add(getattr(document, "id"))
+            raw = document.get("id")
+            if raw is not None:
+                ids.add(int(raw))
         if offset + limit >= result.total:
             break
         offset += limit
     return ids
 
 
-def _sync_index(index: Index, entities: Sequence[_Indexable]) -> None:
+async def _sync_index(index: AsyncIndex, entities: Sequence[_Indexable]) -> None:
     db_ids: set[int] = {entity.id for entity in entities}
     if entities:
-        index.add_documents([entity.document() for entity in entities])
-    meili_ids: set[int] = _get_all_meili_ids(index)
-    stale: list[int] = list(meili_ids - db_ids)
+        await index.add_documents([entity.document() for entity in entities])
+    meili_ids: set[int] = await _get_all_meili_ids(index)
+    stale: list[str] = [str(i) for i in (meili_ids - db_ids)]
     if stale:
-        LOGGER.info(f"Deleting {len(stale)} stale docs from {index.uid}.")
-        index.delete_documents(stale)
+        LOGGER.info("Deleting %s stale docs from %s.", len(stale), index.uid)
+        await index.delete_documents(stale)
 
 
-def _fetch_all(
-    session: Session,
+async def _fetch_all(
+    session: AsyncSession,
 ) -> tuple[
     Sequence[Pin],
     Sequence[Tag],
@@ -220,26 +241,29 @@ def _fetch_all(
     Sequence[Shop],
     Sequence[PinSet],
 ]:
+    pin_result = await session.scalars(
+        select(Pin).options(
+            selectinload(Pin.shops).selectinload(Shop.aliases),
+            selectinload(Pin.tags).selectinload(Tag.aliases),
+            selectinload(Pin.artists).selectinload(Artist.aliases),
+        )
+    )
     return (
-        session.scalars(
-            select(Pin).options(
-                selectinload(Pin.shops).selectinload(Shop.aliases),
-                selectinload(Pin.tags).selectinload(Tag.aliases),
-                selectinload(Pin.artists).selectinload(Artist.aliases),
-            )
+        pin_result.all(),
+        (await session.scalars(select(Tag).options(selectinload(Tag.aliases)))).all(),
+        (
+            await session.scalars(select(Artist).options(selectinload(Artist.aliases)))
         ).all(),
-        session.scalars(select(Tag).options(selectinload(Tag.aliases))).all(),
-        session.scalars(select(Artist).options(selectinload(Artist.aliases))).all(),
-        session.scalars(select(Shop).options(selectinload(Shop.aliases))).all(),
-        session.scalars(select(PinSet)).all(),
+        (await session.scalars(select(Shop).options(selectinload(Shop.aliases)))).all(),
+        (await session.scalars(select(PinSet))).all(),
     )
 
 
-def _fetch_entity_for_sync(
-    session: Session, entity_type: EntityType, entity_id: int
+async def _fetch_entity_for_sync(
+    session: AsyncSession, entity_type: EntityType, entity_id: int
 ) -> _Indexable | None:
     if entity_type == EntityType.pin:
-        return session.scalar(
+        return await session.scalar(
             select(Pin)
             .where(Pin.id == entity_id)
             .options(
@@ -249,38 +273,38 @@ def _fetch_entity_for_sync(
             )
         )
     if entity_type == EntityType.tag:
-        return session.scalar(
+        return await session.scalar(
             select(Tag).where(Tag.id == entity_id).options(selectinload(Tag.aliases))
         )
     if entity_type == EntityType.artist:
-        return session.scalar(
+        return await session.scalar(
             select(Artist)
             .where(Artist.id == entity_id)
             .options(selectinload(Artist.aliases))
         )
     if entity_type == EntityType.shop:
-        return session.scalar(
+        return await session.scalar(
             select(Shop).where(Shop.id == entity_id).options(selectinload(Shop.aliases))
         )
     if entity_type == EntityType.pin_set:
-        return session.get(PinSet, entity_id)
+        return await session.get(PinSet, entity_id)
     return None
 
 
-def sync_entity(entity_type: EntityType, entity_id: int) -> None:
+async def sync_entity(entity_type: EntityType, entity_id: int) -> None:
     """Re-fetch entity from DB and upsert to Meili, or delete if absent/deleted."""
-    with session_maker() as session:
-        entity = _fetch_entity_for_sync(session, entity_type, entity_id)
+    async with async_session_maker() as session:
+        entity = await _fetch_entity_for_sync(session, entity_type, entity_id)
     if entity is None:
-        delete_one(entity_type, entity_id)
+        await delete_one(entity_type, entity_id)
     else:
-        update_one(entity_type, entity)
+        await update_one(entity_type, entity)
 
 
-def sync_pin_with_deps(pin_id: int) -> None:
+async def sync_pin_with_deps(pin_id: int) -> None:
     """Sync pin and its related shops/artists/tags after cascade approval."""
-    with session_maker() as session:
-        pin = session.scalar(
+    async with async_session_maker() as session:
+        pin = await session.scalar(
             select(Pin)
             .where(Pin.id == pin_id)
             .options(
@@ -290,25 +314,26 @@ def sync_pin_with_deps(pin_id: int) -> None:
             )
         )
     if pin is None:
-        delete_one(EntityType.pin, pin_id)
+        await delete_one(EntityType.pin, pin_id)
         return
-    update_pin(pin)
+    await update_pin(pin)
     for shop in pin.shops:
-        update_shop(shop)
+        await update_shop(shop)
     for tag in pin.tags:
-        update_tag(tag)
+        await update_tag(tag)
     for artist in pin.artists:
-        update_artist(artist)
+        await update_artist(artist)
 
 
-def update_all() -> None:
+async def update_all() -> None:
     """Reconcile every Meilisearch index with the current database rows (add + prune)."""
     LOGGER.info("Updating all search indexes.")
-    with session_maker() as session:
-        pins, tags, artists, shops, pin_sets = _fetch_all(session)
+    async with async_session_maker() as session:
+        pins, tags, artists, shops, pin_sets = await _fetch_all(session)
 
-    _sync_index(PIN_INDEX, pins)
-    _sync_index(TAGS_INDEX, tags)
-    _sync_index(ARTISTS_INDEX, artists)
-    _sync_index(SHOPS_INDEX, shops)
-    _sync_index(PIN_SETS_INDEX, pin_sets)
+    # Refresh dict entries so AsyncIndex uses current client
+    await _sync_index(_pin_index(), pins)
+    await _sync_index(_tags_index(), tags)
+    await _sync_index(_artists_index(), artists)
+    await _sync_index(_shops_index(), shops)
+    await _sync_index(_pin_sets_index(), pin_sets)

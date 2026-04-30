@@ -7,11 +7,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import AdminUser, AuthenticatedUser
-from pindb.database import Pin, PinSet, User, session_maker
+from pindb.database import Pin, PinSet, User, async_session_maker
 from pindb.database.joins import (
     pin_set_memberships,
     user_favorite_pin_sets,
@@ -56,7 +57,7 @@ def _assert_can_edit_set(pin_set: PinSet, user: User) -> None:
 
 
 @router.get("/me/sets/new", response_model=None)
-def get_create_user_set(
+async def get_create_user_set(
     request: Request,
     _current_user: AuthenticatedUser,
 ) -> HtpyResponse:
@@ -64,7 +65,7 @@ def get_create_user_set(
 
 
 @router.get("/me/sets/check-name", response_model=None)
-def get_personal_set_check_name(
+async def get_personal_set_check_name(
     current_user: AuthenticatedUser,
     name: str = Query(default=""),
     exclude_id: int | None = Query(default=None),
@@ -73,8 +74,8 @@ def get_personal_set_check_name(
     if not normalized_name:
         return empty_name_check_response()
 
-    with session_maker() as db:
-        exists: bool = normalized_name_exists(
+    async with async_session_maker() as db:
+        exists: bool = await normalized_name_exists(
             session=db,
             kind=NameCheckKind.pin_set,
             normalized_name=normalized_name,
@@ -94,23 +95,25 @@ def get_personal_set_check_name(
 
 
 @router.get("/sets/{set_id}/edit", response_model=None)
-def get_edit_set(
+async def get_edit_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
 ) -> HTMLResponse:
-    with session_maker() as db:
-        pin_set = db.get(PinSet, set_id)
+    async with async_session_maker() as db:
+        pin_set = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
 
         pins: list[Pin] = list(
-            db.scalars(
-                select(Pin)
-                .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
-                .where(pin_set_memberships.c.set_id == set_id)
-                .order_by(pin_set_memberships.c.position)
+            (
+                await db.scalars(
+                    select(Pin)
+                    .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
+                    .where(pin_set_memberships.c.set_id == set_id)
+                    .order_by(pin_set_memberships.c.position)
+                )
             ).all()
         )
 
@@ -127,15 +130,15 @@ def get_edit_set(
 
 
 @router.post("/sets/{set_id}/edit", response_model=None)
-def update_set(
+async def update_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
     name: Annotated[str, Form()],
     description: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
@@ -158,19 +161,19 @@ def update_set(
 
 
 @router.post("/sets/{set_id}/pins/reorder", response_model=None)
-def reorder_set_pins(
+async def reorder_set_pins(
     set_id: int,
     current_user: AuthenticatedUser,
     pin_ids: Annotated[list[int], Form()],
 ) -> Response:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
 
         for position, pin_id in enumerate(pin_ids):
-            db.execute(
+            await db.execute(
                 pin_set_memberships.update()
                 .where(
                     pin_set_memberships.c.set_id == set_id,
@@ -188,13 +191,13 @@ def reorder_set_pins(
 
 
 @router.post("/sets/{set_id}/promote", response_model=None)
-def promote_set_to_global(
+async def promote_set_to_global(
     request: Request,
     set_id: int,
     _current_user: AdminUser,
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         if pin_set.owner_id is None:
@@ -215,18 +218,20 @@ def promote_set_to_global(
 
 
 @router.post("/favorites/pins/{pin_id}", response_model=None)
-def favorite_pin(
+async def favorite_pin(
     request: Request,
     pin_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        pin: Pin | None = db.get(Pin, pin_id)
+    async with async_session_maker.begin() as db:
+        pin: Pin | None = await db.get(Pin, pin_id)
         if pin is None:
             raise HTTPException(status_code=404, detail="Pin not found")
-        user: User | None = db.get(User, current_user.id)
-        assert user is not None
-        user.favorite_pins.add(pin)
+        await db.execute(
+            pg_insert(user_favorite_pins)
+            .values(user_id=current_user.id, pin_id=pin_id)
+            .on_conflict_do_nothing()
+        )
 
     if request.headers.get("HX-Request"):
         return HTMLResponse(
@@ -238,13 +243,13 @@ def favorite_pin(
 
 
 @router.delete("/favorites/pins/{pin_id}", response_model=None)
-def unfavorite_pin(
+async def unfavorite_pin(
     request: Request,
     pin_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        db.execute(
+    async with async_session_maker.begin() as db:
+        await db.execute(
             user_favorite_pins.delete().where(
                 user_favorite_pins.c.user_id == current_user.id,
                 user_favorite_pins.c.pin_id == pin_id,
@@ -266,27 +271,29 @@ def unfavorite_pin(
 
 
 @router.post("/favorites/sets/{set_id}", response_model=None)
-def favorite_set(
+async def favorite_set(
     set_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
-        user: User | None = db.get(User, current_user.id)
-        assert user is not None
-        user.favorite_pin_sets.add(pin_set)
+        await db.execute(
+            pg_insert(user_favorite_pin_sets)
+            .values(user_id=current_user.id, pin_set_id=set_id)
+            .on_conflict_do_nothing()
+        )
     return Response(status_code=204)
 
 
 @router.delete("/favorites/sets/{set_id}", response_model=None)
-def unfavorite_set(
+async def unfavorite_set(
     set_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        db.execute(
+    async with async_session_maker.begin() as db:
+        await db.execute(
             user_favorite_pin_sets.delete().where(
                 user_favorite_pin_sets.c.user_id == current_user.id,
                 user_favorite_pin_sets.c.pin_set_id == set_id,
@@ -301,20 +308,20 @@ def unfavorite_set(
 
 
 @router.post("/me/sets", response_model=None)
-def create_personal_set(
+async def create_personal_set(
     request: Request,
     current_user: AuthenticatedUser,
     name: Annotated[str, Form()],
     description: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker.begin() as db:
+    async with async_session_maker.begin() as db:
         pin_set = PinSet(
             name=name.strip(),
             description=description.strip() if description else None,
             owner_id=current_user.id,
         )
         db.add(pin_set)
-        db.flush()
+        await db.flush()
         set_id = pin_set.id
 
     return redirect_or_htmx_toast(
@@ -325,17 +332,17 @@ def create_personal_set(
 
 
 @router.post("/sets/{set_id}/delete", response_model=None)
-def delete_personal_set(
+async def delete_personal_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
 ) -> HTMLResponse | RedirectResponse:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
-        db.delete(pin_set)
+        await db.delete(pin_set)
 
     return redirect_or_htmx_toast(
         request=request,
@@ -352,33 +359,35 @@ def delete_personal_set(
 
 
 @router.post("/sets/{set_id}/pins/{pin_id}", response_model=None)
-def add_pin_to_personal_set(
+async def add_pin_to_personal_set(
     request: Request,
     set_id: int,
     pin_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
-        if db.get(Pin, pin_id) is None:
+        if await db.get(Pin, pin_id) is None:
             raise HTTPException(status_code=404, detail="Pin not found")
 
-        already: Row[Any] | None = db.execute(
-            select(pin_set_memberships).where(
-                pin_set_memberships.c.set_id == set_id,
-                pin_set_memberships.c.pin_id == pin_id,
+        already: Row[Any] | None = (
+            await db.execute(
+                select(pin_set_memberships).where(
+                    pin_set_memberships.c.set_id == set_id,
+                    pin_set_memberships.c.pin_id == pin_id,
+                )
             )
         ).first()
         if already is None:
-            max_pos = db.scalar(
+            max_pos = await db.scalar(
                 select(
                     func.coalesce(func.max(pin_set_memberships.c.position), -1)
                 ).where(pin_set_memberships.c.set_id == set_id)
             )
-            db.execute(
+            await db.execute(
                 pin_set_memberships.insert().values(
                     set_id=set_id, pin_id=pin_id, position=(max_pos or 0) + 1
                 )
@@ -387,14 +396,14 @@ def add_pin_to_personal_set(
     if request.headers.get("HX-Request"):
         hx_target: str = request.headers.get("HX-Target", "")
         if hx_target.startswith("search-row-"):
-            with session_maker() as db:
-                pin = db.scalar(
+            async with async_session_maker() as db:
+                pin = await db.scalar(
                     select(Pin)
                     .where(Pin.id == pin_id)
                     .options(selectinload(Pin.shops), selectinload(Pin.artists))
                 )
                 assert pin is not None
-                count = db.scalar(
+                count = await db.scalar(
                     select(func.count()).where(pin_set_memberships.c.set_id == set_id)
                 )
 
@@ -411,8 +420,8 @@ def add_pin_to_personal_set(
                 parts.append(str(pin_empty_oob()))
             return HTMLResponse(content="".join(parts))
         else:
-            with session_maker() as db:
-                pin_set = db.get(PinSet, set_id)
+            async with async_session_maker() as db:
+                pin_set = await db.get(PinSet, set_id)
                 assert pin_set is not None
 
             return HtpyResponse(
@@ -422,18 +431,18 @@ def add_pin_to_personal_set(
 
 
 @router.delete("/sets/{set_id}/pins/{pin_id}", response_model=None)
-def remove_pin_from_personal_set(
+async def remove_pin_from_personal_set(
     request: Request,
     set_id: int,
     pin_id: int,
     current_user: AuthenticatedUser,
 ) -> Response:
-    with session_maker.begin() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker.begin() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
-        db.execute(
+        await db.execute(
             pin_set_memberships.delete().where(
                 pin_set_memberships.c.set_id == set_id,
                 pin_set_memberships.c.pin_id == pin_id,
@@ -443,15 +452,15 @@ def remove_pin_from_personal_set(
     if request.headers.get("HX-Request"):
         hx_target: str = request.headers.get("HX-Target", "")
         if hx_target.startswith("pin-row-"):
-            with session_maker() as db:
-                count = db.scalar(
+            async with async_session_maker() as db:
+                count = await db.scalar(
                     select(func.count()).where(pin_set_memberships.c.set_id == set_id)
                 )
 
             return HtpyResponse(pin_count_oob(count or 0))
         elif hx_target.startswith("search-row-"):
-            with session_maker() as db:
-                pin = db.scalar(
+            async with async_session_maker() as db:
+                pin = await db.scalar(
                     select(Pin)
                     .where(Pin.id == pin_id)
                     .options(selectinload(Pin.shops), selectinload(Pin.artists))
@@ -466,8 +475,8 @@ def remove_pin_from_personal_set(
                 )
             )
         else:
-            with session_maker() as db:
-                pin_set = db.get(PinSet, set_id)
+            async with async_session_maker() as db:
+                pin_set = await db.get(PinSet, set_id)
                 assert pin_set is not None
 
             return HTMLResponse(
@@ -486,25 +495,27 @@ def remove_pin_from_personal_set(
 
 
 @router.get("/sets/{set_id}/pin-search", response_model=None)
-def search_pins_for_set(
+async def search_pins_for_set(
     request: Request,
     set_id: int,
     current_user: AuthenticatedUser,
     q: str = "",
 ) -> HTMLResponse:
-    with session_maker() as db:
-        pin_set: PinSet | None = db.get(PinSet, set_id)
+    async with async_session_maker() as db:
+        pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
 
         results: list[Pin] = []
         if q.strip():
-            results = search_pin(query=q.strip(), session=db) or []
+            results = await search_pin(query=q.strip(), session=db) or []
         existing_ids: set[int] = set(
-            db.scalars(
-                select(pin_set_memberships.c.pin_id).where(
-                    pin_set_memberships.c.set_id == set_id
+            (
+                await db.scalars(
+                    select(pin_set_memberships.c.pin_id).where(
+                        pin_set_memberships.c.set_id == set_id
+                    )
                 )
             ).all()
         )

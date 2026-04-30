@@ -103,7 +103,7 @@ def provider_enabled(provider: OAuthProvider) -> bool:
     return False
 
 
-def get_client(provider: OAuthProvider) -> StarletteOAuth2App:
+async def get_client(provider: OAuthProvider) -> StarletteOAuth2App:
     client = getattr(_oauth, provider.value, None)
     if client is None:
         raise RuntimeError(f"OAuth provider not configured: {provider.value}")
@@ -179,14 +179,14 @@ def normalize_meta(userinfo: dict[str, Any]) -> OAuthIdentity:
 
 
 async def fetch_google(request: Request) -> OAuthIdentity:
-    client = get_client(OAuthProvider.google)
+    client = await get_client(OAuthProvider.google)
     token = await client.authorize_access_token(request)
     userinfo = token.get("userinfo") or {}
     return normalize_google(userinfo)
 
 
 async def fetch_discord(request: Request) -> OAuthIdentity:
-    client = get_client(OAuthProvider.discord)
+    client = await get_client(OAuthProvider.discord)
     token = await client.authorize_access_token(request)
     async with httpx.AsyncClient() as http:
         resp = await http.get(
@@ -198,7 +198,7 @@ async def fetch_discord(request: Request) -> OAuthIdentity:
 
 
 async def fetch_meta(request: Request) -> OAuthIdentity:
-    client = get_client(OAuthProvider.meta)
+    client = await get_client(OAuthProvider.meta)
     token = await client.authorize_access_token(request)
     async with httpx.AsyncClient() as http:
         resp = await http.get(
