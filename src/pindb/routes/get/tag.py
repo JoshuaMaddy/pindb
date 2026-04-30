@@ -152,6 +152,7 @@ async def get_tag(
                 select(Pin)
                 .join(pins_tags, Pin.id == pins_tags.c.pin_id)
                 .where(pins_tags.c.tag_id == tag_obj.id)
+                .options(selectinload(Pin.shops), selectinload(Pin.artists))
                 .order_by(Pin.name.asc())
                 .limit(_PER_PAGE)
                 .offset(offset)

@@ -84,6 +84,7 @@ async def get_shop(
                 select(Pin)
                 .join(pins_shops, Pin.id == pins_shops.c.pin_id)
                 .where(pins_shops.c.shop_id == shop_obj.id)
+                .options(selectinload(Pin.shops), selectinload(Pin.artists))
                 .order_by(Pin.name.asc())
                 .limit(_PER_PAGE)
                 .offset(offset)

@@ -114,17 +114,26 @@ async def get_user_profile(
 
         favorite_count = await count_favorites(session=db, user_id=user.id)
         favorite_pins = await get_favorite_pins(
-            session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
+            session=db,
+            user_id=user.id,
+            limit=PROFILE_PREVIEW_LIMIT,
+            eager_pin_relationships=True,
         )
 
         owned_count = await count_owned(session=db, user_id=user.id)
         owned_pins = await get_owned_entries(
-            session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
+            session=db,
+            user_id=user.id,
+            limit=PROFILE_PREVIEW_LIMIT,
+            eager_pin_relationships=True,
         )
 
         wanted_count = await count_wanted(session=db, user_id=user.id)
         wanted_pins = await get_wanted_entries(
-            session=db, user_id=user.id, limit=PROFILE_PREVIEW_LIMIT
+            session=db,
+            user_id=user.id,
+            limit=PROFILE_PREVIEW_LIMIT,
+            eager_pin_relationships=True,
         )
 
         tradeable_count = await count_owned(
@@ -135,6 +144,7 @@ async def get_user_profile(
             user_id=user.id,
             limit=PROFILE_PREVIEW_LIMIT,
             tradeable_only=True,
+            eager_pin_relationships=True,
         )
 
         personal_sets: list[PinSet] = list(

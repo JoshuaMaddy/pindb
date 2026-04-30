@@ -8,6 +8,7 @@ from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from pindb.database import Pin, async_session_maker
 from pindb.database.joins import pin_set_memberships
@@ -67,6 +68,7 @@ async def get_pin_set(
                 select(Pin)
                 .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
                 .where(pin_set_memberships.c.set_id == id)
+                .options(selectinload(Pin.shops), selectinload(Pin.artists))
                 .order_by(pin_set_memberships.c.position.asc())
                 .limit(per_page)
                 .offset(offset)
