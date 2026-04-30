@@ -241,7 +241,7 @@ def build_user_list_og_image(pin_image_bytes: Sequence[bytes]) -> bytes:
         Encoded WebP bytes (1200x630, sRGB).
     """
     w, h = _IMAGE_SIZE
-    canvas = Image.new("RGB", (w, h), _EMPTY_SQUARE_FILL)
+    canvas = Image.new("RGB", (w, h), _PIN_OG_BACKGROUND)
 
     slot = 0
     for y in _USER_GRID_ROW_Y:
