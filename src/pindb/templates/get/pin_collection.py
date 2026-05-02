@@ -189,7 +189,7 @@ def _owned_row_new(
     return Markup(
         f"""<div class="flex items-center gap-2 py-1.5 px-1 border-b border-lightest last:border-0">
           <span class="w-20 text-sm shrink-0 text-lightest-hover">{safe_grade_name}</span>
-          <form hx-post="{add_url}" hx-target="#{target_id}" hx-swap="outerHTML" class="contents">
+          <form hx-post="{add_url}" hx-target="#{target_id}" hx-swap="outerHTML" class="contents" data-htmx-submit-guard>
             {grade_input}
             <input type="number" name="quantity" value="1" min="1"
                    class="w-14 text-sm bg-lighter border border-lightest rounded px-1 py-0.5"

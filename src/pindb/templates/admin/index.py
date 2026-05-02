@@ -127,6 +127,7 @@ def _search_section() -> Element:
             action="/admin/search/sync",
             hx_post="/admin/search/sync",
             hx_swap="none",
+            **{"data-htmx-submit-guard": ""},
         )[
             button(
                 type="submit",

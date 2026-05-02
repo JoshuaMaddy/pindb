@@ -110,5 +110,6 @@ def html_base(
         script(src=templates_js_url("forms/form_persist.js"), defer=True),
         script(src=templates_js_url("forms/markdown_editor.js"), defer=True),
         script(src=templates_js_url("forms/form_validate.js"), defer=True),
+        script(src=templates_js_url("forms/htmx_submit_guard.js"), defer=True),
         *extra_scripts,
     ]

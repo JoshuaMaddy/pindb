@@ -18,6 +18,7 @@ from htpy import (
 )
 from markupsafe import Markup
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database import Artist, Shop, Tag
 from pindb.database.currency import Currency
 from pindb.database.pin import Pin
@@ -70,6 +71,10 @@ def pin_form(
 
     return html_base(
         title="Create Pin" if not pin else "Edit Pin",
+        head_content=script(
+            **{"type": "module"},
+            src=f"/static/vendor/pindb-webp/pindb-webp-encode.js?v={STATIC_CACHE_BUSTER}",
+        ),
         template_js_extra=("pins/pin_creation.js",),
         body_content=centered_div(
             content=[
@@ -92,6 +97,7 @@ def pin_form(
                     enctype="multipart/form-data",
                     class_="grid w-full min-w-0 grid-cols-[1fr_2fr] max-sm:grid-cols-1 gap-2 [&_label]:font-semibold",
                     autocomplete="off",
+                    **{"data-htmx-submit-guard": ""},
                 )[
                     div(class_="flex flex-col gap-2 min-w-0")[
                         _front_image_input(pin=pin),
@@ -123,6 +129,7 @@ def pin_form(
                             class_=(
                                 "col-span-full mt-2 px-4 py-2 rounded-lg bg-main "
                                 "hover:bg-main-hover border border-lightest "
+                                "inline-flex items-center justify-center gap-2 "
                                 "cursor-pointer text-base-text w-full transition-opacity"
                             ),
                         )["Submit"],

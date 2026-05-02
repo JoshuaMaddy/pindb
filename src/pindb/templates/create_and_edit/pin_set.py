@@ -85,6 +85,7 @@ def pin_set_create_page(request: Request) -> Element:
                     hx_post=str(request.url_for("post_create_pin_set")),
                     hx_swap="none",
                     class_="flex flex-col gap-2",
+                    **{"data-htmx-submit-guard": ""},
                 )[
                     form_field(
                         label_text="Name",
@@ -227,6 +228,7 @@ def _metadata_form(request: Request, pin_set: PinSet) -> Element:
             hx_post=str(request.url_for("update_set", set_id=pin_set.id)),
             hx_swap="none",
             class_="flex flex-col gap-2",
+            **{"data-htmx-submit-guard": ""},
         )[
             form_field(
                 label_text="Name",

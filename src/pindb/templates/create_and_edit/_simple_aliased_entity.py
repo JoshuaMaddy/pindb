@@ -93,6 +93,7 @@ def simple_aliased_entity_form(
                     hx_target="#pindb-toast-host",
                     hx_swap="innerHTML",
                     class_="flex flex-col gap-2 [&_label]:font-semibold",
+                    **{"data-htmx-submit-guard": ""},
                 )[
                     label(for_="name")[
                         "Name", span(class_="text-error-main ml-0.5")["*"]

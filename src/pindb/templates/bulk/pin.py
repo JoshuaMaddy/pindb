@@ -24,6 +24,7 @@ from htpy import (
 from markupsafe import Markup
 from titlecase import titlecase
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.currency import Currency
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
@@ -77,6 +78,10 @@ def bulk_pin_page(
     return html_base(
         title="Bulk Import Pins",
         request=request,
+        head_content=script(
+            **{"type": "module"},
+            src=f"/static/vendor/pindb-webp/pindb-webp-encode.js?v={STATIC_CACHE_BUSTER}",
+        ),
         template_js_extra=("bulk/bulk_import.js",),
         body_content=[
             script(**{"type": "application/json"}, id="bulk-ref-data")[

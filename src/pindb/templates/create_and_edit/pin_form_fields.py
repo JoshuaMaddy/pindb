@@ -94,7 +94,7 @@ def _optional_fields(
 def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         div(
-            class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
+            class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-contain bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
             data_input_id="front_image",
             id="front_image_preview",
             data_pin_field="front",
@@ -121,7 +121,7 @@ def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
 def _back_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         div(
-            class_="image-drop w-full flex flex-col gap-1 aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-cover bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
+            class_="image-drop w-full flex flex-col gap-1 aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-contain bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
             data_input_id="back_image",
             id="back_image_preview",
             style=f"background-image: url(/get/image/{pin.back_image_guid})"

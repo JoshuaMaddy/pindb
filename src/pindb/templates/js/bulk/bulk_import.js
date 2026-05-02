@@ -8,6 +8,35 @@
 (function () {
   "use strict";
 
+  /** Same quality as single-pin create (`pins/pin_creation.js`). */
+  var BULK_IMAGE_WEBP_QUALITY = 95;
+
+  /**
+   * When `globalThis.pindbWebpFromFile` is loaded (see static/vendor/pindb-webp),
+   * re-encode raster images to WebP before upload. Otherwise returns `file`.
+   *
+   * @param {File} file
+   * @returns {Promise<File>}
+   */
+  async function maybeTranscodeBulkImageToWebp(file) {
+    if (!file) return file;
+    if (file.type === "image/webp") return file;
+    if (file.type && file.type.indexOf("image/") !== 0) return file;
+    var enc = globalThis.pindbWebpFromFile;
+    if (typeof enc !== "function") return file;
+    try {
+      var blob = await enc(file, BULK_IMAGE_WEBP_QUALITY);
+      if (!blob || blob.size === 0) return file;
+      var stem = file.name.replace(/\.[^.\\/]+$/, "") || "image";
+      return new File([blob], stem + ".webp", {
+        type: "image/webp",
+        lastModified: Date.now(),
+      });
+    } catch {
+      return file;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Module state
   // ---------------------------------------------------------------------------
@@ -249,7 +278,7 @@
           data-col-type="front_image"
           style="width:88px;min-width:88px;">
         <div class="image-drop-cell" data-row="${id}" data-side="front"
-             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
+             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:contain;background-repeat:no-repeat;background-position:center;font-size:10px;text-align:center;padding:4px;">
           Front
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="front"
@@ -262,7 +291,7 @@
       <!-- Back image -->
       <td class="bulk-td relative" data-col-type="back_image">
         <div class="image-drop-cell" data-row="${id}" data-side="back"
-             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:cover;background-position:center;font-size:10px;text-align:center;padding:4px;">
+             style="width:72px;height:72px;border:2px dashed var(--color-lightest);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-size:contain;background-repeat:no-repeat;background-position:center;font-size:10px;text-align:center;padding:4px;">
           Back
         </div>
         <input type="file" class="img-file-input hidden" data-row="${id}" data-side="back"
@@ -672,6 +701,8 @@
   // ---------------------------------------------------------------------------
 
   async function uploadImage(rowId, side, file) {
+    file = await maybeTranscodeBulkImageToWebp(file);
+
     const tr = document.getElementById(rowId);
     const box = tr.querySelector(`.image-drop-cell[data-side="${side}"]`);
     const spinner = tr.querySelector(`.img-spinner[data-side="${side}"]`);

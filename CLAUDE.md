@@ -23,6 +23,7 @@ npm run js:lint
 - **Tooling:** UV, Ruff, ty, Oxlint
 - **CSS build:** Node.js **20+** required (Tailwind v4 `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
 - **Lucide (JS):** `npm run build` / `vendor:build` runs `scripts/lucide/build-lucide.mjs` (Rolldown) tree-shakes `lucide` from auto-generated icon list. New dynamic names: add literal in templates or entry in `EXTRA_KEBAB` in that script.
+- **Pin image WebP (JS):** `vendor:build` runs `scripts/build-webp-encode.mjs` (Rolldown + `@jsquash/webp`) → `static/vendor/pindb-webp/` (ESM + `.wasm`). Pin create/edit and bulk pin import load it for optional client-side WebP before upload.
 
 ## Running Locally
 ```bash
@@ -38,7 +39,7 @@ Or: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 Standard layout: `src/pindb/{database,routes,templates,search,models}/`. Names mirror — route `routes/get/pin.py` → template `templates/get/pin.py`. Env config = Pydantic Settings in `config.py` (source of truth for env vars).
 
-First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/` with `CacheBustedTemplateJsFiles` (same long cache as vendored static); use `templates_js_url("pins/pin_lightbox.js")` so every URL includes `?v=<process start>` (see `templates/base.py` and `template_js_extra` on pages).
+First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/` with `CacheBustedTemplateJsFiles` (same long cache as vendored static); use `templates_js_url("pins/pin_lightbox.js")` so every URL includes `?v=<process start>` (see `templates/base.py` and `template_js_extra` on pages). `html_base` always loads `forms/htmx_submit_guard.js`; opt in per form with `data-htmx-submit-guard` to disable submit + spinner during HTMX posts (create/edit flows).
 
 Key files where behavior not obvious from name:
 - `audit_events.py` — session-level SQLAlchemy events (before_flush, after_flush, do_orm_execute). Soft-delete + pending filters here.

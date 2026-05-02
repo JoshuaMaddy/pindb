@@ -1,3 +1,37 @@
+/** libwebp WASM via bundled @jsquash/webp (see scripts/build-webp-encode.mjs). */
+var PIN_IMAGE_WEBP_QUALITY = 95;
+
+/**
+ * Replace raster file inputs with WebP when `globalThis.pindbWebpFromFile` is
+ * available (module loaded). On failure or missing encoder, leaves the file
+ * unchanged.
+ *
+ * @param {HTMLInputElement | null} input
+ * @returns {Promise<void>}
+ */
+async function maybeTranscodePinImageToWebp(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  var file = input.files[0];
+  if (file.type === "image/webp") return;
+  if (file.type && file.type.indexOf("image/") !== 0) return;
+  var enc = globalThis.pindbWebpFromFile;
+  if (typeof enc !== "function") return;
+  try {
+    var blob = await enc(file, PIN_IMAGE_WEBP_QUALITY);
+    if (!blob || blob.size === 0) return;
+    var stem = file.name.replace(/\.[^.\\/]+$/, "") || "image";
+    var webpFile = new File([blob], stem + ".webp", {
+      type: "image/webp",
+      lastModified: Date.now(),
+    });
+    var dt = new DataTransfer();
+    dt.items.add(webpFile);
+    input.files = dt.files;
+  } catch {
+    /* keep original */
+  }
+}
+
 window.addEventListener("load", function () {
   var _refEl = document.getElementById("pin-form-ref-data");
   if (_refEl && _refEl.textContent && !window.PIN_FORM_REF) {
@@ -5,55 +39,6 @@ window.addEventListener("load", function () {
       window.PIN_FORM_REF = JSON.parse(_refEl.textContent);
     } catch {}
   }
-
-  // -------------------------------
-  // Link Add/Remove
-  // -------------------------------
-  /*
-  const addLinkButton = document.getElementById("add-link-button");
-  const removeButtons = document.querySelectorAll(".remove-link-button");
-  const linksDiv = document.getElementById("links");
-  const baseLink = document.getElementById("link_0");
-
-  if (!baseLink || !linksDiv) {
-    console.error("No first link found!");
-    return;
-  }
-
-  let links = Array.from(document.querySelectorAll("#links > input"));
-  const removeButtonTemplate = document.createElement("button");
-  removeButtonTemplate.innerText = "Remove";
-
-  addLinkButton.addEventListener("click", addLink);
-
-  removeButtons.forEach((el) => {
-    el.addEventListener("click", (event) => removeLink(event.currentTarget));
-  });
-
-  function addLink() {
-    const newLink = baseLink.cloneNode();
-    newLink.id = `link_${links.length}`;
-    newLink.value = "";
-    newLink.classList.remove("col-span-2");
-
-    const newRemoveButton = removeButtonTemplate.cloneNode(true);
-    newRemoveButton.dataset.link_id = newLink.id;
-    newRemoveButton.addEventListener("click", (event) =>
-      removeLink(event.currentTarget)
-    );
-
-    linksDiv.appendChild(newLink);
-    linksDiv.appendChild(newRemoveButton);
-
-    links.push(newLink);
-  }
-
-  function removeLink(button) {
-    links = links.filter((link) => link.id !== button.dataset.link_id);
-    button.previousSibling.remove();
-    button.remove();
-  }
-  */
 
   // -------------------------------
   // Tom Select Initialization
@@ -139,7 +124,8 @@ window.addEventListener("load", function () {
 
     box.addEventListener("click", () => input.click());
 
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
+      await maybeTranscodePinImageToWebp(input);
       if (input.files[0]) showPreview(box, input.files[0]);
     });
 
@@ -159,7 +145,7 @@ window.addEventListener("load", function () {
       box.classList.replace("border-accent", "border-lightest");
     });
 
-    box.addEventListener("drop", (e) => {
+    box.addEventListener("drop", async (e) => {
       e.preventDefault();
       box.classList.remove("border-lightest");
       box.classList.add("border-accent");
@@ -171,7 +157,8 @@ window.addEventListener("load", function () {
       dt.items.add(file);
       input.files = dt.files;
 
-      showPreview(box, file);
+      await maybeTranscodePinImageToWebp(input);
+      if (input.files[0]) showPreview(box, input.files[0]);
     });
   });
 
@@ -186,7 +173,11 @@ window.addEventListener("load", function () {
         const dt = new DataTransfer();
         dt.items.add(file);
         _hoveredImageBox.input.files = dt.files;
-        showPreview(_hoveredImageBox.box, file);
+        void (async () => {
+          await maybeTranscodePinImageToWebp(_hoveredImageBox.input);
+          const f = _hoveredImageBox.input.files[0];
+          if (f) showPreview(_hoveredImageBox.box, f);
+        })();
         e.preventDefault();
         break;
       }

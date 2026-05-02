@@ -44,6 +44,7 @@ def _create_form(request: Request) -> Element:
             hx_post=str(request.url_for("create_personal_set")),
             hx_swap="none",
             class_="flex flex-col gap-2",
+            **{"data-htmx-submit-guard": ""},
         )[
             form_field(
                 label_text="Name",

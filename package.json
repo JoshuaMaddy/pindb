@@ -7,10 +7,11 @@
     "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify",
     "css:contrast": "node scripts/check-theme-contrast.mjs",
     "js:lint": "oxlint --deny-warnings src/pindb/templates/js scripts/*.mjs scripts/lucide/*.mjs",
-    "vendor:build": "node scripts/vendor.mjs && node scripts/lucide/build-lucide.mjs",
+    "vendor:build": "node scripts/vendor.mjs && node scripts/build-webp-encode.mjs && node scripts/lucide/build-lucide.mjs",
     "build": "npm run css:build && npm run vendor:build"
   },
   "dependencies": {
+    "@jsquash/webp": "1.5.0",
     "@tailwindcss/cli": "^4.2.4",
     "@tailwindcss/typography": "^0.5.19",
     "alpinejs": "^3.15.11",

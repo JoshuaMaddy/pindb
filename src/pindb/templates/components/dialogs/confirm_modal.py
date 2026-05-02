@@ -38,6 +38,7 @@ def confirm_modal(
         if htmx_post:
             form_attrs["hx_post"] = form_action
             form_attrs["hx_swap"] = "none"
+            form_attrs["data-htmx-submit-guard"] = ""
         confirm_btn: Element = form(**form_attrs)[
             button(
                 type="submit",
