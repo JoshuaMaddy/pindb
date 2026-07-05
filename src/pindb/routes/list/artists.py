@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from pindb.database import Artist, async_session_maker
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
+from pindb.routes.list._render import list_response
 from pindb.search.search import search_artists
 from pindb.templates.list.artists import artists_list, artists_list_section
 from pindb.templates.list.base import DEFAULT_PER_PAGE
@@ -60,28 +61,15 @@ async def get_list_artists(
                 )
             ).all()
 
-        if request.headers.get("HX-Request"):
-            return HtpyResponse(
-                artists_list_section(
-                    request=request,
-                    artists=artists,
-                    view=view,
-                    page=page,
-                    total_count=total_count,
-                    base_url=base_url,
-                    q=q,
-                    sort=sort,
-                )
-            )
-        return HtpyResponse(
-            artists_list(
-                request=request,
-                artists=artists,
-                view=view,
-                page=page,
-                total_count=total_count,
-                base_url=base_url,
-                q=q,
-                sort=sort,
-            )
+        return list_response(
+            request,
+            full=artists_list,
+            section=artists_list_section,
+            artists=artists,
+            view=view,
+            page=page,
+            total_count=total_count,
+            base_url=base_url,
+            q=q,
+            sort=sort,
         )

@@ -6,7 +6,6 @@ dependencies may delete expired sessions when loading the user for protected rou
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
 from typing import Annotated
 
 from argon2 import PasswordHasher
@@ -19,6 +18,7 @@ from pindb.config import CONFIGURATION
 from pindb.database import UserSession
 from pindb.database import async_session_maker as db_async_session_maker
 from pindb.database.user import User
+from pindb.utils import utc_now
 
 _hasher = PasswordHasher()
 
@@ -126,7 +126,7 @@ async def _resolve_user_from_token(
     the FastAPI dependency). The middleware skips expired sessions via a WHERE
     clause instead.
     """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now()
     async with db_async_session_maker() as session:
         user_session: UserSession | None = await session.get(UserSession, token)
         if user_session is None:

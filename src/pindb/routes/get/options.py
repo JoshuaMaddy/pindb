@@ -2,10 +2,11 @@
 FastAPI routes: `routes/get/options.py`.
 """
 
-from fastapi import Query
+from fastapi import Depends, Query
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 
+from pindb.auth import require_editor
 from pindb.database.entity_type import EntityType
 from pindb.search.search import (
     ARTISTS_INDEX,
@@ -16,7 +17,12 @@ from pindb.search.search import (
     search_entity_options,
 )
 
-router = APIRouter()
+# Options feed the multi-select autocompletes on create/edit/bulk forms, which
+# are all editor-gated. Pending entities live in Meili (so editors see them with
+# the (P) prefix) and this endpoint reads Meili directly with no DB re-hydration,
+# so it must be editor-gated too — otherwise guests/regular users could pull
+# pending items straight from the index.
+router = APIRouter(dependencies=[Depends(require_editor)])
 
 _ALLOWED_ENTITY_TYPES: frozenset[EntityType] = frozenset(
     {

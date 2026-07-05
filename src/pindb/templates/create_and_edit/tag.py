@@ -33,6 +33,7 @@ from pindb.templates.components.forms.name_availability import (
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.utils import pending_label
 
 
 def _duplicate_notice(source_display_name: str) -> Element:
@@ -81,7 +82,11 @@ def tag_form(
 
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
-        template_js_extra=("tags/tag_form.js", "forms/entity_form_gate.js"),
+        template_js_extra=(
+            "tags/tag_form.js",
+            "shared/form_gate.js",
+            "forms/entity_form_gate.js",
+        ),
         body_content=centered_div(
             content=[
                 page_heading(
@@ -162,7 +167,7 @@ def tag_form(
                                 data_icon=CATEGORY_ICONS.get(t.category, "tag"),
                                 data_color=CATEGORY_COLORS.get(t.category, ""),
                                 data_category=t.category.value,
-                            )["(P) " + t.name if t.is_pending else t.name]
+                            )[pending_label(t.name, t.is_pending)]
                             for t in selected_implications
                         ]
                     ],

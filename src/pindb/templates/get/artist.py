@@ -22,6 +22,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
+from pindb.utils import pending_label
 
 
 def artist_page(
@@ -54,7 +55,7 @@ def artist_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_artists"), "Artists"),
-                        ("(P) " + artist.name) if artist.is_pending else artist.name,
+                        pending_label(artist.name, artist.is_pending),
                     ]
                 ),
                 has_pending_chain
@@ -65,7 +66,7 @@ def artist_page(
                 ),
                 page_heading(
                     icon="palette",
-                    text=("(P) " + artist.name) if artist.is_pending else artist.name,
+                    text=pending_label(artist.name, artist.is_pending),
                     full_width=True,
                     extras=fragment[
                         user

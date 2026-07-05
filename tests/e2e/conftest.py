@@ -28,10 +28,9 @@ from typing import Any
 import httpx
 import pytest
 
-pytest_plugins = (
-    "tests.e2e.fixtures.live_server",
-    "tests.e2e.fixtures.db_isolation",
-)
+# Fixture plugins (live_server, db_isolation) are registered from the top-level
+# tests/conftest.py — pytest no longer allows ``pytest_plugins`` in a
+# non-top-level conftest.
 
 
 # ---------------------------------------------------------------------------

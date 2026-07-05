@@ -57,7 +57,7 @@ def bulk_tag_page(
     return html_base(
         title="Bulk Create Tags",
         request=request,
-        template_js_extra=("bulk/bulk_tag.js",),
+        template_js_extra=("shared/dom_format.js", "bulk/bulk_tag.js"),
         body_content=[
             script(**{"type": "application/json"}, id="bulk-tag-ref-data")[
                 Markup(ref_json)

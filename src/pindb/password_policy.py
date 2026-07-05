@@ -14,12 +14,15 @@ submitted to ``/auth/signup`` or ``/user/me/password`` flow through here.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Iterable
 
 from zxcvbn import zxcvbn
 
 from pindb.config import CONFIGURATION
+
+LOGGER = logging.getLogger(__name__)
 
 # A small inline blocklist so we reject the top offenders even when zxcvbn
 # happens to score them above the threshold for short inputs. zxcvbn's own
@@ -175,6 +178,8 @@ def validate_password(
     except Exception:
         # zxcvbn should not fail for normal inputs, but don't let a bug
         # in the library lock users out; treat it as "no extra info".
+        # (KeyboardInterrupt/SystemExit are BaseException and still propagate.)
+        LOGGER.warning("zxcvbn scoring failed; defaulting to max score", exc_info=True)
         score = 4
 
     min_score = CONFIGURATION.password_min_zxcvbn_score

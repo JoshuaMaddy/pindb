@@ -37,8 +37,20 @@
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(collectFields()));
   }
 
-  document.addEventListener("input", save);
-  document.addEventListener("change", save);
+  // Debounce: input + change both fire rapidly; serialize at most every 300ms.
+  var saveTimer = null;
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 300);
+  }
+
+  document.addEventListener("input", scheduleSave);
+  document.addEventListener("change", scheduleSave);
+  // Flush any pending save before navigating away so nothing is lost.
+  window.addEventListener("beforeunload", function () {
+    if (saveTimer) clearTimeout(saveTimer);
+    save();
+  });
 
   // ── Restore ─────────────────────────────────────────────────────────────
 

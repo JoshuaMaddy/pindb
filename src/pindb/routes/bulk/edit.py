@@ -21,7 +21,6 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from titlecase import titlecase
 
 from pindb.auth import AdminUser, EditorUser
@@ -37,6 +36,7 @@ from pindb.database.pin import Pin
 from pindb.database.tag import Tag, apply_pin_tags
 from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError
+from pindb.routes._pin_shared import PIN_SELECTINLOADS
 from pindb.routes.bulk._helpers import (
     BULK_SCALAR_FIELDS,
     BulkEditSource,
@@ -55,20 +55,6 @@ from pindb.templates.bulk.edit import bulk_edit_page
 router = APIRouter(prefix="/bulk-edit")
 
 LOGGER = user_logger("pindb.routes.bulk.edit")
-
-
-_PIN_SELECTINLOADS = (
-    selectinload(Pin.shops),
-    selectinload(Pin.tags),
-    selectinload(Pin.explicit_tags),
-    selectinload(Pin.artists),
-    selectinload(Pin.sets),
-    selectinload(Pin.links),
-    selectinload(Pin.grades),
-    selectinload(Pin.currency),
-    selectinload(Pin.variants),
-    selectinload(Pin.unauthorized_copies),
-)
 
 
 @router.get("/from/{source_type}/{source_id}", response_model=None)
@@ -226,7 +212,7 @@ async def post_bulk_edit_apply(
                 await session.scalars(
                     select(Pin)
                     .where(Pin.id.in_(pin_id_list))
-                    .options(*_PIN_SELECTINLOADS)
+                    .options(*PIN_SELECTINLOADS)
                 )
             ).all()
         )

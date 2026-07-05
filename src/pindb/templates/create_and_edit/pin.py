@@ -75,7 +75,11 @@ def pin_form(
             **{"type": "module"},
             src=f"/static/vendor/pindb-webp/pindb-webp-encode.js?v={STATIC_CACHE_BUSTER}",
         ),
-        template_js_extra=("pins/pin_creation.js",),
+        template_js_extra=(
+            "shared/webp_transcode.js",
+            "shared/form_gate.js",
+            "pins/pin_creation.js",
+        ),
         body_content=centered_div(
             content=[
                 script(**{"type": "application/json"}, id="pin-form-ref-data")[

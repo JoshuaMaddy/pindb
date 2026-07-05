@@ -9,6 +9,7 @@ from pindb.database.pin import Pin
 from pindb.routes._urls import pin_url
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_front_image_alt
+from pindb.utils import pending_label
 
 
 def pin_preview_card(
@@ -19,7 +20,7 @@ def pin_preview_card(
     artists = sorted(pin.artists, key=lambda artist: artist.name)
     shop_text: str | None = (
         (
-            (("(P) " + shops[0].name) if shops[0].is_pending else shops[0].name)
+            pending_label(shops[0].name, shops[0].is_pending)
             + (" …" if len(shops) > 1 else "")
         )
         if shops
@@ -27,7 +28,7 @@ def pin_preview_card(
     )
     artist_text: str | None = (
         (
-            (("(P) " + artists[0].name) if artists[0].is_pending else artists[0].name)
+            pending_label(artists[0].name, artists[0].is_pending)
             + (" …" if len(artists) > 1 else "")
         )
         if artists
@@ -66,7 +67,7 @@ def pin_preview_card(
                     back=str(request.url)
                 )
             ),
-        )[span[("(P) " + pin.name) if pin.is_pending else pin.name],],
+        )[span[pending_label(pin.name, pin.is_pending)],],
         div(class_="p-2")[
             bool(shop_text or artist_text)
             and div(class_="flex flex-col gap-0.5 text-xs **:text-lightest-hover")[

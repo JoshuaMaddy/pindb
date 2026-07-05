@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from rich.repr import Result
@@ -12,13 +12,11 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 from pindb.database.base import Base
+from pindb.database.pending_mixin import PendingStateMixin
+from pindb.utils import utc_now
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-class PendingEdit(MappedAsDataclass, Base):
+class PendingEdit(PendingStateMixin, MappedAsDataclass, Base):
     """Proposed edit to a canonical entity, awaiting admin approval.
 
     entity_type is the table name of the target entity (e.g. "pins").
@@ -36,7 +34,7 @@ class PendingEdit(MappedAsDataclass, Base):
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), default=None
     )
-    created_at: Mapped[datetime] = mapped_column(default_factory=_utc_now, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utc_now, init=False)
 
     approved_at: Mapped[datetime | None] = mapped_column(default=None)
     approved_by_id: Mapped[int | None] = mapped_column(
@@ -55,18 +53,6 @@ class PendingEdit(MappedAsDataclass, Base):
         default=None,
         index=True,
     )
-
-    @property
-    def is_pending(self) -> bool:
-        return self.approved_at is None and self.rejected_at is None
-
-    @property
-    def is_approved(self) -> bool:
-        return self.approved_at is not None
-
-    @property
-    def is_rejected(self) -> bool:
-        return self.rejected_at is not None
 
     def __rich_repr__(self) -> Result:
         """Rich debug fields for consoles and traces."""

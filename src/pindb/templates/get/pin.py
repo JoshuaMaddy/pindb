@@ -28,6 +28,7 @@ from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
 from pindb.templates.get.pin_fragments import favorite_button, set_row
+from pindb.utils import pending_label
 
 __all__ = ["pin_page", "favorite_button", "set_row"]
 
@@ -120,7 +121,7 @@ def _page_layout(
             ),
             page_heading(
                 icon="circle-star",
-                text=("(P) " + pin.name) if pin.is_pending else pin.name,
+                text=pending_label(pin.name, pin.is_pending),
                 full_width=True,
                 extras=fragment[
                     user

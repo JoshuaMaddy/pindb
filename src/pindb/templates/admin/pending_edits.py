@@ -8,18 +8,10 @@ from datetime import datetime
 from htpy import (
     Element,
     a,
-    button,
     div,
-    form,
-    h2,
-    i,
     p,
     span,
-    table,
-    tbody,
     td,
-    th,
-    thead,
     tr,
 )
 from titlecase import titlecase
@@ -28,7 +20,12 @@ from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.database.user import User
-from pindb.templates.list.base import TABLE_LIST_SCROLL
+from pindb.templates.admin._pending_shared import (
+    action_buttons,
+    action_form_button,
+    pending_table,
+    section_header,
+)
 
 
 def _edit_groups_section(
@@ -39,49 +36,31 @@ def _edit_groups_section(
     local_date_formatter: Callable[[datetime | None], Element | str],
 ) -> Element:
     return div(class_="flex flex-col gap-2")[
-        div(class_="flex items-baseline gap-2")[
-            i(data_lucide="pen", class_="inline-block w-4 h-4"),
-            h2["Pending Edits"],
-            span(
-                class_="text-xs font-semibold px-2 py-0.5 rounded bg-darker text-lightest-hover"
-            )[str(len(edit_groups))],
-        ],
+        section_header(icon="pen", title="Pending Edits", count=len(edit_groups)),
         p(class_="text-lightest-hover text-sm")[
             "Edits proposed by editors to approved entries. "
             "Approving applies the accumulated chain to the canonical entry."
         ],
-        div(class_=TABLE_LIST_SCROLL)[
-            table(class_="w-full text-sm")[
-                thead[
-                    tr(class_="text-left text-lightest-hover border-b border-darker")[
-                        th(class_="py-2 pr-6 font-medium")["Entity"],
-                        th(class_="py-2 pr-6 font-medium")["Edits"],
-                        th(class_="py-2 pr-6 font-medium")["Latest editor"],
-                        th(class_="py-2 pr-6 font-medium")["Latest at"],
-                        th(class_="py-2 font-medium")["Actions"],
-                    ]
-                ],
-                tbody[
-                    [
-                        _edit_group_row(
-                            table_name=table_name,
-                            entity_id=entity_id,
-                            chain=chain,
-                            entity=entities.get((table_name, entity_id)),
-                            creators=creators,
-                            local_date_formatter=local_date_formatter,
-                        )
-                        for (table_name, entity_id), chain in sorted(
-                            edit_groups.items(),
-                            key=lambda group_entry: (
-                                group_entry[0][0],
-                                group_entry[0][1],
-                            ),
-                        )
-                    ]
-                ],
+        pending_table(
+            columns=["Entity", "Edits", "Latest editor", "Latest at", "Actions"],
+            rows=[
+                _edit_group_row(
+                    table_name=table_name,
+                    entity_id=entity_id,
+                    chain=chain,
+                    entity=entities.get((table_name, entity_id)),
+                    creators=creators,
+                    local_date_formatter=local_date_formatter,
+                )
+                for (table_name, entity_id), chain in sorted(
+                    edit_groups.items(),
+                    key=lambda group_entry: (
+                        group_entry[0][0],
+                        group_entry[0][1],
+                    ),
+                )
             ],
-        ],
+        ),
     ]
 
 
@@ -122,37 +101,16 @@ def _edit_group_row(
         td(class_="py-2 pr-6 text-lighter-hover")[latest_editor],
         td(class_="py-2 pr-6 text-lighter-hover")[local_date_formatter(latest_at)],
         td(class_="py-2")[
-            div(class_="flex gap-2")[
-                form(method="post", action=approve_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-primary",
-                        title="Approve edits",
-                    )[
-                        i(data_lucide="check", class_="inline-block w-3 h-3 mr-1"),
-                        "Approve",
-                    ]
-                ],
-                form(method="post", action=reject_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-warning",
-                        title="Reject edits",
-                    )[
-                        i(data_lucide="x", class_="inline-block w-3 h-3 mr-1"),
-                        "Reject",
-                    ]
-                ],
-                form(method="post", action=delete_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-error",
-                        title="Delete edits",
-                    )[
-                        i(data_lucide="trash-2", class_="inline-block w-3 h-3 mr-1"),
-                        "Delete",
-                    ]
-                ],
-            ]
+            action_buttons(
+                action_form_button(
+                    action="approve", url=approve_url, title="Approve edits"
+                ),
+                action_form_button(
+                    action="reject", url=reject_url, title="Reject edits"
+                ),
+                action_form_button(
+                    action="delete", url=delete_url, title="Delete edits"
+                ),
+            )
         ],
     ]

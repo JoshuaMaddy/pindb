@@ -49,3 +49,26 @@ class TestListPinSets:
         PinSetFactory(name="My Awesome Set")
         response = client.get("/list/pin_sets")
         assert "My Awesome Set" in response.text
+
+
+@pytest.mark.integration
+class TestListDetailedView:
+    """The shared entity_list_items factory must render both grid and detailed."""
+
+    def test_shops_detailed(self, client, db_session):
+        ShopFactory(name="Detailed Shop")
+        response = client.get("/list/shops?view=detailed")
+        assert response.status_code == 200
+        assert "Detailed Shop" in response.text
+
+    def test_artists_detailed(self, client, db_session):
+        ArtistFactory(name="Detailed Artist")
+        response = client.get("/list/artists?view=detailed")
+        assert response.status_code == 200
+        assert "Detailed Artist" in response.text
+
+    def test_pin_sets_detailed(self, client, db_session):
+        PinSetFactory(name="Detailed Set")
+        response = client.get("/list/pin_sets?view=detailed")
+        assert response.status_code == 200
+        assert "Detailed Set" in response.text

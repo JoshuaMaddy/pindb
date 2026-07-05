@@ -26,6 +26,7 @@ from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import describe_policy
 from pindb.templates.base import html_base
+from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.forms.error_message import error_message
 from pindb.templates.components.layout.centered import centered_div
 
@@ -54,19 +55,28 @@ def _provider_section(
             if link.email_verified:
                 detail_parts.append("verified")
             detail = f" ({', '.join(detail_parts)})" if detail_parts else ""
+            if can_unlink:
+                unlink_control: Element = confirm_modal(
+                    trigger=button(type="button", class_="text-sm")["Unlink"],
+                    message=(
+                        f"Unlink {label_text}? You will no longer be able to sign "
+                        "in with it. You can re-link it later."
+                    ),
+                    form_action=f"/user/me/unlink/{provider.value}",
+                    confirm_label="Unlink",
+                )
+            else:
+                # Only sign-in method left — unlinking would lock the user out.
+                unlink_control = button(
+                    type="button",
+                    disabled=True,
+                    class_="text-sm",
+                    title="Set a password or link another provider first.",
+                )["Unlink"]
             rows.append(
                 li(class_="flex items-center justify-between gap-2")[
                     div[f"{label_text}{detail}"],
-                    form(
-                        method="post",
-                        action=f"/user/me/unlink/{provider.value}",
-                    )[
-                        button(
-                            type="submit",
-                            disabled=not can_unlink,
-                            class_="text-sm",
-                        )["Unlink"],
-                    ],
+                    unlink_control,
                 ]
             )
         else:

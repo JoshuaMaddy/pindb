@@ -70,7 +70,8 @@ async def _render_owned_panel(
                 select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
             )
         ).first()
-        assert pin is not None
+        if pin is None:
+            raise HTTPException(status_code=404, detail="Pin not found")
         owned_entries = await _get_owned_entries(
             session=session, pin_id=pin_id, user_id=user_id
         )
@@ -98,7 +99,8 @@ async def _render_wanted_panel(
                 select(Pin).where(Pin.id == pin_id).options(selectinload(Pin.grades))
             )
         ).first()
-        assert pin is not None
+        if pin is None:
+            raise HTTPException(status_code=404, detail="Pin not found")
         wanted_entries = await _get_wanted_entries(
             session=session, pin_id=pin_id, user_id=user_id
         )

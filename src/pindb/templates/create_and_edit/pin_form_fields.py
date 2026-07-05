@@ -37,6 +37,7 @@ from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
+from pindb.utils import pending_label
 
 
 def _required_fields(
@@ -237,7 +238,7 @@ def _shops_input(
                 option(
                     value=str(shop.id),
                     selected=shop in pin.shops if pin else False,
-                )["(P) " + shop.name if shop.is_pending else shop.name]
+                )[pending_label(shop.name, shop.is_pending)]
                 for shop in shops
             ]
         ],
@@ -348,7 +349,7 @@ def _tag_ids_input(
                     value=str(tag.id),
                     selected=tag in pin.tags if pin else False,
                     data_category=tag.category.value,
-                )["(P) " + tag.display_name if tag.is_pending else tag.display_name]
+                )[pending_label(tag.display_name, tag.is_pending)]
                 for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
             ]
         ],
@@ -374,7 +375,7 @@ def _artist_ids_input(
                 option(
                     value=str(artist.id),
                     selected=artist in pin.artists if pin else False,
-                )["(P) " + artist.name if artist.is_pending else artist.name]
+                )[pending_label(artist.name, artist.is_pending)]
                 for artist in artists
             ]
         ],
@@ -399,7 +400,7 @@ def _pin_sets_ids_input(
                 option(
                     value=str(pin_set.id),
                     selected=pin_set in pin.sets if pin else False,
-                )["(P) " + pin_set.name if pin_set.is_pending else pin_set.name]
+                )[pending_label(pin_set.name, pin_set.is_pending)]
                 for pin_set in pin_sets
             ]
         ],
@@ -411,7 +412,7 @@ def _pin_option(*, pin_obj: Pin) -> Element:
         value=str(pin_obj.id),
         selected=True,
         data_thumbnail=f"/get/image/{pin_obj.front_image_guid}?w=100",
-    )["(P) " + pin_obj.name if pin_obj.is_pending else pin_obj.name]
+    )[pending_label(pin_obj.name, pin_obj.is_pending)]
 
 
 def _variant_pins_input(

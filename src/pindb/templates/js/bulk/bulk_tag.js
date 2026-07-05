@@ -445,24 +445,13 @@
     }
   }
 
+  // Thin wrappers over shared/dom_format.js (shared with bulk_import.js)
   function setLucideIcon(container, iconName) {
-    const existing =
-      container.querySelector("i") ?? container.querySelector("svg");
-    const el = document.createElement("i");
-    el.setAttribute("data-lucide", iconName);
-    if (existing) {
-      existing.replaceWith(el);
-    } else {
-      container.prepend(el);
-    }
-    if (window.lucide) lucide.createIcons({ nodes: [container] });
+    return globalThis.pindbSetLucideIcon(container, iconName);
   }
 
   function escHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    return globalThis.pindbEscHtml(str);
   }
 
   function destroyRow(tr) {

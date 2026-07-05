@@ -9,28 +9,26 @@ from htpy import (
     Element,
     VoidElement,
     a,
-    button,
     div,
-    form,
-    h2,
     hr,
     i,
     p,
     span,
-    table,
-    tbody,
     td,
-    th,
-    thead,
     tr,
 )
 
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.database.user import User
+from pindb.templates.admin._pending_shared import (
+    action_buttons,
+    action_form_button,
+    pending_table,
+    section_header,
+)
 from pindb.templates.admin.pending_bulk import BulkGroupView
 from pindb.templates.admin.pending_edits import _edit_groups_section
-from pindb.templates.list.base import TABLE_LIST_SCROLL
 
 
 def _sections(
@@ -113,36 +111,19 @@ def _entity_section(
     local_date_formatter: Callable[[datetime | None], Element | str],
 ) -> Element:
     return div(class_="flex flex-col gap-2")[
-        div(class_="flex items-baseline gap-2")[
-            i(data_lucide=icon, class_="inline-block w-4 h-4"),
-            h2[label],
-            span(
-                class_="text-xs font-semibold px-2 py-0.5 rounded bg-darker text-lightest-hover"
-            )[str(len(items))],
-        ],
-        div(class_=TABLE_LIST_SCROLL)[
-            table(class_="w-full text-sm")[
-                thead[
-                    tr(class_="text-left text-lightest-hover border-b border-darker")[
-                        th(class_="py-2 pr-6 font-medium")["Name"],
-                        th(class_="py-2 pr-6 font-medium")["Submitted by"],
-                        th(class_="py-2 pr-6 font-medium")["Submitted at"],
-                        th(class_="py-2 font-medium")["Actions"],
-                    ]
-                ],
-                tbody[
-                    [
-                        _entity_row(
-                            entity_type=entity_type,
-                            entity=item,
-                            creators=creators,
-                            local_date_formatter=local_date_formatter,
-                        )
-                        for item in items
-                    ]
-                ],
+        section_header(icon=icon, title=label, count=len(items)),
+        pending_table(
+            columns=["Name", "Submitted by", "Submitted at", "Actions"],
+            rows=[
+                _entity_row(
+                    entity_type=entity_type,
+                    entity=item,
+                    creators=creators,
+                    local_date_formatter=local_date_formatter,
+                )
+                for item in items
             ],
-        ],
+        ),
     ]
 
 
@@ -185,34 +166,10 @@ def _entity_row(
         td(class_="py-2 pr-6 text-lighter-hover")[creator_name],
         td(class_="py-2 pr-6 text-lighter-hover")[local_date_formatter(created_at)],
         td(class_="py-2")[
-            div(class_="flex gap-2")[
-                form(method="post", action=approve_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-primary",
-                        title="Approve",
-                    )[
-                        i(data_lucide="check", class_="inline-block w-3 h-3 mr-1"),
-                        "Approve",
-                    ]
-                ],
-                form(method="post", action=reject_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-warning",
-                        title="Reject",
-                    )[i(data_lucide="x", class_="inline-block w-3 h-3 mr-1"), "Reject"]
-                ],
-                form(method="post", action=delete_url)[
-                    button(
-                        type="submit",
-                        class_="btn btn-sm btn-error",
-                        title="Delete",
-                    )[
-                        i(data_lucide="trash-2", class_="inline-block w-3 h-3 mr-1"),
-                        "Delete",
-                    ]
-                ],
-            ]
+            action_buttons(
+                action_form_button(action="approve", url=approve_url),
+                action_form_button(action="reject", url=reject_url),
+                action_form_button(action="delete", url=delete_url),
+            )
         ],
     ]

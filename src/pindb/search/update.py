@@ -99,7 +99,14 @@ async def setup_index() -> None:
     )
     await _create_index(uid="artists", searchable=["name", "aliases", "description"])
     await _create_index(uid="shops", searchable=["name", "aliases", "description"])
-    await _create_index(uid="pin_sets", searchable=["name", "description"])
+    await _create_index(
+        uid="pin_sets",
+        searchable=["name", "description"],
+        # owner_id is already in the document; making it filterable lets the
+        # public list filter to global sets (owner_id IS NULL) in Meili so
+        # pagination/total stay correct.
+        filterable=["owner_id"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -241,27 +248,58 @@ async def _fetch_all(
     Sequence[Shop],
     Sequence[PinSet],
 ]:
+    # include_pending: pending entities must stay indexed so editor form
+    # dropdowns (which read Meili directly via search_entity_options) can
+    # surface them with the (P) prefix. Without this the guest-level audit
+    # filter drops pending rows from db_ids and _sync_index prunes their
+    # Meili docs as stale. Soft-deleted rows stay filtered (correctly pruned).
     pin_result = await session.scalars(
-        select(Pin).options(
+        select(Pin)
+        .options(
             selectinload(Pin.shops).selectinload(Shop.aliases),
             selectinload(Pin.tags).selectinload(Tag.aliases),
             selectinload(Pin.artists).selectinload(Artist.aliases),
         )
+        .execution_options(include_pending=True)
     )
     return (
         pin_result.all(),
-        (await session.scalars(select(Tag).options(selectinload(Tag.aliases)))).all(),
         (
-            await session.scalars(select(Artist).options(selectinload(Artist.aliases)))
+            await session.scalars(
+                select(Tag)
+                .options(selectinload(Tag.aliases))
+                .execution_options(include_pending=True)
+            )
         ).all(),
-        (await session.scalars(select(Shop).options(selectinload(Shop.aliases)))).all(),
-        (await session.scalars(select(PinSet))).all(),
+        (
+            await session.scalars(
+                select(Artist)
+                .options(selectinload(Artist.aliases))
+                .execution_options(include_pending=True)
+            )
+        ).all(),
+        (
+            await session.scalars(
+                select(Shop)
+                .options(selectinload(Shop.aliases))
+                .execution_options(include_pending=True)
+            )
+        ).all(),
+        (
+            await session.scalars(
+                select(PinSet).execution_options(include_pending=True)
+            )
+        ).all(),
     )
 
 
 async def _fetch_entity_for_sync(
     session: AsyncSession, entity_type: EntityType, entity_id: int
 ) -> _Indexable | None:
+    # include_pending: a sync fired outside a request (or without editor/admin
+    # audit context) must still find pending rows, otherwise the entity looks
+    # absent and gets deleted from Meili. Soft-deleted rows stay filtered so a
+    # deleted entity correctly resolves to None → removed from the index.
     if entity_type == EntityType.pin:
         return await session.scalar(
             select(Pin)
@@ -271,23 +309,35 @@ async def _fetch_entity_for_sync(
                 selectinload(Pin.tags).selectinload(Tag.aliases),
                 selectinload(Pin.artists).selectinload(Artist.aliases),
             )
+            .execution_options(include_pending=True)
         )
     if entity_type == EntityType.tag:
         return await session.scalar(
-            select(Tag).where(Tag.id == entity_id).options(selectinload(Tag.aliases))
+            select(Tag)
+            .where(Tag.id == entity_id)
+            .options(selectinload(Tag.aliases))
+            .execution_options(include_pending=True)
         )
     if entity_type == EntityType.artist:
         return await session.scalar(
             select(Artist)
             .where(Artist.id == entity_id)
             .options(selectinload(Artist.aliases))
+            .execution_options(include_pending=True)
         )
     if entity_type == EntityType.shop:
         return await session.scalar(
-            select(Shop).where(Shop.id == entity_id).options(selectinload(Shop.aliases))
+            select(Shop)
+            .where(Shop.id == entity_id)
+            .options(selectinload(Shop.aliases))
+            .execution_options(include_pending=True)
         )
     if entity_type == EntityType.pin_set:
-        return await session.get(PinSet, entity_id)
+        return await session.scalar(
+            select(PinSet)
+            .where(PinSet.id == entity_id)
+            .execution_options(include_pending=True)
+        )
     return None
 
 
@@ -312,6 +362,7 @@ async def sync_pin_with_deps(pin_id: int) -> None:
                 selectinload(Pin.tags).selectinload(Tag.aliases),
                 selectinload(Pin.artists).selectinload(Artist.aliases),
             )
+            .execution_options(include_pending=True)
         )
     if pin is None:
         await delete_one(EntityType.pin, pin_id)

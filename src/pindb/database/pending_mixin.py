@@ -3,12 +3,36 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
+
+
+class PendingStateMixin:
+    """Read-only approval-state flags shared by ``PendingMixin`` and ``PendingEdit``.
+
+    Plain (non-mapped) mixin: it only derives flags from ``approved_at`` /
+    ``rejected_at`` columns that the consuming mapped class declares.
+    """
+
+    if TYPE_CHECKING:
+        approved_at: datetime | None
+        rejected_at: datetime | None
+
+    @property
+    def is_pending(self) -> bool:
+        return self.approved_at is None and self.rejected_at is None
+
+    @property
+    def is_approved(self) -> bool:
+        return self.approved_at is not None
+
+    @property
+    def is_rejected(self) -> bool:
+        return self.rejected_at is not None
 
 
 class PendingAuditEntity(Protocol):
@@ -34,7 +58,7 @@ class PendingAuditEntity(Protocol):
     def is_rejected(self) -> bool: ...
 
 
-class PendingMixin(MappedAsDataclass):
+class PendingMixin(PendingStateMixin, MappedAsDataclass):
     """Columns and flags for content pending admin approval."""
 
     __abstract__ = True
@@ -63,15 +87,3 @@ class PendingMixin(MappedAsDataclass):
         init=False,
         index=True,
     )
-
-    @property
-    def is_pending(self) -> bool:
-        return self.approved_at is None and self.rejected_at is None
-
-    @property
-    def is_approved(self) -> bool:
-        return self.approved_at is not None
-
-    @property
-    def is_rejected(self) -> bool:
-        return self.rejected_at is not None

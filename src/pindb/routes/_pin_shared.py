@@ -20,6 +20,22 @@ from pindb.model_utils import (
 from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 
+# Single source of truth for eager-loading a Pin with everything a detail/edit
+# view or search sync touches. Adding a new Pin relationship to a detail view
+# means updating only this tuple.
+PIN_SELECTINLOADS = (
+    selectinload(Pin.shops),
+    selectinload(Pin.tags),
+    selectinload(Pin.explicit_tags),
+    selectinload(Pin.artists),
+    selectinload(Pin.sets),
+    selectinload(Pin.links),
+    selectinload(Pin.grades),
+    selectinload(Pin.currency),
+    selectinload(Pin.variants),
+    selectinload(Pin.unauthorized_copies),
+)
+
 
 class PinFormParams:
     """FastAPI ``Depends()`` class consolidating shared pin form fields.

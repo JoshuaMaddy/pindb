@@ -2,9 +2,9 @@
 var PIN_IMAGE_WEBP_QUALITY = 95;
 
 /**
- * Replace raster file inputs with WebP when `globalThis.pindbWebpFromFile` is
- * available (module loaded). On failure or missing encoder, leaves the file
- * unchanged.
+ * Replace a raster file input's file with WebP via the shared transcode
+ * primitive (`shared/webp_transcode.js`). No-op when the encoder is missing
+ * or the file is already WebP / not an image (primitive returns it unchanged).
  *
  * @param {HTMLInputElement | null} input
  * @returns {Promise<void>}
@@ -12,24 +12,14 @@ var PIN_IMAGE_WEBP_QUALITY = 95;
 async function maybeTranscodePinImageToWebp(input) {
   if (!input || !input.files || input.files.length === 0) return;
   var file = input.files[0];
-  if (file.type === "image/webp") return;
-  if (file.type && file.type.indexOf("image/") !== 0) return;
-  var enc = globalThis.pindbWebpFromFile;
-  if (typeof enc !== "function") return;
-  try {
-    var blob = await enc(file, PIN_IMAGE_WEBP_QUALITY);
-    if (!blob || blob.size === 0) return;
-    var stem = file.name.replace(/\.[^.\\/]+$/, "") || "image";
-    var webpFile = new File([blob], stem + ".webp", {
-      type: "image/webp",
-      lastModified: Date.now(),
-    });
-    var dt = new DataTransfer();
-    dt.items.add(webpFile);
-    input.files = dt.files;
-  } catch {
-    /* keep original */
-  }
+  var webpFile = await globalThis.pindbTranscodeFileToWebp(
+    file,
+    PIN_IMAGE_WEBP_QUALITY,
+  );
+  if (webpFile === file) return;
+  var dt = new DataTransfer();
+  dt.items.add(webpFile);
+  input.files = dt.files;
 }
 
 window.addEventListener("load", function () {
@@ -68,7 +58,10 @@ window.addEventListener("load", function () {
           fetch(url)
             .then((res) => res.json())
             .then(callback)
-            .catch(() => callback());
+            .catch((err) => {
+              console.warn("Option lookup failed", err);
+              callback();
+            });
         },
         shouldLoad: (q) => q.length > 0,
         maxItems: null,
@@ -256,25 +249,6 @@ function initPinFormValidation() {
     tags: "Select at least one tag.",
   };
 
-  const ERR_CLASSES = [
-    "ring-2",
-    "ring-error-main",
-    "rounded-md",
-    "border",
-    "border-error-main",
-    "p-1",
-  ];
-
-  let hintsShown = false;
-
-  function tomSelectHasItems(selectId) {
-    const el = document.getElementById(selectId);
-    if (!el || !el.tomselect) return false;
-    const v = el.tomselect.getValue();
-    if (Array.isArray(v)) return v.length > 0;
-    return v !== "" && v !== null && typeof v !== "undefined";
-  }
-
   function acquisitionOk() {
     const el = document.getElementById("acquisition_type");
     if (!el) return false;
@@ -312,15 +286,11 @@ function initPinFormValidation() {
       return !!(el && el.value.trim());
     },
     front: frontOk,
-    shops: () => tomSelectHasItems("shop_ids"),
+    shops: () => globalThis.pindbTomSelectHasItems("shop_ids"),
     acquisition: acquisitionOk,
     grades: gradesOk,
-    tags: () => tomSelectHasItems("tag_ids"),
+    tags: () => globalThis.pindbTomSelectHasItems("tag_ids"),
   };
-
-  function computeValid() {
-    return FIELD_ORDER.every((k) => checks[k]());
-  }
 
   function findHighlightEl(key) {
     if (key === "name") {
@@ -345,113 +315,32 @@ function initPinFormValidation() {
     return sel.tomselect ? sel.tomselect.wrapper : sel;
   }
 
-  function removeHints() {
-    document.querySelectorAll(".pin-form-field-hint").forEach((n) => n.remove());
-  }
-
-  function clearErrorDecorations() {
-    removeHints();
-    FIELD_ORDER.forEach((key) => {
-      const el = findHighlightEl(key);
-      if (!el) return;
-      ERR_CLASSES.forEach((c) => el.classList.remove(c));
-    });
-  }
-
-  function applyHintsForInvalid() {
-    clearErrorDecorations();
-    FIELD_ORDER.forEach((key) => {
-      if (checks[key]()) return;
-      const target = findHighlightEl(key);
-      if (!target) return;
-      ERR_CLASSES.forEach((c) => target.classList.add(c));
-      const hint = document.createElement("p");
-      /* Right-column fields use the inner label|field grid: pin hint under field only,
-         leave column 1 empty on that row (front image lives in the outer left column). */
-      hint.className =
-        key === "front"
-          ? "pin-form-field-hint text-error-main text-sm mt-1"
-          : "pin-form-field-hint text-error-main text-sm mt-1 max-sm:col-span-full sm:col-start-2";
-      hint.setAttribute("role", "alert");
-      hint.textContent = HINT_TEXT[key];
-      target.insertAdjacentElement("afterend", hint);
-    });
-  }
-
-  function updateSubmitAppearance() {
-    const ok = computeValid();
-    submitBtn.classList.toggle("opacity-40", !ok);
-    submitBtn.classList.toggle("cursor-not-allowed", !ok);
-    submitBtn.setAttribute("aria-disabled", ok ? "false" : "true");
-    submitBtn.title = ok ? "" : "Fill required fields to submit";
-  }
-
-  function refreshAfterHintsGate() {
-    if (computeValid()) {
-      hintsShown = false;
-    }
-    updateSubmitAppearance();
-    if (!hintsShown) {
-      clearErrorDecorations();
-      return;
-    }
-    applyHintsForInvalid();
-  }
-
-  function scrollToFirstInvalid() {
-    for (let i = 0; i < FIELD_ORDER.length; i++) {
-      const key = FIELD_ORDER[i];
-      if (checks[key]()) continue;
-      const el = findHighlightEl(key);
-      if (el && el.scrollIntoView) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      break;
-    }
-  }
-
-  form.addEventListener(
-    "submit",
-    function (e) {
-      if (computeValid()) {
-        hintsShown = false;
-        clearErrorDecorations();
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      hintsShown = true;
-      applyHintsForInvalid();
-      updateSubmitAppearance();
-      scrollToFirstInvalid();
-    },
-    true,
-  );
-
-  form.addEventListener("input", function () {
-    refreshAfterHintsGate();
+  const gate = globalThis.pindbCreateFormGate({
+    form: form,
+    submitBtn: submitBtn,
+    fieldOrder: FIELD_ORDER,
+    checks: checks,
+    hintText: HINT_TEXT,
+    findHighlightEl: findHighlightEl,
+    hintSelector: ".pin-form-field-hint",
+    // Right-column fields use the inner label|field grid: pin hint under field
+    // only, leaving column 1 empty (front image lives in the outer left column).
+    hintClassFor: (key) =>
+      key === "front"
+        ? "pin-form-field-hint text-error-main text-sm mt-1"
+        : "pin-form-field-hint text-error-main text-sm mt-1 max-sm:col-span-full sm:col-start-2",
   });
 
-  form.addEventListener(
-    "change",
-    function () {
-      refreshAfterHintsGate();
-    },
-    true,
-  );
-
+  // Tom Select + file input changes don't bubble as form input/change.
   ["shop_ids", "tag_ids", "acquisition_type"].forEach((id) => {
     const el = document.getElementById(id);
     if (el && el.tomselect) {
-      el.tomselect.on("change", refreshAfterHintsGate);
+      el.tomselect.on("change", gate.refresh);
     }
   });
 
   const frontInp = document.getElementById("front_image");
   if (frontInp) {
-    frontInp.addEventListener("change", refreshAfterHintsGate);
+    frontInp.addEventListener("change", gate.refresh);
   }
-
-  updateSubmitAppearance();
 }

@@ -2,18 +2,29 @@
 htpy page and fragment builders: `templates/list/base.py`.
 """
 
+from collections.abc import Callable, Sequence
+from typing import TypeVar
 from urllib.parse import urlencode
 
 from fastapi import Request
-from htpy import Element, VoidElement, a, div, hr, input, span
+from htpy import Element, VoidElement, a, div, hr, i, input, p, span
+from starlette.datastructures import URL
 
+from pindb.database.artist import Artist
+from pindb.database.pin_set import PinSet
+from pindb.database.shop import Shop
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.templates.base import html_base
+from pindb.templates.components.layout.card import card
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.listing.pagination_controls import pagination_controls
 from pindb.templates.components.listing.view_toggle import view_toggle
+from pindb.templates.components.nav.bread_crumb import bread_crumb
+from pindb.templates.components.pins.entity_grid_card import entity_grid_card
+from pindb.templates.components.pins.thumbnail_grid import thumbnail_grid
+from pindb.utils import pending_label
 
 SECTION_ID: str = "entity-list-section"
 DEFAULT_PER_PAGE: int = 100
@@ -24,6 +35,24 @@ _SORT_LABELS: dict[SortOrder, str] = {
     SortOrder.newest: "Newest",
     SortOrder.oldest: "Oldest",
 }
+# Direction chevron per sort: up = ascending, down = descending. Shown on every
+# option so the sort direction is always legible, not just the active one.
+_SORT_CHEVRON: dict[SortOrder, str] = {
+    SortOrder.name: "chevron-up",  # A → Z
+    SortOrder.newest: "chevron-down",  # newest first (created desc)
+    SortOrder.oldest: "chevron-up",  # oldest first (created asc)
+}
+
+
+def _result_range_label(*, page: int, per_page: int, shown: int, total: int) -> str:
+    """Human range like ``Showing 1–24 of 137`` for the current page slice."""
+    if total <= 0 or shown <= 0:
+        return "No items"
+    start = (page - 1) * per_page + 1
+    end = start + shown - 1
+    return f"Showing {start}–{end} of {total}"
+
+
 _ACTIVE_CLASS: str = (
     "px-3 py-1 rounded border border-accent text-accent text-sm no-underline"
 )
@@ -43,14 +72,24 @@ def _sort_control(
         if extra_params:
             params.update(extra_params)
         href = f"{base_url}?{urlencode(params)}"
+        active = current_sort == sort
         return a(
             href=href,
             hx_get=href,
             hx_target=f"#{SECTION_ID}",
             hx_swap="outerHTML",
             hx_push_url="true",
-            class_=_ACTIVE_CLASS if current_sort == sort else _INACTIVE_CLASS,
-        )[_SORT_LABELS[sort]]
+            aria_current="true" if active else None,
+            class_=(_ACTIVE_CLASS if active else _INACTIVE_CLASS)
+            + " inline-flex items-center gap-1",
+        )[
+            _SORT_LABELS[sort],
+            i(
+                data_lucide=_SORT_CHEVRON[sort],
+                class_="inline-block w-4 h-4",
+                aria_hidden="true",
+            ),
+        ]
 
     return div(class_="flex items-center gap-1", role="group", aria_label="Sort")[
         span(class_="text-sm text-lightest-hover mr-0.5")["Sort:"],
@@ -159,7 +198,14 @@ def entity_list_section(
                 )
             ),
         ],
-        span(class_="text-sm text-lightest-hover")[f"{total_count} items"],
+        span(class_="text-sm text-lightest-hover")[
+            _result_range_label(
+                page=page,
+                per_page=per_page,
+                shown=len(items),
+                total=total_count,
+            )
+        ],
         content,
         pagination_controls(
             base_url=base_url,
@@ -170,6 +216,82 @@ def entity_list_section(
             extra_params=pagination_extra,
         ),
     ]
+
+
+_BrowseEntity = TypeVar("_BrowseEntity", Shop, Artist, PinSet)
+
+
+def entity_list_items(
+    *,
+    request: Request,
+    entities: Sequence[_BrowseEntity],
+    view: EntityListView,
+    url_of: Callable[[_BrowseEntity], URL],
+) -> list[Element]:
+    """Grid or detailed cards for a simple browse entity (shop / artist / pin set).
+
+    These three render identically apart from their canonical URL, so the only
+    per-entity input is ``url_of``. ``name``/``description``/``pins``/
+    ``is_pending`` are read directly. (Tags differ — category badge, extra
+    filter — and keep their own builders.)
+    """
+    if view == EntityListView.grid:
+        return [
+            entity_grid_card(
+                request=request,
+                href=str(url_of(entity)),
+                pins=entity.pins,
+                name=pending_label(entity.name, entity.is_pending),
+            )
+            for entity in entities
+        ]
+    return [
+        card(
+            href=url_of(entity),
+            content=div(class_="flex gap-2 w-full")[
+                thumbnail_grid(request=request, pins=entity.pins),
+                div[
+                    p(class_="text-lg")[
+                        pending_label(entity.name, entity.is_pending),
+                        span(class_="text-lightest-hover ml-1")[
+                            f"({len(entity.pins)})"
+                        ],
+                    ],
+                    p(class_="text-lightest-hover")[entity.description],
+                ],
+            ],
+        )
+        for entity in entities
+    ]
+
+
+def list_page(
+    *,
+    request: Request,
+    title: str,
+    icon: str,
+    search_controls: Element | VoidElement,
+    section: Element,
+    breadcrumb_label: str | None = None,
+) -> Element:
+    """Full directory page wrapper shared by every entity list template.
+
+    Builds the standard ``List > <title>`` breadcrumb and delegates layout to
+    ``base_list``. ``breadcrumb_label`` defaults to ``title``.
+    """
+    return base_list(
+        title=title,
+        icon=icon,
+        request=request,
+        search_controls=search_controls,
+        section=section,
+        bread_crumb=bread_crumb(
+            entries=[
+                (request.url_for("get_list_index"), "List"),
+                breadcrumb_label or title,
+            ]
+        ),
+    )
 
 
 def base_list(

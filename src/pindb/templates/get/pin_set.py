@@ -21,6 +21,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
+from pindb.utils import pending_label
 
 
 def pin_set_page(
@@ -56,14 +57,12 @@ def pin_set_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_pin_sets"), "Pin Sets"),
-                        ("(P) " + pin_set.name) if pin_set.is_pending else pin_set.name,
+                        pending_label(pin_set.name, pin_set.is_pending),
                     ]
                 ),
                 page_heading(
                     icon="layout-grid",
-                    text=("(P) " + titlecase(pin_set.name))
-                    if pin_set.is_pending
-                    else titlecase(pin_set.name),
+                    text=pending_label(titlecase(pin_set.name), pin_set.is_pending),
                     extras=[
                         (user is not None and (user.is_admin or user.is_editor))
                         and icon_button(

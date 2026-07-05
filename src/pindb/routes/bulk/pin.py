@@ -38,7 +38,9 @@ from pindb.search.search import (
     _search_results_to_raw,
     meilisearch_hit_dicts,
 )
+from pindb.search.update import sync_pin_with_deps
 from pindb.templates.bulk.pin import bulk_pin_page
+from pindb.utils import pending_label
 
 LOGGER = user_logger("pindb.routes.bulk.pin")
 
@@ -143,9 +145,10 @@ async def get_bulk_options(
         tag_options = [
             {
                 "value": str(hit["name"]),
-                "text": ("(P) " + str(hit.get("display_name") or hit["name"]))
-                if hit.get("is_pending")
-                else str(hit.get("display_name") or hit["name"]),
+                "text": pending_label(
+                    str(hit.get("display_name") or hit["name"]),
+                    bool(hit.get("is_pending")),
+                ),
                 "category": str(hit.get("category", "")),
             }
             for hit in tag_hits
@@ -164,7 +167,7 @@ async def get_bulk_options(
             tag_options.append(
                 {
                     "value": tag.name,
-                    "text": ("(P) " + tag.name) if tag.is_pending else tag.name,
+                    "text": pending_label(tag.name, tag.is_pending),
                     "category": tag.category.value,
                 }
             )
@@ -224,88 +227,102 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     bulk_id: UUID = uuid4()
     LOGGER.info("Bulk-creating %d pins bulk_id=%s", len(body.pins), bulk_id)
 
+    created_pin_ids: list[int] = []
+
     async with async_session_maker.begin() as session:
         for index, row in enumerate(body.pins):
             try:
-                currency: Currency = await session.get_one(
-                    entity=Currency, ident=row.currency_id
-                )
-
-                shops: set[Shop] = {
-                    await _get_or_create(
-                        session=session, model=Shop, name=name, bulk_id=bulk_id
+                # Per-row savepoint: a row that fails after flushing its pin
+                # rolls back cleanly instead of leaving a partial pin (and any
+                # get-or-created shops/tags) to be committed with the batch.
+                async with session.begin_nested():
+                    currency: Currency = await session.get_one(
+                        entity=Currency, ident=row.currency_id
                     )
-                    for name in row.shop_names
-                    if name
-                }
-                explicit_tags: set[Tag] = {
-                    await _get_or_create(
-                        session=session, model=Tag, name=name, bulk_id=bulk_id
+
+                    shops: set[Shop] = {
+                        await _get_or_create(
+                            session=session, model=Shop, name=name, bulk_id=bulk_id
+                        )
+                        for name in row.shop_names
+                        if name
+                    }
+                    explicit_tags: set[Tag] = {
+                        await _get_or_create(
+                            session=session, model=Tag, name=name, bulk_id=bulk_id
+                        )
+                        for name in row.tag_names
+                        if name
+                    }
+                    artists: set[Artist] = {
+                        await _get_or_create(
+                            session=session, model=Artist, name=name, bulk_id=bulk_id
+                        )
+                        for name in row.artist_names
+                        if name
+                    }
+                    pin_sets: set[PinSet] = {
+                        await _get_or_create(
+                            session=session, model=PinSet, name=name, bulk_id=bulk_id
+                        )
+                        for name in row.pin_set_names
+                        if name
+                    }
+
+                    grades: set[Grade] = {
+                        Grade(name=grade.name, price=grade.price)
+                        for grade in row.grades
+                    }
+                    links: set[Link] = {Link(path=url) for url in row.links if url}
+
+                    width_mm = parse_magnitude_mm(field_label="Width", raw=row.width)
+                    height_mm = parse_magnitude_mm(field_label="Height", raw=row.height)
+
+                    new_pin = Pin(
+                        name=row.name,
+                        acquisition_type=row.acquisition_type,
+                        front_image_guid=UUID(row.front_image_guid),
+                        back_image_guid=UUID(row.back_image_guid)
+                        if row.back_image_guid
+                        else None,
+                        currency=currency,
+                        shops=shops,
+                        artists=artists,
+                        sets=pin_sets,
+                        grades=grades,
+                        links=links,
+                        limited_edition=row.limited_edition,
+                        number_produced=row.number_produced,
+                        release_date=row.release_date,
+                        end_date=row.end_date,
+                        funding_type=row.funding_type,
+                        posts=row.posts,
+                        width=width_mm,
+                        height=height_mm,
+                        description=row.description,
                     )
-                    for name in row.tag_names
-                    if name
-                }
-                artists: set[Artist] = {
-                    await _get_or_create(
-                        session=session, model=Artist, name=name, bulk_id=bulk_id
+
+                    # Set bulk_id before flush so a row that fails mid-flush
+                    # never persists a pin missing its batch correlation id.
+                    new_pin.bulk_id = bulk_id
+                    session.add(new_pin)
+                    await session.flush()
+                    await apply_pin_tags(
+                        new_pin.id, {tag.id for tag in explicit_tags}, session
                     )
-                    for name in row.artist_names
-                    if name
-                }
-                pin_sets: set[PinSet] = {
-                    await _get_or_create(
-                        session=session, model=PinSet, name=name, bulk_id=bulk_id
-                    )
-                    for name in row.pin_set_names
-                    if name
-                }
 
-                grades: set[Grade] = {
-                    Grade(name=grade.name, price=grade.price) for grade in row.grades
-                }
-                links: set[Link] = {Link(path=url) for url in row.links if url}
+                    row_pin_id = new_pin.id
+                    row_pin_name = new_pin.name
+                    row_front_guid = str(new_pin.front_image_guid)
 
-                width_mm = parse_magnitude_mm(field_label="Width", raw=row.width)
-                height_mm = parse_magnitude_mm(field_label="Height", raw=row.height)
-
-                new_pin = Pin(
-                    name=row.name,
-                    acquisition_type=row.acquisition_type,
-                    front_image_guid=UUID(row.front_image_guid),
-                    back_image_guid=UUID(row.back_image_guid)
-                    if row.back_image_guid
-                    else None,
-                    currency=currency,
-                    shops=shops,
-                    artists=artists,
-                    sets=pin_sets,
-                    grades=grades,
-                    links=links,
-                    limited_edition=row.limited_edition,
-                    number_produced=row.number_produced,
-                    release_date=row.release_date,
-                    end_date=row.end_date,
-                    funding_type=row.funding_type,
-                    posts=row.posts,
-                    width=width_mm,
-                    height=height_mm,
-                    description=row.description,
-                )
-
-                session.add(new_pin)
-                await session.flush()
-                new_pin.bulk_id = bulk_id
-                await apply_pin_tags(
-                    new_pin.id, {tag.id for tag in explicit_tags}, session
-                )
-
+                created_pin_ids.append(row_pin_id)
                 results.append(
                     PinRowResult(
                         index=index,
                         success=True,
-                        pin_id=new_pin.id,
-                        pin_name=new_pin.name,
-                        front_image_guid=str(new_pin.front_image_guid),
+                        pin_id=row_pin_id,
+                        pin_name=row_pin_name,
+                        front_image_guid=row_front_guid,
                     )
                 )
             except Exception as error:
@@ -322,6 +339,12 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
 
     created = sum(1 for result in results if result.success)
     failed = sum(1 for result in results if not result.success)
+
+    # Sync each created pin (and its shops/artists/tags) to Meilisearch now so
+    # admin-created bulk pins are searchable immediately instead of waiting for
+    # the scheduled reconcile. Runs after the write transaction has committed.
+    for pin_id in created_pin_ids:
+        await sync_pin_with_deps(pin_id)
 
     LOGGER.info(
         "Bulk pin submission complete bulk_id=%s created=%d failed=%d",

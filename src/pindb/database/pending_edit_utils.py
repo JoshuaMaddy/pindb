@@ -246,6 +246,49 @@ def _parse_date(value: str | None) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
+# ---------------------------------------------------------------------------
+# Scalar-field appliers: the plain (non-relationship, non-link) columns are
+# identical between the in-memory view and the approval write paths, so both
+# call these. Currency, relationships, links and cascades genuinely differ
+# (transient vs persisted) and stay in the per-path functions.
+# ---------------------------------------------------------------------------
+
+
+def _apply_pin_scalar_fields(pin: Pin, snapshot: dict[str, Any]) -> None:
+    pin.name = snapshot["name"]
+    pin.acquisition_type = AcquisitionType(snapshot["acquisition_type"])
+    pin.limited_edition = snapshot["limited_edition"]
+    pin.number_produced = snapshot["number_produced"]
+    pin.release_date = _parse_date(snapshot["release_date"])
+    pin.end_date = _parse_date(snapshot["end_date"])
+    pin.funding_type = (
+        FundingType(snapshot["funding_type"]) if snapshot["funding_type"] else None
+    )
+    pin.posts = snapshot["posts"]
+    pin.width = snapshot["width"]
+    pin.height = snapshot["height"]
+    pin.description = snapshot["description"]
+    pin.sku = snapshot["sku"]
+    pin.front_image_guid = UUID(snapshot["front_image_guid"])
+    pin.back_image_guid = (
+        UUID(snapshot["back_image_guid"]) if snapshot["back_image_guid"] else None
+    )
+
+
+def _apply_active_entity_scalars(
+    entity: Artist | Shop, snapshot: dict[str, Any]
+) -> None:
+    entity.name = snapshot["name"]
+    entity.description = snapshot["description"]
+    entity.active = snapshot["active"]
+
+
+def _apply_tag_scalar_fields(tag: Tag, snapshot: dict[str, Any]) -> None:
+    tag.name = snapshot["name"]
+    tag.description = snapshot["description"]
+    tag.category = TagCategory(snapshot["category"])
+
+
 async def apply_snapshot_in_memory(
     entity: Pin | Artist | Shop | Tag,
     snapshot: dict[str, Any],
@@ -272,20 +315,7 @@ async def apply_snapshot_in_memory(
 async def _apply_pin_snapshot_in_memory(
     pin: Pin, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    pin.name = snapshot["name"]
-    pin.acquisition_type = AcquisitionType(snapshot["acquisition_type"])
-    pin.limited_edition = snapshot["limited_edition"]
-    pin.number_produced = snapshot["number_produced"]
-    pin.release_date = _parse_date(snapshot["release_date"])
-    pin.end_date = _parse_date(snapshot["end_date"])
-    pin.funding_type = (
-        FundingType(snapshot["funding_type"]) if snapshot["funding_type"] else None
-    )
-    pin.posts = snapshot["posts"]
-    pin.width = snapshot["width"]
-    pin.height = snapshot["height"]
-    pin.description = snapshot["description"]
-    pin.sku = snapshot["sku"]
+    _apply_pin_scalar_fields(pin, snapshot)
 
     currency_id: int = snapshot["currency_id"]
     if pin.currency_id != currency_id:
@@ -293,11 +323,6 @@ async def _apply_pin_snapshot_in_memory(
         if currency is not None:
             pin.currency = currency
             pin.currency_id = currency_id
-
-    pin.front_image_guid = UUID(snapshot["front_image_guid"])
-    pin.back_image_guid = (
-        UUID(snapshot["back_image_guid"]) if snapshot["back_image_guid"] else None
-    )
 
     pin.shops = set(
         (
@@ -381,25 +406,19 @@ async def _apply_pin_snapshot_in_memory(
 
 
 def _apply_artist_snapshot_in_memory(artist: Artist, snapshot: dict[str, Any]) -> None:
-    artist.name = snapshot["name"]
-    artist.description = snapshot["description"]
-    artist.active = snapshot["active"]
+    _apply_active_entity_scalars(artist, snapshot)
     artist.links = {Link(path=path) for path in snapshot["links"]}
 
 
 def _apply_shop_snapshot_in_memory(shop: Shop, snapshot: dict[str, Any]) -> None:
-    shop.name = snapshot["name"]
-    shop.description = snapshot["description"]
-    shop.active = snapshot["active"]
+    _apply_active_entity_scalars(shop, snapshot)
     shop.links = {Link(path=path) for path in snapshot["links"]}
 
 
 async def _apply_tag_snapshot_in_memory(
     tag: Tag, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    tag.name = snapshot["name"]
-    tag.description = snapshot["description"]
-    tag.category = TagCategory(snapshot["category"])
+    _apply_tag_scalar_fields(tag, snapshot)
     tag.implications = set(
         (
             await session.scalars(
@@ -454,29 +473,11 @@ async def _replace_links(
 async def _approve_pin_snapshot(
     pin: Pin, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    pin.name = snapshot["name"]
-    pin.acquisition_type = AcquisitionType(snapshot["acquisition_type"])
-    pin.limited_edition = snapshot["limited_edition"]
-    pin.number_produced = snapshot["number_produced"]
-    pin.release_date = _parse_date(snapshot["release_date"])
-    pin.end_date = _parse_date(snapshot["end_date"])
-    pin.funding_type = (
-        FundingType(snapshot["funding_type"]) if snapshot["funding_type"] else None
-    )
-    pin.posts = snapshot["posts"]
-    pin.width = snapshot["width"]
-    pin.height = snapshot["height"]
-    pin.description = snapshot["description"]
-    pin.sku = snapshot["sku"]
+    _apply_pin_scalar_fields(pin, snapshot)
 
     currency = await session.get_one(entity=Currency, ident=snapshot["currency_id"])
     pin.currency = currency
     pin.currency_id = currency.id
-
-    pin.front_image_guid = UUID(snapshot["front_image_guid"])
-    pin.back_image_guid = (
-        UUID(snapshot["back_image_guid"]) if snapshot["back_image_guid"] else None
-    )
 
     pin.shops = set(
         (
@@ -551,27 +552,21 @@ async def _approve_pin_snapshot(
 async def _approve_artist_snapshot(
     artist: Artist, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    artist.name = snapshot["name"]
-    artist.description = snapshot["description"]
-    artist.active = snapshot["active"]
+    _apply_active_entity_scalars(artist, snapshot)
     await _replace_links(artist, snapshot["links"], session)
 
 
 async def _approve_shop_snapshot(
     shop: Shop, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    shop.name = snapshot["name"]
-    shop.description = snapshot["description"]
-    shop.active = snapshot["active"]
+    _apply_active_entity_scalars(shop, snapshot)
     await _replace_links(shop, snapshot["links"], session)
 
 
 async def _approve_tag_snapshot(
     tag: Tag, snapshot: dict[str, Any], session: AsyncSession
 ) -> None:
-    tag.name = snapshot["name"]
-    tag.description = snapshot["description"]
-    tag.category = TagCategory(snapshot["category"])
+    _apply_tag_scalar_fields(tag, snapshot)
 
     old_implication_ids: set[int] = {implied_tag.id for implied_tag in tag.implications}
     implied_tags = set(

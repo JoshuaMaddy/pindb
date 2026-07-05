@@ -75,7 +75,7 @@ def setup_rich_logger() -> None:
     # Remove all handlers from root logger
     # and propagate to root logger.
     for name in logging.root.manager.loggerDict.keys():
-        logging.getLogger(name).handlers: list[logging.Handler] = []
+        logging.getLogger(name).handlers = []
         logging.getLogger(name).propagate = True
 
     logging.basicConfig(

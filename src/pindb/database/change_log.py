@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from rich.repr import Result
 from sqlalchemy import ForeignKey
@@ -10,10 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
 from pindb.database.base import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+from pindb.utils import utc_now
 
 
 class ChangeLog(MappedAsDataclass, Base):
@@ -28,7 +25,7 @@ class ChangeLog(MappedAsDataclass, Base):
     changed_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), default=None
     )
-    changed_at: Mapped[datetime] = mapped_column(default_factory=_utc_now, init=False)
+    changed_at: Mapped[datetime] = mapped_column(default_factory=utc_now, init=False)
     patch: Mapped[dict] = mapped_column(JSONB, default_factory=dict)
 
     def __rich_repr__(self) -> Result:

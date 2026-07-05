@@ -6,11 +6,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from htpy import Element, a, button, div, form, h2, h3, i, span
+from htpy import Element, a, div, h3, i, span
 
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
+from pindb.templates.admin._pending_shared import (
+    action_buttons,
+    action_form_button,
+    section_header,
+)
 
 
 @dataclass
@@ -27,13 +32,7 @@ class BulkGroupView:
 
 def _bulk_groups_section(*, bulk_groups: Sequence[BulkGroupView]) -> Element:
     return div(class_="flex flex-col gap-4")[
-        div(class_="flex items-baseline gap-2")[
-            i(data_lucide="layers", class_="inline-block w-4 h-4"),
-            h2["Bulk Bundles"],
-            span(class_="text-xs font-semibold px-2 py-0.5 rounded")[
-                str(len(bulk_groups))
-            ],
-        ],
+        section_header(icon="layers", title="Bulk Bundles", count=len(bulk_groups)),
         div(class_="flex flex-col gap-3")[
             [_bulk_group_card(group=group) for group in bulk_groups]
         ],
@@ -94,26 +93,13 @@ def _bulk_group_card(*, group: BulkGroupView) -> Element:
                 for (table_name, entity_id), chain in group.edits
             ],
         ],
-        div(class_="flex gap-2")[
-            form(method="post", action=approve_url)[
-                button(type="submit", class_="btn btn-sm btn-primary")[
-                    i(data_lucide="check", class_="inline-block w-3 h-3 mr-1"),
-                    "Approve bundle",
-                ]
-            ],
-            form(method="post", action=reject_url)[
-                button(type="submit", class_="btn btn-sm btn-warning")[
-                    i(data_lucide="x", class_="inline-block w-3 h-3 mr-1"),
-                    "Reject bundle",
-                ]
-            ],
-            form(method="post", action=delete_url)[
-                button(type="submit", class_="btn btn-sm btn-error")[
-                    i(data_lucide="trash-2", class_="inline-block w-3 h-3 mr-1"),
-                    "Delete bundle",
-                ]
-            ],
-        ],
+        action_buttons(
+            action_form_button(
+                action="approve", url=approve_url, label="Approve bundle"
+            ),
+            action_form_button(action="reject", url=reject_url, label="Reject bundle"),
+            action_form_button(action="delete", url=delete_url, label="Delete bundle"),
+        ),
     ]
 
 

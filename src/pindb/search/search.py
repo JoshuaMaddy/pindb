@@ -17,6 +17,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag, TagCategory
+from pindb.utils import pending_label
 
 PIN_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(
     uid=CONFIGURATION.meilisearch_index
@@ -214,8 +215,10 @@ async def search_pin_sets(
     session: AsyncSession,
     offset: int = 0,
     limit: int = 100,
+    global_only: bool = False,
 ) -> tuple[list[PinSet], int]:
-    ids, total = await _search_index(PIN_SETS_INDEX, query, offset, limit)
+    filter_str: str | None = "owner_id IS NULL" if global_only else None
+    ids, total = await _search_index(PIN_SETS_INDEX, query, offset, limit, filter_str)
     if not ids:
         return [], total
     rows = (
@@ -245,7 +248,7 @@ async def search_entity_options(
         text = str(hit.get("display_name") or hit["name"])
         item: dict[str, str] = {
             "value": str(hit["id"]),
-            "text": ("(P) " + text) if hit.get("is_pending") else text,
+            "text": pending_label(text, bool(hit.get("is_pending"))),
         }
         if "category" in hit:
             item["category"] = str(hit["category"])

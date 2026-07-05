@@ -25,6 +25,7 @@ from pindb.database.pending_edit_utils import (
 )
 from pindb.database.pending_mixin import PendingAuditEntity, PendingMixin
 from pindb.database.user import User
+from pindb.routes._pin_shared import PIN_SELECTINLOADS
 from pindb.search.update import delete_one, sync_entity, sync_pin_with_deps
 from pindb.templates.admin.pending import BulkGroupView, pending_page
 from pindb.utils import utc_now
@@ -93,18 +94,7 @@ async def _load_pin_for_edit(session: AsyncSession, pin_id: int) -> Pin | None:
     return await session.scalar(
         select(Pin)
         .where(Pin.id == pin_id)
-        .options(
-            selectinload(Pin.shops),
-            selectinload(Pin.artists),
-            selectinload(Pin.tags),
-            selectinload(Pin.explicit_tags),
-            selectinload(Pin.sets),
-            selectinload(Pin.links),
-            selectinload(Pin.grades),
-            selectinload(Pin.currency),
-            selectinload(Pin.variants),
-            selectinload(Pin.unauthorized_copies),
-        )
+        .options(*PIN_SELECTINLOADS)
         .execution_options(include_pending=True)  # type: ignore[call-overload]
     )
 

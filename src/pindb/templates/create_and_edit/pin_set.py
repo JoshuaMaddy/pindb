@@ -67,7 +67,7 @@ def pin_set_create_page(request: Request) -> Element:
     return html_base(
         title="Create Pin Set",
         request=request,
-        template_js_extra=("forms/entity_form_gate.js",),
+        template_js_extra=("shared/form_gate.js", "forms/entity_form_gate.js"),
         body_content=centered_div(
             content=[
                 page_heading(

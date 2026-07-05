@@ -10,7 +10,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from pindb.auth import EditorUser
 from pindb.database import async_session_maker
@@ -30,6 +29,7 @@ from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
 from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
 from pindb.routes._pin_shared import (
+    PIN_SELECTINLOADS,
     PinFormParams,
     load_pin_links,
     load_pin_relations,
@@ -45,20 +45,6 @@ router = APIRouter()
 LOGGER = user_logger("pindb.routes.edit.pin")
 
 
-_PIN_SELECTINLOADS = (
-    selectinload(Pin.shops),
-    selectinload(Pin.tags),
-    selectinload(Pin.explicit_tags),
-    selectinload(Pin.artists),
-    selectinload(Pin.sets),
-    selectinload(Pin.links),
-    selectinload(Pin.grades),
-    selectinload(Pin.currency),
-    selectinload(Pin.variants),
-    selectinload(Pin.unauthorized_copies),
-)
-
-
 @router.get(path="/pin/{id}", response_model=None)
 async def get_edit_pin(
     request: Request,
@@ -67,7 +53,7 @@ async def get_edit_pin(
 ) -> HtpyResponse:
     async with async_session_maker() as session:
         pin: Pin | None = await session.scalar(
-            select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
+            select(Pin).where(Pin.id == id).options(*PIN_SELECTINLOADS)
         )
 
         if pin is None:
@@ -134,7 +120,7 @@ async def post_edit_pin(
 
     async with async_session_maker.begin() as session:
         pin: Pin | None = await session.scalar(
-            select(Pin).where(Pin.id == id).options(*_PIN_SELECTINLOADS)
+            select(Pin).where(Pin.id == id).options(*PIN_SELECTINLOADS)
         )
         if not pin:
             raise HTTPException(status_code=404, detail="Pin not found")

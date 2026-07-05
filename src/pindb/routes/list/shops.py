@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from pindb.database import Shop, async_session_maker
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
+from pindb.routes.list._render import list_response
 from pindb.search.search import search_shops
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 from pindb.templates.list.shops import shops_list, shops_list_section
@@ -60,28 +61,15 @@ async def get_list_shops(
                 )
             ).all()
 
-        if request.headers.get("HX-Request"):
-            return HtpyResponse(
-                shops_list_section(
-                    request=request,
-                    shops=shops,
-                    view=view,
-                    page=page,
-                    total_count=total_count,
-                    base_url=base_url,
-                    q=q,
-                    sort=sort,
-                )
-            )
-        return HtpyResponse(
-            shops_list(
-                request=request,
-                shops=shops,
-                view=view,
-                page=page,
-                total_count=total_count,
-                base_url=base_url,
-                q=q,
-                sort=sort,
-            )
+        return list_response(
+            request,
+            full=shops_list,
+            section=shops_list_section,
+            shops=shops,
+            view=view,
+            page=page,
+            total_count=total_count,
+            base_url=base_url,
+            q=q,
+            sort=sort,
         )

@@ -31,6 +31,7 @@ from pindb.templates.components.tags.tag_branding import (
     CATEGORY_ICONS,
     category_badge,
 )
+from pindb.utils import pending_label
 
 _RELATION_CAP = 5
 
@@ -39,7 +40,7 @@ def _relation_pills(tags: list[Tag], request: Request) -> list[Element]:
     return [
         pill_link(
             href=str(tag_url(request=request, tag=t)),
-            text=("(P) " + t.display_name) if t.is_pending else t.display_name,
+            text=pending_label(t.display_name, t.is_pending),
             icon=CATEGORY_ICONS.get(t.category, "tag"),
             color_classes=CATEGORY_COLORS.get(t.category, "bg-main text-base-text"),
             hover_classes=CATEGORY_HOVER_CLASSES.get(
@@ -130,7 +131,7 @@ def tag_page(
     viewing_pending: bool = False,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    display_name = ("(P) " + tag.display_name) if tag.is_pending else tag.display_name
+    display_name = pending_label(tag.display_name, tag.is_pending)
     canonical_url = str(tag_url(request=request, tag=tag))
     pending_url = canonical_url + "?version=pending"
     return html_base(

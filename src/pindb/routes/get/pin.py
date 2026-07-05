@@ -47,6 +47,7 @@ async def get_pin(
             .options(
                 selectinload(Pin.shops),
                 selectinload(Pin.tags),
+                selectinload(Pin.explicit_tags),
                 selectinload(Pin.artists),
                 selectinload(Pin.sets),
                 selectinload(Pin.links),

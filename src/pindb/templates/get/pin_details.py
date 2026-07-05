@@ -46,7 +46,12 @@ from pindb.templates.components.tags.tag_branding import (
     CATEGORY_ICONS,
 )
 from pindb.templates.get.pin_fragments import favorite_button, set_row
-from pindb.utils import domain_from_url, format_currency_code, format_pin_dimension_mm
+from pindb.utils import (
+    domain_from_url,
+    format_currency_code,
+    format_pin_dimension_mm,
+    pending_label,
+)
 
 
 def pin_details(
@@ -162,7 +167,7 @@ def _shops(pin: Pin, request: Request) -> Element:
         items=[
             pill_link(
                 href=str(shop_url(request=request, shop=shop)),
-                text=("(P) " + shop.name) if shop.is_pending else shop.name,
+                text=pending_label(shop.name, shop.is_pending),
             )
             for shop in sorted(pin.shops, key=lambda shop: shop.name)
         ],
@@ -179,7 +184,7 @@ def _artists(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(artist_url(request=request, artist=artist)),
-                text=("(P) " + artist.name) if artist.is_pending else artist.name,
+                text=pending_label(artist.name, artist.is_pending),
             )
             for artist in sorted(pin.artists, key=lambda artist: artist.name)
         ],
@@ -210,7 +215,7 @@ def _variants(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(pin_url(request=request, pin=variant)),
-                text=("(P) " + variant.name) if variant.is_pending else variant.name,
+                text=pending_label(variant.name, variant.is_pending),
             )
             for variant in sorted(pin.variants, key=lambda v: v.name)
         ],
@@ -227,7 +232,7 @@ def _unauthorized_copies(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(pin_url(request=request, pin=copy)),
-                text=("(P) " + copy.name) if copy.is_pending else copy.name,
+                text=pending_label(copy.name, copy.is_pending),
             )
             for copy in sorted(pin.unauthorized_copies, key=lambda c: c.name)
         ],
@@ -319,9 +324,7 @@ def _pin_sets(
         items=[
             pill_link(
                 href=str(pin_set_url(request=request, pin_set=ps)),
-                text=("(P) " + titlecase(ps.name))
-                if ps.is_pending
-                else titlecase(ps.name),
+                text=pending_label(titlecase(ps.name), ps.is_pending),
             )
             for ps in visible_pin_sets
         ],
@@ -336,9 +339,7 @@ def _tags(pin: Pin, request: Request) -> Element:
         items=[
             pill_link(
                 href=str(tag_url(request=request, tag=tag)),
-                text=("(P) " + tag.display_name)
-                if tag.is_pending
-                else tag.display_name,
+                text=pending_label(tag.display_name, tag.is_pending),
                 icon=CATEGORY_ICONS.get(tag.category, "tag"),
                 color_classes=CATEGORY_COLORS.get(
                     tag.category, "bg-main text-base-text"

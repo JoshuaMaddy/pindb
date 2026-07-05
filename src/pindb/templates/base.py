@@ -91,6 +91,7 @@ def html_base(
             ),
         ],
         body(class_="min-h-screen flex flex-col")[
+            div(id="pindb-htmx-progress", aria_hidden="true"),
             navbar(request=request),
             main_el(class_="min-h-screen relative z-5")[body_content,],
             footer(),
@@ -111,5 +112,6 @@ def html_base(
         script(src=templates_js_url("forms/markdown_editor.js"), defer=True),
         script(src=templates_js_url("forms/form_validate.js"), defer=True),
         script(src=templates_js_url("forms/htmx_submit_guard.js"), defer=True),
+        script(src=templates_js_url("forms/htmx_progress_bar.js"), defer=True),
         *extra_scripts,
     ]

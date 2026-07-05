@@ -23,4 +23,11 @@ pytest_plugins = [
     "tests.fixtures.users",
     "tests.fixtures.images",
     "tests.fixtures.autouse",
+    # e2e plugins must be registered from this top-level conftest (pytest no
+    # longer allows ``pytest_plugins`` in a non-top-level conftest). These
+    # modules only import stdlib/httpx at import time; their container and
+    # Playwright work happens lazily inside fixtures requested by e2e tests, so
+    # registering them globally stays cheap for unit/integration runs.
+    "tests.e2e.fixtures.live_server",
+    "tests.e2e.fixtures.db_isolation",
 ]

@@ -36,6 +36,7 @@ from pindb.routes.bulk._helpers import TagMode
 from pindb.templates.base import html_base
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
+from pindb.utils import pending_label
 
 
 def bulk_edit_page(
@@ -56,7 +57,11 @@ def bulk_edit_page(
     return html_base(
         title=title,
         request=request,
-        template_js_extra=("pins/pin_creation.js",),
+        template_js_extra=(
+            "shared/webp_transcode.js",
+            "shared/form_gate.js",
+            "pins/pin_creation.js",
+        ),
         body_content=centered_div(
             content=[
                 script(**{"type": "application/json"}, id="pin-form-ref-data")[
@@ -115,7 +120,7 @@ def _tag_section(
     preview_url = str(request.url_for("get_tag_implication_preview"))
     tag_options = [
         option(value=str(tag.id), data_category=tag.category.value)[
-            ("(P) " + tag.display_name) if tag.is_pending else tag.display_name
+            pending_label(tag.display_name, tag.is_pending)
         ]
         for tag in sorted(tags, key=lambda t: (t.category, t.name))
     ]

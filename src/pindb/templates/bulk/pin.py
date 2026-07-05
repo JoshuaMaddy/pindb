@@ -82,7 +82,11 @@ def bulk_pin_page(
             **{"type": "module"},
             src=f"/static/vendor/pindb-webp/pindb-webp-encode.js?v={STATIC_CACHE_BUSTER}",
         ),
-        template_js_extra=("bulk/bulk_import.js",),
+        template_js_extra=(
+            "shared/webp_transcode.js",
+            "shared/dom_format.js",
+            "bulk/bulk_import.js",
+        ),
         body_content=[
             script(**{"type": "application/json"}, id="bulk-ref-data")[
                 Markup(ref_json)

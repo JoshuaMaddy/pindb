@@ -22,6 +22,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
+from pindb.utils import pending_label
 
 
 def shop_page(
@@ -54,7 +55,7 @@ def shop_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_shops"), "Shops"),
-                        ("(P) " + shop.name) if shop.is_pending else shop.name,
+                        pending_label(shop.name, shop.is_pending),
                     ]
                 ),
                 has_pending_chain
@@ -65,7 +66,7 @@ def shop_page(
                 ),
                 page_heading(
                     icon="store",
-                    text=("(P) " + shop.name) if shop.is_pending else shop.name,
+                    text=pending_label(shop.name, shop.is_pending),
                     full_width=True,
                     extras=fragment[
                         user

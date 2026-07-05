@@ -79,7 +79,11 @@ def simple_aliased_entity_form(
 
     return html_base(
         title=title,
-        template_js_extra=("forms/alias_select_init.js", "forms/entity_form_gate.js"),
+        template_js_extra=(
+            "forms/alias_select_init.js",
+            "shared/form_gate.js",
+            "forms/entity_form_gate.js",
+        ),
         body_content=centered_div(
             content=[
                 page_heading(icon=heading_icon, text=heading_text),

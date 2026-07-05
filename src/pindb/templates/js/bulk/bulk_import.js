@@ -12,29 +12,15 @@
   var BULK_IMAGE_WEBP_QUALITY = 95;
 
   /**
-   * When `globalThis.pindbWebpFromFile` is loaded (see static/vendor/pindb-webp),
-   * re-encode raster images to WebP before upload. Otherwise returns `file`.
+   * Re-encode a raster image to WebP before upload via the shared transcode
+   * primitive (`shared/webp_transcode.js`); returns `file` unchanged when the
+   * encoder is missing or the file isn't a transcodable image.
    *
    * @param {File} file
    * @returns {Promise<File>}
    */
-  async function maybeTranscodeBulkImageToWebp(file) {
-    if (!file) return file;
-    if (file.type === "image/webp") return file;
-    if (file.type && file.type.indexOf("image/") !== 0) return file;
-    var enc = globalThis.pindbWebpFromFile;
-    if (typeof enc !== "function") return file;
-    try {
-      var blob = await enc(file, BULK_IMAGE_WEBP_QUALITY);
-      if (!blob || blob.size === 0) return file;
-      var stem = file.name.replace(/\.[^.\\/]+$/, "") || "image";
-      return new File([blob], stem + ".webp", {
-        type: "image/webp",
-        lastModified: Date.now(),
-      });
-    } catch {
-      return file;
-    }
+  function maybeTranscodeBulkImageToWebp(file) {
+    return globalThis.pindbTranscodeFileToWebp(file, BULK_IMAGE_WEBP_QUALITY);
   }
 
   // ---------------------------------------------------------------------------
@@ -99,7 +85,8 @@
     if (bulkNavType === "reload" && savedBulk) {
       try {
         JSON.parse(savedBulk).forEach((pin) => addRow(pin));
-      } catch {
+      } catch (err) {
+        console.warn("Failed to restore saved bulk import state", err);
         addRow();
       }
     } else {
@@ -474,7 +461,10 @@
               }
               callback(results);
             })
-            .catch(() => callback());
+            .catch((err) => {
+              console.warn("Bulk option lookup failed", err);
+              callback();
+            });
         },
         shouldLoad: (q) => q.length > 0,
         create: (input, callback) => {
@@ -1226,19 +1216,6 @@
   // Submit
   // ---------------------------------------------------------------------------
 
-  function setLucideIcon(container, iconName) {
-    const existing =
-      container.querySelector("i") ?? container.querySelector("svg");
-    const el = document.createElement("i");
-    el.setAttribute("data-lucide", iconName);
-    if (existing) {
-      existing.replaceWith(el);
-    } else {
-      container.prepend(el);
-    }
-    if (window.lucide) lucide.createIcons({ nodes: [container] });
-  }
-
   async function submitAll() {
     // Close any open sub-rows so their data is saved to dataset
     if (openGradesRowId) closeGrades(openGradesRowId);
@@ -1410,13 +1387,14 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Utilities
+  // Utilities — thin wrappers over shared/dom_format.js (shared with bulk_tag.js)
   // ---------------------------------------------------------------------------
 
+  function setLucideIcon(container, iconName) {
+    return globalThis.pindbSetLucideIcon(container, iconName);
+  }
+
   function escHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    return globalThis.pindbEscHtml(str);
   }
 })();

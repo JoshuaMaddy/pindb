@@ -17,6 +17,7 @@ from pindb.database.tag import Tag, TagCategory
 from pindb.model_utils import empty_str_to_none
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
+from pindb.routes.list._render import list_response
 from pindb.search.search import search_tags
 from pindb.templates.list.base import DEFAULT_PER_PAGE
 from pindb.templates.list.tags import tags_list, tags_list_section
@@ -71,30 +72,16 @@ async def get_list_tags(
                 await session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset))
             ).all()
 
-        if request.headers.get("HX-Request"):
-            return HtpyResponse(
-                tags_list_section(
-                    request=request,
-                    tags=tags,
-                    view=view,
-                    page=page,
-                    total_count=total_count,
-                    base_url=base_url,
-                    q=q,
-                    category=category,
-                    sort=sort,
-                )
-            )
-        return HtpyResponse(
-            tags_list(
-                request=request,
-                tags=tags,
-                view=view,
-                page=page,
-                total_count=total_count,
-                base_url=base_url,
-                q=q,
-                category=category,
-                sort=sort,
-            )
+        return list_response(
+            request,
+            full=tags_list,
+            section=tags_list_section,
+            tags=tags,
+            view=view,
+            page=page,
+            total_count=total_count,
+            base_url=base_url,
+            q=q,
+            category=category,
+            sort=sort,
         )

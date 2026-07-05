@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
 
-
-def _utc_now() -> datetime:
-    """Return current UTC time as naive datetime for timestamp columns."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+from pindb.utils import utc_now
 
 
 class AuditMixin(MappedAsDataclass):
@@ -19,7 +16,7 @@ class AuditMixin(MappedAsDataclass):
     __abstract__ = True
 
     created_at: Mapped[datetime] = mapped_column(
-        default_factory=_utc_now,
+        default_factory=utc_now,
         init=False,
     )
     created_by_id: Mapped[int | None] = mapped_column(
