@@ -48,9 +48,10 @@ dev = [
 
 [tool.pytest.ini_options]
 # e2e tests require Playwright browsers + Docker (Postgres + Meilisearch
-# testcontainers). Skip them locally with `pytest -m "not e2e"` if the host
-# lacks those; CI runs the full suite.
-addopts = ["--import-mode=importlib", "-p", "pytest_asyncio"]
+# testcontainers), and their session-scoped containers clash with the
+# integration fixtures when both suites share one pytest run — so they are
+# excluded by default. Run them separately with `uv run pytest -m e2e`.
+addopts = ["--import-mode=importlib", "-p", "pytest_asyncio", "-m", "not e2e"]
 pythonpath = "src"
 testpaths = ["tests"]
 asyncio_mode = "auto"

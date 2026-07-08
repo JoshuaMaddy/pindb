@@ -86,8 +86,18 @@ user_favorite_pin_sets = Table(
 tag_implications = Table(
     "tag_implications",
     Base.metadata,
-    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
-    Column("implied_tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+    Column(
+        "tag_id",
+        Integer,
+        ForeignKey("tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "implied_tag_id",
+        Integer,
+        ForeignKey("tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 pin_variants = Table(

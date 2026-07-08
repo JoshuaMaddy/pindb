@@ -10,6 +10,7 @@ import pindb.database.currency  # noqa: F401
 import pindb.database.grade  # noqa: F401
 import pindb.database.joins  # noqa: F401
 import pindb.database.link  # noqa: F401
+import pindb.database.message  # noqa: F401
 import pindb.database.pending_edit  # noqa: F401
 import pindb.database.pin  # noqa: F401
 import pindb.database.pin_set  # noqa: F401

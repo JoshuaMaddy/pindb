@@ -29,6 +29,7 @@ from pindb.database.joins import (
     user_favorite_pins,
 )
 from pindb.database.link import Link
+from pindb.database.message import Message, MessageReceipt
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -55,6 +56,7 @@ _AUDIT_MODELS = (
     UserAuthProvider,
     UserOwnedPin,
     UserWantedPin,
+    Message,
 )
 _AUDIT_FIELDS = ("created_by_id", "updated_by_id", "deleted_by_id")
 
@@ -74,9 +76,12 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
     3. ChangeLog and PendingEdit FKs to this user are set to NULL.
     4. Personal PinSets owned by this user are hard-deleted along with
        their memberships, favorites-of, and link associations.
-    5. Join-table rows (favorites), OAuth linkages, sessions, and
+    5. Messages addressed to the user are hard-deleted (nobody else can
+       see them), messages they sent are anonymised (``sender_id`` NULL),
+       and their message receipts are removed.
+    6. Join-table rows (favorites), OAuth linkages, sessions, and
        per-user pin-list rows are deleted outright.
-    6. The user row itself is deleted.
+    7. The user row itself is deleted.
     """
     # 1. Anonymise AuditMixin FKs across every inheriting table.
     for model in _AUDIT_MODELS:
@@ -131,7 +136,21 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
         )
         await session.execute(delete(PinSet).where(PinSet.id.in_(personal_set_ids)))
 
-    # 5. Drop user-owned data.
+    # 5. Messages. Delete the user's inbox outright — a direct message to
+    #    them is visible to nobody else, and its body may be personal data.
+    #    Other users' receipts on those rows cascade at the DB level
+    #    (message_id ondelete CASCADE); replies pointing at deleted rows get
+    #    parent_id SET NULL. Sent messages survive anonymised, like other
+    #    contributed content.
+    await session.execute(delete(Message).where(Message.recipient_id == user_id))
+    await session.execute(
+        update(Message).where(Message.sender_id == user_id).values(sender_id=None)
+    )
+    await session.execute(
+        delete(MessageReceipt).where(MessageReceipt.user_id == user_id)
+    )
+
+    # 6. Drop user-owned data.
     await session.execute(
         delete(user_favorite_pins).where(user_favorite_pins.c.user_id == user_id)
     )
@@ -147,6 +166,6 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
     await session.execute(delete(UserOwnedPin).where(UserOwnedPin.user_id == user_id))
     await session.execute(delete(UserWantedPin).where(UserWantedPin.user_id == user_id))
 
-    # 6. Delete the user row. All references above are gone, so no FK
+    # 7. Delete the user row. All references above are gone, so no FK
     #    violation.
     await session.execute(delete(User).where(User.id == user_id))

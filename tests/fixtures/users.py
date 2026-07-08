@@ -137,10 +137,15 @@ def _seed_full_profile_user_associations(
 def seed_currencies(db_session: Session) -> None:
     """Seed currencies into the test DB (mirrors lifespan behaviour)."""
     from pindb.database.currency import Currency
+    from pindb.utils import utc_now
 
+    # Core insert bypasses the audit ``before_flush`` that populates
+    # ``created_at`` on ORM adds, so set it explicitly (the column is NOT NULL).
+    now = utc_now()
+    rows = [{**row, "created_at": now} for row in core.currency_rows()]
     db_session.execute(
         pg_insert(Currency)
-        .values(core.currency_rows())
+        .values(rows)
         .on_conflict_do_nothing(index_elements=[Currency.id])
     )
     db_session.commit()

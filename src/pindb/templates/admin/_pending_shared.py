@@ -22,10 +22,21 @@ _ACTION_SPECS: dict[str, tuple[str, str, str]] = {
 def action_form_button(
     *, action: str, url: str, label: str | None = None, title: str | None = None
 ) -> Element:
-    """A single POST form wrapping an icon button for an approve/reject/delete action."""
+    """A single POST form wrapping an icon button for an approve/reject/delete action.
+
+    ``hx-post`` swaps the whole ``#pending-content`` region in place so the queue
+    updates without a full-page reload (which would reset the scroll position).
+    ``method``/``action`` remain as a no-JS fallback that redirects to the page.
+    """
     icon, variant, default_label = _ACTION_SPECS[action]
     text = label or default_label
-    return form(method="post", action=url)[
+    return form(
+        method="post",
+        action=url,
+        hx_post=url,
+        hx_target="#pending-content",
+        hx_swap="outerHTML",
+    )[
         button(type="submit", class_=f"btn btn-sm {variant}", title=title or text)[
             i(data_lucide=icon, class_="inline-block w-3 h-3 mr-1"),
             text,

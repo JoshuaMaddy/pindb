@@ -4,6 +4,9 @@ Registers three listeners on SQLAlchemy's sync ``Session`` class:
 
 * ``before_flush`` — fills ``AuditMixin`` timestamps and user ids, queues
   ``ChangeLog`` work, and auto-approves ``PendingMixin`` rows created by admins.
+  Models that set ``__change_log_exclude__ = True`` still get timestamps but
+  never emit ``ChangeLog`` rows (e.g. ``Message`` — private bodies must not be
+  copied into ``change_log.patch``).
 * ``after_flush`` — persists ``ChangeLog`` rows with JSON patches (or full
   snapshots for creates).
 * ``do_orm_execute`` — applies loader criteria so soft-deleted rows and
@@ -21,6 +24,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy
+from pydantic import BaseModel
 from sqlalchemy import event
 from sqlalchemy.orm import ORMExecuteState, Session, with_loader_criteria
 from sqlalchemy.orm.attributes import get_history
@@ -99,6 +103,8 @@ def _serialize_value(val: object) -> object:
         return str(val)
     if isinstance(val, enum.Enum):
         return val.value
+    if isinstance(val, BaseModel):
+        return val.model_dump(mode="json")
     return val
 
 
@@ -163,6 +169,8 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
         if isinstance(obj, PendingMixin) and is_admin:
             obj.approved_at = now
             obj.approved_by_id = user_id
+        if getattr(obj, "__change_log_exclude__", False):
+            continue
         # Snapshot taken post-flush (after_flush) so FKs are populated
         pending.append((obj, "create", None))
 
@@ -171,6 +179,8 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
             continue
         obj.updated_at = now
         obj.updated_by_id = user_id
+        if getattr(obj, "__change_log_exclude__", False):
+            continue
         diff = _compute_patch(obj)
         # `deleted_at` is excluded from `_AUDIT_FIELDS`, so we detect a
         # soft-delete by inspecting the column transition directly.
@@ -213,6 +223,18 @@ def _after_flush(session: Session, flush_context: object) -> None:
             patch=resolved_patch,
         )
         session.add(log)
+
+
+def _discard_pending_audit(session: Session, *args: object) -> None:
+    """Drop queued ``ChangeLog`` work when a transaction rolls back.
+
+    ``_before_flush`` queues create/update/delete entries, but ``_after_flush``
+    (which clears the queue) only runs on a successful flush. A failed flush
+    rolls back and leaves stale, now-invalid instances in ``_pending_audit``;
+    without this they would leak into the next flush in the same context and
+    emit bogus ``ChangeLog`` rows (e.g. a create snapshot with ``id`` NULL).
+    """
+    _pending_audit.set([])
 
 
 def _filter_deleted(execute_state: ORMExecuteState) -> None:
@@ -264,3 +286,7 @@ def register_audit_events() -> None:
         event.listen(Session, "after_flush", _after_flush)
     if not event.contains(Session, "do_orm_execute", _filter_deleted):
         event.listen(Session, "do_orm_execute", _filter_deleted)
+    if not event.contains(Session, "after_rollback", _discard_pending_audit):
+        event.listen(Session, "after_rollback", _discard_pending_audit)
+    if not event.contains(Session, "after_soft_rollback", _discard_pending_audit):
+        event.listen(Session, "after_soft_rollback", _discard_pending_audit)

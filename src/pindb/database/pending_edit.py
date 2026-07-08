@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
@@ -25,6 +25,16 @@ class PendingEdit(PendingStateMixin, MappedAsDataclass, Base):
     """
 
     __tablename__ = "pending_edits"
+    __table_args__ = (
+        Index("ix_pending_edits_entity", "entity_type", "entity_id"),
+        Index(
+            "ix_pending_edits_open",
+            "entity_type",
+            "entity_id",
+            "created_at",
+            postgresql_where=text("approved_at IS NULL AND rejected_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     entity_type: Mapped[str]

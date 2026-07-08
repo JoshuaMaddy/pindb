@@ -17,7 +17,7 @@ from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 from fastapi import HTTPException
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from starlette.datastructures import UploadFile
 
 from pindb.config import CONFIGURATION
@@ -374,7 +374,8 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
 
     Raises:
         HTTPException: 413 when the payload exceeds ``MAX_IMAGE_BYTES`` or
-            Pillow raises ``DecompressionBombError`` for oversized dimensions.
+            Pillow raises ``DecompressionBombError`` for oversized dimensions;
+            422 when the bytes are not a decodable image.
     """
     data = await file.read() if isinstance(file, UploadFile) else file.read_bytes()
     if len(data) > MAX_IMAGE_BYTES:
@@ -385,6 +386,12 @@ async def save_image(file: UploadFile | Path) -> uuid.UUID:
     except Image.DecompressionBombError as exc:
         raise HTTPException(
             status_code=413, detail="Image dimensions too large."
+        ) from exc
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        # UnidentifiedImageError: unknown format; OSError/ValueError: truncated
+        # or malformed data surfaced during decode/re-encode.
+        raise HTTPException(
+            status_code=422, detail="File is not a valid image."
         ) from exc
     file_uuid = uuid.uuid4()
     key = str(file_uuid)

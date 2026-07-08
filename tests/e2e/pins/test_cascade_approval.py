@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e._pages import submit_pending_action
 from tests.e2e.pins._helpers import create_pin_via_http, editor_login_http
 
 
@@ -46,10 +47,10 @@ class TestPinCascadeApproval:
         admin_page.wait_for_load_state("load")
         pin_row = admin_page.locator("tr", has_text="CascadePin")
         expect(pin_row).to_contain_text("Will also approve")
-        pin_row.locator("form[action*='/admin/pending/approve/pin/']").locator(
-            "button[type='submit']"
-        ).click()
-        admin_page.wait_for_load_state("load")
+        submit_pending_action(
+            admin_page,
+            pin_row.locator("form[action*='/admin/pending/approve/pin/']"),
+        )
 
         pin_rows = db_handle("SELECT approved_at FROM pins WHERE name = 'CascadePin'")
         shop_rows = db_handle(

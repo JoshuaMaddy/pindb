@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable
 
 from rich.repr import Result
-from sqlalchemy import Computed, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Computed, ForeignKey, Index, Text, UniqueConstraint
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
@@ -60,6 +60,7 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     # Required Attributes
     name: Mapped[str]
     normalized_name: Mapped[str] = mapped_column(
+        Text,
         Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
         init=False,
     )

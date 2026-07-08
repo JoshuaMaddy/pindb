@@ -7,7 +7,7 @@ from typing import Any, cast
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,11 @@ from pindb.database.pending_mixin import PendingAuditEntity, PendingMixin
 from pindb.database.user import User
 from pindb.routes._pin_shared import PIN_SELECTINLOADS
 from pindb.search.update import delete_one, sync_entity, sync_pin_with_deps
-from pindb.templates.admin.pending import BulkGroupView, pending_page
+from pindb.templates.admin.pending import (
+    BulkGroupView,
+    pending_content,
+    pending_page,
+)
 from pindb.utils import utc_now
 
 router = APIRouter(prefix="/admin/pending", dependencies=[Depends(require_admin)])
@@ -131,208 +135,227 @@ async def _load_entity_for_edit(
     return None
 
 
+async def _collect_pending_view(session: AsyncSession) -> dict[str, Any]:
+    """Query every pending entity/edit and group them for the pending templates.
+
+    Returns kwargs shared by ``pending_page`` (full page) and ``pending_content``
+    (the HTMX-swapped fragment).
+    """
+    opts: dict[str, bool] = {"include_pending": True}
+
+    pending_pins = (
+        await session.scalars(
+            select(Pin)
+            .where(
+                Pin.approved_at.is_(None),
+                Pin.rejected_at.is_(None),
+                Pin.deleted_at.is_(None),
+            )
+            .options(
+                selectinload(Pin.shops),
+                selectinload(Pin.artists),
+                selectinload(Pin.tags),
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+    ).all()
+    pending_shops = (
+        await session.scalars(
+            select(Shop)
+            .where(
+                Shop.approved_at.is_(None),
+                Shop.rejected_at.is_(None),
+                Shop.deleted_at.is_(None),
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+    ).all()
+    pending_artists = (
+        await session.scalars(
+            select(Artist)
+            .where(
+                Artist.approved_at.is_(None),
+                Artist.rejected_at.is_(None),
+                Artist.deleted_at.is_(None),
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+    ).all()
+    pending_tags = (
+        await session.scalars(
+            select(Tag)
+            .where(
+                Tag.approved_at.is_(None),
+                Tag.rejected_at.is_(None),
+                Tag.deleted_at.is_(None),
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+    ).all()
+    pending_pin_sets = (
+        await session.scalars(
+            select(PinSet)
+            .where(
+                PinSet.approved_at.is_(None),
+                PinSet.rejected_at.is_(None),
+                PinSet.deleted_at.is_(None),
+            )
+            .execution_options(**opts)  # type: ignore[arg-type]
+        )
+    ).all()
+
+    pending_pins_list: list[Pin] = list(pending_pins)
+    pending_shops_list: list[Shop] = list(pending_shops)
+    pending_artists_list: list[Artist] = list(pending_artists)
+    pending_tags_list: list[Tag] = list(pending_tags)
+    pending_pin_sets_list: list[PinSet] = list(pending_pin_sets)
+
+    creator_ids: set[int] = {
+        e.created_by_id
+        for group in [
+            pending_pins_list,
+            pending_shops_list,
+            pending_artists_list,
+            pending_tags_list,
+            pending_pin_sets_list,
+        ]
+        for e in group
+        if e.created_by_id is not None
+    }
+
+    # Pending edits: group by (entity_type, entity_id)
+    pending_edits = (
+        await session.scalars(
+            select(PendingEdit)
+            .where(
+                PendingEdit.approved_at.is_(None),
+                PendingEdit.rejected_at.is_(None),
+            )
+            .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
+        )
+    ).all()
+
+    edit_groups: dict[tuple[str, int], list[PendingEdit]] = {}
+    for edit in pending_edits:
+        edit_groups.setdefault((edit.entity_type, edit.entity_id), []).append(edit)
+
+    # Bulk groups: collect pending entities and edits keyed by bulk_id.
+    # Any row with a bulk_id is pulled out of the flat per-type sections
+    # and rendered as a single collapsible bundle.
+    bulk_groups: dict[UUID, _BulkGroupBucket] = {}
+    per_type_lists: list[tuple[list[PendingAuditEntity], str]] = [
+        (cast(list[PendingAuditEntity], pending_pins_list), "pin"),
+        (cast(list[PendingAuditEntity], pending_shops_list), "shop"),
+        (cast(list[PendingAuditEntity], pending_artists_list), "artist"),
+        (cast(list[PendingAuditEntity], pending_tags_list), "tag"),
+        (cast(list[PendingAuditEntity], pending_pin_sets_list), "pin_set"),
+    ]
+    for pending_list, entity_type_slug in per_type_lists:
+        for entity in list(pending_list):
+            entity_bulk_id: UUID | None = getattr(entity, "bulk_id", None)
+            if entity_bulk_id is None:
+                continue
+            bucket = bulk_groups.setdefault(entity_bulk_id, _BulkGroupBucket())
+            bucket.entities.append((entity_type_slug, entity))
+            pending_list.remove(entity)
+
+    for (table_name, entity_id), chain in list(edit_groups.items()):
+        bulk_ids_in_chain = {edit.bulk_id for edit in chain if edit.bulk_id}
+        if not bulk_ids_in_chain:
+            continue
+        # An entity's chain belongs to a bulk only if every pending edit on
+        # it shares the bulk_id. Otherwise leave it in the per-entity list.
+        if len(bulk_ids_in_chain) != 1 or any(edit.bulk_id is None for edit in chain):
+            continue
+        bulk_id_val = next(iter(bulk_ids_in_chain))
+        bucket = bulk_groups.setdefault(bulk_id_val, _BulkGroupBucket())
+        bucket.edits.append(((table_name, entity_id), chain))
+        edit_groups.pop((table_name, entity_id))
+
+    for edit in pending_edits:
+        if edit.created_by_id is not None:
+            creator_ids.add(edit.created_by_id)
+
+    # Resolve entity names for each edit group
+    group_entities: dict[tuple[str, int], PendingAuditEntity] = {}
+    pending_opts: Any = {"include_pending": True}
+    for (table_name, entity_id), _edits in edit_groups.items():
+        entity_type = EntityType.from_table_name(table_name)
+        if entity_type is None:
+            continue
+        entity = await session.get(
+            entity_type.model, entity_id, execution_options=pending_opts
+        )
+        if entity is not None:
+            group_entities[(table_name, entity_id)] = cast(PendingAuditEntity, entity)
+
+    creators: dict[int, User] = {}
+    if creator_ids:
+        creators = {
+            u.id: u
+            for u in (
+                await session.scalars(select(User).where(User.id.in_(creator_ids)))
+            ).all()
+        }
+
+    bulk_view_groups: list[BulkGroupView] = [
+        BulkGroupView(
+            bulk_id=bulk_id_val,
+            entities=bucket.entities,
+            edits=bucket.edits,
+            edit_entities={
+                (table_name, entity_id): group_entities[(table_name, entity_id)]
+                for ((table_name, entity_id), _chain) in bucket.edits
+                if (table_name, entity_id) in group_entities
+            },
+        )
+        for bulk_id_val, bucket in bulk_groups.items()
+    ]
+
+    return {
+        "pending_pins": pending_pins_list,
+        "pending_shops": pending_shops_list,
+        "pending_artists": pending_artists_list,
+        "pending_tags": pending_tags_list,
+        "pending_pin_sets": pending_pin_sets_list,
+        "creators": creators,
+        "edit_groups": edit_groups,
+        "edit_group_entities": group_entities,
+        "bulk_groups": bulk_view_groups,
+    }
+
+
 @router.get("")
 async def get_pending_queue(request: Request) -> HTMLResponse:
     async with async_session_maker() as session:
-        opts: dict[str, bool] = {"include_pending": True}
+        view = await _collect_pending_view(session)
+    return HTMLResponse(content=str(pending_page(request=request, **view)))
 
-        pending_pins = (
-            await session.scalars(
-                select(Pin)
-                .where(
-                    Pin.approved_at.is_(None),
-                    Pin.rejected_at.is_(None),
-                    Pin.deleted_at.is_(None),
-                )
-                .options(
-                    selectinload(Pin.shops),
-                    selectinload(Pin.artists),
-                    selectinload(Pin.tags),
-                )
-                .execution_options(**opts)  # type: ignore[arg-type]
-            )
-        ).all()
-        pending_shops = (
-            await session.scalars(
-                select(Shop)
-                .where(
-                    Shop.approved_at.is_(None),
-                    Shop.rejected_at.is_(None),
-                    Shop.deleted_at.is_(None),
-                )
-                .execution_options(**opts)  # type: ignore[arg-type]
-            )
-        ).all()
-        pending_artists = (
-            await session.scalars(
-                select(Artist)
-                .where(
-                    Artist.approved_at.is_(None),
-                    Artist.rejected_at.is_(None),
-                    Artist.deleted_at.is_(None),
-                )
-                .execution_options(**opts)  # type: ignore[arg-type]
-            )
-        ).all()
-        pending_tags = (
-            await session.scalars(
-                select(Tag)
-                .where(
-                    Tag.approved_at.is_(None),
-                    Tag.rejected_at.is_(None),
-                    Tag.deleted_at.is_(None),
-                )
-                .execution_options(**opts)  # type: ignore[arg-type]
-            )
-        ).all()
-        pending_pin_sets = (
-            await session.scalars(
-                select(PinSet)
-                .where(
-                    PinSet.approved_at.is_(None),
-                    PinSet.rejected_at.is_(None),
-                    PinSet.deleted_at.is_(None),
-                )
-                .execution_options(**opts)  # type: ignore[arg-type]
-            )
-        ).all()
 
-        pending_pins_list: list[Pin] = list(pending_pins)
-        pending_shops_list: list[Shop] = list(pending_shops)
-        pending_artists_list: list[Artist] = list(pending_artists)
-        pending_tags_list: list[Tag] = list(pending_tags)
-        pending_pin_sets_list: list[PinSet] = list(pending_pin_sets)
+async def _pending_action_response(
+    request: Request,
+) -> Response:
+    """Response after an approve/reject/delete post.
 
-        creator_ids: set[int] = {
-            e.created_by_id
-            for group in [
-                pending_pins_list,
-                pending_shops_list,
-                pending_artists_list,
-                pending_tags_list,
-                pending_pin_sets_list,
-            ]
-            for e in group
-            if e.created_by_id is not None
-        }
-
-        # Pending edits: group by (entity_type, entity_id)
-        pending_edits = (
-            await session.scalars(
-                select(PendingEdit)
-                .where(
-                    PendingEdit.approved_at.is_(None),
-                    PendingEdit.rejected_at.is_(None),
-                )
-                .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
-            )
-        ).all()
-
-        edit_groups: dict[tuple[str, int], list[PendingEdit]] = {}
-        for edit in pending_edits:
-            edit_groups.setdefault((edit.entity_type, edit.entity_id), []).append(edit)
-
-        # Bulk groups: collect pending entities and edits keyed by bulk_id.
-        # Any row with a bulk_id is pulled out of the flat per-type sections
-        # and rendered as a single collapsible bundle.
-        bulk_groups: dict[UUID, _BulkGroupBucket] = {}
-        per_type_lists: list[tuple[list[PendingAuditEntity], str]] = [
-            (cast(list[PendingAuditEntity], pending_pins_list), "pin"),
-            (cast(list[PendingAuditEntity], pending_shops_list), "shop"),
-            (cast(list[PendingAuditEntity], pending_artists_list), "artist"),
-            (cast(list[PendingAuditEntity], pending_tags_list), "tag"),
-            (cast(list[PendingAuditEntity], pending_pin_sets_list), "pin_set"),
-        ]
-        for pending_list, entity_type_slug in per_type_lists:
-            for entity in list(pending_list):
-                entity_bulk_id: UUID | None = getattr(entity, "bulk_id", None)
-                if entity_bulk_id is None:
-                    continue
-                bucket = bulk_groups.setdefault(entity_bulk_id, _BulkGroupBucket())
-                bucket.entities.append((entity_type_slug, entity))
-                pending_list.remove(entity)
-
-        for (table_name, entity_id), chain in list(edit_groups.items()):
-            bulk_ids_in_chain = {edit.bulk_id for edit in chain if edit.bulk_id}
-            if not bulk_ids_in_chain:
-                continue
-            # An entity's chain belongs to a bulk only if every pending edit on
-            # it shares the bulk_id. Otherwise leave it in the per-entity list.
-            if len(bulk_ids_in_chain) != 1 or any(
-                edit.bulk_id is None for edit in chain
-            ):
-                continue
-            bulk_id_val = next(iter(bulk_ids_in_chain))
-            bucket = bulk_groups.setdefault(bulk_id_val, _BulkGroupBucket())
-            bucket.edits.append(((table_name, entity_id), chain))
-            edit_groups.pop((table_name, entity_id))
-
-        for edit in pending_edits:
-            if edit.created_by_id is not None:
-                creator_ids.add(edit.created_by_id)
-
-        # Resolve entity names for each edit group
-        group_entities: dict[tuple[str, int], PendingAuditEntity] = {}
-        pending_opts: Any = {"include_pending": True}
-        for (table_name, entity_id), _edits in edit_groups.items():
-            entity_type = EntityType.from_table_name(table_name)
-            if entity_type is None:
-                continue
-            entity = await session.get(
-                entity_type.model, entity_id, execution_options=pending_opts
-            )
-            if entity is not None:
-                group_entities[(table_name, entity_id)] = cast(
-                    PendingAuditEntity, entity
-                )
-
-        creators: dict[int, User] = {}
-        if creator_ids:
-            creators = {
-                u.id: u
-                for u in (
-                    await session.scalars(select(User).where(User.id.in_(creator_ids)))
-                ).all()
-            }
-
-        bulk_view_groups: list[BulkGroupView] = [
-            BulkGroupView(
-                bulk_id=bulk_id_val,
-                entities=bucket.entities,
-                edits=bucket.edits,
-                edit_entities={
-                    (table_name, entity_id): group_entities[(table_name, entity_id)]
-                    for ((table_name, entity_id), _chain) in bucket.edits
-                    if (table_name, entity_id) in group_entities
-                },
-            )
-            for bulk_id_val, bucket in bulk_groups.items()
-        ]
-
-        return HTMLResponse(
-            content=str(
-                pending_page(
-                    request=request,
-                    pending_pins=pending_pins_list,
-                    pending_shops=pending_shops_list,
-                    pending_artists=pending_artists_list,
-                    pending_tags=pending_tags_list,
-                    pending_pin_sets=pending_pin_sets_list,
-                    creators=creators,
-                    edit_groups=edit_groups,
-                    edit_group_entities=group_entities,
-                    bulk_groups=bulk_view_groups,
-                )
-            )
-        )
+    HTMX callers get a fresh ``#pending-content`` fragment swapped in place, so
+    the queue (including cascaded rows and count badges) updates without a
+    full-page navigation and the scroll position is preserved. No-JS callers
+    get a 303 back to the full page.
+    """
+    if request.headers.get("HX-Request"):
+        async with async_session_maker() as session:
+            view = await _collect_pending_view(session)
+        return HTMLResponse(content=str(pending_content(**view)))
+    return RedirectResponse(url="/admin/pending", status_code=303)
 
 
 @router.post("/approve/{entity_type}/{entity_id}")
 async def approve_entity(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     async with async_session_maker.begin() as session:
         entity = await _get_pending_entity(session, entity_type, entity_id)
@@ -358,15 +381,16 @@ async def approve_entity(
     else:
         await sync_entity(entity_type, entity_id)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/reject/{entity_type}/{entity_id}")
 async def reject_entity(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     async with async_session_maker.begin() as session:
         entity = await _get_pending_entity(session, entity_type, entity_id)
@@ -376,15 +400,16 @@ async def reject_entity(
 
     await delete_one(entity_type, entity_id)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/delete/{entity_type}/{entity_id}")
 async def delete_pending_entity(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     async with async_session_maker.begin() as session:
         entity = await _get_pending_entity(session, entity_type, entity_id)
@@ -394,7 +419,7 @@ async def delete_pending_entity(
 
     await delete_one(entity_type, entity_id)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 # ---------------------------------------------------------------------------
@@ -404,10 +429,11 @@ async def delete_pending_entity(
 
 @router.post("/approve-edits/{entity_type}/{entity_id}")
 async def approve_pending_edits(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     table_name = entity_type.table_name
     async with async_session_maker.begin() as session:
@@ -416,36 +442,36 @@ async def approve_pending_edits(
             raise HTTPException(status_code=404, detail="Entity not found")
 
         chain = await get_edit_chain(session, table_name, entity_id)
-        if not chain:
-            return RedirectResponse(url="/admin/pending", status_code=303)
+        if chain:
+            effective = get_effective_snapshot(entity, chain)
+            await apply_snapshot_to_entity(entity, effective, session)
 
-        effective = get_effective_snapshot(entity, chain)
-        await apply_snapshot_to_entity(entity, effective, session)
+            for edit in chain:
+                edit.approved_at = now
+                edit.approved_by_id = current_user.id
 
-        for edit in chain:
-            edit.approved_at = now
-            edit.approved_by_id = current_user.id
+            # Cascade pending deps when approving a pin edit (same as pin approval)
+            if isinstance(entity, Pin):
+                _approve_with_cascade(
+                    cast(PendingAuditEntity, entity), current_user.id, now
+                )
 
-        # Cascade pending deps when approving a pin edit (same as pin approval)
-        if isinstance(entity, Pin):
-            _approve_with_cascade(
-                cast(PendingAuditEntity, entity), current_user.id, now
-            )
+    if chain:
+        if entity_type == EntityType.pin:
+            await sync_pin_with_deps(entity_id)
+        else:
+            await sync_entity(entity_type, entity_id)
 
-    if entity_type == EntityType.pin:
-        await sync_pin_with_deps(entity_id)
-    else:
-        await sync_entity(entity_type, entity_id)
-
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/reject-edits/{entity_type}/{entity_id}")
 async def reject_pending_edits(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     table_name = entity_type.table_name
     async with async_session_maker.begin() as session:
@@ -454,21 +480,22 @@ async def reject_pending_edits(
             edit.rejected_at = now
             edit.rejected_by_id = current_user.id
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/delete-edits/{entity_type}/{entity_id}")
 async def delete_pending_edits(
+    request: Request,
     entity_type: EntityType,
     entity_id: int,
-) -> RedirectResponse:
+) -> Response:
     table_name = entity_type.table_name
     async with async_session_maker.begin() as session:
         chain = await get_edit_chain(session, table_name, entity_id)
         for edit in chain:
             await session.delete(edit)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 # ---------------------------------------------------------------------------
@@ -512,9 +539,10 @@ async def _collect_bulk_edits(
 
 @router.post("/approve-bulk/{bulk_id}")
 async def approve_bulk(
+    request: Request,
     bulk_id: UUID,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     to_sync: set[tuple[EntityType, int]] = set()
 
@@ -557,14 +585,15 @@ async def approve_bulk(
         else:
             await sync_entity(et, eid)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/reject-bulk/{bulk_id}")
 async def reject_bulk(
+    request: Request,
     bulk_id: UUID,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     to_delete: list[tuple[EntityType, int]] = []
 
@@ -586,14 +615,15 @@ async def reject_bulk(
     for et, eid in to_delete:
         await delete_one(et, eid)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)
 
 
 @router.post("/delete-bulk/{bulk_id}")
 async def delete_bulk(
+    request: Request,
     bulk_id: UUID,
     current_user: User = Depends(require_admin),
-) -> RedirectResponse:
+) -> Response:
     now = utc_now()
     async with async_session_maker.begin() as session:
         to_delete: list[tuple[EntityType, int]] = []
@@ -613,4 +643,4 @@ async def delete_bulk(
     for et, eid in to_delete:
         await delete_one(et, eid)
 
-    return RedirectResponse(url="/admin/pending", status_code=303)
+    return await _pending_action_response(request)

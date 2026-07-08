@@ -43,8 +43,20 @@
         window.pindbNotyf.error(msg);
       }
     });
+    function formatLocalTimes(root) {
+      (root || document)
+        .querySelectorAll("time[data-localtime]")
+        .forEach(function (el) {
+          var iso = el.getAttribute("datetime");
+          if (!iso) return;
+          try {
+            el.textContent = new Date(iso).toLocaleDateString();
+          } catch {}
+        });
+    }
     document.body.addEventListener("htmx:afterSwap", function (evt) {
       lucide.createIcons();
+      formatLocalTimes(evt.detail.target);
       var target = evt.detail.target;
       if (!target || target.id !== "pindb-toast-host") {
         return;
@@ -91,13 +103,7 @@
       card.style.removeProperty("--rx");
       card.style.removeProperty("--ry");
     });
-    document.querySelectorAll("time[data-localtime]").forEach(function (el) {
-      var iso = el.getAttribute("datetime");
-      if (!iso) return;
-      try {
-        el.textContent = new Date(iso).toLocaleDateString();
-      } catch {}
-    });
+    formatLocalTimes(document);
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", pindbAfterVendorScripts);

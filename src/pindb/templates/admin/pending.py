@@ -29,8 +29,7 @@ def _local_date(dt: datetime | None) -> Element | str:
     return time_el(datetime=dt.isoformat() + "Z", data_localtime=True)["…"]
 
 
-def pending_page(
-    request: Request,
+def pending_content(
     pending_pins: list[Pin],
     pending_shops: list[Shop],
     pending_artists: list[Artist],
@@ -41,6 +40,13 @@ def pending_page(
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity] | None = None,
     bulk_groups: list[BulkGroupView] | None = None,
 ) -> Element:
+    """The swappable region of the pending queue.
+
+    Action buttons ``hx-post`` and swap ``#pending-content`` with a fresh copy
+    of this fragment, so a single approve/reject/delete updates every section
+    (including cascaded dependency rows) and the count badges in place — no
+    full-page navigation, so the scroll position is preserved.
+    """
     edit_groups = edit_groups or {}
     edit_group_entities = edit_group_entities or {}
     bulk_groups = bulk_groups or []
@@ -54,35 +60,60 @@ def pending_page(
         + len(bulk_groups)
     )
 
+    return div(id="pending-content", class_="flex flex-col gap-2")[
+        div(class_="flex items-baseline gap-3")[
+            page_heading(icon="clock", text="Pending Approvals"),
+            span(
+                class_="text-xs font-semibold px-2 py-0.5 rounded bg-pending-dark-hover text-pending-main-hover"
+            )[str(total)],
+        ],
+        p(class_="text-lightest-hover text-sm")[
+            "Review and approve or reject pending entries submitted by editors. "
+            "Approving a pin also approves its pending dependencies (shops, artists, tags)."
+        ],
+        *_sections(
+            pending_pins=pending_pins,
+            pending_shops=pending_shops,
+            pending_artists=pending_artists,
+            pending_tags=pending_tags,
+            pending_pin_sets=pending_pin_sets,
+            creators=creators,
+            edit_groups=edit_groups,
+            edit_group_entities=edit_group_entities,
+            bulk_groups=bulk_groups,
+            local_date_formatter=_local_date,
+            bulk_groups_section=_bulk_groups_section,
+        ),
+    ]
+
+
+def pending_page(
+    request: Request,
+    pending_pins: list[Pin],
+    pending_shops: list[Shop],
+    pending_artists: list[Artist],
+    pending_tags: list[Tag],
+    pending_pin_sets: list[PinSet],
+    creators: dict[int, User],
+    edit_groups: dict[tuple[str, int], list[PendingEdit]] | None = None,
+    edit_group_entities: dict[tuple[str, int], PendingAuditEntity] | None = None,
+    bulk_groups: list[BulkGroupView] | None = None,
+) -> Element:
     return html_base(
         title="Pending Approvals",
         request=request,
         body_content=centered_div(
-            content=[
-                div(class_="flex items-baseline gap-3")[
-                    page_heading(icon="clock", text="Pending Approvals"),
-                    span(
-                        class_="text-xs font-semibold px-2 py-0.5 rounded bg-pending-dark-hover text-pending-main-hover"
-                    )[str(total)],
-                ],
-                p(class_="text-lightest-hover text-sm")[
-                    "Review and approve or reject pending entries submitted by editors. "
-                    "Approving a pin also approves its pending dependencies (shops, artists, tags)."
-                ],
-                *_sections(
-                    pending_pins=pending_pins,
-                    pending_shops=pending_shops,
-                    pending_artists=pending_artists,
-                    pending_tags=pending_tags,
-                    pending_pin_sets=pending_pin_sets,
-                    creators=creators,
-                    edit_groups=edit_groups,
-                    edit_group_entities=edit_group_entities,
-                    bulk_groups=bulk_groups,
-                    local_date_formatter=_local_date,
-                    bulk_groups_section=_bulk_groups_section,
-                ),
-            ],
+            content=pending_content(
+                pending_pins=pending_pins,
+                pending_shops=pending_shops,
+                pending_artists=pending_artists,
+                pending_tags=pending_tags,
+                pending_pin_sets=pending_pin_sets,
+                creators=creators,
+                edit_groups=edit_groups,
+                edit_group_entities=edit_group_entities,
+                bulk_groups=bulk_groups,
+            ),
             flex=True,
             col=True,
         ),

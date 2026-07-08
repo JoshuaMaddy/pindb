@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e._pages import submit_content_form
+from tests.e2e._pages import submit_content_form, submit_pending_action
 
 
 @pytest.mark.slow
@@ -28,10 +28,10 @@ def test_editor_pending_edit_approved_by_admin(
 
     admin_page.goto(f"{live_server}/admin/pending")
     expect(admin_page.get_by_text("Target Shop")).to_be_visible()
-    admin_page.locator(
-        "form[action*='/admin/pending/approve-edits/shop/']"
-    ).first.locator("button[type='submit']").click()
-    admin_page.wait_for_load_state("load")
+    submit_pending_action(
+        admin_page,
+        admin_page.locator("form[action*='/admin/pending/approve-edits/shop/']").first,
+    )
 
     admin_page.goto(f"{live_server}/list/shops")
     expect(admin_page.get_by_text("Target Shop (Renamed)")).to_be_visible()

@@ -43,6 +43,25 @@ def submit_content_form(page: Page, *, wait_for_navigation: bool = True) -> None
         _do_click()
 
 
+def submit_pending_action(page: Page, form: Locator) -> None:
+    """Submit a pending-queue action form and wait for its POST to complete.
+
+    Pending-queue action buttons post via ``hx-post`` and swap
+    ``#pending-content`` in place — no navigation happens, so
+    ``wait_for_load_state("load")`` resolves immediately and races the request
+    (DB asserts then read pre-action state). Waiting on the POST response
+    guarantees the server transaction committed; DOM assertions afterwards
+    rely on Playwright's auto-retrying ``expect()`` to see the swapped
+    fragment.
+    """
+    with page.expect_response(
+        lambda response: (
+            response.request.method == "POST" and "/admin/pending/" in response.url
+        )
+    ):
+        form.locator("button[type='submit']").click()
+
+
 def set_markdown_field(page: Page, name: str, value: str) -> None:
     """Set the value of a ``markdown_editor`` hidden input by name.
 
@@ -172,44 +191,44 @@ class PendingQueuePage(_PageBase):
 
     def approve_entity(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(f"form[action*='/admin/pending/approve/{entity_type}/']").locator(
-            "button[type='submit']"
-        ).click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/approve/{entity_type}/']"),
+        )
 
     def reject_entity(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(f"form[action*='/admin/pending/reject/{entity_type}/']").locator(
-            "button[type='submit']"
-        ).click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/reject/{entity_type}/']"),
+        )
 
     def delete_entity(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(f"form[action*='/admin/pending/delete/{entity_type}/']").locator(
-            "button[type='submit']"
-        ).click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/delete/{entity_type}/']"),
+        )
 
     # Action buttons (pending edits)
 
     def approve_edits(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(
-            f"form[action*='/admin/pending/approve-edits/{entity_type}/']"
-        ).locator("button[type='submit']").click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/approve-edits/{entity_type}/']"),
+        )
 
     def reject_edits(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(
-            f"form[action*='/admin/pending/reject-edits/{entity_type}/']"
-        ).locator("button[type='submit']").click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/reject-edits/{entity_type}/']"),
+        )
 
     def delete_edits(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
-        row.locator(
-            f"form[action*='/admin/pending/delete-edits/{entity_type}/']"
-        ).locator("button[type='submit']").click()
-        self._settle()
+        submit_pending_action(
+            self.page,
+            row.locator(f"form[action*='/admin/pending/delete-edits/{entity_type}/']"),
+        )

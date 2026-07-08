@@ -124,3 +124,107 @@ class TestAdditionalOauthRoutes:
         )
         response = anon_client.get("/auth/discord/callback", follow_redirects=False)
         assert response.status_code == 404
+
+
+@pytest.mark.integration
+class TestDocsRoutes:
+    def test_docs_index_returns_200(self, anon_client):
+        response = anon_client.get("/docs")
+        assert response.status_code == 200
+        assert "<html" in response.text.lower()
+
+    def test_docs_section_redirects_to_first_page(self, anon_client):
+        docs_module = importlib.import_module("pindb.routes.docs")
+        sections = docs_module._SECTIONS
+        assert sections, "expected at least one docs section on disk"
+        section_key = next(iter(sections))
+
+        response = anon_client.get(f"/docs/{section_key}", follow_redirects=False)
+        assert response.status_code == 302
+        assert response.headers["location"].startswith(f"/docs/{section_key}/")
+
+        page = anon_client.get(response.headers["location"])
+        assert page.status_code == 200
+
+    def test_unknown_section_returns_404(self, anon_client):
+        response = anon_client.get("/docs/not-a-section", follow_redirects=False)
+        assert response.status_code == 404
+
+    def test_unknown_page_returns_404(self, anon_client):
+        docs_module = importlib.import_module("pindb.routes.docs")
+        section_key = next(iter(docs_module._SECTIONS))
+        response = anon_client.get(f"/docs/{section_key}/not-a-real-page")
+        assert response.status_code == 404
+
+
+@pytest.mark.integration
+class TestTagRelationsRoute:
+    def test_relations_render_implications(self, anon_client, db_session, admin_user):
+        implied = TagFactory(
+            name="relations_implied", approved=True, created_by=admin_user
+        )
+        selected = TagFactory(
+            name="relations_selected", approved=True, created_by=admin_user
+        )
+        selected.implications.add(implied)  # ty:ignore[unresolved-attribute]
+        db_session.flush()
+
+        response = anon_client.get(
+            f"/get/tag/{selected.id}/relations/implications"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert "relations_implied" in response.text
+
+    def test_invalid_direction_returns_empty(self, anon_client, db_session, admin_user):
+        tag = TagFactory(name="relations_dir", approved=True, created_by=admin_user)
+        response = anon_client.get(
+            f"/get/tag/{tag.id}/relations/sideways"  # ty:ignore[unresolved-attribute]
+        )
+        assert response.status_code == 200
+        assert response.text == ""
+
+    def test_unknown_tag_returns_empty(self, anon_client):
+        response = anon_client.get("/get/tag/9999999/relations/implications")
+        assert response.status_code == 200
+        assert response.text == ""
+
+
+@pytest.mark.integration
+class TestSecurityPage:
+    def test_requires_auth(self, anon_client):
+        response = anon_client.get("/user/me/security")
+        assert response.status_code == 401
+
+    def test_renders_for_authenticated_user(self, auth_client):
+        response = auth_client.get("/user/me/security")
+        assert response.status_code == 200
+        assert "<html" in response.text.lower()
+
+
+@pytest.mark.integration
+class TestEntityOptionsAuth:
+    """/get/options reads pending entities straight from Meili — editor-gated."""
+
+    async def _fake_options(self, *, index, query):
+        return [{"value": "1", "label": "Opt One"}]
+
+    def test_guest_rejected(self, anon_client):
+        response = anon_client.get("/get/options/shop")
+        assert response.status_code == 401
+
+    def test_regular_user_rejected(self, auth_client):
+        response = auth_client.get("/get/options/shop")
+        assert response.status_code == 403
+
+    def test_editor_allowed(self, editor_client, monkeypatch):
+        monkeypatch.setattr(
+            "pindb.routes.get.options.search_entity_options",
+            self._fake_options,
+        )
+        response = editor_client.get("/get/options/shop")
+        assert response.status_code == 200
+        assert response.json() == [{"value": "1", "label": "Opt One"}]
+
+    def test_unknown_entity_type_is_422(self, editor_client):
+        response = editor_client.get("/get/options/currency")
+        assert response.status_code == 422

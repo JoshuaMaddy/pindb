@@ -11,6 +11,7 @@ from sqlalchemy import (
     Computed,
     ForeignKey,
     Index,
+    Text,
     UniqueConstraint,
     delete,
     insert,
@@ -125,6 +126,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
     name: Mapped[str] = mapped_column()
     normalized_name: Mapped[str] = mapped_column(
+        Text,
         Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
         init=False,
     )

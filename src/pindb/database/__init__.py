@@ -21,6 +21,12 @@ from pindb.database.currency import Currency
 from pindb.database.entity_type import EntityType
 from pindb.database.grade import Grade
 from pindb.database.link import Link
+from pindb.database.message import (
+    Message,
+    MessageAudience,
+    MessageCategory,
+    MessageReceipt,
+)
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingMixin
 from pindb.database.pin import Pin
@@ -49,6 +55,10 @@ __all__: list[str] = [
     "Currency",
     "Grade",
     "Link",
+    "Message",
+    "MessageAudience",
+    "MessageCategory",
+    "MessageReceipt",
     "PendingEdit",
     "Pin",
     "PinSet",

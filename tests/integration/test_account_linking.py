@@ -103,6 +103,26 @@ class TestUnlinkProvider:
         ).first()
         assert remaining is None
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_unlink_unknown_provider_returns_404(
+        self, auth_client_as_subject, subject_user
+    ):
+        response = auth_client_as_subject.post(
+            "/user/me/unlink/facebook", follow_redirects=False
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_unlink_provider_that_is_not_linked_shows_error(
+        self, auth_client_as_subject, subject_user
+    ):
+        response = auth_client_as_subject.post(
+            "/user/me/unlink/google", follow_redirects=False
+        )
+        # _render() re-renders the security page with status 400 on errors.
+        assert response.status_code == 400
+        assert "No google account is linked." in response.text
+
     def test_unlink_refuses_when_it_leaves_no_login(
         self, client, db_session, seed_currencies
     ):

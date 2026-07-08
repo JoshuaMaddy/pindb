@@ -43,6 +43,21 @@ class TestBulkImageUpload:
         assert "guid" in data
         assert len(data["guid"]) == 36
 
+    def test_oversized_upload_rejected_413(self, admin_client):
+        oversized = b"\x89PNG\r\n\x1a\n" + b"\x00" * (20 * 1024 * 1024 + 1)
+        response = admin_client.post(
+            "/bulk/pin/image",
+            files={"image": ("huge.png", oversized, "image/png")},
+        )
+        assert response.status_code == 413
+
+    def test_non_image_bytes_rejected_422(self, admin_client):
+        response = admin_client.post(
+            "/bulk/pin/image",
+            files={"image": ("bad.png", b"this is not an image", "image/png")},
+        )
+        assert response.status_code == 422
+
 
 @pytest.mark.integration
 class TestBulkPinsCreate:

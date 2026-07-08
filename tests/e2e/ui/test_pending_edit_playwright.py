@@ -7,7 +7,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
-from tests.e2e._pages import submit_content_form
+from tests.e2e._pages import submit_content_form, submit_pending_action
 
 
 @pytest.mark.slow
@@ -92,10 +92,12 @@ class TestPendingEditReject:
         editor_page.wait_for_load_state("load")
 
         admin_page.goto(f"{live_server}/admin/pending")
-        admin_page.locator(
-            "form[action*='/admin/pending/reject-edits/shop/']"
-        ).first.locator("button[type='submit']").click()
-        admin_page.wait_for_load_state("load")
+        submit_pending_action(
+            admin_page,
+            admin_page.locator(
+                "form[action*='/admin/pending/reject-edits/shop/']"
+            ).first,
+        )
 
         admin_page.goto(f"{live_server}/list/shops")
         expect(admin_page.get_by_text("RejectMe")).to_be_visible()

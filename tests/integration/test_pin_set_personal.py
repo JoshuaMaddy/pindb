@@ -71,6 +71,13 @@ class TestPersonalSetCrud:
         )
         assert response.status_code == 403
 
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_delete_unknown_set_returns_404(self, auth_client_as_subject, subject_user):
+        response = auth_client_as_subject.post(
+            "/user/sets/9999999/delete", follow_redirects=False
+        )
+        assert response.status_code == 404
+
 
 @pytest.mark.integration
 class TestPersonalSetMembership:

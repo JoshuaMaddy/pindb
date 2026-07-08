@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from rich.repr import Result
-from sqlalchemy import Computed, ForeignKey, Index, and_
+from sqlalchemy import Computed, ForeignKey, Index, Text, and_
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -65,6 +65,7 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
     # Required Attributes
     name: Mapped[str]
     normalized_name: Mapped[str] = mapped_column(
+        Text,
         Computed("replace(lower(btrim(name)), ' ', '_')", persisted=True),
         init=False,
     )

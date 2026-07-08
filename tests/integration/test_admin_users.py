@@ -108,3 +108,47 @@ class TestMissingUser:
             "/admin/users/9999999/promote", follow_redirects=False
         )
         assert response.status_code == 404
+
+
+@pytest.mark.integration
+class TestAdminDeleteAccount:
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_admin_erases_other_user(self, admin_client, db_session, subject_user):
+        user_id: int = subject_user.id
+        response = admin_client.post(
+            f"/admin/users/{user_id}/delete-account", follow_redirects=False
+        )
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/admin/users"
+
+        db_session.expire_all()
+        assert db_session.get(User, user_id) is None
+
+    def test_admin_cannot_delete_own_account(
+        self, admin_client, admin_user, db_session
+    ):
+        response = admin_client.post(
+            f"/admin/users/{admin_user.id}/delete-account", follow_redirects=False
+        )
+        assert response.status_code == 400
+
+        db_session.expire_all()
+        assert db_session.get(User, admin_user.id) is not None
+
+    def test_unknown_user_returns_404(self, admin_client):
+        response = admin_client.post(
+            "/admin/users/9999999/delete-account", follow_redirects=False
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
+    def test_non_admin_rejected(
+        self, auth_client_as_subject, subject_user, db_session, admin_user
+    ):
+        response = auth_client_as_subject.post(
+            f"/admin/users/{admin_user.id}/delete-account", follow_redirects=False
+        )
+        assert response.status_code == 403
+
+        db_session.expire_all()
+        assert db_session.get(User, admin_user.id) is not None
