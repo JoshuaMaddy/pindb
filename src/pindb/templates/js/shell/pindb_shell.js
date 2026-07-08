@@ -56,7 +56,12 @@
     }
     document.body.addEventListener("htmx:afterSwap", function (evt) {
       lucide.createIcons();
-      formatLocalTimes(evt.detail.target);
+      // Scan the whole document rather than evt.detail.target: outerHTML swaps
+      // (e.g. the #pending-content queue) replace the target element, so
+      // evt.detail.target points at the old, detached node and misses the
+      // freshly swapped-in <time data-localtime> placeholders. Reformatting is
+      // idempotent, so re-scanning already-formatted times is harmless.
+      formatLocalTimes(document);
       var target = evt.detail.target;
       if (!target || target.id !== "pindb-toast-host") {
         return;
