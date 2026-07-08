@@ -30,6 +30,11 @@ from pindb.templates.admin._pending_shared import (
 from pindb.templates.admin.pending_bulk import BulkGroupView
 from pindb.templates.admin.pending_edits import _edit_groups_section
 
+# Shared column widths so every per-entity section (pins, shops, artists, tags,
+# pin sets) lines its columns up vertically. ``None`` = flexible (Name absorbs
+# the remaining width). Order matches the columns list in ``_entity_section``.
+_ENTITY_COL_WIDTHS: tuple[str | None, ...] = (None, "9rem", "8rem", "16rem")
+
 
 def _sections(
     *,
@@ -114,6 +119,7 @@ def _entity_section(
         section_header(icon=icon, title=label, count=len(items)),
         pending_table(
             columns=["Name", "Submitted by", "Submitted at", "Actions"],
+            col_widths=_ENTITY_COL_WIDTHS,
             rows=[
                 _entity_row(
                     entity_type=entity_type,

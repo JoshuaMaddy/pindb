@@ -7,7 +7,22 @@ sections; defining them once keeps styling and action wiring in sync.
 
 from collections.abc import Sequence
 
-from htpy import Element, button, div, form, h2, i, span, table, tbody, th, thead, tr
+from htpy import (
+    Element,
+    button,
+    col,
+    colgroup,
+    div,
+    form,
+    h2,
+    i,
+    span,
+    table,
+    tbody,
+    th,
+    thead,
+    tr,
+)
 
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 
@@ -65,11 +80,31 @@ def section_header(*, icon: str, title: str, count: int) -> Element:
     ]
 
 
-def pending_table(*, columns: Sequence[str], rows: Sequence[Element]) -> Element:
+def pending_table(
+    *,
+    columns: Sequence[str],
+    rows: Sequence[Element],
+    col_widths: Sequence[str | None] | None = None,
+) -> Element:
     """Scroll-wrapped table; every column but the last gets right padding, and
-    the last column (Actions) is flush, matching the original markup."""
+    the last column (Actions) is flush, matching the original markup.
+
+    When ``col_widths`` is given (one entry per column, ``None`` = flexible), the
+    table switches to a fixed layout with a ``<colgroup>`` so that separate
+    tables sharing the same widths line their columns up vertically. Used by the
+    per-entity pending sections (pins/shops/artists/tags/pin sets) so their
+    Name/Submitted-by/Submitted-at/Actions columns align across sections.
+    """
+    table_class = "w-full text-sm"
+    colgroup_el: Element | str = ""
+    if col_widths is not None:
+        table_class = "w-full min-w-[45rem] table-fixed text-sm"
+        colgroup_el = colgroup[
+            [col(style=f"width:{w}") if w else col for w in col_widths]
+        ]
     return div(class_=TABLE_LIST_SCROLL)[
-        table(class_="w-full text-sm")[
+        table(class_=table_class)[
+            colgroup_el,
             thead[
                 tr(class_="text-left text-lightest-hover border-b border-darker")[
                     [

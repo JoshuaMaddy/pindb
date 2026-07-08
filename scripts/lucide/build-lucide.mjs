@@ -20,6 +20,9 @@ const SCAN_ROOTS = [join(ROOT, "src/pindb")];
  */
 const EXTRA_KEBAB = new Set([
   "tag",
+  /* pending approve button: icon comes from _ACTION_SPECS as data_lucide=<var>,
+     so the scanner never sees "check" as a literal */
+  "check",
   "copyright",
   "user",
   "paw-print",
