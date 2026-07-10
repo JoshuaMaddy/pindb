@@ -46,6 +46,10 @@
   --color-pending-dark-hover: hsl(38deg, 52%, 34%);
   --color-pending-main: hsl(38deg, 78%, 58%);
   --color-pending-main-hover: hsl(38deg, 82%, 65%);
+  --color-success-dark: hsl(145deg, 52%, 24%);
+  --color-success-dark-hover: hsl(145deg, 52%, 30%);
+  --color-success-main: hsl(145deg, 58%, 44%);
+  --color-success-main-hover: hsl(145deg, 62%, 51%);
 
   /* Tag category badge colors (dark/mocha defaults) */
   --color-tag-general: hsl(220, 9%, 28%);

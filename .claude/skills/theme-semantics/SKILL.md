@@ -13,7 +13,8 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 4. Structural borders (table/grid separators, section dividers, row rules) may use other semantic border colors when needed for hierarchy/legibility.
 5. Use semantic error colors for destructive/error states: `error-dark`, `error-main`, and hover counterparts.
 6. Use semantic pending colors (`pending-dark`, `pending-main`, and hover counterparts) for approvals-queue UX — banners, badges, and notes tied to “pending approval” or “pending edit”, same layering patterns as `error-*` but amber-based.
-7. Do not introduce raw `pin-base-*`, custom mixes, or opacity-based new colors.
+7. Use semantic success colors (`success-dark`, `success-main`, and hover counterparts) for additive/affirmative states — diff additions, confirmations — same layering patterns as `error-*` but green-based.
+8. Do not introduce raw `pin-base-*`, custom mixes, or opacity-based new colors.
 
 ## Semantic Token Intent
 
@@ -28,6 +29,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 - `error-main`: primary destructive text/icon/accent color.
 - `error-main-hover`: hover state for `error-main`.
 - `pending-dark` / `pending-dark-hover` / `pending-main` / `pending-main-hover`: queued-for-approval surfaces and accents (amber ramp; same roles as `error-*`).
+- `success-dark` / `success-dark-hover` / `success-main` / `success-main-hover`: additive/affirmative surfaces and accents (green ramp; same roles as `error-*`). Diff additions pair `text-success-main` with `text-error-main` removals.
 - `darker-hover`, `main-hover`, `lighter-hover`, `lightest-hover`: interactive state versions of the same layer.
 - `tag-*`: category palette tokens for tag/category chips and taxonomy visuals.
 
@@ -52,6 +54,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
   - Emphasis/action text: `text-accent`.
   - Error/destructive text: `text-error-main`.
   - Pending-queue text/accent: `text-pending-main` (and `*-hover` for interactive).
+  - Additive/affirmative text: `text-success-main` (and `*-hover` for interactive).
   - Muted/helper text: `text-lightest-hover`.
   - Interactive text should include `hover:text-*` and generally switch to `accent` for links/actions.
 

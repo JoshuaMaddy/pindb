@@ -4,9 +4,32 @@ htpy fragment builder: `templates/components/display/pending_changes_table.py`.
 
 from collections.abc import Sequence
 
-from htpy import Element, div, i, table, tbody, td, th, thead, tr
+from htpy import Element, Node, div, i, li, table, tbody, td, th, thead, tr, ul
 
 from pindb.database.pending_edit_utils import PendingChange
+
+_CELL: str = "px-4 py-2 whitespace-pre-wrap break-words"
+
+
+def _delta_list(items: Sequence[str], sign: str, class_: str) -> Node:
+    """Render one side of a list-field delta as signed entries, or an em dash."""
+    if not items:
+        return "—"
+    return ul(class_=f"space-y-0.5 {class_}")[[li[f"{sign} {item}"] for item in items]]
+
+
+def _change_row(change: PendingChange) -> Element:
+    if change.is_delta:
+        before: Node = _delta_list(change.removed, "−", "text-error-main")
+        after: Node = _delta_list(change.added, "+", "text-success-main")
+    else:
+        before = change.old
+        after = change.new
+    return tr(class_="border-b border-lightest last:border-0 align-top")[
+        td(class_="px-4 py-2 font-medium text-base-text")[change.label],
+        td(class_=f"{_CELL} text-lightest-hover")[before],
+        td(class_=f"{_CELL} text-base-text")[after],
+    ]
 
 
 def pending_changes_table(changes: Sequence[PendingChange]) -> Element | None:
@@ -33,22 +56,7 @@ def pending_changes_table(changes: Sequence[PendingChange]) -> Element | None:
                         th(class_="px-4 py-2 font-medium")["After"],
                     ]
                 ],
-                tbody[
-                    [
-                        tr(class_="border-b border-lightest last:border-0 align-top")[
-                            td(class_="px-4 py-2 font-medium text-base-text")[
-                                change.label
-                            ],
-                            td(
-                                class_="px-4 py-2 text-lightest-hover whitespace-pre-wrap break-words"
-                            )[change.old],
-                            td(
-                                class_="px-4 py-2 text-base-text whitespace-pre-wrap break-words"
-                            )[change.new],
-                        ]
-                        for change in changes
-                    ]
-                ],
+                tbody[[_change_row(change) for change in changes]],
             ]
         ],
     ]

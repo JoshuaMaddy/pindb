@@ -9,7 +9,7 @@ row.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Sequence
 from uuid import UUID
@@ -212,11 +212,21 @@ async def has_pending_edits(
 
 @dataclass
 class PendingChange:
-    """One field's before/after values, formatted for display."""
+    """One field's change, formatted for display.
+
+    Scalar fields carry ``old``/``new`` text. List-valued fields (tags, shops,
+    links, grades, ...) carry only the delta: ``removed`` and ``added`` entries.
+    """
 
     label: str
-    old: str
-    new: str
+    old: str = ""
+    new: str = ""
+    removed: list[str] = field(default_factory=list)
+    added: list[str] = field(default_factory=list)
+
+    @property
+    def is_delta(self) -> bool:
+        return bool(self.removed or self.added)
 
 
 # Snapshot key -> human label. Insertion order drives the change-table order.
@@ -297,7 +307,11 @@ async def _resolve_change_id_names(
             )
         ).all()
         for row in rows:
-            name_map[(model, row.id)] = getattr(row, "name", None) or f"#{row.id}"
+            name_map[(model, row.id)] = (
+                getattr(row, "display_name", None)
+                or getattr(row, "name", None)
+                or f"#{row.id}"
+            )
     return name_map
 
 
@@ -310,16 +324,7 @@ def _format_grade(grade: dict[str, Any]) -> str:
 def _format_change_value(
     key: str, value: Any, name_map: dict[tuple[Any, int], str]
 ) -> str:
-    """Render a single snapshot value as reviewer-friendly text."""
-    list_model = _CHANGE_ID_LIST_FIELDS.get(key)
-    if list_model is not None:
-        if not value:
-            return "—"
-        return ", ".join(
-            name_map.get((list_model, entity_id), f"#{entity_id}")
-            for entity_id in value
-        )
-
+    """Render a single scalar snapshot value as reviewer-friendly text."""
     scalar_model = _CHANGE_SCALAR_ID_FIELDS.get(key)
     if scalar_model is not None:
         if value is None:
@@ -330,13 +335,36 @@ def _format_change_value(
         return "—"
     if key in _CHANGE_IMAGE_FIELDS:
         return f"{str(value)[:8]}…"
-    if key == "grades":
-        return ", ".join(_format_grade(grade) for grade in value) if value else "—"
     if isinstance(value, bool):
         return "Yes" if value else "No"
-    if isinstance(value, list):
-        return ", ".join(str(item) for item in value) if value else "—"
     return str(value)
+
+
+def _format_change_item(
+    key: str, item: Any, name_map: dict[tuple[Any, int], str]
+) -> str:
+    """Render one element of a list-valued snapshot field."""
+    list_model = _CHANGE_ID_LIST_FIELDS.get(key)
+    if list_model is not None:
+        return name_map.get((list_model, item), f"#{item}")
+    if key == "grades":
+        return _format_grade(item)
+    return str(item)
+
+
+def _list_delta(
+    key: str,
+    old_value: Any,
+    new_value: Any,
+    name_map: dict[tuple[Any, int], str],
+) -> tuple[list[str], list[str]]:
+    """Return ``(removed, added)`` display strings for a list-valued field."""
+    old_items = [_format_change_item(key, item, name_map) for item in old_value or []]
+    new_items = [_format_change_item(key, item, name_map) for item in new_value or []]
+    old_set, new_set = set(old_items), set(new_items)
+    removed = [item for item in old_items if item not in new_set]
+    added = [item for item in new_items if item not in old_set]
+    return removed, added
 
 
 async def build_pending_changes(
@@ -344,21 +372,37 @@ async def build_pending_changes(
     old_snapshot: dict[str, Any],
     new_snapshot: dict[str, Any],
 ) -> list[PendingChange]:
-    """Field-wise before/after rows between two snapshots, ordered for display."""
+    """Field-wise change rows between two snapshots, ordered for display.
+
+    List-valued fields collapse to their added/removed delta; a pure reordering
+    yields no row at all.
+    """
     patch = compute_patch(old_snapshot, new_snapshot)
     if not patch:
         return []
     name_map = await _resolve_change_id_names(session, patch)
     ordered_keys = [key for key in _CHANGE_FIELD_LABELS if key in patch]
     ordered_keys += [key for key in patch if key not in _CHANGE_FIELD_LABELS]
-    return [
-        PendingChange(
-            label=_CHANGE_FIELD_LABELS.get(key, key),
-            old=_format_change_value(key, patch[key].get("old"), name_map),
-            new=_format_change_value(key, patch[key].get("new"), name_map),
+
+    changes: list[PendingChange] = []
+    for key in ordered_keys:
+        label = _CHANGE_FIELD_LABELS.get(key, key)
+        old_value = patch[key].get("old")
+        new_value = patch[key].get("new")
+        if isinstance(old_value, list) or isinstance(new_value, list):
+            removed, added = _list_delta(key, old_value, new_value, name_map)
+            if not removed and not added:
+                continue
+            changes.append(PendingChange(label=label, removed=removed, added=added))
+            continue
+        changes.append(
+            PendingChange(
+                label=label,
+                old=_format_change_value(key, old_value, name_map),
+                new=_format_change_value(key, new_value, name_map),
+            )
         )
-        for key in ordered_keys
-    ]
+    return changes
 
 
 async def maybe_apply_pending_view(
