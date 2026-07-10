@@ -1,7 +1,8 @@
 """HTMX toast payloads and helpers for PostgreSQL unique violations.
 
-``unique_constraint_response`` returns a small HTML fragment that Alpine uses
-to show a toast for HTMX requests, or a plain conflict response otherwise.
+``unique_constraint_response`` returns a small HTML fragment that the toast
+shell (``pindb_shell.js``) shows for HTMX requests, or a plain conflict
+response otherwise.
 
 Success paths use the ``HX-Trigger`` header with a ``pindbToast`` payload; the
 client shows a Notyf toast before following ``HX-Redirect``.

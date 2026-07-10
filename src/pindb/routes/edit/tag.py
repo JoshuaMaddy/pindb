@@ -10,6 +10,7 @@ from fastapi.routing import APIRouter
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
 from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.entity_type import EntityType
@@ -155,6 +156,7 @@ async def post_edit_tag(
         tag_id: int = tag.id
 
     await sync_entity(EntityType.tag, tag_id)
+    await refresh_user_stats(user_id=current_user.id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

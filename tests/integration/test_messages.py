@@ -9,11 +9,11 @@ logic: reads LEFT JOIN receipts for the current user and treat a missing row as
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import and_, func, literal, or_, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,13 @@ from pindb.database.message import (
     MessageCategory,
     MessageReceipt,
 )
+from pindb.database.message_queries import (
+    archive_statement,
+    inbox_statement,
+    mark_all_read_statement,
+    mark_read_statement,
+    unread_count_statement,
+)
 from pindb.database.user import User
 from pindb.models.message_body import (
     ContributionBody,
@@ -32,134 +39,37 @@ from pindb.models.message_body import (
     PinRejectionBody,
     TextBody,
 )
+from pindb.templates.messages.render import message_target_url
 from pindb.utils import utc_now
 
-# --- Query helpers (stand-ins for the future inbox routes) ------------------
-
-
-def _broadcast_audiences(user: User) -> list[MessageAudience]:
-    """Broadcast audiences the *user* is allowed to receive."""
-    audiences: list[MessageAudience] = [MessageAudience.all]
-    if user.is_editor or user.is_admin:
-        audiences.append(MessageAudience.editors)
-    if user.is_admin:
-        audiences.append(MessageAudience.admins)
-    return audiences
-
-
-def _visible_clause(user: User):
-    """Direct-to-user OR an in-audience, unexpired broadcast."""
-    now = utc_now()
-    return and_(
-        or_(
-            Message.recipient_id == user.id,
-            and_(
-                Message.recipient_id.is_(None),
-                Message.audience.in_(_broadcast_audiences(user)),
-            ),
-        ),
-        or_(
-            Message.expires_at.is_(None),
-            Message.expires_at > now,
-        ),
-    )
+# --- Query helpers: thin sync wrappers over the production statement builders.
+# These exercise the real inbox logic (``database.message_queries``) against the
+# sync test session, so the behaviour asserted here is exactly what the routes run.
 
 
 def _inbox(session: Session, user: User) -> list[Message]:
     """Non-archived visible messages, newest first."""
-    statement = (
-        select(Message)
-        .outerjoin(
-            MessageReceipt,
-            and_(
-                MessageReceipt.message_id == Message.id,
-                MessageReceipt.user_id == user.id,
-            ),
-        )
-        .where(
-            _visible_clause(user),
-            MessageReceipt.archived_at.is_(None),
-        )
-        .order_by(Message.created_at.desc())
-    )
-    return list(session.scalars(statement).all())
+    return list(session.scalars(inbox_statement(user, limit=100, offset=0)).all())
 
 
 def _unread_count(session: Session, user: User) -> int:
-    """Count of visible, unseen, non-archived messages."""
-    statement = (
-        select(func.count())
-        .select_from(Message)
-        .outerjoin(
-            MessageReceipt,
-            and_(
-                MessageReceipt.message_id == Message.id,
-                MessageReceipt.user_id == user.id,
-            ),
-        )
-        .where(
-            _visible_clause(user),
-            MessageReceipt.seen_at.is_(None),
-            MessageReceipt.archived_at.is_(None),
-        )
-    )
-    return session.scalar(statement) or 0
+    """Count of visible, unread (``read_at IS NULL``), non-archived messages."""
+    return session.scalar(unread_count_statement(user)) or 0
 
 
-def _mark_seen(session: Session, *, message_id: int, user_id: int) -> None:
-    """Idempotently record that *user* has seen *message* (first-seen preserved)."""
-    now = utc_now()
-    statement = (
-        pg_insert(MessageReceipt)
-        .values(message_id=message_id, user_id=user_id, seen_at=now)
-        .on_conflict_do_update(
-            index_elements=["message_id", "user_id"],
-            set_={"seen_at": func.coalesce(MessageReceipt.seen_at, now)},
-        )
-    )
-    session.execute(statement)
+def _mark_read(session: Session, *, message_id: int, user_id: int) -> None:
+    """Idempotently mark one message read (first-read timestamps preserved)."""
+    session.execute(mark_read_statement(message_id=message_id, user_id=user_id))
 
 
-def _mark_all_seen(session: Session, user: User) -> None:
-    """Mark every visible unseen message seen, creating receipts as needed."""
-    now = utc_now()
-    selectable = (
-        select(Message.id, literal(user.id), literal(now))
-        .outerjoin(
-            MessageReceipt,
-            and_(
-                MessageReceipt.message_id == Message.id,
-                MessageReceipt.user_id == user.id,
-            ),
-        )
-        .where(
-            _visible_clause(user),
-            MessageReceipt.seen_at.is_(None),
-        )
-    )
-    statement = (
-        pg_insert(MessageReceipt)
-        .from_select(["message_id", "user_id", "seen_at"], selectable)
-        .on_conflict_do_update(
-            index_elements=["message_id", "user_id"],
-            set_={"seen_at": func.coalesce(MessageReceipt.seen_at, now)},
-        )
-    )
-    session.execute(statement)
+def _mark_all_read(session: Session, user: User) -> None:
+    """Mark every visible unread message read, creating receipts as needed."""
+    session.execute(mark_all_read_statement(user))
 
 
 def _archive(session: Session, *, message_id: int, user_id: int) -> None:
     """Archive a message for a user (creates the receipt on first archive)."""
-    now = utc_now()
-    statement = (
-        pg_insert(MessageReceipt)
-        .values(message_id=message_id, user_id=user_id, archived_at=now)
-        .on_conflict_do_update(
-            index_elements=["message_id", "user_id"],
-            set_={"archived_at": now},
-        )
-    )
-    session.execute(statement)
+    session.execute(archive_statement(message_id=message_id, user_id=user_id))
 
 
 def _receipt_rows(session: Session, message_id: int) -> list[MessageReceipt]:
@@ -179,6 +89,7 @@ class TestMessageBodyRoundTrip:
         "body",
         [
             TextBody(text="hello world"),
+            TextBody(text="linked", redirect_url="/user/me#badges"),
             PinRejectionBody(reason="blurry image", pin_id=42),
             ContributionBody(summary="added 3 pins", points=3),
         ],
@@ -195,10 +106,37 @@ class TestMessageBodyRoundTrip:
         assert reloaded is not None
         assert type(reloaded.body) is type(body)
         assert reloaded.body == body
+        assert reloaded.body.redirect_url == body.redirect_url
+
+    def test_redirect_url_defaults_to_none(self):
+        assert TextBody(text="x").redirect_url is None
 
     def test_unknown_body_type_fails_validation(self):
         with pytest.raises(ValidationError):
             MessageBodyAdapter.validate_python({"type": "not_a_real_kind"})
+
+
+@pytest.mark.integration
+class TestMessageTargetUrl:
+    def test_redirect_url_takes_precedence_over_entity(self):
+        request = MagicMock()
+        request.url_for.side_effect = AssertionError("url_for must not be called")
+        message = Message(
+            category=MessageCategory.pin_rejection,
+            body=PinRejectionBody(reason="dupe", pin_id=7, redirect_url="/go"),
+            related_entity_type=EntityType.pin,
+            related_entity_id=7,
+        )
+        assert message_target_url(request, message) == "/go"
+
+    def test_no_target_without_redirect_or_entity(self):
+        request = MagicMock()
+        request.url_for.side_effect = AssertionError("url_for must not be called")
+        message = Message(
+            category=MessageCategory.announcement,
+            body=TextBody(text="plain"),
+        )
+        assert message_target_url(request, message) is None
 
 
 @pytest.mark.integration
@@ -275,8 +213,8 @@ class TestAudienceAndExpiry:
 
 
 @pytest.mark.integration
-class TestSeenReadArchive:
-    def test_mark_seen_is_idempotent_and_preserves_first_seen(
+class TestReadArchive:
+    def test_mark_read_sets_both_timestamps_and_is_idempotent(
         self, db_session, admin_user
     ):
         message = Message(
@@ -286,20 +224,24 @@ class TestSeenReadArchive:
         db_session.add(message)
         db_session.flush()
 
-        _mark_seen(db_session, message_id=message.id, user_id=admin_user.id)
+        assert _unread_count(db_session, admin_user) == 1
+
+        _mark_read(db_session, message_id=message.id, user_id=admin_user.id)
         rows = _receipt_rows(db_session, message.id)
         assert len(rows) == 1
-        first_seen = rows[0].seen_at
-        assert first_seen is not None
+        first_read = rows[0].read_at
+        assert first_read is not None
+        # Marking read also records seen (so a future seen/read split has data).
+        assert rows[0].seen_at is not None
         assert _unread_count(db_session, admin_user) == 0
 
-        _mark_seen(db_session, message_id=message.id, user_id=admin_user.id)
+        _mark_read(db_session, message_id=message.id, user_id=admin_user.id)
         db_session.expire_all()
         rows = _receipt_rows(db_session, message.id)
         assert len(rows) == 1
-        assert rows[0].seen_at == first_seen
+        assert rows[0].read_at == first_read
 
-    def test_mark_all_seen_creates_receipts_for_untouched_broadcasts(
+    def test_mark_all_read_creates_receipts_for_untouched_broadcasts(
         self, db_session, admin_user
     ):
         first_global = Message(
@@ -318,19 +260,19 @@ class TestSeenReadArchive:
         db_session.add_all([first_global, second_global, direct])
         db_session.flush()
 
-        _mark_all_seen(db_session, admin_user)
+        _mark_all_read(db_session, admin_user)
         db_session.expire_all()
 
-        seen_message_ids = {
+        read_message_ids = {
             row.message_id
             for row in db_session.scalars(
                 select(MessageReceipt).where(
                     MessageReceipt.user_id == admin_user.id,
-                    MessageReceipt.seen_at.is_not(None),
+                    MessageReceipt.read_at.is_not(None),
                 )
             ).all()
         }
-        assert {first_global.id, second_global.id, direct.id} <= seen_message_ids
+        assert {first_global.id, second_global.id, direct.id} <= read_message_ids
         assert _unread_count(db_session, admin_user) == 0
 
     def test_archive_hides_then_unarchive_restores(self, db_session, admin_user):

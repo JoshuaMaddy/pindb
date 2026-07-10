@@ -9,43 +9,25 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e.pins._helpers import png_bytes
+from tests.e2e.select_helpers import (
+    multi_add,
+    single_pick,
+    wait_for_option_indexed,
+    widget_root,
+)
 
 
 def _browser(role: str, admin_browser_context, editor_browser_context):
     return admin_browser_context if role == "admin" else editor_browser_context
 
 
-def _set_tomselect_values(page: Page, select_id: str, values: list[str]) -> None:
-    page.evaluate(
-        """([sid, vals]) => {
-            const el = document.getElementById(sid);
-            if (!el || !el.tomselect) throw new Error('no tomselect for ' + sid);
-            const ts = el.tomselect;
-            if (el.multiple) {
-              vals.forEach((raw) => {
-                const v = String(raw);
-                if (!ts.options[v]) {
-                  ts.addOption({ value: v, text: v });
-                }
-              });
-              ts.setValue(vals.map(String), true);
-            } else {
-              ts.setValue(vals[0], true);
-            }
-        }""",
-        [select_id, values],
+def _pin_form_options_url(page: Page, entity_type: str) -> str:
+    """Options endpoint for a pin-form multi-select, read from the ref JSON."""
+    base = page.evaluate(
+        "() => JSON.parse(document.getElementById('pin-form-ref-data').textContent)"
+        ".optionsBaseUrl"
     )
-
-
-def _pin_form_dispatch_refresh(page: Page) -> None:
-    page.evaluate(
-        """() => {
-          const f = document.getElementById('pin-form');
-          if (!f) return;
-          f.dispatchEvent(new Event('input', { bubbles: true }));
-          f.dispatchEvent(new Event('change', { bubbles: true }));
-        }"""
-    )
+    return f"{base}/{entity_type}"
 
 
 def _wait_for_grade_inputs_ready(page: Page) -> None:
@@ -136,9 +118,31 @@ class TestPinFormClientValidation:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
-        _set_tomselect_values(page, "shop_ids", [str(shop["id"])])
-        _set_tomselect_values(page, "tag_ids", [str(tag["id"])])
-        _set_tomselect_values(page, "acquisition_type", ["single"])
-        _pin_form_dispatch_refresh(page)
+        # UI-driven picks: remote-loading selects need the entities indexed.
+        wait_for_option_indexed(
+            page, _pin_form_options_url(page, "shop"), "ValSubmitShop"
+        )
+        wait_for_option_indexed(
+            page, _pin_form_options_url(page, "tag"), "val_submit_tag"
+        )
+        # Underscore names: query the first name chunk (the search backend
+        # doesn't split on underscores) and match the rendered display text.
+        multi_add(page, page.locator("#shop_ids"), "ValSubmitShop")
+        multi_add(page, page.locator("#tag_ids"), "val", option_text="val submit tag")
+        single_pick(page, page.locator("#acquisition_type"), "Single")
 
         expect(submit).to_have_attribute("aria-disabled", "false")
+
+
+@pytest.mark.slow
+def test_tag_chip_visual_baseline(
+    admin_browser_context, live_server, make_tag, assert_screenshot
+):
+    """Selected tag renders as a category-colored chip in the widget control."""
+    tag = make_tag("chip_visual_tag", approved=True)
+    page = admin_browser_context.new_page()
+    page.goto(f"{live_server}/create/pin", wait_until="networkidle")
+
+    wait_for_option_indexed(page, _pin_form_options_url(page, "tag"), tag["name"])
+    multi_add(page, page.locator("#tag_ids"), "chip", option_text="chip visual tag")
+    assert_screenshot(widget_root(page.locator("#tag_ids")), "pin-form-tag-chips")

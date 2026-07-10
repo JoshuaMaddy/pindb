@@ -12,6 +12,7 @@ from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
 from pindb.database import Artist, async_session_maker
 from pindb.database.artist import replace_artist_aliases
@@ -133,6 +134,7 @@ async def post_edit_artist(
         artist_id: int = artist.id
 
     await sync_entity(EntityType.artist, artist_id)
+    await refresh_user_stats(user_id=current_user.id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

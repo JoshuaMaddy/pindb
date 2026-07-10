@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.auth import require_admin
 from pindb.database import (
     Artist,
@@ -345,6 +347,8 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     # the scheduled reconcile. Runs after the write transaction has committed.
     for pin_id in created_pin_ids:
         await sync_pin_with_deps(pin_id)
+    if created_pin_ids:
+        await refresh_users_stats([get_audit_user()])
 
     LOGGER.info(
         "Bulk pin submission complete bulk_id=%s created=%d failed=%d",

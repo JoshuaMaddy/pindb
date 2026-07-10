@@ -86,6 +86,66 @@
     if (window.lucide) {
       lucide.createIcons();
     }
+    // ── Disclosure widgets (replaces Alpine {open} toggles) ─────────────
+    // [data-disclosure] root wraps [data-disclosure-trigger] and a
+    // [data-disclosure-panel] toggled via the `hidden` class. Delegated
+    // listeners so htmx-swapped content needs no re-init.
+    function closeDisclosures(except) {
+      document
+        .querySelectorAll("[data-disclosure-panel]:not(.hidden)")
+        .forEach(function (panel) {
+          var root = panel.closest("[data-disclosure]");
+          if (except && root && root.contains(except)) return;
+          panel.classList.add("hidden");
+          syncDisclosureAria(root);
+        });
+    }
+    function syncDisclosureAria(root) {
+      if (!root) return;
+      var panel = root.querySelector("[data-disclosure-panel]");
+      var expander = root.querySelector("[aria-expanded]");
+      if (panel && expander) {
+        expander.setAttribute(
+          "aria-expanded",
+          String(!panel.classList.contains("hidden")),
+        );
+      }
+    }
+    document.addEventListener("click", function (evt) {
+      var trigger =
+        evt.target.closest && evt.target.closest("[data-disclosure-trigger]");
+      if (trigger) {
+        var root = trigger.closest("[data-disclosure]");
+        var panel = root && root.querySelector("[data-disclosure-panel]");
+        if (panel) {
+          closeDisclosures(trigger);
+          panel.classList.toggle("hidden");
+          syncDisclosureAria(root);
+        }
+        return;
+      }
+      closeDisclosures(evt.target);
+    });
+    document.addEventListener("keydown", function (evt) {
+      if (evt.key === "Escape") closeDisclosures(null);
+    });
+    // ── Count labels updated by htmx-swapped fragments ──────────────────
+    // A swapped-in node carrying data-count-for/data-count-text updates the
+    // referenced label (e.g. the "I Own (n)" trigger text).
+    function applyCountLabels(root) {
+      (root || document)
+        .querySelectorAll("[data-count-for]")
+        .forEach(function (el) {
+          var label = document.getElementById(el.dataset.countFor);
+          if (label && el.dataset.countText != null) {
+            label.textContent = el.dataset.countText;
+          }
+        });
+    }
+    document.body.addEventListener("htmx:afterSwap", function () {
+      applyCountLabels(document);
+    });
+    applyCountLabels(document);
     document.addEventListener(
       "mousemove",
       function (evt) {

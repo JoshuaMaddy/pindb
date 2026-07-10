@@ -7,6 +7,8 @@ RUN npm ci
 
 COPY src/ ./src/
 COPY scripts/ ./scripts/
+COPY frontend/ ./frontend/
+COPY vite.config.ts svelte.config.js tsconfig.json ./
 RUN npm run build
 
 # Stage 2: Python runtime.
@@ -27,6 +29,7 @@ COPY README.md ./
 # Overlay built assets on top of source tree.
 COPY --from=assets /build/src/pindb/static/main.css ./src/pindb/static/main.css
 COPY --from=assets /build/src/pindb/static/vendor/ ./src/pindb/static/vendor/
+COPY --from=assets /build/src/pindb/static/islands/ ./src/pindb/static/islands/
 
 RUN uv sync --no-dev --frozen
 

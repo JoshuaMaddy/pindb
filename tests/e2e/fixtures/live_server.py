@@ -95,10 +95,13 @@ def live_server(
     pg_url = e2e_database_url
     async_pg_url = pg_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
 
-    # Per-worker index on the shared server; dropped first so a kept container
-    # (PINDB_TEST_KEEP_PG=1) never leaks documents from a previous run.
+    # Per-worker index base on the shared server; every entity index derives
+    # from it (see src/pindb/search/search.py), so workers stay isolated.
+    # Dropped first so a kept container (PINDB_TEST_KEEP_PG=1) never leaks
+    # documents from a previous run.
     meili_index = f"pins_e2e_{os.environ.get('PYTEST_XDIST_WORKER', 'main')}"
-    _meili.delete_index(e2e_meili_url, meili_index)
+    for suffix in ("", "_tags", "_artists", "_shops", "_pin_sets"):
+        _meili.delete_index(e2e_meili_url, f"{meili_index}{suffix}")
 
     env = {
         **os.environ,

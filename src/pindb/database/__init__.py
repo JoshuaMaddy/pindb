@@ -37,6 +37,7 @@ from pindb.database.tag import Tag, TagAlias, TagCategory
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
 from pindb.database.user_owned_pin import UserOwnedPin
+from pindb.database.user_stats import UserAchievement, UserStats
 from pindb.database.user_wanted_pin import UserWantedPin
 
 __all__: list[str] = [
@@ -68,9 +69,11 @@ __all__: list[str] = [
     "TagAlias",
     "TagCategory",
     "User",
+    "UserAchievement",
     "UserAuthProvider",
     "UserOwnedPin",
     "UserSession",
+    "UserStats",
     "UserWantedPin",
 ]
 

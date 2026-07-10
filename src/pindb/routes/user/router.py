@@ -10,11 +10,11 @@ from typing import Annotated
 from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
-from pindb.database import PinSet, User, async_session_maker
+from pindb.database import PinSet, User, UserAchievement, async_session_maker
 from pindb.database.erasure import erase_user_account
 from pindb.database.user_pin_queries import (
     count_favorites,
@@ -159,11 +159,26 @@ async def get_user_profile(
             ).all()
         )
 
+        achievement_rows = (
+            await db.execute(
+                select(
+                    UserAchievement.family,
+                    func.max(UserAchievement.tier),
+                )
+                .where(UserAchievement.user_id == user.id)
+                .group_by(UserAchievement.family)
+            )
+        ).all()
+        achievements: dict[str, int] = {
+            family: max_tier for family, max_tier in achievement_rows
+        }
+
         return HTMLResponse(
             content=str(
                 user_profile_page(
                     request=request,
                     profile_user=user,
+                    achievements=achievements,
                     favorite_pins=favorite_pins,
                     favorite_count=favorite_count,
                     personal_sets=personal_sets,

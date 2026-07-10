@@ -11,6 +11,8 @@ from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import Artist, ArtistAlias, async_session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import (
@@ -80,6 +82,7 @@ async def post_create_artist(
         return unique_constraint_response(request=request)
 
     await update_artist(artist=artist)
+    await refresh_users_stats([get_audit_user()])
 
     LOGGER.info("Created artist id=%d name=%r", artist_id, name)
 

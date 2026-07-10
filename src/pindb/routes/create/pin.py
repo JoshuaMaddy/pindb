@@ -12,6 +12,8 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import Artist, Shop, async_session_maker
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
@@ -207,6 +209,7 @@ async def post_create_pin(
         )
     if created_pin is not None:
         await update_pin(pin=created_pin)
+    await refresh_users_stats([get_audit_user()])
 
     LOGGER.info("Created pin id=%d name=%r", pin_id, fields.name)
 

@@ -11,6 +11,7 @@ from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import select
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
 from pindb.database import async_session_maker
 from pindb.database.currency import Currency
@@ -241,6 +242,7 @@ async def post_edit_pin(
         pin_id: int = pin.id
 
     await sync_entity(EntityType.pin, pin_id)
+    await refresh_user_stats(user_id=current_user.id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

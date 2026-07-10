@@ -9,6 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import Tag, TagAlias, TagCategory, async_session_maker
 from pindb.database.tag import normalize_tag_name
 from pindb.htmx_toast import (
@@ -103,6 +105,7 @@ async def post_create_tag(
         return unique_constraint_response(request=request)
 
     await update_tag(tag=tag)
+    await refresh_users_stats([get_audit_user()])
 
     LOGGER.info("Created tag id=%d name=%r", tag_id, name)
 

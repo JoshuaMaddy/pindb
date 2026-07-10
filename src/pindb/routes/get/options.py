@@ -43,6 +43,13 @@ _INDEX_MAP = {
 }
 
 
+# Autocomplete results go stale the moment someone else creates/renames/deletes
+# the entity being searched; a client- or shared-cache hit would silently show
+# an editor outdated options. Not worth caching for the perf gain, so results
+# are never stored — each keystroke's query is normally unique anyway.
+_NO_STORE_HEADERS = {"Cache-Control": "no-store"}
+
+
 @router.get(path="/options/{entity_type}")
 async def get_entity_options(
     entity_type: EntityType,
@@ -50,10 +57,10 @@ async def get_entity_options(
     exclude: int | None = Query(default=None),
 ) -> JSONResponse:
     if entity_type not in _ALLOWED_ENTITY_TYPES:
-        return JSONResponse(content=[])
+        return JSONResponse(content=[], headers=_NO_STORE_HEADERS)
     index = _INDEX_MAP[entity_type]
     results = await search_entity_options(index=index, query=q)
     if exclude is not None:
         exclude_str = str(exclude)
         results = [item for item in results if item["value"] != exclude_str]
-    return JSONResponse(content=results)
+    return JSONResponse(content=results, headers=_NO_STORE_HEADERS)

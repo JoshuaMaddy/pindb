@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Sequence
 
 from fastapi import Request
@@ -21,11 +20,9 @@ from htpy import (
     label,
     option,
     p,
-    script,
     select,
     span,
 )
-from markupsafe import Markup
 from titlecase import titlecase
 
 from pindb.database.tag import Tag
@@ -34,6 +31,7 @@ from pindb.models.acquisition_type import AcquisitionType
 from pindb.models.funding_type import FundingType
 from pindb.routes.bulk._helpers import TagMode
 from pindb.templates.base import html_base
+from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.utils import pending_label
@@ -51,22 +49,11 @@ def bulk_edit_page(
     request: Request,
 ) -> Element:
     title = f"Bulk edit — {source_label}"
-    pin_form_ref_json = json.dumps({"optionsBaseUrl": options_base_url}).replace(
-        "</", "<\\/"
-    )
     return html_base(
         title=title,
         request=request,
-        template_js_extra=(
-            "shared/webp_transcode.js",
-            "shared/form_gate.js",
-            "pins/pin_creation.js",
-        ),
         body_content=centered_div(
             content=[
-                script(**{"type": "application/json"}, id="pin-form-ref-data")[
-                    Markup(pin_form_ref_json)
-                ],
                 page_heading(icon="pencil-ruler", text=title),
                 p(class_="text-lightest-hover")[source_description],
                 _pin_count_banner(pin_count=pin_count),
@@ -78,7 +65,11 @@ def bulk_edit_page(
                     class_="flex flex-col gap-6",
                     autocomplete="off",
                 )[
-                    _tag_section(tags=tags, request=request),
+                    _tag_section(
+                        tags=tags,
+                        request=request,
+                        options_base_url=options_base_url,
+                    ),
                     hr,
                     _scalar_section(),
                     hr,
@@ -116,6 +107,7 @@ def _tag_section(
     *,
     tags: Sequence[Tag],
     request: Request,
+    options_base_url: str,
 ) -> Fragment:
     preview_url = str(request.url_for("get_tag_implication_preview"))
     tag_options = [
@@ -141,19 +133,27 @@ def _tag_section(
         h2["Tags"],
         div(class_="flex flex-col gap-2")[
             label(for_="tag_ids", class_="font-semibold")["Tags"],
-            select(
-                name="tag_ids",
-                id="tag_ids",
-                multiple=True,
-                class_="multi-select",
-                data_entity_type="tag",
-                hx_get=preview_url,
-                # Defensive: if this form ever uses hx_swap="none", inherited swap would drop preview HTML.
-                hx_swap="innerHTML",
-                hx_trigger="load, change",
-                hx_include="[name='tag_ids']",
-                hx_target="#implication-preview",
-            )[tag_options],
+            div(class_="w-full min-w-0")[
+                select(
+                    name="tag_ids",
+                    id="tag_ids",
+                    multiple=True,
+                    hx_get=preview_url,
+                    # Defensive: if this form ever uses hx_swap="none", inherited swap would drop preview HTML.
+                    hx_swap="innerHTML",
+                    hx_trigger="load, change",
+                    hx_include="[name='tag_ids']",
+                    hx_target="#implication-preview",
+                )[tag_options],
+                island(
+                    "multi-select",
+                    props={
+                        "selectId": "tag_ids",
+                        "loadUrl": f"{options_base_url}/tag",
+                        "tagMode": True,
+                    },
+                ),
+            ],
             div(id="implication-preview"),
             div(class_="flex flex-col gap-1 mt-2")[
                 label(class_="font-semibold")["Tag mode"],
@@ -307,6 +307,10 @@ def _enum_select(
     name: str,
     values: list[tuple[str, str]],
 ) -> Element:
-    return select(name=name, class_="single-select")[
-        [option(value=value)[label_text] for value, label_text in values]
+    select_id = f"bulk-edit-{name}"
+    return div(class_="w-full min-w-0")[
+        select(name=name, id=select_id)[
+            [option(value=value)[label_text] for value, label_text in values]
+        ],
+        island("multi-select", props={"selectId": select_id}),
     ]

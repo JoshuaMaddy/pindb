@@ -13,17 +13,11 @@ const VENDOR = resolve(ROOT, "src/pindb/static/vendor");
 
 const FILES = [
   ["htmx.org/dist/htmx.min.js", "htmx.min.js"],
+  ["swiper/swiper-bundle.min.js", "swiper.min.js"],
+  ["swiper/swiper-bundle.min.css", "swiper.min.css"],
+  ["sortablejs/Sortable.min.js", "sortable.min.js"],
   ["notyf/notyf.min.js", "notyf.min.js"],
   ["notyf/notyf.min.css", "notyf.min.css"],
-  [
-    "tom-select/dist/js/tom-select.complete.min.js",
-    "tom-select.complete.min.js",
-  ],
-  [
-    "tom-select/dist/css/tom-select.default.min.css",
-    "tom-select.default.min.css",
-  ],
-  ["alpinejs/dist/cdn.min.js", "alpine.min.js"],
   ["overtype/dist/overtype.min.js", "overtype.min.js"],
   ["marked/lib/marked.umd.js", "marked.min.js"],
 ];

@@ -45,16 +45,7 @@
     base.thumbs = { swiper: thumbSwiper };
     new window.Swiper(mainEl, base);
   }
-  function loadSwiper(cb) {
-    if (window.Swiper) {
-      cb();
-      return;
-    }
-    var s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js";
-    s.async = true;
-    s.onload = cb;
-    document.head.appendChild(s);
-  }
-  loadSwiper(boot);
+  // Vendored swiper.min.js loads (deferred, in document order) before this
+  // script — see templates/get/pin.py head_content.
+  boot();
 })();

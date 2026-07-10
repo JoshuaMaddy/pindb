@@ -5,6 +5,7 @@ middleware resolves the user without pruning expired rows on every request;
 dependencies may delete expired sessions when loading the user for protected routes.
 """
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -12,13 +13,22 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import Response
+from sqlalchemy import select
 
 from pindb.audit_events import set_audit_user, set_audit_user_flags
 from pindb.config import CONFIGURATION
 from pindb.database import UserSession
 from pindb.database import async_session_maker as db_async_session_maker
+from pindb.database.message import Message, MessageReceipt
+from pindb.database.message_queries import inbox_statement, unread_count_statement
 from pindb.database.user import User
 from pindb.utils import utc_now
+
+logger = logging.getLogger(__name__)
+
+# Messages shown in the navbar hover preview (must match PREVIEW_LIMIT in the
+# templates). Kept here as a literal so auth does not import the template layer.
+_NAV_PREVIEW_LIMIT = 5
 
 _hasher = PasswordHasher()
 
@@ -178,6 +188,42 @@ def require_user(user: CurrentUser) -> User:
 AuthenticatedUser = Annotated[User, Depends(require_user)]
 
 
+async def _load_message_indicators(
+    user: User,
+) -> tuple[int, list[tuple[Message, bool]]]:
+    """Unread count + newest inbox messages (with unread flags) for the navbar.
+
+    Best-effort: a query hiccup must never 500 a page, so failures log and return
+    an empty indicator instead of propagating.
+    """
+    try:
+        async with db_async_session_maker() as session:
+            unread = await session.scalar(unread_count_statement(user)) or 0
+            messages = list(
+                (
+                    await session.scalars(
+                        inbox_statement(user, limit=_NAV_PREVIEW_LIMIT, offset=0)
+                    )
+                ).all()
+            )
+            read_ids: set[int] = set()
+            ids = [message.id for message in messages]
+            if ids:
+                rows = await session.execute(
+                    select(MessageReceipt.message_id).where(
+                        MessageReceipt.user_id == user.id,
+                        MessageReceipt.message_id.in_(ids),
+                        MessageReceipt.read_at.is_not(None),
+                    )
+                )
+                read_ids = {row[0] for row in rows}
+        preview = [(message, message.id not in read_ids) for message in messages]
+        return unread, preview
+    except Exception:
+        logger.exception("Failed to load navbar message indicators")
+        return 0, []
+
+
 def require_admin(user: AuthenticatedUser) -> User:
     """Dependency that requires ``user.is_admin``.
 
@@ -241,6 +287,17 @@ async def attach_user_middleware(
     request.state.dimension_unit = (
         current_user.dimension_unit if current_user is not None else "mm"
     )
+
+    # Navbar message indicators — only for full-page renders (HTMX fragments do
+    # not render the navbar and keep it in sync via OOB swaps instead).
+    request.state.unread_message_count = 0
+    request.state.message_preview = []
+    if current_user is not None and not request.headers.get("HX-Request"):
+        (
+            request.state.unread_message_count,
+            request.state.message_preview,
+        ) = await _load_message_indicators(current_user)
+
     set_audit_user(current_user.id if current_user else None)
     set_audit_user_flags(
         is_admin=current_user.is_admin if current_user else False,

@@ -19,13 +19,22 @@ from pindb.database.shop import Shop
 from pindb.database.tag import Tag, TagCategory
 from pindb.utils import pending_label
 
-PIN_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(
-    uid=CONFIGURATION.meilisearch_index
+# Every index uid derives from the configured base so parallel test workers
+# (which point separate app instances at one shared Meilisearch server with
+# per-worker base names) stay fully isolated. Hard-coded uids here caused
+# cross-worker doc clobbering: table truncation restarts identities, so two
+# workers' "shop id 1" would overwrite each other in a shared "shops" index.
+_INDEX_BASE: str = CONFIGURATION.meilisearch_index
+
+PIN_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid=_INDEX_BASE)
+TAGS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_tags")
+ARTISTS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(
+    uid=f"{_INDEX_BASE}_artists"
 )
-TAGS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="tags")
-ARTISTS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="artists")
-SHOPS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="shops")
-PIN_SETS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid="pin_sets")
+SHOPS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_shops")
+PIN_SETS_INDEX: AsyncIndex = CONFIGURATION.meili_client.index(
+    uid=f"{_INDEX_BASE}_pin_sets"
+)
 
 
 def meilisearch_hit_dicts(raw: dict[str, object]) -> list[dict[str, object]]:

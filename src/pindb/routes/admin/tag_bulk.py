@@ -14,6 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.joins import tag_implications
 from pindb.database.tag import (
@@ -343,6 +345,8 @@ async def run_bulk_tag_upsert(body: BulkTagUpsertBody) -> BulkTagUpsertResult:
                 len(tags_to_index),
                 exc_info=True,
             )
+    if touched:
+        await refresh_users_stats([get_audit_user()])
 
     return BulkTagUpsertResult(root_tag_ids=root_ids, touched_tag_ids=unique_sorted)
 

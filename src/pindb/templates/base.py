@@ -52,14 +52,6 @@ def html_base(
                 src=f"/static/vendor/notyf.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
             ),
-            script(
-                src=f"/static/vendor/tom-select.complete.min.js?v={STATIC_CACHE_BUSTER}",
-                defer=True,
-            ),
-            link(
-                rel="stylesheet",
-                href=f"/static/vendor/tom-select.default.min.css?v={STATIC_CACHE_BUSTER}",
-            ),
             link(
                 rel="stylesheet",
                 href=f"/static/vendor/notyf.min.css?v={STATIC_CACHE_BUSTER}",
@@ -73,14 +65,6 @@ def html_base(
             script(**{"type": "application/json"}, id="pindb-tag-category-data")[
                 Markup(_TAG_CATEGORY_JSON)
             ],
-            script(
-                src=templates_js_url("tables/data_table_alpine_register.js"),
-                defer=True,
-            ),
-            script(
-                src=f"/static/vendor/alpine.min.js?v={STATIC_CACHE_BUSTER}",
-                defer=True,
-            ),
             script(
                 src=f"/static/vendor/overtype.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
@@ -107,11 +91,16 @@ def html_base(
         ),
         script(src=templates_js_url("shell/pindb_shell.js"), defer=True),
         script(src=templates_js_url("tags/tag_category_bootstrap.js"), defer=True),
-        script(src=templates_js_url("tags/tag_select.js"), defer=True),
         script(src=templates_js_url("forms/form_persist.js"), defer=True),
         script(src=templates_js_url("forms/markdown_editor.js"), defer=True),
         script(src=templates_js_url("forms/form_validate.js"), defer=True),
         script(src=templates_js_url("forms/htmx_submit_guard.js"), defer=True),
         script(src=templates_js_url("forms/htmx_progress_bar.js"), defer=True),
+        # Svelte island loader — scans [data-island] mount points, see
+        # templates/components/islands.py. Module scripts defer by default.
+        script(
+            src=f"/static/islands/mount.js?v={STATIC_CACHE_BUSTER}",
+            type="module",
+        ),
         *extra_scripts,
     ]

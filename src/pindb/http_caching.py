@@ -16,9 +16,14 @@ IMAGE_CACHE_CONTROL = VENDORED_STATIC_CACHE_CONTROL
 
 
 def is_vendored_or_built_css_path(full_path: str | os.PathLike[str]) -> bool:
-    """True for files under ``vendor/`` and for ``main.css`` in the static tree."""
+    """True for files under ``vendor/`` or ``islands/`` and for ``main.css``.
+
+    ``islands/`` holds the built Svelte island bundles: entries are fetched
+    with ``?v=`` (like vendor files) and shared chunks are content-hashed,
+    so the whole directory is safe to serve immutable.
+    """
     p = Path(full_path)
-    return "vendor" in p.parts or p.name == "main.css"
+    return "vendor" in p.parts or "islands" in p.parts or p.name == "main.css"
 
 
 class CacheBustedStaticFiles(StaticFiles):

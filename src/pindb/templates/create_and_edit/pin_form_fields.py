@@ -2,7 +2,6 @@
 Field builders for the pin create/edit form.
 """
 
-import json
 import uuid
 from typing import Sequence
 
@@ -23,7 +22,6 @@ from htpy import (
     select,
     span,
 )
-from markupsafe import Markup
 from titlecase import titlecase
 
 from pindb.database import Artist, Shop, Tag
@@ -37,7 +35,42 @@ from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
+from pindb.templates.components.islands import island
 from pindb.utils import pending_label
+
+
+def _enhanced_select(
+    select_element: Element,
+    *,
+    select_id: str,
+    load_url: str = "",
+    create: bool = False,
+    tag_mode: bool = False,
+    single_mode: bool = False,
+    placeholder: str = "",
+) -> Element:
+    """Server-rendered select + the ``multi-select`` island that enhances it.
+
+    The island adopts the select at mount (moves it inside itself, hidden);
+    the select stays the form-submitting element, so names, HTMX triggers
+    and server routes are untouched. Wrapped in one div so [label, widget]
+    field pairs keep their two-column grid placement.
+    """
+    props: dict[str, object] = {"selectId": select_id}
+    if load_url:
+        props["loadUrl"] = load_url
+    if create:
+        props["create"] = True
+    if tag_mode:
+        props["tagMode"] = True
+    if single_mode:
+        props["singleMode"] = True
+    if placeholder:
+        props["placeholder"] = placeholder
+    return div(class_="w-full min-w-0")[
+        select_element,
+        island("multi-select", props=props),
+    ]
 
 
 def _required_fields(
@@ -46,6 +79,7 @@ def _required_fields(
     tags: Sequence[Tag],
     currencies: Sequence[Currency],
     request: Request,
+    options_base_url: str,
     pin: Pin | None = None,
     name_check_exclude_id: int | None = None,
 ) -> Fragment:
@@ -56,10 +90,12 @@ def _required_fields(
             request=request,
             exclude_id=name_check_exclude_id,
         ),
-        _shops_input(pin=pin, shops=shops),
+        _shops_input(pin=pin, shops=shops, options_base_url=options_base_url),
         _acquisition_input(pin=pin),
         _grades_input(currencies=currencies, pin=pin),
-        _tag_ids_input(pin=pin, tags=tags, request=request),
+        _tag_ids_input(
+            pin=pin, tags=tags, request=request, options_base_url=options_base_url
+        ),
     ]
 
 
@@ -69,15 +105,25 @@ def _optional_fields(
     pin_sets: Sequence[PinSet],
     variant_pins: Sequence[Pin],
     unauthorized_copy_pins: Sequence[Pin],
+    options_base_url: str,
     pin: Pin | None = None,
+    exclude_pin_id: int | None = None,
 ) -> Fragment:
+    # Exclude only the pin being edited (not a duplicate's source — the
+    # duplicate may legitimately become a variant of it).
+    exclude_query = f"?exclude={exclude_pin_id}" if exclude_pin_id is not None else ""
+    pin_load_url = f"{options_base_url}/pin{exclude_query}"
     return fragment[
         h2(class_="col-span-full")["Optional"],
-        _artist_ids_input(pin=pin, artists=artists),
-        _pin_sets_ids_input(pin=pin, pin_sets=pin_sets),
-        _variant_pins_input(pin=pin, variant_pins=variant_pins),
+        _artist_ids_input(pin=pin, artists=artists, options_base_url=options_base_url),
+        _pin_sets_ids_input(
+            pin=pin, pin_sets=pin_sets, options_base_url=options_base_url
+        ),
+        _variant_pins_input(pin=pin, variant_pins=variant_pins, load_url=pin_load_url),
         _unauthorized_copy_pins_input(
-            pin=pin, unauthorized_copy_pins=unauthorized_copy_pins
+            pin=pin,
+            unauthorized_copy_pins=unauthorized_copy_pins,
+            load_url=pin_load_url,
         ),
         _limited_edition_input(pin=pin),
         _number_produced_input(pin=pin),
@@ -92,21 +138,26 @@ def _optional_fields(
     ]
 
 
-def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
+def _pin_images_input(*, pin: Pin | None) -> list[Element | VoidElement]:
+    """Svelte ``pin-images`` island + the server-rendered file inputs it drives.
+
+    The hidden inputs stay outside the island so their files ride the normal
+    multipart form submit; the island syncs picked/dropped/pasted files into
+    them via ``DataTransfer`` after client-side WebP transcode.
+    """
+    front_url: str | None = f"/get/image/{pin.front_image_guid}" if pin else None
+    back_url: str | None = (
+        f"/get/image/{pin.back_image_guid}" if pin and pin.back_image_guid else None
+    )
     return [
-        div(
-            class_="image-drop w-full flex aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-contain bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
-            data_input_id="front_image",
-            id="front_image_preview",
-            data_pin_field="front",
-            style=f"background-image: url(/get/image/{pin.front_image_guid})"
-            if pin
-            else False,
-        )[
-            fragment["Front Image", span(class_="text-error-main ml-0.5")["*"]]
-            if not pin
-            else ""
-        ],
+        island(
+            "pin-images",
+            props={
+                "front": {"existingUrl": front_url},
+                "back": {"existingUrl": back_url},
+            },
+            class_="contents",
+        ),
         input(
             type="file",
             id="front_image",
@@ -116,26 +167,6 @@ def _front_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
             class_="hidden",
             hidden=True,
         ),
-    ]
-
-
-def _back_image_input(*, pin: Pin | None) -> list[Element | VoidElement]:
-    return [
-        div(
-            class_="image-drop w-full flex flex-col gap-1 aspect-square justify-center items-center border-2 border-lightest rounded-lg bg-contain bg-no-repeat bg-center transition-all duration-100 cursor-pointer hover:border-accent",
-            data_input_id="back_image",
-            id="back_image_preview",
-            style=f"background-image: url(/get/image/{pin.back_image_guid})"
-            if pin and pin.back_image_guid
-            else False,
-        )[
-            fragment[
-                p["Back Image"],
-                i["(Optional)"],
-            ]
-            if (pin and not pin.back_image_guid) or not pin
-            else ""
-        ],
         input(
             type="file",
             id="back_image",
@@ -222,26 +253,30 @@ def _shops_input(
     *,
     shops: Sequence[Shop],
     pin: Pin | None,
+    options_base_url: str,
 ) -> list[Element | VoidElement]:
     return [
         label(for_="shop_ids")["Shops", span(class_="text-error-main ml-0.5")["*"]],
-        select(
-            name="shop_ids",
-            id="shop_ids",
-            required=True,
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="shop",
-            data_pin_field="shops",
-        )[
-            [
-                option(
-                    value=str(shop.id),
-                    selected=shop in pin.shops if pin else False,
-                )[pending_label(shop.name, shop.is_pending)]
-                for shop in shops
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="shop_ids",
+                id="shop_ids",
+                required=True,
+                multiple=True,
+                class_="w-full min-w-0",
+                data_pin_field="shops",
+            )[
+                [
+                    option(
+                        value=str(shop.id),
+                        selected=shop in pin.shops if pin else False,
+                    )[pending_label(shop.name, shop.is_pending)]
+                    for shop in shops
+                ]
+            ],
+            select_id="shop_ids",
+            load_url=f"{options_base_url}/shop",
+        ),
     ]
 
 
@@ -250,21 +285,26 @@ def _acquisition_input(*, pin: Pin | None) -> list[Element | VoidElement]:
         label(for_="acquisition_type")[
             "Acquisition", span(class_="text-error-main ml-0.5")["*"]
         ],
-        select(
-            name="acquisition_type",
-            id="acquisition_type",
-            class_="single-select w-full min-w-0",
-            required=True,
-            data_pin_field="acquisition",
-        )[
-            [
-                option(
-                    value=acquisition_type,
-                    selected=acquisition_type == pin.acquisition_type if pin else False,
-                )[titlecase(acquisition_type.replace("_", " "))]
-                for acquisition_type in AcquisitionType
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="acquisition_type",
+                id="acquisition_type",
+                class_="w-full min-w-0",
+                required=True,
+                data_pin_field="acquisition",
+            )[
+                [
+                    option(
+                        value=acquisition_type,
+                        selected=acquisition_type == pin.acquisition_type
+                        if pin
+                        else False,
+                    )[titlecase(acquisition_type.replace("_", " "))]
+                    for acquisition_type in AcquisitionType
+                ]
+            ],
+            select_id="acquisition_type",
+        ),
     ]
 
 
@@ -272,7 +312,7 @@ def _grades_input(
     *,
     currencies: Sequence[Currency],
     pin: Pin | None,
-) -> list[Element | VoidElement | Markup]:
+) -> list[Element | VoidElement]:
     grades_data: list[dict[str, str]] = []
     if pin and pin.grades:
         grades_data = [
@@ -288,36 +328,30 @@ def _grades_input(
         grades_data = [{"id": str(uuid.uuid4()), "name": "Normal", "price": ""}]
 
     default_currency_id = pin.currency_id if pin else 999
-    grades_json = json.dumps(grades_data)
 
     return [
         label(for_="grade")["Grade", span(class_="text-error-main ml-0.5")["*"]],
-        Markup(f"""<div class="flex w-full min-w-0 flex-wrap gap-2">
-            <div id="pin-grade-section" data-pin-field="grades" class="flex min-w-0 flex-1 flex-col gap-2" x-data="{{ grades: {grades_json.replace('"', "'")} }}">
-                <template x-for="grade in grades" :key="grade.id">
-                    <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
-                        <input class="w-full min-w-0 sm:w-auto sm:min-w-0 sm:flex-1" type="text" name="grade_names" x-model="grade.name" required autocomplete="off" placeholder="Grade">
-                        <input class="w-full min-w-0 sm:w-25" type="number" name="grade_prices" x-model="grade.price" autocomplete="off" step="0.01" min="0" placeholder="Unknown">
-                        <button type="button" @click="grades.splice(grades.indexOf(grade), 1)" x-show="grades.length > 1" class="remove-grade-button w-full sm:w-auto sm:shrink-0">Remove</button>
-                    </div>
-                </template>
-                <button type="button" @click="grades.push({{ id: crypto.randomUUID(), name: '', price: '' }})" class="w-full">Add Grade</button>
-            </div>
-        """),
-        select(
-            name="currency_id",
-            id="currency_id",
-            class_="w-full min-w-0 sm:w-auto sm:min-w-32",
-        )[
-            [
-                option(
-                    value=currency.id,
-                    selected=currency.id == default_currency_id,
-                )[currency.code]
-                for currency in currencies
-            ]
+        div(class_="flex w-full min-w-0 flex-wrap gap-2")[
+            island(
+                "grades-editor",
+                props={"grades": grades_data},
+                id="pin-grade-section",
+                class_="flex min-w-0 flex-1 flex-col gap-2",
+            ),
+            select(
+                name="currency_id",
+                id="currency_id",
+                class_="w-full min-w-0 sm:w-auto sm:min-w-32",
+            )[
+                [
+                    option(
+                        value=currency.id,
+                        selected=currency.id == default_currency_id,
+                    )[currency.code]
+                    for currency in currencies
+                ]
+            ],
         ],
-        Markup("</div>"),
     ]
 
 
@@ -326,33 +360,38 @@ def _tag_ids_input(
     pin: Pin | None,
     tags: Sequence[Tag],
     request: Request,
+    options_base_url: str,
 ) -> list[Element | VoidElement]:
     preview_url = str(request.url_for("get_tag_implication_preview"))
     return [
         label(for_="tag_ids")["Tags", span(class_="text-error-main ml-0.5")["*"]],
-        select(
-            name="tag_ids",
-            id="tag_ids",
-            required=True,
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="tag",
-            data_pin_field="tags",
-            hx_get=preview_url,
-            hx_swap="innerHTML",
-            hx_trigger="load, change",
-            hx_include="[name='tag_ids']",
-            hx_target="#implication-preview",
-        )[
-            [
-                option(
-                    value=str(tag.id),
-                    selected=tag in pin.tags if pin else False,
-                    data_category=tag.category.value,
-                )[pending_label(tag.display_name, tag.is_pending)]
-                for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="tag_ids",
+                id="tag_ids",
+                required=True,
+                multiple=True,
+                class_="w-full min-w-0",
+                data_pin_field="tags",
+                hx_get=preview_url,
+                hx_swap="innerHTML",
+                hx_trigger="load, change",
+                hx_include="[name='tag_ids']",
+                hx_target="#implication-preview",
+            )[
+                [
+                    option(
+                        value=str(tag.id),
+                        selected=tag in pin.tags if pin else False,
+                        data_category=tag.category.value,
+                    )[pending_label(tag.display_name, tag.is_pending)]
+                    for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
+                ]
+            ],
+            select_id="tag_ids",
+            load_url=f"{options_base_url}/tag",
+            tag_mode=True,
+        ),
         div(id="implication-preview", class_="col-span-full"),
     ]
 
@@ -361,24 +400,28 @@ def _artist_ids_input(
     *,
     pin: Pin | None,
     artists: Sequence[Artist],
+    options_base_url: str,
 ) -> list[Element | VoidElement]:
     return [
         label(for_="artist_ids")["Artists"],
-        select(
-            name="artist_ids",
-            id="artist_ids",
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="artist",
-        )[
-            [
-                option(
-                    value=str(artist.id),
-                    selected=artist in pin.artists if pin else False,
-                )[pending_label(artist.name, artist.is_pending)]
-                for artist in artists
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="artist_ids",
+                id="artist_ids",
+                multiple=True,
+                class_="w-full min-w-0",
+            )[
+                [
+                    option(
+                        value=str(artist.id),
+                        selected=artist in pin.artists if pin else False,
+                    )[pending_label(artist.name, artist.is_pending)]
+                    for artist in artists
+                ]
+            ],
+            select_id="artist_ids",
+            load_url=f"{options_base_url}/artist",
+        ),
     ]
 
 
@@ -386,24 +429,28 @@ def _pin_sets_ids_input(
     *,
     pin: Pin | None,
     pin_sets: Sequence[PinSet],
+    options_base_url: str,
 ) -> list[Element | VoidElement]:
     return [
         label(for_="pin_sets_ids")["Pin Sets"],
-        select(
-            name="pin_sets_ids",
-            id="pin_sets_ids",
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="pin_set",
-        )[
-            [
-                option(
-                    value=str(pin_set.id),
-                    selected=pin_set in pin.sets if pin else False,
-                )[pending_label(pin_set.name, pin_set.is_pending)]
-                for pin_set in pin_sets
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="pin_sets_ids",
+                id="pin_sets_ids",
+                multiple=True,
+                class_="w-full min-w-0",
+            )[
+                [
+                    option(
+                        value=str(pin_set.id),
+                        selected=pin_set in pin.sets if pin else False,
+                    )[pending_label(pin_set.name, pin_set.is_pending)]
+                    for pin_set in pin_sets
+                ]
+            ],
+            select_id="pin_sets_ids",
+            load_url=f"{options_base_url}/pin_set",
+        ),
     ]
 
 
@@ -419,16 +466,20 @@ def _variant_pins_input(
     *,
     pin: Pin | None,
     variant_pins: Sequence[Pin],
+    load_url: str,
 ) -> list[Element | VoidElement]:
     return [
         label(for_="variant_pin_ids")["Variants"],
-        select(
-            name="variant_pin_ids",
-            id="variant_pin_ids",
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="pin",
-        )[[_pin_option(pin_obj=variant) for variant in variant_pins]],
+        _enhanced_select(
+            select(
+                name="variant_pin_ids",
+                id="variant_pin_ids",
+                multiple=True,
+                class_="w-full min-w-0",
+            )[[_pin_option(pin_obj=variant) for variant in variant_pins]],
+            select_id="variant_pin_ids",
+            load_url=load_url,
+        ),
     ]
 
 
@@ -436,16 +487,20 @@ def _unauthorized_copy_pins_input(
     *,
     pin: Pin | None,
     unauthorized_copy_pins: Sequence[Pin],
+    load_url: str,
 ) -> list[Element | VoidElement]:
     return [
         label(for_="unauthorized_copy_pin_ids")["Unauthorized Copies"],
-        select(
-            name="unauthorized_copy_pin_ids",
-            id="unauthorized_copy_pin_ids",
-            multiple=True,
-            class_="multi-select w-full min-w-0",
-            data_entity_type="pin",
-        )[[_pin_option(pin_obj=copy_pin) for copy_pin in unauthorized_copy_pins]],
+        _enhanced_select(
+            select(
+                name="unauthorized_copy_pin_ids",
+                id="unauthorized_copy_pin_ids",
+                multiple=True,
+                class_="w-full min-w-0",
+            )[[_pin_option(pin_obj=copy_pin) for copy_pin in unauthorized_copy_pins]],
+            select_id="unauthorized_copy_pin_ids",
+            load_url=load_url,
+        ),
     ]
 
 
@@ -519,19 +574,22 @@ def _end_date_input(*, pin: Pin | None) -> list[Element | VoidElement]:
 def _funding_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return [
         label(for_="funding_type")["Funding Type"],
-        select(
-            name="funding_type",
-            id="funding_type",
-            class_="single-select w-full min-w-0",
-        )[
-            [
-                option(
-                    value=funding_type,
-                    selected=funding_type == pin.funding_type if pin else False,
-                )[titlecase(funding_type.replace("_", " "))]
-                for funding_type in FundingType
-            ]
-        ],
+        _enhanced_select(
+            select(
+                name="funding_type",
+                id="funding_type",
+                class_="w-full min-w-0",
+            )[
+                [
+                    option(
+                        value=funding_type,
+                        selected=funding_type == pin.funding_type if pin else False,
+                    )[titlecase(funding_type.replace("_", " "))]
+                    for funding_type in FundingType
+                ]
+            ],
+            select_id="funding_type",
+        ),
     ]
 
 
@@ -570,7 +628,7 @@ def _height_input(*, pin: Pin | None) -> list[Element | VoidElement]:
     return _dimension_field(name="height", label_text="Height", pin=pin)
 
 
-def _links_input(*, pin: Pin | None) -> Element | Markup:
+def _links_input(*, pin: Pin | None) -> Element:
     pin_links: list[str] = []
     if pin and pin.links:
         pin_links = [link.path for link in pin.links]
@@ -578,32 +636,13 @@ def _links_input(*, pin: Pin | None) -> Element | Markup:
     if not pin_links:
         pin_links = [""]
 
-    links_json = json.dumps(pin_links)
-
     return div(class_="col-span-full")[
         label(for_="links")["Links"],
-        Markup(f"""<div class="mt-2" x-data="{{ links: {links_json.replace('"', "'")} }}">
-            <template x-for="(link, index) in links" :key="index">
-                <div class="grid grid-cols-[1fr_min-content] gap-2 mb-2">
-                    <input
-                        type="text"
-                        name="links"
-                        x-model="links[index]"
-                        autocomplete="off"
-                        placeholder="https://..."
-                        class="col-span-1">
-                    <button
-                        type="button"
-                        @click="links.splice(index, 1)"
-                        x-show="links.length > 1"
-                        class="remove-link-button">Remove</button>
-                </div>
-            </template>
-            <button
-                type="button"
-                @click="links.push('')"
-                class="w-full mt-2">Add Another Link</button>
-        </div>"""),
+        island(
+            "links-editor",
+            props={"links": pin_links, "placeholder": "https://..."},
+            class_="mt-2",
+        ),
     ]
 
 

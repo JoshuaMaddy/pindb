@@ -11,6 +11,8 @@ from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy.exc import IntegrityError
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import Shop, ShopAlias, async_session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import (
@@ -80,6 +82,7 @@ async def post_create_shop(
         return unique_constraint_response(request=request)
 
     await update_shop(shop=shop)
+    await refresh_users_stats([get_audit_user()])
 
     LOGGER.info("Created shop id=%d name=%r", shop_id, name)
 

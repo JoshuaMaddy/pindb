@@ -18,6 +18,8 @@ wheels/
 node_modules
 main.css
 src/pindb/static/vendor/
+# Svelte island build output (vite build, emptyOutDir)
+src/pindb/static/islands/
 
 # Pi coding agent (project-local sessions from .pi/settings.json)
 .pi/sessions/
@@ -30,6 +32,9 @@ src/pindb/static/vendor/
 
 # Logs
 *.log
+
+# E2E screenshot failure artifacts (baselines in __screenshots__ are tracked)
+tests/e2e/artifacts/
 
 # Temp dirs
 scripts/images

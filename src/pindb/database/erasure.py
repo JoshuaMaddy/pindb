@@ -39,6 +39,7 @@ from pindb.database.tag import Tag
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
 from pindb.database.user_owned_pin import UserOwnedPin
+from pindb.database.user_stats import UserAchievement, UserStats
 from pindb.database.user_wanted_pin import UserWantedPin
 
 # Every model carrying AuditMixin has created_by_id / updated_by_id /
@@ -165,6 +166,10 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
     await session.execute(delete(UserSession).where(UserSession.user_id == user_id))
     await session.execute(delete(UserOwnedPin).where(UserOwnedPin.user_id == user_id))
     await session.execute(delete(UserWantedPin).where(UserWantedPin.user_id == user_id))
+    await session.execute(delete(UserStats).where(UserStats.user_id == user_id))
+    await session.execute(
+        delete(UserAchievement).where(UserAchievement.user_id == user_id)
+    )
 
     # 7. Delete the user row. All references above are gone, so no FK
     #    violation.

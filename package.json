@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "engines": {
     "node": ">=20.0.0 <23"
   },
@@ -6,25 +7,36 @@
     "css:watch": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --watch",
     "css:build": "tailwindcss -i src/pindb/static/input.css -o src/pindb/static/main.css --minify",
     "css:contrast": "node scripts/check-theme-contrast.mjs",
-    "js:lint": "oxlint --deny-warnings src/pindb/templates/js scripts/*.mjs scripts/lucide/*.mjs",
+    "js:lint": "oxlint --deny-warnings --ignore-pattern \"**/*.svelte\" src/pindb/templates/js scripts/*.mjs scripts/lucide/*.mjs frontend",
     "vendor:build": "node scripts/vendor.mjs && node scripts/build-webp-encode.mjs && node scripts/lucide/build-lucide.mjs",
-    "build": "npm run css:build && npm run vendor:build"
+    "islands:build": "vite build",
+    "islands:watch": "vite build --watch",
+    "islands:check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "build": "npm run css:build && npm run vendor:build && npm run islands:build"
   },
   "dependencies": {
     "@jsquash/webp": "1.5.0",
+    "@lucide/svelte": "^1.24.0",
     "@tailwindcss/cli": "^4.2.4",
     "@tailwindcss/typography": "^0.5.19",
-    "alpinejs": "^3.15.11",
     "htmx.org": "^2.0.10",
     "lucide": "^1.8.0",
     "marked": "^18.0.2",
     "notyf": "^3.10.0",
     "overtype": "^2.3.5",
-    "tailwindcss": "^4.2.4",
-    "tom-select": "^2.6.0"
+    "sortablejs": "^1.15.7",
+    "swiper": "^11.2.10",
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^26.1.1",
     "oxlint": "^1.62.0",
-    "rolldown": "^1.0.0-rc.17"
+    "rolldown": "^1.0.0-rc.17",
+    "svelte": "^5.56.4",
+    "svelte-check": "^4.7.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.4"
   }
 }

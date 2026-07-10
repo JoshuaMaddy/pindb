@@ -51,6 +51,10 @@ class MessageCategory(StrEnum):
     direct = auto()
     contribution = auto()
     pin_rejection = auto()
+    # "achievement" (11 chars) fits the existing VARCHAR(13) sized to
+    # "pin_rejection"; adding a member needs no migration (native_enum=False,
+    # no CHECK constraint).
+    achievement = auto()
 
 
 class MessageAudience(StrEnum):

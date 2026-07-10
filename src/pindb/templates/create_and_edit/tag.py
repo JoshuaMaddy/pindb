@@ -30,6 +30,7 @@ from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
+from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
@@ -83,7 +84,6 @@ def tag_form(
     return html_base(
         title="Create Tag" if not tag else "Edit Tag",
         template_js_extra=(
-            "tags/tag_form.js",
             "shared/form_gate.js",
             "forms/entity_form_gate.js",
         ),
@@ -137,51 +137,73 @@ def tag_form(
                         value=prefill.description if prefill else None,
                     ),
                     label(for_="category")["Category"],
-                    select(name="category", id="category", class_="single-select")[
-                        [
-                            option(
-                                value=cat.value,
-                                selected=cat
-                                == (
-                                    prefill.category if prefill else TagCategory.general
-                                ),
-                                data_icon=CATEGORY_ICONS[cat],
-                                data_color=CATEGORY_COLORS[cat],
-                                data_category=cat.value,
-                            )[titlecase(cat.value)]
-                            for cat in TagCategory
-                        ]
+                    div(class_="w-full min-w-0")[
+                        select(name="category", id="category")[
+                            [
+                                option(
+                                    value=cat.value,
+                                    selected=cat
+                                    == (
+                                        prefill.category
+                                        if prefill
+                                        else TagCategory.general
+                                    ),
+                                    data_icon=CATEGORY_ICONS[cat],
+                                    data_color=CATEGORY_COLORS[cat],
+                                    data_category=cat.value,
+                                )[titlecase(cat.value)]
+                                for cat in TagCategory
+                            ]
+                        ],
+                        island(
+                            "multi-select",
+                            props={"selectId": "category", "singleMode": True},
+                        ),
                     ],
                     label(for_="implication_ids")["Child of"],
-                    select(
-                        name="implication_ids",
-                        id="implication_ids",
-                        multiple=True,
-                        class_="multi-select",
-                        data_options_url=options_url,
-                    )[
-                        [
-                            option(
-                                value=t.id,
-                                selected=True,
-                                data_icon=CATEGORY_ICONS.get(t.category, "tag"),
-                                data_color=CATEGORY_COLORS.get(t.category, ""),
-                                data_category=t.category.value,
-                            )[pending_label(t.name, t.is_pending)]
-                            for t in selected_implications
-                        ]
+                    div(class_="w-full min-w-0")[
+                        select(
+                            name="implication_ids",
+                            id="implication_ids",
+                            multiple=True,
+                            data_options_url=options_url,
+                        )[
+                            [
+                                option(
+                                    value=t.id,
+                                    selected=True,
+                                    data_icon=CATEGORY_ICONS.get(t.category, "tag"),
+                                    data_color=CATEGORY_COLORS.get(t.category, ""),
+                                    data_category=t.category.value,
+                                )[pending_label(t.name, t.is_pending)]
+                                for t in selected_implications
+                            ]
+                        ],
+                        island(
+                            "multi-select",
+                            props={
+                                "selectId": "implication_ids",
+                                "loadUrl": options_url,
+                                "tagMode": True,
+                            },
+                        ),
                     ],
                     label(for_="aliases")["Aliases"],
-                    select(
-                        name="aliases",
-                        id="aliases",
-                        multiple=True,
-                        class_="alias-select",
-                    )[
-                        [
-                            option(value=alias, selected=True)[alias]
-                            for alias in current_aliases
-                        ]
+                    div(class_="w-full min-w-0")[
+                        select(
+                            name="aliases",
+                            id="aliases",
+                            multiple=True,
+                        )[
+                            [
+                                option(value=alias, selected=True)[alias]
+                                for alias in current_aliases
+                            ]
+                        ],
+                        island(
+                            "multi-select",
+                            props={"selectId": "aliases", "create": True},
+                        ),
                     ],
                     button(
                         type="submit",

@@ -21,6 +21,7 @@ from htpy import (
 )
 from markupsafe import Markup
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
@@ -181,6 +182,10 @@ def pin_set_edit_page(
         title=f"Edit — {pin_set.name}",
         request=request,
         template_js_extra=("pins/pin_set_sortable.js",),
+        head_content=script(
+            src=f"/static/vendor/sortable.min.js?v={STATIC_CACHE_BUSTER}",
+            defer=True,
+        ),
         body_content=centered_div(
             content=[
                 a(

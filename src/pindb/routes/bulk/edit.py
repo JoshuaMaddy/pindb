@@ -23,6 +23,7 @@ from fastapi.routing import APIRouter
 from sqlalchemy import select
 from titlecase import titlecase
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import AdminUser, EditorUser
 from pindb.database import async_session_maker
 from pindb.database.pending_edit import PendingEdit
@@ -241,6 +242,10 @@ async def post_bulk_edit_apply(
                 current_user_id=current_user.id,
                 bulk_id=bulk_id,
             )
+
+    if not use_pending_flow:
+        # Direct edits land immediately; pending-flow edits count on approval.
+        await refresh_user_stats(user_id=current_user.id)
 
     LOGGER.info("Bulk edit complete bulk_id=%s", bulk_id)
     return RedirectResponse(url=redirect_url + f"?bulk={bulk_id}", status_code=303)

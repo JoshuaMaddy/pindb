@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import AuthenticatedUser
 from pindb.database import Pin, UserOwnedPin, UserWantedPin, async_session_maker
 from pindb.templates.get.pin_collection import owned_panel_content, wanted_panel_content
@@ -156,6 +157,8 @@ async def add_owned_pin(
                 )
             )
 
+    await refresh_user_stats(user_id=current_user.id)
+
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
@@ -185,6 +188,8 @@ async def remove_owned_pin(
         if entry is None or entry.pin_id != pin_id or entry.user_id != current_user.id:
             raise HTTPException(status_code=404, detail="Owned pin entry not found")
         await db.delete(entry)
+
+    await refresh_user_stats(user_id=current_user.id)
 
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
@@ -219,6 +224,8 @@ async def update_owned_pin(
 
         entry.quantity = max(1, quantity)
         entry.tradeable_quantity = max(0, min(tradeable_quantity, entry.quantity))
+
+    await refresh_user_stats(user_id=current_user.id)
 
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
@@ -264,6 +271,8 @@ async def add_wanted_pin(
                 )
             )
 
+    await refresh_user_stats(user_id=current_user.id)
+
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)
 
@@ -293,6 +302,8 @@ async def remove_wanted_pin(
         if entry is None or entry.pin_id != pin_id or entry.user_id != current_user.id:
             raise HTTPException(status_code=404, detail="Wanted pin entry not found")
         await db.delete(entry)
+
+    await refresh_user_stats(user_id=current_user.id)
 
     if not request.headers.get("HX-Request"):
         return Response(status_code=204)

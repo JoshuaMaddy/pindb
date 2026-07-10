@@ -7,6 +7,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 
+from pindb.achievements import refresh_users_stats
+from pindb.audit_events import get_audit_user
 from pindb.database import async_session_maker
 from pindb.database.pin_set import PinSet
 from pindb.htmx_toast import redirect_or_htmx_toast
@@ -42,6 +44,7 @@ async def post_create_pin_set(
         set_id: int = pin_set.id
 
     await update_pin_set(pin_set=pin_set)
+    await refresh_users_stats([get_audit_user()])
     LOGGER.info("Created pin_set id=%d name=%r", set_id, name)
 
     return redirect_or_htmx_toast(

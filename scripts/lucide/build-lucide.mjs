@@ -32,6 +32,26 @@ const EXTRA_KEBAB = new Set([
   /* profile.py uses multiline data_lucide=(...) — the scanner regex misses these */
   "sun",
   "moon",
+  /* achievement badges: icons come from FAMILY_SPECS dict lookups
+     (achievements.py), so data_lucide= is always a variable */
+  "anvil",
+  "sparkles",
+  "tags",
+  "bookmark-check",
+  "store",
+  "scale",
+  "palette",
+  "brush",
+  "library-big",
+  "heart",
+  "boxes",
+  "crosshair",
+  /* messages inbox: icons come from dict lookups / conditionals (render.py,
+     components.py), so data_lucide= is a variable the scanner cannot see */
+  "mail",
+  "circle-x",
+  "archive",
+  "archive-restore",
 ]);
 
 function toCamelCase(string) {

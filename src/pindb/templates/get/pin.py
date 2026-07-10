@@ -8,8 +8,9 @@ column, and HTMX fragments live in sibling modules.
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div, fragment
+from htpy import Element, div, fragment, script
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -74,15 +75,23 @@ def pin_page(
         title=pin.name,
         request=request,
         template_js_extra=("pins/pin_swiper.js", "pins/pin_lightbox.js"),
-        head_content=opengraph_head(
-            title=f"Pin: {pin.name}",
-            description=_pin_share_description(pin),
-            canonical_url=canonical_url,
-            image_url=str(
-                request.url_for("get_og_image", entity_type="pin", id=pin.id)
+        head_content=[
+            # Vendored Swiper must load (deferred, document order) before
+            # pins/pin_swiper.js boots the carousel.
+            script(
+                src=f"/static/vendor/swiper.min.js?v={STATIC_CACHE_BUSTER}",
+                defer=True,
             ),
-            og_type="article",
-        ),
+            opengraph_head(
+                title=f"Pin: {pin.name}",
+                description=_pin_share_description(pin),
+                canonical_url=canonical_url,
+                image_url=str(
+                    request.url_for("get_og_image", entity_type="pin", id=pin.id)
+                ),
+                og_type="article",
+            ),
+        ],
         body_content=fragment[
             _page_layout(
                 request=request,

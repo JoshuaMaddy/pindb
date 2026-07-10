@@ -28,10 +28,11 @@ class PinFactory(BaseFactory):
     acquisition_type = AcquisitionType.single
     front_image_guid = factory.LazyFunction(uuid.uuid4)
 
-    # Control params (not model fields) — set approved=False for a pending pin
-    class Params:
-        approved = True
-        created_by = None
+    # NOTE: `approved` / `created_by` are plain kwargs consumed in `_create`
+    # (same as the other factories). They must NOT be declared in a
+    # `class Params` block — factory_boy strips Params before `_create`, so
+    # the pops there would only ever see the defaults and a caller's
+    # `created_by=` would be silently dropped.
 
     @factory.lazy_attribute
     def currency(self):

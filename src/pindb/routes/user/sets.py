@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats, refresh_users_stats
 from pindb.auth import AdminUser, AuthenticatedUser
 from pindb.database import Pin, PinSet, User, async_session_maker
 from pindb.database.joins import (
@@ -204,6 +205,9 @@ async def promote_set_to_global(
             raise HTTPException(status_code=400, detail="Set is already global")
         # owner_id=None ⇒ global, visible to all
         pin_set.owner_id = None
+        creator_id: int | None = pin_set.created_by_id
+
+    await refresh_users_stats([creator_id])
 
     return redirect_or_htmx_toast(
         request=request,
@@ -233,6 +237,8 @@ async def favorite_pin(
             .on_conflict_do_nothing()
         )
 
+    await refresh_user_stats(user_id=current_user.id)
+
     if request.headers.get("HX-Request"):
         return HTMLResponse(
             content=str(
@@ -255,6 +261,8 @@ async def unfavorite_pin(
                 user_favorite_pins.c.pin_id == pin_id,
             )
         )
+
+    await refresh_user_stats(user_id=current_user.id)
 
     if request.headers.get("HX-Request"):
         return HTMLResponse(

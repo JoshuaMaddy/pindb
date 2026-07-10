@@ -89,7 +89,7 @@
 
   // Non-htmx submissions (forms with method=post, no hx-post). Browser native
   // required handling typically blocks these, but mirror server-side messaging
-  // for forms whose required fields are TomSelect-hidden (browser refuses to
+  // for forms whose required fields are widget-hidden (browser refuses to
   // surface a tooltip on display:none controls).
   document.body.addEventListener(
     "submit",

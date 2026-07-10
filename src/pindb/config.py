@@ -83,6 +83,10 @@ class Configuration(BaseSettings):
     meilisearch_index: str = Field(default="pins")
     search_sync_interval_minutes: int = Field(default=5)
 
+    # Achievements: safety-net sweep recomputing every user's stats (routes
+    # keep stats fresh; the sweep heals missed call sites).
+    stats_refresh_interval_minutes: int = Field(default=60)
+
     _meili_client: AsyncClient | None = None
 
     @property
@@ -166,7 +170,7 @@ class Configuration(BaseSettings):
 
 
 try:
-    CONFIGURATION = Configuration()  # type: ignore
+    CONFIGURATION = Configuration()
 except ValidationError as exc:
     print(exc.json(indent=2), file=sys.stderr)
     raise

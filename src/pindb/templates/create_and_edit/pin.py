@@ -27,9 +27,8 @@ from pindb.templates.base import html_base
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.create_and_edit.pin_form_fields import (
-    _back_image_input,
-    _front_image_input,
     _optional_fields,
+    _pin_images_input,
     _required_fields,
 )
 
@@ -104,8 +103,7 @@ def pin_form(
                     **{"data-htmx-submit-guard": ""},
                 )[
                     div(class_="flex flex-col gap-2 min-w-0")[
-                        _front_image_input(pin=pin),
-                        _back_image_input(pin=pin),
+                        _pin_images_input(pin=pin),
                     ],
                     div(
                         class_="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[max-content_1fr] sm:items-start"
@@ -116,6 +114,7 @@ def pin_form(
                             pin=prefill,
                             currencies=currencies,
                             request=request,
+                            options_base_url=options_base_url,
                             name_check_exclude_id=pin.id if pin is not None else None,
                         ),
                         hr(class_="col-span-full"),
@@ -125,6 +124,8 @@ def pin_form(
                             artists=artists,
                             variant_pins=variant_pins,
                             unauthorized_copy_pins=unauthorized_copy_pins,
+                            options_base_url=options_base_url,
+                            exclude_pin_id=pin.id if pin is not None else None,
                         ),
                         button(
                             type="submit",

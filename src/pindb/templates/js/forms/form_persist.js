@@ -1,14 +1,18 @@
+// Reload-only form persistence. Saves every named form field (including
+// island-rendered inputs) to sessionStorage; restores on reload-type loads.
+// Svelte islands restore their own subtrees from the same payload (see
+// frontend/lib/form-persist.ts) — the generic restore below skips them.
+//
+// Save listeners are always armed (a fresh navigate clears any stale
+// payload first) so the FIRST reload already restores. Historically saving
+// only armed on reload-type loads and restore hung off `alpine:initialized`,
+// which had already fired before this script ran — restore was dead code.
 (function () {
   "use strict";
 
   var navEntry = performance.getEntriesByType("navigation")[0];
   var navType = navEntry ? navEntry.type : "navigate";
   var STORAGE_KEY = "form_persist:" + location.pathname;
-
-  if (navType !== "reload") {
-    sessionStorage.removeItem(STORAGE_KEY);
-    return;
-  }
 
   // ── Save ────────────────────────────────────────────────────────────────
 
@@ -52,7 +56,12 @@
     save();
   });
 
-  // ── Restore ─────────────────────────────────────────────────────────────
+  // ── Restore (reload loads only) ─────────────────────────────────────────
+
+  if (navType !== "reload") {
+    sessionStorage.removeItem(STORAGE_KEY);
+    return;
+  }
 
   var rawStored = sessionStorage.getItem(STORAGE_KEY);
   if (!rawStored) return;
@@ -64,67 +73,39 @@
     return;
   }
 
-  document.addEventListener("alpine:initialized", function () {
-    // Restore Alpine x-data components (links, grades)
-    document.querySelectorAll("[x-data]").forEach(function (el) {
-      if (!window.Alpine) return;
-      try {
-        var alpine = Alpine.$data(el);
+  // Deferred scripts run with the DOM parsed — restore immediately.
+  var seen = {};
+  document.querySelectorAll("form [name]").forEach(function (el) {
+    if (el.type === "file") return;
+    // Svelte islands restore their own inputs from the same payload.
+    if (el.closest("[data-island]")) return;
 
-        if (Array.isArray(alpine.links) && Array.isArray(data.links) && data.links.length) {
-          alpine.links = data.links.slice();
-        }
+    var name = el.name;
+    var storedVal = data[name];
+    if (storedVal === undefined) return;
 
-        if (Array.isArray(alpine.grades)) {
-          var names = data.grade_names;
-          var prices = data.grade_prices;
-          if (Array.isArray(names) && names.length) {
-            alpine.grades = names.map(function (gradeName, i) {
-              return {
-                id: crypto.randomUUID(),
-                name: gradeName,
-                price: prices && prices[i] != null ? prices[i] : "",
-              };
-            });
-          }
-        }
-      } catch {}
-    });
+    if (el.tagName === "SELECT" && el.multiple) {
+      var multiValues = Array.isArray(storedVal) ? storedVal : [storedVal];
+      Array.from(el.options).forEach(function (opt) {
+        opt.selected = multiValues.includes(opt.value);
+      });
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
 
-    // Restore non-Alpine form fields
-    var seen = {};
-    document.querySelectorAll("form [name]").forEach(function (el) {
-      if (el.type === "file") return;
-      // Alpine x-model inputs are handled above via $data — skip here
-      if (el.closest("[x-data]") && el.hasAttribute("x-model")) return;
+    if (el.type === "checkbox" || el.type === "radio") {
+      el.checked = storedVal;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
 
-      var name = el.name;
-      var storedVal = data[name];
-      if (storedVal === undefined) return;
-
-      if (el.tagName === "SELECT" && el.multiple) {
-        var multiValues = Array.isArray(storedVal) ? storedVal : [storedVal];
-        Array.from(el.options).forEach(function (opt) {
-          opt.selected = multiValues.includes(opt.value);
-        });
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        return;
-      }
-
-      if (el.type === "checkbox" || el.type === "radio") {
-        el.checked = storedVal;
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        return;
-      }
-
-      if (!seen[name]) seen[name] = 0;
-      var idx = seen[name]++;
-      var values = Array.isArray(storedVal) ? storedVal : [storedVal];
-      if (idx < values.length) {
-        el.value = values[idx];
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    });
+    if (!seen[name]) seen[name] = 0;
+    var idx = seen[name]++;
+    var values = Array.isArray(storedVal) ? storedVal : [storedVal];
+    if (idx < values.length) {
+      el.value = values[idx];
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   });
 })();

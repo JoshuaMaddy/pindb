@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_users_stats
 from pindb.auth import require_admin
 from pindb.database import Artist, Pin, PinSet, Shop, Tag, async_session_maker
 from pindb.database.audit_mixin import AuditMixin
@@ -68,22 +69,31 @@ async def _get_pending_entity(
 
 def _approve_entity(
     entity: PendingAuditEntity, user_id: int | None, now: datetime
-) -> None:
-    """Set approved_at on entity; skip if already approved."""
+) -> bool:
+    """Set approved_at on entity; skip if already approved.
+
+    Returns True when the entity was newly approved.
+    """
     if entity.approved_at is not None:
-        return
+        return False
     entity.approved_at = now  # type: ignore[misc]
     entity.approved_by_id = user_id  # type: ignore[misc]
+    return True
 
 
 def _approve_with_cascade(
     entity: PendingAuditEntity, user_id: int | None, now: datetime
-) -> None:
-    """Approve entity and any pending direct dependencies (Pin only)."""
-    _approve_entity(entity, user_id, now)
+) -> set[int]:
+    """Approve entity and any pending direct dependencies (Pin only).
+
+    Returns creator ids of every newly approved entity, for stats refresh.
+    """
+    affected_creators: set[int] = set()
+    if _approve_entity(entity, user_id, now) and entity.created_by_id is not None:
+        affected_creators.add(entity.created_by_id)
 
     if not isinstance(entity, Pin):
-        return
+        return affected_creators
 
     for rel in [*entity.shops, *entity.artists, *entity.tags]:
         if (
@@ -91,7 +101,12 @@ def _approve_with_cascade(
             and rel.approved_at is None
             and rel.rejected_at is None
         ):
-            _approve_entity(rel, user_id, now)  # type: ignore[arg-type]
+            if (
+                _approve_entity(rel, user_id, now)  # type: ignore[arg-type]
+                and rel.created_by_id is not None
+            ):
+                affected_creators.add(rel.created_by_id)
+    return affected_creators
 
 
 async def _load_pin_for_edit(session: AsyncSession, pin_id: int) -> Pin | None:
@@ -374,12 +389,13 @@ async def approve_entity(
             if pin_with_rels is not None:
                 entity = pin_with_rels  # type: ignore[assignment]
 
-        _approve_with_cascade(entity, current_user.id, now)
+        affected_creators = _approve_with_cascade(entity, current_user.id, now)
 
     if entity_type == EntityType.pin:
         await sync_pin_with_deps(entity_id)
     else:
         await sync_entity(entity_type, entity_id)
+    await refresh_users_stats(affected_creators)
 
     return await _pending_action_response(request)
 
@@ -413,11 +429,13 @@ async def delete_pending_entity(
     now = utc_now()
     async with async_session_maker.begin() as session:
         entity = await _get_pending_entity(session, entity_type, entity_id)
+        creator_id: int | None = entity.created_by_id
         if isinstance(entity, AuditMixin):
             entity.deleted_at = now
             entity.deleted_by_id = current_user.id
 
     await delete_one(entity_type, entity_id)
+    await refresh_users_stats([creator_id])
 
     return await _pending_action_response(request)
 
@@ -441,6 +459,7 @@ async def approve_pending_edits(
         if entity is None:
             raise HTTPException(status_code=404, detail="Entity not found")
 
+        affected_user_ids: set[int | None] = set()
         chain = await get_edit_chain(session, table_name, entity_id)
         if chain:
             effective = get_effective_snapshot(entity, chain)
@@ -449,10 +468,11 @@ async def approve_pending_edits(
             for edit in chain:
                 edit.approved_at = now
                 edit.approved_by_id = current_user.id
+                affected_user_ids.add(edit.created_by_id)
 
             # Cascade pending deps when approving a pin edit (same as pin approval)
             if isinstance(entity, Pin):
-                _approve_with_cascade(
+                affected_user_ids |= _approve_with_cascade(
                     cast(PendingAuditEntity, entity), current_user.id, now
                 )
 
@@ -461,6 +481,7 @@ async def approve_pending_edits(
             await sync_pin_with_deps(entity_id)
         else:
             await sync_entity(entity_type, entity_id)
+        await refresh_users_stats(affected_user_ids)
 
     return await _pending_action_response(request)
 
@@ -545,12 +566,13 @@ async def approve_bulk(
 ) -> Response:
     now = utc_now()
     to_sync: set[tuple[EntityType, int]] = set()
+    affected_user_ids: set[int | None] = set()
 
     async with async_session_maker.begin() as session:
         bulk_entities = await _collect_bulk_entities(session, bulk_id)
         for entity in bulk_entities:
             if entity.approved_at is None and entity.rejected_at is None:
-                _approve_with_cascade(entity, current_user.id, now)
+                affected_user_ids |= _approve_with_cascade(entity, current_user.id, now)
                 et = _entity_type_of(entity)
                 if et is not None:
                     to_sync.add((et, entity.id))
@@ -577,6 +599,7 @@ async def approve_bulk(
             for edit in full_chain:
                 edit.approved_at = now
                 edit.approved_by_id = current_user.id
+                affected_user_ids.add(edit.created_by_id)
             to_sync.add((entity_type, entity_id))
 
     for et, eid in to_sync:
@@ -584,6 +607,7 @@ async def approve_bulk(
             await sync_pin_with_deps(eid)
         else:
             await sync_entity(et, eid)
+    await refresh_users_stats(affected_user_ids)
 
     return await _pending_action_response(request)
 
@@ -625,6 +649,7 @@ async def delete_bulk(
     current_user: User = Depends(require_admin),
 ) -> Response:
     now = utc_now()
+    affected_user_ids: set[int | None] = set()
     async with async_session_maker.begin() as session:
         to_delete: list[tuple[EntityType, int]] = []
         bulk_entities = await _collect_bulk_entities(session, bulk_id)
@@ -632,6 +657,7 @@ async def delete_bulk(
             if isinstance(entity, AuditMixin) and entity.deleted_at is None:
                 entity.deleted_at = now
                 entity.deleted_by_id = current_user.id
+                affected_user_ids.add(entity.created_by_id)
                 et = _entity_type_of(entity)
                 if et is not None:
                     to_delete.append((et, entity.id))
@@ -642,5 +668,6 @@ async def delete_bulk(
 
     for et, eid in to_delete:
         await delete_one(et, eid)
+    await refresh_users_stats(affected_user_ids)
 
     return await _pending_action_response(request)

@@ -21,16 +21,17 @@
   ];
 
   /**
-   * True when the Tom Select control for `selectId` has at least one value.
+   * True when the select for `selectId` has at least one selected value.
+   * Widget-agnostic: both the Svelte multi-select island and (historically)
+   * Tom Select keep the underlying select element's selection in sync.
    * @param {string} selectId
    * @returns {boolean}
    */
-  globalThis.pindbTomSelectHasItems = function (selectId) {
+  globalThis.pindbSelectHasItems = function (selectId) {
     var el = document.getElementById(selectId);
-    if (!el || !el.tomselect) return false;
-    var v = el.tomselect.getValue();
-    if (Array.isArray(v)) return v.length > 0;
-    return v !== "" && v !== null && typeof v !== "undefined";
+    if (!el) return false;
+    if (el.multiple) return el.selectedOptions.length > 0;
+    return el.value !== "" && el.value !== null && el.value !== undefined;
   };
 
   /**

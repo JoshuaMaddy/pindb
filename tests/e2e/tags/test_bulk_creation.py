@@ -10,6 +10,9 @@ from typing import Any
 from urllib.parse import quote
 
 from playwright.sync_api import Locator, Page, expect
+from titlecase import titlecase
+
+from tests.e2e.select_helpers import multi_add, single_pick
 
 
 def _tag_rows(page: Page) -> Locator:
@@ -21,11 +24,10 @@ def _fill_row_name(page: Page, row_index: int, name: str) -> None:
 
 
 def _set_row_category(page: Page, row_index: int, category: str) -> None:
-    _tag_rows(page).nth(row_index).locator("select").nth(0).evaluate(
-        """(select, category) => {
-            select.tomselect.setValue(category);
-        }""",
-        category,
+    single_pick(
+        page,
+        _tag_rows(page).nth(row_index).locator("select").nth(0),
+        titlecase(category),
     )
 
 
@@ -34,14 +36,8 @@ def _set_row_description(page: Page, row_index: int, description: str) -> None:
 
 
 def _add_row_alias(page: Page, row_index: int, alias: str) -> None:
-    alias_input = (
-        _tag_rows(page).nth(row_index).locator("td").nth(3).locator(".ts-control input")
-    )
-    alias_input.click()
-    alias_input.fill(alias)
-    option = page.locator(".ts-dropdown:visible [data-selectable]").first
-    expect(option).to_contain_text(f"Add {alias}")
-    option.click()
+    alias_select = _tag_rows(page).nth(row_index).locator("td").nth(3).locator("select")
+    multi_add(page, alias_select, alias, create=True)
 
 
 def _select_row_implication(
@@ -51,29 +47,21 @@ def _select_row_implication(
     query: str,
     value: str,
 ) -> None:
-    """Select an implication through the page's Tom Select load pipeline."""
-    _tag_rows(page).nth(row_index).locator("select").nth(1).evaluate(
-        """(select, args) => new Promise((resolve, reject) => {
-            const tomSelect = select.tomselect;
-            const loader = tomSelect.settings.load;
-            if (!loader) {
-                reject(new Error("implication select has no loader"));
-                return;
-            }
+    """Select the implication tag named *value* through the widget UI.
 
-            loader.call(tomSelect, args.query, function(results) {
-                (results || []).forEach(function(option) {
-                    tomSelect.addOption(option);
-                });
-                if (!tomSelect.options[args.value]) {
-                    reject(new Error("missing implication option: " + args.value));
-                    return;
-                }
-                tomSelect.addItem(args.value, true);
-                resolve(tomSelect.getValue());
-            });
-        })""",
-        {"query": query, "value": value},
+    Server-indexed options render a titlecased display text ("Bulk E2e C")
+    while in-batch sibling options render the raw name — match either,
+    exactly. The typed query is the first underscore-free chunk so both the
+    search backend (no underscore splitting) and the widget's text filter
+    (which sees the display text) agree.
+    """
+    display = titlecase(value.replace("_", " "))
+    pattern = re.compile(rf"^\s*(?:{re.escape(value)}|{re.escape(display)})\s*$", re.I)
+    multi_add(
+        page,
+        _tag_rows(page).nth(row_index).locator("select").nth(1),
+        query.split("_", 1)[0],
+        option_text=pattern,
     )
 
 

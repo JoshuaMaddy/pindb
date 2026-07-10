@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from sqlalchemy import select
 
+from pindb.achievements import refresh_all_user_stats
 from pindb.config import CONFIGURATION
 from pindb.database import async_engine, async_session_maker, seed_currencies
 from pindb.database.user import User
@@ -55,6 +56,11 @@ async def lifespan(app: FastAPI):
             update_all,
             trigger="interval",
             minutes=CONFIGURATION.search_sync_interval_minutes,
+        )
+        scheduler.add_job(
+            refresh_all_user_stats,
+            trigger="interval",
+            minutes=CONFIGURATION.stats_refresh_interval_minutes,
         )
         scheduler.start()
 

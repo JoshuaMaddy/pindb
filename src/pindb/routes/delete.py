@@ -6,6 +6,7 @@ from fastapi import Depends
 from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRouter
 
+from pindb.achievements import refresh_users_stats
 from pindb.audit_events import get_audit_user
 from pindb.auth import require_admin
 from pindb.database import async_session_maker
@@ -24,14 +25,17 @@ async def post_delete_entity(entity_type: EntityType, id: int) -> RedirectRespon
     now = utc_now()
     user_id = get_audit_user()
     LOGGER.info("Soft-deleting %s id=%d", entity_type.value, id)
+    creator_id: int | None = None
     async with async_session_maker.begin() as session:
         entity = await session.get(entity_type.model, id)
         if entity is not None:
+            creator_id = entity.created_by_id
             entity.deleted_at = now
             entity.deleted_by_id = user_id
         else:
             LOGGER.warning("Delete target %s id=%d not found", entity_type.value, id)
 
     await delete_one(entity_type, id)
+    await refresh_users_stats([creator_id])
 
     return RedirectResponse(url="/", status_code=303)

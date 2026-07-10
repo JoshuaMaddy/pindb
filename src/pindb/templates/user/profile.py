@@ -11,6 +11,7 @@ from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
+from pindb.templates.components.achievements.badge import achievement_badge_row
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.user.profile_sections import (
@@ -28,6 +29,7 @@ from pindb.templates.user.profile_settings import (
 def user_profile_page(
     request: Request,
     profile_user: User,
+    achievements: dict[str, int],
     favorite_pins: list[Pin],
     favorite_count: int,
     personal_sets: list[PinSet],
@@ -54,6 +56,7 @@ def user_profile_page(
                     text=username,
                     heading_id="user-profile-heading",
                 ),
+                achievement_badge_row(highest_tiers=achievements),
                 hr,
                 _favorites_section(
                     request=request,

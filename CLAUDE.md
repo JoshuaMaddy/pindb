@@ -12,12 +12,14 @@ uvx ruff check --select I --fix .
 uvx ruff format .
 uvx ty check
 npm run js:lint
+npm run islands:check   # when frontend/ touched
 ```
 
 ## Tech Stack
 - **Backend:** Python 3.13+, FastAPI, SQLAlchemy 2.0+, Pydantic Settings, APScheduler
 - **Auth:** Argon2, DB-backed session tokens, Google OIDC, Discord OAuth, Meta OAuth
-- **Frontend:** htpy, HTMX, Tailwind CSS 4, Alpine.js, Tom Select, Lucide icons
+- **Frontend:** htpy, HTMX, Tailwind CSS 4, Svelte 5 islands (TypeScript), Lucide icons. Alpine.js and Tom Select fully removed — complex widgets are islands; pure show/hide disclosures use the delegated `data-disclosure` pattern in `templates/js/shell/pindb_shell.js`.
+- **Select widgets:** all enhanced selects are the native `frontend/lib/MultiSelect.svelte` component (chips, dropdown, remote load via `/get/options/*` or `/bulk/options/*`, create-on-type, tag category branding from `window.TagCategoryData`). Bulk grids use it as a plain component; page forms render a server `<select>` followed by the `multi-select` enhancer island (`island("multi-select", props={"selectId": ...})`), which adopts the select — moves it inside the widget, keeps it synced, dispatches real bubbling `change` events (HTMX `hx-trigger="change"`, form gates and form-persist saves all keep working). Gate check is `pindbSelectHasItems` (reads the underlying select). E2E drives selects only through `tests/e2e/select_helpers.py`, never widget internals. Meilisearch note: index uids all derive from `MEILISEARCH_INDEX` (base name) — `<base>`, `<base>_tags`, `<base>_artists`, `<base>_shops`, `<base>_pin_sets` — so parallel test workers on one Meili server stay isolated; renaming means indexes rebuild on next sync after deploy.
 - **Database:** PostgreSQL 17, Meilisearch
 - **Migrations:** Alembic (runs on container start, not app startup)
 - **Tooling:** UV, Ruff, ty, Oxlint
@@ -39,7 +41,9 @@ Or: `bash scripts/dev.sh` / `scripts/dev.ps1`
 
 Standard layout: `src/pindb/{database,routes,templates,search,models}/`. Names mirror — route `routes/get/pin.py` → template `templates/get/pin.py`. Env config = Pydantic Settings in `config.py` (source of truth for env vars).
 
-First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `bulk/`, `tables/`). Mount stays `/templates-js/` with `CacheBustedTemplateJsFiles` (same long cache as vendored static); use `templates_js_url("pins/pin_lightbox.js")` so every URL includes `?v=<process start>` (see `templates/base.py` and `template_js_extra` on pages). `html_base` always loads `forms/htmx_submit_guard.js`; opt in per form with `data-htmx-submit-guard` to disable submit + spinner during HTMX posts (create/edit flows).
+**Svelte islands** (complex interactive widgets; htpy + HTMX stay for pages/fragments): source in `frontend/` at repo root (TypeScript + Svelte 5 runes; never imported by Python). `npm run islands:build` (or `islands:watch` during dev, alongside `fastapi dev`) emits to gitignored `src/pindb/static/islands/` — stable entry names + content-hashed shared chunks; `vite.config.ts` auto-globs `frontend/islands/*.entry.ts` (each entry = 2 lines via `lib/define-island.ts`). Templates render mount points via `island("name", props={...})` from `templates/components/islands.py` (props = real JSON script block — never `json.dumps().replace('"', "'")`); loader (`frontend/mount.ts`, loaded in `base.py`) mounts on load + `htmx:afterSwap`/`oobAfterSwap`/`historyRestore`, unmounts on `htmx:beforeCleanupElement`. Rules: Tailwind classes only, literal strings, no `<style>` blocks (`input.css` has `@source` for `frontend/`); icons via `@lucide/svelte` direct imports; shared reactive modules named `*.svelte.ts`; islands never rely on legacy scripts binding listeners into their DOM (mount is async — interop via localStorage/CustomEvents/self-applied effects). `npm run islands:check` (svelte-check) gates components; oxlint skips `.svelte`. `preserveEntrySignatures: "exports-only"` in `vite.config.ts` keeps island default exports — do not remove. E2E visual parity: `assert_screenshot` fixture + `tests/e2e/screenshots.py`; baselines in `tests/e2e/__screenshots__/` are machine-specific — regenerate via `uv run pytest -m e2e --update-screenshots` and visually review before committing.
+
+First-party page scripts live under `templates/js/` in subfolders (`shell/`, `forms/`, `tags/`, `pins/`, `shared/`). Mount stays `/templates-js/` with `CacheBustedTemplateJsFiles` (same long cache as vendored static); use `templates_js_url("pins/pin_lightbox.js")` so every URL includes `?v=<process start>` (see `templates/base.py` and `template_js_extra` on pages). `html_base` always loads `forms/htmx_submit_guard.js`; opt in per form with `data-htmx-submit-guard` to disable submit + spinner during HTMX posts (create/edit flows).
 
 Key files where behavior not obvious from name:
 - `audit_events.py` — session-level SQLAlchemy events (before_flush, after_flush, do_orm_execute). Soft-delete + pending filters here.
@@ -127,6 +131,12 @@ return HTMLResponse(content=str(template(pin=pin)))
 - Searchable attributes configured on startup.
 - APScheduler syncs every N minutes (`search_sync_interval_minutes`, default 5). Manual: `POST /admin/search/sync`.
 - **DB ↔ Meili sync rule:** Every write that changes entity visibility or content must be followed by a Meili call. Use `sync_entity(entity_type, entity_id)` (upsert or auto-delete if gone) or `delete_one(entity_type, id)` (immediate remove). For pin approval with cascade, use `sync_pin_with_deps(pin_id)` which also re-syncs the pin's shops/artists/tags. Applies to: create, direct edit, approve, reject, delete — for all five tracked entity types (Pin, Tag, Artist, Shop, PinSet). Call **after** the write session closes.
+
+### Achievements & User Stats
+- `achievements.py` = derived-state sync layer (like `search/update.py`). `UserStats` (wide row per user) is always **recomputed from source**, never incremented; `UserAchievement` rows are permanent (unique on `(user_id, family, tier)` — that constraint is the exactly-once award mechanism; the winning `ON CONFLICT DO NOTHING ... RETURNING` insert also creates the notification `Message` in the same transaction).
+- **Stats sync rule (mirrors the Meili rule):** every write that changes a user's countable contributions (create/edit/approve/reject/delete of Pin/Tag/Shop/Artist/PinSet, favorites, owned/wanted) is followed by `await refresh_user_stats(user_id)` (or `refresh_users_stats([...])` for multi-user approval flows) **after** the write session closes, beside the existing `sync_entity` call. It never raises (logs instead); the hourly scheduler sweep (`stats_refresh_interval_minutes`) self-heals missed call sites.
+- Edit stats union `ChangeLog` (`operation="update"`) with **approved** `PendingEdit` rows — the ChangeLog row for an applied pending edit credits the approving admin, so PendingEdit is the editor's paper trail. "Others' entities" predicates use `IS DISTINCT FROM` (erasure nulls `created_by_id`).
+- Badge UI: `templates/components/achievements/badge.py`; colors = `achievement-*`/`metal-*` tokens in `input.css` (tag-chip exception pattern); metal border shine = scroll-driven animation (`animation-timeline: view()`, static fallback). Badge icons load via `EXTRA_KEBAB` in `build-lucide.mjs` (dict-lookup icons are invisible to the scanner).
 
 ### Global vs Personal PinSets
 - `PinSet.owner_id = NULL` → global/curator set (admin-editable).

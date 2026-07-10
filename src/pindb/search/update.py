@@ -24,24 +24,30 @@ from pindb.database.tag import Tag
 LOGGER: logging.Logger = logging.getLogger(name="pindb.search.update")
 
 
+# All index uids derive from the configured base name so separate app
+# instances (parallel test workers against one shared Meilisearch server)
+# never share an index. See the matching constants in ``search.py``.
+_INDEX_BASE: str = CONFIGURATION.meilisearch_index
+
+
 def _pin_index() -> AsyncIndex:
-    return CONFIGURATION.meili_client.index(uid=CONFIGURATION.meilisearch_index)
+    return CONFIGURATION.meili_client.index(uid=_INDEX_BASE)
 
 
 def _tags_index() -> AsyncIndex:
-    return CONFIGURATION.meili_client.index(uid="tags")
+    return CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_tags")
 
 
 def _artists_index() -> AsyncIndex:
-    return CONFIGURATION.meili_client.index(uid="artists")
+    return CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_artists")
 
 
 def _shops_index() -> AsyncIndex:
-    return CONFIGURATION.meili_client.index(uid="shops")
+    return CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_shops")
 
 
 def _pin_sets_index() -> AsyncIndex:
-    return CONFIGURATION.meili_client.index(uid="pin_sets")
+    return CONFIGURATION.meili_client.index(uid=f"{_INDEX_BASE}_pin_sets")
 
 
 INDEX_BY_ENTITY_TYPE: dict[EntityType, AsyncIndex] = {
@@ -80,7 +86,7 @@ async def setup_index() -> None:
     """Create indexes if needed and apply searchable/filterable attribute settings."""
     LOGGER.info("Configuring Meilisearch indexes.")
     await _create_index(
-        uid=CONFIGURATION.meilisearch_index,
+        uid=_INDEX_BASE,
         searchable=[
             "name",
             "tags",
@@ -93,14 +99,18 @@ async def setup_index() -> None:
         ],
     )
     await _create_index(
-        uid="tags",
+        uid=f"{_INDEX_BASE}_tags",
         searchable=["display_name", "name", "aliases", "category"],
         filterable=["category"],
     )
-    await _create_index(uid="artists", searchable=["name", "aliases", "description"])
-    await _create_index(uid="shops", searchable=["name", "aliases", "description"])
     await _create_index(
-        uid="pin_sets",
+        uid=f"{_INDEX_BASE}_artists", searchable=["name", "aliases", "description"]
+    )
+    await _create_index(
+        uid=f"{_INDEX_BASE}_shops", searchable=["name", "aliases", "description"]
+    )
+    await _create_index(
+        uid=f"{_INDEX_BASE}_pin_sets",
         searchable=["name", "description"],
         # owner_id is already in the document; making it filterable lets the
         # public list filter to global sets (owner_id IS NULL) in Meili so

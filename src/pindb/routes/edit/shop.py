@@ -11,6 +11,7 @@ from pydantic import BeforeValidator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
 from pindb.database import Shop, async_session_maker
 from pindb.database.entity_type import EntityType
@@ -134,6 +135,7 @@ async def post_edit_shop(
         shop_id: int = shop.id
 
     await sync_entity(EntityType.shop, shop_id)
+    await refresh_user_stats(user_id=current_user.id)
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

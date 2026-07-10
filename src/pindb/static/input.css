@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+/* Svelte island sources — Tailwind must scan them for class usage. */
+@source "../../../frontend";
 
 @custom-variant mocha (&:where(.mocha, .mocha *));
 @custom-variant macchiato (&:where(.macchiato, .macchiato *));
@@ -18,6 +20,22 @@
 @custom-variant gruvbox-light-soft (&:where(.gruvbox-light-soft, .gruvbox-light-soft *));
 @custom-variant hc-dark (&:where(.hc-dark, .hc-dark *));
 @custom-variant hc-light (&:where(.hc-light, .hc-light *));
+
+/* Registered so the achievement badge's conic border angle interpolates —
+   without @property support the facets simply sit still. */
+@property --badge-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* 0–100 mix ratio pulsing the badge facets between the metal's deep and base
+   tones; registered so it interpolates. */
+@property --badge-pulse {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
 
 @theme {
   --color-pin-base-300: hsl(231deg, 11%, 58%);
@@ -82,6 +100,49 @@
   --color-tag-company: hsl(50, 50%, 24%);
   --color-tag-company-fg: hsl(50, 80%, 76%);
   --color-tag-company-hover: hsl(50, 90%, 88%);
+
+  /* Achievement badge colors (dark defaults; create/edit pairs share a hue).
+     Non-interactive chips: bg + fg only, no hover set. */
+  --color-achievement-pinsmith: hsl(25, 48%, 24%);
+  --color-achievement-pinsmith-fg: hsl(25, 78%, 74%);
+  --color-achievement-polisher: hsl(25, 48%, 24%);
+  --color-achievement-polisher-fg: hsl(25, 78%, 74%);
+  --color-achievement-taxonomist: hsl(42, 48%, 24%);
+  --color-achievement-taxonomist-fg: hsl(42, 80%, 74%);
+  --color-achievement-archivist: hsl(42, 48%, 24%);
+  --color-achievement-archivist-fg: hsl(42, 80%, 74%);
+  --color-achievement-merchant: hsl(190, 48%, 22%);
+  --color-achievement-merchant-fg: hsl(190, 70%, 74%);
+  --color-achievement-appraiser: hsl(190, 48%, 22%);
+  --color-achievement-appraiser-fg: hsl(190, 70%, 74%);
+  --color-achievement-patron: hsl(300, 42%, 24%);
+  --color-achievement-patron-fg: hsl(300, 65%, 78%);
+  --color-achievement-restorer: hsl(300, 42%, 24%);
+  --color-achievement-restorer-fg: hsl(300, 65%, 78%);
+  --color-achievement-curator: hsl(270, 38%, 26%);
+  --color-achievement-curator-fg: hsl(270, 58%, 78%);
+  --color-achievement-pin-lover: hsl(340, 48%, 24%);
+  --color-achievement-pin-lover-fg: hsl(340, 72%, 78%);
+  --color-achievement-hoarder: hsl(145, 40%, 20%);
+  --color-achievement-hoarder-fg: hsl(145, 58%, 68%);
+  --color-achievement-hunter: hsl(215, 50%, 24%);
+  --color-achievement-hunter-fg: hsl(215, 78%, 78%);
+
+  /* Achievement tier metals: base + deep (facet shadow) + shine (highlight).
+     Platinum is deliberately iridescent (cyan/violet) so it never reads as
+     a second silver. */
+  --color-metal-bronze: hsl(28, 65%, 45%);
+  --color-metal-bronze-deep: hsl(18, 70%, 30%);
+  --color-metal-bronze-shine: hsl(36, 95%, 75%);
+  --color-metal-silver: hsl(210, 15%, 72%);
+  --color-metal-silver-deep: hsl(215, 15%, 45%);
+  --color-metal-silver-shine: hsl(0, 0%, 98%);
+  --color-metal-gold: hsl(45, 95%, 55%);
+  --color-metal-gold-deep: hsl(36, 90%, 38%);
+  --color-metal-gold-shine: hsl(54, 100%, 85%);
+  --color-metal-platinum: hsl(190, 45%, 80%);
+  --color-metal-platinum-deep: hsl(265, 55%, 65%);
+  --color-metal-platinum-shine: hsl(180, 100%, 96%);
 }
 
 @layer theme {
@@ -357,6 +418,44 @@
       --color-tag-company: hsl(50deg, 100%, 16%);
       --color-tag-company-fg: hsl(50deg, 100%, 94%);
       --color-tag-company-hover: hsl(51deg, 100%, 50%);
+
+      --color-achievement-pinsmith: hsl(25deg, 100%, 16%);
+      --color-achievement-pinsmith-fg: hsl(38deg, 100%, 92%);
+      --color-achievement-polisher: hsl(25deg, 100%, 16%);
+      --color-achievement-polisher-fg: hsl(38deg, 100%, 92%);
+      --color-achievement-taxonomist: hsl(42deg, 100%, 16%);
+      --color-achievement-taxonomist-fg: hsl(48deg, 100%, 92%);
+      --color-achievement-archivist: hsl(42deg, 100%, 16%);
+      --color-achievement-archivist-fg: hsl(48deg, 100%, 92%);
+      --color-achievement-merchant: hsl(190deg, 100%, 14%);
+      --color-achievement-merchant-fg: hsl(190deg, 100%, 92%);
+      --color-achievement-appraiser: hsl(190deg, 100%, 14%);
+      --color-achievement-appraiser-fg: hsl(190deg, 100%, 92%);
+      --color-achievement-patron: hsl(300deg, 100%, 16%);
+      --color-achievement-patron-fg: hsl(300deg, 100%, 94%);
+      --color-achievement-restorer: hsl(300deg, 100%, 16%);
+      --color-achievement-restorer-fg: hsl(300deg, 100%, 94%);
+      --color-achievement-curator: hsl(270deg, 100%, 18%);
+      --color-achievement-curator-fg: hsl(270deg, 100%, 95%);
+      --color-achievement-pin-lover: hsl(340deg, 100%, 16%);
+      --color-achievement-pin-lover-fg: hsl(340deg, 100%, 94%);
+      --color-achievement-hoarder: hsl(145deg, 100%, 14%);
+      --color-achievement-hoarder-fg: hsl(145deg, 80%, 92%);
+      --color-achievement-hunter: hsl(215deg, 100%, 18%);
+      --color-achievement-hunter-fg: hsl(215deg, 100%, 94%);
+
+      --color-metal-bronze: hsl(30deg, 100%, 55%);
+      --color-metal-bronze-deep: hsl(20deg, 100%, 35%);
+      --color-metal-bronze-shine: hsl(35deg, 100%, 85%);
+      --color-metal-silver: hsl(0deg, 0%, 85%);
+      --color-metal-silver-deep: hsl(0deg, 0%, 55%);
+      --color-metal-silver-shine: hsl(0deg, 0%, 100%);
+      --color-metal-gold: hsl(51deg, 100%, 50%);
+      --color-metal-gold-deep: hsl(40deg, 100%, 35%);
+      --color-metal-gold-shine: hsl(55deg, 100%, 88%);
+      --color-metal-platinum: hsl(185deg, 100%, 85%);
+      --color-metal-platinum-deep: hsl(275deg, 100%, 70%);
+      --color-metal-platinum-shine: hsl(0deg, 0%, 100%);
     }
 
     /* ── High contrast light (near black on white + blue accent) ───────── */
@@ -400,6 +499,44 @@
       --color-tag-company: hsl(50deg, 100%, 88%);
       --color-tag-company-fg: hsl(40deg, 100%, 20%);
       --color-tag-company-hover: hsl(230deg, 100%, 28%);
+
+      --color-achievement-pinsmith: hsl(38deg, 100%, 92%);
+      --color-achievement-pinsmith-fg: hsl(25deg, 100%, 18%);
+      --color-achievement-polisher: hsl(38deg, 100%, 92%);
+      --color-achievement-polisher-fg: hsl(25deg, 100%, 18%);
+      --color-achievement-taxonomist: hsl(48deg, 100%, 90%);
+      --color-achievement-taxonomist-fg: hsl(42deg, 100%, 18%);
+      --color-achievement-archivist: hsl(48deg, 100%, 90%);
+      --color-achievement-archivist-fg: hsl(42deg, 100%, 18%);
+      --color-achievement-merchant: hsl(190deg, 90%, 92%);
+      --color-achievement-merchant-fg: hsl(190deg, 100%, 16%);
+      --color-achievement-appraiser: hsl(190deg, 90%, 92%);
+      --color-achievement-appraiser-fg: hsl(190deg, 100%, 16%);
+      --color-achievement-patron: hsl(300deg, 100%, 94%);
+      --color-achievement-patron-fg: hsl(300deg, 100%, 20%);
+      --color-achievement-restorer: hsl(300deg, 100%, 94%);
+      --color-achievement-restorer-fg: hsl(300deg, 100%, 20%);
+      --color-achievement-curator: hsl(270deg, 100%, 95%);
+      --color-achievement-curator-fg: hsl(270deg, 100%, 22%);
+      --color-achievement-pin-lover: hsl(340deg, 100%, 94%);
+      --color-achievement-pin-lover-fg: hsl(340deg, 100%, 22%);
+      --color-achievement-hoarder: hsl(145deg, 70%, 90%);
+      --color-achievement-hoarder-fg: hsl(145deg, 100%, 14%);
+      --color-achievement-hunter: hsl(215deg, 100%, 94%);
+      --color-achievement-hunter-fg: hsl(215deg, 100%, 22%);
+
+      --color-metal-bronze: hsl(30deg, 100%, 24%);
+      --color-metal-bronze-deep: hsl(18deg, 100%, 15%);
+      --color-metal-bronze-shine: hsl(30deg, 100%, 45%);
+      --color-metal-silver: hsl(0deg, 0%, 35%);
+      --color-metal-silver-deep: hsl(0deg, 0%, 18%);
+      --color-metal-silver-shine: hsl(0deg, 0%, 60%);
+      --color-metal-gold: hsl(43deg, 100%, 28%);
+      --color-metal-gold-deep: hsl(36deg, 100%, 16%);
+      --color-metal-gold-shine: hsl(48deg, 100%, 45%);
+      --color-metal-platinum: hsl(200deg, 80%, 30%);
+      --color-metal-platinum-deep: hsl(268deg, 70%, 32%);
+      --color-metal-platinum-shine: hsl(190deg, 90%, 50%);
     }
   }
 
@@ -448,12 +585,333 @@
     --color-tag-company: hsl(50, 70%, 86%);
     --color-tag-company-fg: hsl(40, 70%, 26%);
     --color-tag-company-hover: hsl(40, 80%, 16%);
+
+    --color-achievement-pinsmith: hsl(25, 70%, 88%);
+    --color-achievement-pinsmith-fg: hsl(25, 70%, 28%);
+    --color-achievement-polisher: hsl(25, 70%, 88%);
+    --color-achievement-polisher-fg: hsl(25, 70%, 28%);
+    --color-achievement-taxonomist: hsl(42, 70%, 86%);
+    --color-achievement-taxonomist-fg: hsl(42, 75%, 26%);
+    --color-achievement-archivist: hsl(42, 70%, 86%);
+    --color-achievement-archivist-fg: hsl(42, 75%, 26%);
+    --color-achievement-merchant: hsl(190, 60%, 86%);
+    --color-achievement-merchant-fg: hsl(190, 75%, 22%);
+    --color-achievement-appraiser: hsl(190, 60%, 86%);
+    --color-achievement-appraiser-fg: hsl(190, 75%, 22%);
+    --color-achievement-patron: hsl(300, 55%, 90%);
+    --color-achievement-patron-fg: hsl(300, 60%, 28%);
+    --color-achievement-restorer: hsl(300, 55%, 90%);
+    --color-achievement-restorer-fg: hsl(300, 60%, 28%);
+    --color-achievement-curator: hsl(270, 50%, 90%);
+    --color-achievement-curator-fg: hsl(270, 50%, 28%);
+    --color-achievement-pin-lover: hsl(340, 70%, 90%);
+    --color-achievement-pin-lover-fg: hsl(340, 70%, 28%);
+    --color-achievement-hoarder: hsl(145, 50%, 86%);
+    --color-achievement-hoarder-fg: hsl(145, 55%, 20%);
+    --color-achievement-hunter: hsl(215, 70%, 88%);
+    --color-achievement-hunter-fg: hsl(215, 70%, 28%);
+
+    /* Metals darken on light backgrounds so borders keep contrast. */
+    --color-metal-bronze: hsl(28, 70%, 40%);
+    --color-metal-bronze-deep: hsl(18, 75%, 26%);
+    --color-metal-bronze-shine: hsl(36, 95%, 62%);
+    --color-metal-silver: hsl(215, 12%, 55%);
+    --color-metal-silver-deep: hsl(215, 15%, 35%);
+    --color-metal-silver-shine: hsl(210, 20%, 88%);
+    --color-metal-gold: hsl(43, 95%, 45%);
+    --color-metal-gold-deep: hsl(36, 90%, 30%);
+    --color-metal-gold-shine: hsl(52, 100%, 68%);
+    --color-metal-platinum: hsl(195, 55%, 55%);
+    --color-metal-platinum-deep: hsl(265, 50%, 48%);
+    --color-metal-platinum-shine: hsl(185, 85%, 76%);
   }
 }
 
 /* Theme picker: solid moon + filled sun disc. Base `* { color: base-text }` applies to
    svg path/circle too, so shapes must inherit the wrapper span’s `text-amber-*` color. */
 @layer components {
+  /* Achievement badges: family-colored chip with a faceted "metal" border.
+     Three background layers (top to bottom):
+       1. padding-box chip fill (family color)
+       2. border-box shine sweep — transparent except a moving highlight,
+          driven by the scroll timeline
+       3. border-box conic metal facets — spun continuously via the
+          registered --badge-angle custom property
+     A ::after overlay adds small soft glints that fire on their own
+     time-based clock (not scroll) at long, mutually-prime-ish intervals
+     (27s/34s/41s across nth-child variants) so a row never twinkles in
+     unison and firing reads as random rather than metronomic. Without
+     scroll-timeline support the facets still spin and the shine sits at
+     the chip's center; reduced-motion disables all of it. */
+  .achievement-badge {
+    position: relative;
+    border: 2px solid transparent;
+    /* Facet shadow tone: --badge-pulse (0–100) slowly, irregularly blends the
+       deep tone toward the base metal so the border "breathes". */
+    --badge-facet-deep: color-mix(
+      in oklab,
+      var(--badge-metal-deep),
+      var(--badge-metal) calc(var(--badge-pulse) * 1%)
+    );
+    background:
+      linear-gradient(var(--badge-bg), var(--badge-bg)) padding-box,
+      linear-gradient(
+          110deg,
+          transparent 40%,
+          var(--badge-metal-shine) 50%,
+          transparent 60%
+        )
+        border-box,
+      conic-gradient(
+          from var(--badge-angle),
+          var(--badge-metal) 0%,
+          var(--badge-facet-deep) 12%,
+          var(--badge-metal) 25%,
+          var(--badge-metal-shine) 38%,
+          var(--badge-metal) 50%,
+          var(--badge-facet-deep) 62%,
+          var(--badge-metal) 75%,
+          var(--badge-metal-shine) 88%,
+          var(--badge-metal) 100%
+        )
+        border-box;
+    background-size:
+      100% 100%,
+      250% 100%,
+      100% 100%;
+    background-position:
+      0 0,
+      50% 0,
+      0 0;
+    background-repeat: no-repeat;
+    animation:
+      badge-spin 18s linear infinite,
+      badge-pulse 13s ease-in-out infinite;
+  }
+
+  /* Stagger spin phase and pulse phase so a row of badges never moves in
+     lockstep (negative delays = start mid-cycle). */
+  .achievement-badge:nth-child(even) {
+    animation-delay: -6s, -5s;
+  }
+
+  .achievement-badge:nth-child(3n) {
+    animation-delay: -12s, -9s;
+  }
+
+  .achievement-badge::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    animation: badge-glint 27s ease-in-out infinite;
+    background:
+      radial-gradient(
+        circle 5px at 12% 20%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 3px at 82% 30%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 4px at 55% 85%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      );
+  }
+
+  .achievement-badge:nth-child(even)::after {
+    animation-duration: 34s;
+    animation-delay: -11s;
+    background:
+      radial-gradient(
+        circle 4px at 78% 75%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 5px at 30% 15%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 3px at 8% 65%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      );
+  }
+
+  .achievement-badge:nth-child(3n)::after {
+    animation-duration: 41s;
+    animation-delay: -23s;
+    background:
+      radial-gradient(
+        circle 3px at 90% 18%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 5px at 45% 30%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle 4px at 20% 88%,
+        var(--badge-metal-shine) 0%,
+        transparent 70%
+      );
+  }
+
+  @supports (animation-timeline: view()) {
+    .achievement-badge {
+      animation:
+        badge-spin 18s linear infinite,
+        badge-pulse 13s ease-in-out infinite,
+        badge-shine linear both;
+      animation-timeline: auto, auto, view();
+      animation-range: normal, normal, entry 0% exit 100%;
+    }
+
+    .achievement-badge:nth-child(even) {
+      animation-delay: -6s, -5s, 0s;
+    }
+
+    .achievement-badge:nth-child(3n) {
+      animation-delay: -12s, -9s, 0s;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .achievement-badge,
+    .achievement-badge::after {
+      animation: none;
+    }
+  }
+
+  @keyframes badge-spin {
+    to {
+      --badge-angle: 360deg;
+    }
+  }
+
+  /* Uneven stops so the deep→light breathing never feels metronomic; 13s
+     duration is deliberately co-prime with the 18s spin. */
+  @keyframes badge-pulse {
+    0% {
+      --badge-pulse: 0;
+    }
+    17% {
+      --badge-pulse: 55;
+    }
+    29% {
+      --badge-pulse: 20;
+    }
+    46% {
+      --badge-pulse: 85;
+    }
+    61% {
+      --badge-pulse: 35;
+    }
+    78% {
+      --badge-pulse: 70;
+    }
+    100% {
+      --badge-pulse: 0;
+    }
+  }
+
+  @keyframes badge-shine {
+    from {
+      background-position:
+        0 0,
+        0% 0,
+        0 0;
+    }
+    to {
+      background-position:
+        0 0,
+        100% 0,
+        0 0;
+    }
+  }
+
+  /* Single brief fire near cycle start, then dark for the rest of the
+     (27s/34s/41s) duration — reads as a badge sparkling at random rather
+     than on a visible loop. */
+  @keyframes badge-glint {
+    0%,
+    5%,
+    100% {
+      opacity: 0;
+    }
+    2% {
+      opacity: 0.9;
+    }
+  }
+
+  .badge-family-pinsmith {
+    --badge-bg: var(--color-achievement-pinsmith);
+  }
+  .badge-family-polisher {
+    --badge-bg: var(--color-achievement-polisher);
+  }
+  .badge-family-taxonomist {
+    --badge-bg: var(--color-achievement-taxonomist);
+  }
+  .badge-family-archivist {
+    --badge-bg: var(--color-achievement-archivist);
+  }
+  .badge-family-merchant {
+    --badge-bg: var(--color-achievement-merchant);
+  }
+  .badge-family-appraiser {
+    --badge-bg: var(--color-achievement-appraiser);
+  }
+  .badge-family-patron {
+    --badge-bg: var(--color-achievement-patron);
+  }
+  .badge-family-restorer {
+    --badge-bg: var(--color-achievement-restorer);
+  }
+  .badge-family-curator {
+    --badge-bg: var(--color-achievement-curator);
+  }
+  .badge-family-pin-lover {
+    --badge-bg: var(--color-achievement-pin-lover);
+  }
+  .badge-family-hoarder {
+    --badge-bg: var(--color-achievement-hoarder);
+  }
+  .badge-family-hunter {
+    --badge-bg: var(--color-achievement-hunter);
+  }
+
+  .badge-metal-bronze {
+    --badge-metal: var(--color-metal-bronze);
+    --badge-metal-deep: var(--color-metal-bronze-deep);
+    --badge-metal-shine: var(--color-metal-bronze-shine);
+  }
+  .badge-metal-silver {
+    --badge-metal: var(--color-metal-silver);
+    --badge-metal-deep: var(--color-metal-silver-deep);
+    --badge-metal-shine: var(--color-metal-silver-shine);
+  }
+  .badge-metal-gold {
+    --badge-metal: var(--color-metal-gold);
+    --badge-metal-deep: var(--color-metal-gold-deep);
+    --badge-metal-shine: var(--color-metal-gold-shine);
+  }
+  .badge-metal-platinum {
+    --badge-metal: var(--color-metal-platinum);
+    --badge-metal-deep: var(--color-metal-platinum-deep);
+    --badge-metal-shine: var(--color-metal-platinum-shine);
+  }
+
   .theme-appearance-icon {
     color: inherit;
   }
@@ -553,180 +1011,16 @@
   }
 }
 
-/** Tom Select **/
-/* Multi-Select Chips */
-.ts-wrapper.multi .ts-control [data-value],
-.ts-wrapper.multi .ts-control [data-value].active {
-  background-image: none;
-  background-color: inherit;
-  background-repeat: inherit;
-  box-shadow: none;
-  text-shadow: none;
-  @apply rounded-lg
-  text-base-text
-  bg-lighter
-  border-lightest;
-}
+/** MultiSelect (Svelte) category chips **/
 
-.ts-wrapper.plugin-remove_button:not(.rtl) .item.active .remove {
-  border-left-color: currentColor;
-}
-
-/* Single Select */
-.ts-wrapper.single,
-.ts-wrapper.single .ts-control {
-  background-image: none;
-  background-color: inherit;
-  background-repeat: inherit;
-  box-shadow: none;
-  text-shadow: none;
-  @apply rounded-lg
-  text-black
-  bg-lighter
-  border-lightest
-  items-center
-  m-0;
-}
-
-.ts-wrapper.single .ts-control {
-  @apply py-2;
-}
-
-/* Select Agnostic */
-.focus .ts-control,
-.ts-control {
-  box-shadow: none;
-  @apply border
-  bg-lighter
-  border-lightest
-  px-2
-  py-1
-  rounded-lg;
-}
-
-.ts-dropdown {
-  @apply border
-  bg-lighter
-  border-lightest
-  rounded-lg
-  shadow-lg
-  overflow-clip;
-}
-
-.ts-dropdown.single,
-.ts-wrapper.single .ts-control,
-.ts-control,
-.ts-wrapper.single.input-active .ts-control {
-  @apply border-lightest bg-lighter;
-}
-
-.ts-dropdown * {
-  @apply bg-lighter text-base-text;
-}
-
-.ts-dropdown *.active,
-.ts-dropdown *.active.create,
-.ts-dropdown *.active > *,
-.ts-dropdown *.active.create > * {
-  @apply bg-lighter-hover text-base-text;
-}
-
-.ts-wrapper.plugin-remove_button:not(.rtl) .item .remove,
-.ts-wrapper.plugin-remove_button .item .remove {
-  border-left-color: currentColor;
+/* Children of category-colored chips and tinted single-select controls must
+   inherit the widget color. Needed because @layer base { * { color: base-text } }
+   explicitly sets color on every element — explicit beats inherited regardless
+   of specificity. Unlayered rules beat @layer rules, so this wins without
+   !important. */
+[data-multiselect] [data-ms-control] [data-value][data-category] *,
+[data-multiselect][data-selected-category] [data-ms-control] * {
   color: inherit;
-}
-
-.ts-control,
-.ts-control input,
-.ts-dropdown {
-  @apply text-base-text;
-}
-
-/** Tag category chips (Tom Select multi-select items) **/
-
-/* Force children of category chips to inherit color.
-   Needed because @layer base { * { color: base-text } } explicitly sets
-   color on every element — explicit beats inherited regardless of specificity.
-   Unlayered rules beat @layer rules, so this wins without !important. */
-.ts-wrapper.multi .ts-control [data-value][data-category] *,
-.ts-wrapper.single[data-selected-category] .ts-control * {
-  color: inherit;
-}
-
-.ts-wrapper.multi .ts-control [data-value][data-category="general"] {
-  @apply bg-tag-general text-tag-general-fg fill-tag-general-fg stroke-tag-general-fg border-tag-general-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="copyright"] {
-  @apply bg-tag-copyright text-tag-copyright-fg stroke-tag-copyright-fg border-tag-copyright-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="character"] {
-  @apply bg-tag-character text-tag-character-fg fill-tag-character-fg stroke-tag-character-fg border-tag-character-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="species"] {
-  @apply bg-tag-species text-tag-species-fg fill-tag-species-fg stroke-tag-species-fg border-tag-species-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="meta"] {
-  @apply bg-tag-meta text-tag-meta-fg stroke-tag-meta-fg border-tag-meta-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="material"] {
-  @apply bg-tag-material text-tag-material-fg fill-tag-material-fg stroke-tag-material-fg border-tag-material-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="color"] {
-  @apply bg-tag-color text-tag-color-fg fill-tag-color-fg stroke-tag-color-fg border-tag-color-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="archetype"] {
-  @apply bg-tag-archetype text-tag-archetype-fg stroke-tag-archetype-fg border-tag-archetype-fg;
-}
-.ts-wrapper.multi .ts-control [data-value][data-category="company"] {
-  @apply bg-tag-company text-tag-company-fg stroke-tag-company-fg border-tag-company-fg;
-}
-
-/** Tag category single-select (Category field) — fix item layout and color the whole control box **/
-
-.ts-wrapper.single .ts-control .item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.ts-wrapper.single[data-selected-category] .ts-control > input {
-  flex: 0 0 0;
-  min-width: 0;
-  width: 0 !important;
-  opacity: 0;
-}
-
-.ts-wrapper.single[data-selected-category] .ts-control:after {
-  border-color: currentColor transparent transparent transparent;
-}
-
-.ts-wrapper.single[data-selected-category="general"] .ts-control {
-  @apply bg-tag-general text-tag-general-fg border-tag-general-fg;
-}
-.ts-wrapper.single[data-selected-category="copyright"] .ts-control {
-  @apply bg-tag-copyright text-tag-copyright-fg border-tag-copyright-fg;
-}
-.ts-wrapper.single[data-selected-category="character"] .ts-control {
-  @apply bg-tag-character text-tag-character-fg border-tag-character-fg;
-}
-.ts-wrapper.single[data-selected-category="species"] .ts-control {
-  @apply bg-tag-species text-tag-species-fg border-tag-species-fg;
-}
-.ts-wrapper.single[data-selected-category="meta"] .ts-control {
-  @apply bg-tag-meta text-tag-meta-fg border-tag-meta-fg;
-}
-.ts-wrapper.single[data-selected-category="material"] .ts-control {
-  @apply bg-tag-material text-tag-material-fg border-tag-material-fg;
-}
-.ts-wrapper.single[data-selected-category="color"] .ts-control {
-  @apply bg-tag-color text-tag-color-fg border-tag-color-fg;
-}
-.ts-wrapper.single[data-selected-category="archetype"] .ts-control {
-  @apply bg-tag-archetype text-tag-archetype-fg border-tag-archetype-fg;
-}
-.ts-wrapper.single[data-selected-category="company"] .ts-control {
-  @apply bg-tag-company text-tag-company-fg border-tag-company-fg;
 }
 
 /** Bulk Tag Table **/
@@ -762,12 +1056,6 @@
   vertical-align: middle;
 }
 
-.bulk-tag-table .ts-wrapper,
-.bulk-tag-table .ts-control {
-  min-width: 0;
-  width: 100%;
-}
-
 .bulk-tag-table td > input {
   min-width: 0;
   width: 100%;
@@ -798,11 +1086,6 @@
 
 .bulk-data-row {
   height: 88px; /* soft minimum — tr expands beyond this when content is taller */
-}
-
-/* Allow Tom Select chip area to grow — row height expands to tallest cell */
-.bulk-td .ts-control {
-  overflow-x: hidden;
 }
 
 .bulk-input {
@@ -864,6 +1147,24 @@
   @apply z-20;
 }
 
+/* Sub-row panels (Links/Grades editors) span the full colspan width and must
+   fill + stay within the scrolled viewport, not anchored to the row's start.
+   `left`/`width` both derive from `cqw` — the scroll wrapper is a size
+   container (`[container-type:inline-size]` in BulkImportGrid.svelte) — so
+   both share the wrapper's actual visible width as one reference frame.
+   `vw` was tried first but Chrome measures it against the full window
+   including the scrollbar gutter while `left`'s sticky offset resolves
+   against the wrapper's content box, leaving uneven left/right padding.
+   Sticky percentage offsets resolve against the full scrollable row width
+   (not the visible slice), so `%` doesn't work here either; `cqw` avoids
+   both problems. Once capped, `left` splits the leftover space evenly. */
+.bulk-sticky-center {
+  position: sticky;
+  left: max(1rem, calc((100cqw - 1400px) / 2));
+  width: min(calc(100cqw - 2rem), 1400px);
+  @apply z-20;
+}
+
 /* Column position classes — applied to both TH and TD */
 .bulk-sticky-col-0 {
   @apply sticky left-0;
@@ -916,10 +1217,6 @@
   @apply border-b border-lightest;
 }
 
-/* Alpine x-cloak: hide elements until Alpine initializes */
-[x-cloak] {
-  display: none !important;
-}
 
 /* ── Overtype editor reset ────────────────────────────────────────────────── */
 /* Prevent global input/button/textarea base styles from leaking into overtype */

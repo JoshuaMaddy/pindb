@@ -30,6 +30,7 @@ from pindb.templates.components.forms.name_availability import (
     name_availability_field,
     name_check_attrs,
 )
+from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 
@@ -48,8 +49,6 @@ def simple_aliased_entity_form(
     entity_links: list[str] = [link.path for link in entity.links] if entity else []
     if not entity_links:
         entity_links = [""]
-
-    links_json: str = json.dumps(entity_links)
 
     creating = entity is None
     title = f"Create {entity_kind}" if creating else f"Edit {entity_kind}"
@@ -80,7 +79,6 @@ def simple_aliased_entity_form(
     return html_base(
         title=title,
         template_js_extra=(
-            "forms/alias_select_init.js",
             "shared/form_gate.js",
             "forms/entity_form_gate.js",
         ),
@@ -129,40 +127,31 @@ def simple_aliased_entity_form(
                     ),
                     div[
                         label(for_="links")["Links"],
-                        Markup(f"""<div class="mt-2" x-data="{{ links: {links_json.replace('"', "'")} }}">
-                            <template x-for="(link, index) in links" :key="index">
-                                <div class="grid grid-cols-[1fr_min-content] gap-2 mb-2">
-                                    <input
-                                        type="text"
-                                        name="links"
-                                        x-model="links[index]"
-                                        autocomplete="off"
-                                        class="col-span-1">
-                                    <button
-                                        type="button"
-                                        @click="links.splice(index, 1)"
-                                        x-show="links.length > 1"
-                                        class="remove-link-button">Remove</button>
-                                </div>
-                            </template>
-                            <button
-                                type="button"
-                                @click="links.push('')"
-                                id="add-link-button"
-                                class="w-full mt-2">Add Another Link</button>
-                        </div>"""),
+                        island(
+                            "links-editor",
+                            props={
+                                "links": entity_links,
+                                "addButtonId": "add-link-button",
+                            },
+                            class_="mt-2",
+                        ),
                     ],
                     label(for_="aliases")["Aliases"],
-                    select(
-                        name="aliases",
-                        id="aliases",
-                        multiple=True,
-                        class_="alias-select",
-                    )[
-                        [
-                            option(value=alias, selected=True)[alias]
-                            for alias in current_aliases
-                        ]
+                    div(class_="w-full min-w-0")[
+                        select(
+                            name="aliases",
+                            id="aliases",
+                            multiple=True,
+                        )[
+                            [
+                                option(value=alias, selected=True)[alias]
+                                for alias in current_aliases
+                            ]
+                        ],
+                        island(
+                            "multi-select",
+                            props={"selectId": "aliases", "create": True},
+                        ),
                     ],
                     button(
                         type="submit",

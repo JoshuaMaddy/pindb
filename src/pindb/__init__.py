@@ -50,6 +50,7 @@ from pindb.routes import (  # noqa: E402
     health,
     legal,
     list,
+    messages,
     search,
     user,
 )
@@ -192,3 +193,4 @@ app.include_router(delete.router)
 app.include_router(bulk.router)
 app.include_router(legal.router)
 app.include_router(docs.router)
+app.include_router(messages.router)

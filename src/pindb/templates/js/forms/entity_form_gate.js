@@ -32,9 +32,9 @@ function initEntityFormGate(cfg) {
         var el = document.getElementById(f.inputId);
         return !!(el && el.value.trim());
       };
-    } else if (f.kind === "tomselect") {
+    } else if (f.kind === "select") {
       checks[f.key] = function () {
-        return globalThis.pindbTomSelectHasItems(f.selectId);
+        return globalThis.pindbSelectHasItems(f.selectId);
       };
     }
   });
@@ -44,14 +44,15 @@ function initEntityFormGate(cfg) {
       return ff.key === key;
     });
     if (!field) return null;
-    if (field.kind === "tomselect") {
+    if (field.kind === "select") {
       var sel = document.getElementById(field.selectId);
-      return sel && sel.tomselect ? sel.tomselect.wrapper : sel;
+      if (!sel) return null;
+      return sel.closest("[data-multiselect]") || sel;
     }
     return document.querySelector(field.highlightSelector);
   }
 
-  var gate = globalThis.pindbCreateFormGate({
+  globalThis.pindbCreateFormGate({
     form: form,
     submitBtn: submitBtn,
     fieldOrder: fieldOrder,
@@ -64,12 +65,6 @@ function initEntityFormGate(cfg) {
     },
   });
 
-  // Tom Select changes don't bubble as form input/change — refresh manually.
-  cfg.fields.forEach(function (f) {
-    if (f.kind !== "tomselect") return;
-    var el = document.getElementById(f.selectId);
-    if (el && el.tomselect) {
-      el.tomselect.on("change", gate.refresh);
-    }
-  });
+  // Select widget islands dispatch bubbling change events on their adopted
+  // selects; the gate's own form-level change listener picks those up.
 }

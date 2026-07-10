@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
 from pindb.database import Tag, TagCategory, async_session_maker
 from pindb.database.tag import normalize_tag_name, replace_tag_aliases
@@ -249,6 +250,7 @@ async def post_bulk_tags(
             ).all()
             for tag in persisted:
                 await update_tag(tag=tag)
+        await refresh_user_stats(user_id=current_user.id)
 
     created = sum(1 for r in results if r.success)
     failed_count = sum(1 for r in results if not r.success)

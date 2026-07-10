@@ -11,6 +11,7 @@ from uuid import UUID
 from fastapi import Request
 from htpy import Element, Fragment, div, fragment, img, link
 
+from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.pin import Pin
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_back_image_alt, pin_front_image_alt
@@ -106,7 +107,7 @@ def pin_image_carousel(request: Request, pin: Pin) -> Fragment:
     return fragment[
         link(
             rel="stylesheet",
-            href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css",
+            href=f"/static/vendor/swiper.min.css?v={STATIC_CACHE_BUSTER}",
         ),
         div(
             class_="relative flex w-full flex-col gap-3 md:gap-5 overflow-x-visible",

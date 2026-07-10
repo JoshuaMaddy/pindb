@@ -11,8 +11,9 @@ Headers set:
 - ``Referrer-Policy: strict-origin-when-cross-origin``.
 - ``Content-Security-Policy`` — report-only for now. Executable page JS is
   loaded from same-origin ``/static/`` and ``/templates-js/`` (both allowed
-  by ``script-src 'self'``), plus CDNs used by vendored and lazy-loaded
-  libraries. ``'wasm-unsafe-eval'`` allows WebAssembly used by the client-side
+  by ``script-src 'self'``); all frontend libraries are vendored or bundled,
+  so no CDN hosts remain (Cloudflare insights is the one external script).
+  ``'wasm-unsafe-eval'`` allows WebAssembly used by the client-side
   WebP encoder (``@jsquash/webp``) without permitting JavaScript ``eval``.
   Non-executable ``<script type="application/json">`` data blocks do not run
   as script and are unaffected by ``script-src``. The policy still constrains
@@ -35,10 +36,10 @@ from pindb.config import CONFIGURATION
 _CSP = (
     "default-src 'self'; "
     "img-src 'self' data: https:; "
-    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net "
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' "
     "https://static.cloudflareinsights.com; "
-    "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-    "font-src 'self' data: https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline'; "
+    "font-src 'self' data:; "
     "connect-src 'self' https://cloudflareinsights.com; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "

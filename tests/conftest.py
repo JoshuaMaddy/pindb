@@ -13,7 +13,19 @@ plugins and triggers bootstrap imports via ``tests.fixtures.core``.
 
 from __future__ import annotations
 
+import pytest
+
 import tests.fixtures.core  # noqa: F401  — side-effect imports (image dir, app, Meili modules)
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--update-screenshots",
+        action="store_true",
+        default=False,
+        help="Regenerate e2e screenshot baselines instead of asserting against them.",
+    )
+
 
 pytest_plugins = [
     "tests.fixtures.database",

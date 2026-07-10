@@ -511,7 +511,7 @@ def make_tag(
 
 @pytest.fixture
 def make_pin(
-    admin_http_client, editor_http_client, db_handle, make_shop
+    admin_http_client, editor_http_client, db_handle, make_shop, make_tag
 ) -> Callable[..., dict[str, Any]]:
     """Create an approved pin via HTTP with a real (1x1) PNG attached."""
     import io
@@ -522,10 +522,15 @@ def make_pin(
         name: str = "SeedPin",
         *,
         shop_name: str | None = None,
+        tag_names: list[str] | None = None,
         approved: bool = True,
     ) -> dict[str, Any]:
         http = admin_http_client if approved else editor_http_client
         shop = make_shop(shop_name or f"{name}Shop", approved=True)
+        tag_ids: list[str] = [
+            str(make_tag(tag_name, approved=True)["id"])
+            for tag_name in (tag_names or [])
+        ]
 
         files = {
             "front_image": ("front.png", io.BytesIO(tiny_png_bytes()), "image/png"),
@@ -541,6 +546,8 @@ def make_pin(
             "posts": "1",
             "shop_ids": [str(shop["id"])],
         }
+        if tag_ids:
+            data["tag_ids"] = tag_ids
         response = http.post("/create/pin", data=data, files=files)
         assert response.status_code == 200, (
             f"/create/pin failed: {response.status_code} {response.text[:300]}"
@@ -673,3 +680,21 @@ def register_test_oauth_identity(live_server) -> Callable[..., str]:
         return identity_id
 
     return _register
+
+
+# ---------------------------------------------------------------------------
+# Screenshot assertions (visual parity for island ports; see screenshots.py)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def assert_screenshot(request: pytest.FixtureRequest) -> Callable[..., None]:
+    """``assert_screenshot(page_or_locator, name)`` bound to --update-screenshots."""
+    from tests.e2e.screenshots import assert_screenshot as _assert_screenshot
+
+    update: bool = bool(request.config.getoption("--update-screenshots"))
+
+    def _assert(target, name: str) -> None:
+        _assert_screenshot(target, name, update=update)
+
+    return _assert
