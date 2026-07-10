@@ -8,6 +8,7 @@ from fastapi import Request
 from htpy import Element, a, br, code, div, fragment, h2
 
 from pindb.database import Artist, User
+from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.routes._urls import artist_url
 from pindb.templates.base import html_base
@@ -15,6 +16,9 @@ from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.display.linked_items_row import linked_items_row
+from pindb.templates.components.display.pending_changes_table import (
+    pending_changes_table,
+)
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
@@ -34,6 +38,7 @@ def artist_page(
     per_page: int,
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
+    pending_changes: Sequence[PendingChange] = (),
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     canonical_url = str(artist_url(request=request, artist=artist))
@@ -64,6 +69,7 @@ def artist_page(
                     canonical_url=canonical_url,
                     pending_url=pending_url,
                 ),
+                viewing_pending and pending_changes_table(pending_changes),
                 page_heading(
                     icon="palette",
                     text=pending_label(artist.name, artist.is_pending),

@@ -9,6 +9,7 @@ from htpy import Element, code, div, fragment, i, p, span
 from titlecase import titlecase
 
 from pindb.database import User
+from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.database.tag import Tag
 from pindb.routes._urls import tag_url
@@ -17,6 +18,9 @@ from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.display.linked_items_row import linked_items_row
+from pindb.templates.components.display.pending_changes_table import (
+    pending_changes_table,
+)
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
@@ -129,6 +133,7 @@ def tag_page(
     per_page: int,
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
+    pending_changes: Sequence[PendingChange] = (),
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     display_name = pending_label(tag.display_name, tag.is_pending)
@@ -160,6 +165,7 @@ def tag_page(
                     canonical_url=canonical_url,
                     pending_url=pending_url,
                 ),
+                viewing_pending and pending_changes_table(pending_changes),
                 page_heading(
                     icon="tag",
                     text=display_name,

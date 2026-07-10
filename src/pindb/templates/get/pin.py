@@ -5,9 +5,12 @@ Top-level pin detail page composition. Image carousel, lightbox, details
 column, and HTMX fragments live in sibling modules.
 """
 
+from typing import Sequence
+
 from fastapi import Request
 from htpy import Element, div, fragment
 
+from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
@@ -17,6 +20,9 @@ from pindb.routes._urls import pin_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.pending_changes_table import (
+    pending_changes_table,
+)
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.page_heading import page_heading
@@ -59,6 +65,7 @@ def pin_page(
     wanted_entries: list[UserWantedPin] | None = None,
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
+    pending_changes: Sequence[PendingChange] = (),
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     canonical_url = str(pin_url(request=request, pin=pin))
@@ -89,6 +96,7 @@ def pin_page(
                 viewing_pending=viewing_pending,
                 canonical_url=canonical_url,
                 pending_url=pending_url,
+                pending_changes=pending_changes,
             ),
             pin_lightbox(),
         ],
@@ -107,6 +115,7 @@ def _page_layout(
     viewing_pending: bool,
     canonical_url: str,
     pending_url: str,
+    pending_changes: Sequence[PendingChange],
 ) -> Element:
     return div(
         class_="mx-auto px-10 my-5 gap-2 w-full grid grid-cols-1 md:gap-8 md:grid-cols-2 md:max-w-[160ch]"
@@ -119,6 +128,7 @@ def _page_layout(
                 canonical_url=canonical_url,
                 pending_url=pending_url,
             ),
+            viewing_pending and pending_changes_table(pending_changes),
             page_heading(
                 icon="circle-star",
                 text=pending_label(pin.name, pin.is_pending),

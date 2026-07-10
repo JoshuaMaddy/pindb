@@ -60,7 +60,11 @@ async def get_shop(
                 id=id,
             )
 
-        pending_chain_exists, viewing_pending = await maybe_apply_pending_view(
+        (
+            pending_chain_exists,
+            viewing_pending,
+            pending_changes,
+        ) = await maybe_apply_pending_view(
             session=session,
             entity=shop_obj,
             entity_table="shops",
@@ -116,6 +120,7 @@ async def get_shop(
                     per_page=_PER_PAGE,
                     has_pending_chain=pending_chain_exists,
                     viewing_pending=viewing_pending,
+                    pending_changes=pending_changes,
                 )
             )
         )

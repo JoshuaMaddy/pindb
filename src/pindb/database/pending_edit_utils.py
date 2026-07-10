@@ -9,6 +9,7 @@ row.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Any, Sequence
 from uuid import UUID
@@ -204,6 +205,162 @@ async def has_pending_edits(
     return await get_head_edit(session, entity_type, entity_id) is not None
 
 
+# ---------------------------------------------------------------------------
+# Reviewer-facing change summary
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PendingChange:
+    """One field's before/after values, formatted for display."""
+
+    label: str
+    old: str
+    new: str
+
+
+# Snapshot key -> human label. Insertion order drives the change-table order.
+_CHANGE_FIELD_LABELS: dict[str, str] = {
+    "name": "Name",
+    "description": "Description",
+    "active": "Active",
+    "category": "Category",
+    "acquisition_type": "Acquisition type",
+    "funding_type": "Funding type",
+    "limited_edition": "Limited edition",
+    "number_produced": "Number produced",
+    "release_date": "Release date",
+    "end_date": "End date",
+    "posts": "Posts",
+    "width": "Width",
+    "height": "Height",
+    "sku": "SKU",
+    "currency_id": "Currency",
+    "front_image_guid": "Front image",
+    "back_image_guid": "Back image",
+    "shop_ids": "Shops",
+    "tag_ids": "Tags",
+    "artist_ids": "Artists",
+    "pin_set_ids": "Sets",
+    "variant_pin_ids": "Variants",
+    "unauthorized_copy_pin_ids": "Unauthorized copies",
+    "implication_ids": "Implications",
+    "aliases": "Aliases",
+    "links": "Links",
+    "grades": "Grades",
+}
+
+# Fields whose values are lists of entity ids, mapped to the model to name them.
+_CHANGE_ID_LIST_FIELDS: dict[str, Any] = {
+    "shop_ids": Shop,
+    "tag_ids": Tag,
+    "artist_ids": Artist,
+    "pin_set_ids": PinSet,
+    "variant_pin_ids": Pin,
+    "unauthorized_copy_pin_ids": Pin,
+    "implication_ids": Tag,
+}
+
+# Fields whose value is a single entity id.
+_CHANGE_SCALAR_ID_FIELDS: dict[str, Any] = {"currency_id": Currency}
+
+_CHANGE_IMAGE_FIELDS: frozenset[str] = frozenset(
+    {"front_image_guid", "back_image_guid"}
+)
+
+
+async def _resolve_change_id_names(
+    session: AsyncSession, patch: dict[str, Any]
+) -> dict[tuple[Any, int], str]:
+    """Batch-load display names for every entity id referenced by *patch*."""
+    ids_by_model: dict[Any, set[int]] = {}
+    for key, change in patch.items():
+        list_model = _CHANGE_ID_LIST_FIELDS.get(key)
+        if list_model is not None:
+            for value in (change.get("old"), change.get("new")):
+                for entity_id in value or []:
+                    ids_by_model.setdefault(list_model, set()).add(entity_id)
+            continue
+        scalar_model = _CHANGE_SCALAR_ID_FIELDS.get(key)
+        if scalar_model is not None:
+            for value in (change.get("old"), change.get("new")):
+                if value is not None:
+                    ids_by_model.setdefault(scalar_model, set()).add(value)
+
+    name_map: dict[tuple[Any, int], str] = {}
+    for model, ids in ids_by_model.items():
+        rows = (
+            await session.scalars(
+                select(model)
+                .where(model.id.in_(ids))
+                .execution_options(include_pending=True)
+            )
+        ).all()
+        for row in rows:
+            name_map[(model, row.id)] = getattr(row, "name", None) or f"#{row.id}"
+    return name_map
+
+
+def _format_grade(grade: dict[str, Any]) -> str:
+    price = grade.get("price")
+    name = grade.get("name")
+    return f"{name} ({price})" if price is not None else str(name)
+
+
+def _format_change_value(
+    key: str, value: Any, name_map: dict[tuple[Any, int], str]
+) -> str:
+    """Render a single snapshot value as reviewer-friendly text."""
+    list_model = _CHANGE_ID_LIST_FIELDS.get(key)
+    if list_model is not None:
+        if not value:
+            return "—"
+        return ", ".join(
+            name_map.get((list_model, entity_id), f"#{entity_id}")
+            for entity_id in value
+        )
+
+    scalar_model = _CHANGE_SCALAR_ID_FIELDS.get(key)
+    if scalar_model is not None:
+        if value is None:
+            return "—"
+        return name_map.get((scalar_model, value), f"#{value}")
+
+    if value is None or value == "":
+        return "—"
+    if key in _CHANGE_IMAGE_FIELDS:
+        return f"{str(value)[:8]}…"
+    if key == "grades":
+        return ", ".join(_format_grade(grade) for grade in value) if value else "—"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else "—"
+    return str(value)
+
+
+async def build_pending_changes(
+    session: AsyncSession,
+    old_snapshot: dict[str, Any],
+    new_snapshot: dict[str, Any],
+) -> list[PendingChange]:
+    """Field-wise before/after rows between two snapshots, ordered for display."""
+    patch = compute_patch(old_snapshot, new_snapshot)
+    if not patch:
+        return []
+    name_map = await _resolve_change_id_names(session, patch)
+    ordered_keys = [key for key in _CHANGE_FIELD_LABELS if key in patch]
+    ordered_keys += [key for key in patch if key not in _CHANGE_FIELD_LABELS]
+    return [
+        PendingChange(
+            label=_CHANGE_FIELD_LABELS.get(key, key),
+            old=_format_change_value(key, patch[key].get("old"), name_map),
+            new=_format_change_value(key, patch[key].get("new"), name_map),
+        )
+        for key in ordered_keys
+    ]
+
+
 async def maybe_apply_pending_view(
     *,
     session: AsyncSession,
@@ -211,12 +368,13 @@ async def maybe_apply_pending_view(
     entity_table: str,
     current_user: object,
     version: str | None,
-) -> tuple[bool, bool]:
-    """Returns ``(pending_chain_exists, viewing_pending)``.
+) -> tuple[bool, bool, list[PendingChange]]:
+    """Returns ``(pending_chain_exists, viewing_pending, pending_changes)``.
 
     If the viewer is allowed to see pending edits *and* requested
     ``?version=pending``, mutates ``entity`` in-memory to reflect the pending
-    chain. The mutation happens inside ``session.no_autoflush``.
+    chain and returns the field-wise before/after diff for display. The
+    mutation happens inside ``session.no_autoflush``.
     """
     can_see_pending = current_user is not None and (
         getattr(current_user, "is_editor", False)
@@ -228,13 +386,20 @@ async def maybe_apply_pending_view(
         session, entity_table, entity.id
     )
 
+    pending_changes: list[PendingChange] = []
     if viewing_pending and pending_chain_exists:
         chain = await get_edit_chain(session, entity_table, entity.id)
-        effective = get_effective_snapshot(entity, chain)
+        # Snapshot the canonical state before mutating, then derive the
+        # effective (pending) snapshot so the diff reflects the proposed edit.
+        old_snapshot = snapshot_entity(entity)
+        effective = old_snapshot
+        for edit in chain:
+            effective = apply_patch(effective, edit.patch)
+        pending_changes = await build_pending_changes(session, old_snapshot, effective)
         with session.no_autoflush:
             await apply_snapshot_in_memory(entity, effective, session)
 
-    return pending_chain_exists, viewing_pending
+    return pending_chain_exists, viewing_pending, pending_changes
 
 
 # ---------------------------------------------------------------------------

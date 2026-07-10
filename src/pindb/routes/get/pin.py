@@ -70,7 +70,11 @@ async def get_pin(
                 id=id,
             )
 
-        pending_chain_exists, viewing_pending = await maybe_apply_pending_view(
+        (
+            pending_chain_exists,
+            viewing_pending,
+            pending_changes,
+        ) = await maybe_apply_pending_view(
             session=session,
             entity=pin_obj,
             entity_table="pins",
@@ -138,5 +142,6 @@ async def get_pin(
                 wanted_entries=wanted_entries,
                 has_pending_chain=pending_chain_exists,
                 viewing_pending=viewing_pending,
+                pending_changes=pending_changes,
             )
         )
