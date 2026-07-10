@@ -64,7 +64,7 @@ def messages_nav_widget(request: Request) -> Element:
     rows: list[MessageRow] = getattr(request.state, "message_preview", []) or []
     unread_exists = unread_count > 0
 
-    return div(class_="relative group")[
+    return div(class_="relative group flex items-center")[
         a(
             href="/messages",
             aria_label="Messages",
