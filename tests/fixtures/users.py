@@ -7,10 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 
 import pytest
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-
-from tests.fixtures import core
 
 MINIMAL_USER_USERNAME = "testuser"
 FULL_PROFILE_USER_USERNAME = "fullprofileuser"
@@ -134,28 +131,21 @@ def _seed_full_profile_user_associations(
 
 
 @pytest.fixture
-def seed_currencies(db_session: Session) -> None:
-    """Seed currencies into the test DB (mirrors lifespan behaviour)."""
-    from pindb.database.currency import Currency
-    from pindb.utils import utc_now
+def seed_currencies() -> None:
+    """
+    No-op: currencies are seeded into the template database once per run.
 
-    # Core insert bypasses the audit ``before_flush`` that populates
-    # ``created_at`` on ORM adds, so set it explicitly (the column is NOT NULL).
-    now = utc_now()
-    rows = [{**row, "created_at": now} for row in core.currency_rows()]
-    db_session.execute(
-        pg_insert(Currency)
-        .values(rows)
-        .on_conflict_do_nothing(index_elements=[Currency.id])
-    )
-    db_session.commit()
+    ``truncate_sql`` excludes ``currencies``, so the rows survive every test. The
+    fixture name is kept because user/pin fixtures declare it to express the
+    dependency.
+    """
 
 
 @pytest.fixture
 def test_user(db_session: Session, seed_currencies):
     """Regular (non-admin) user, flushed but not committed."""
-    from pindb.auth import hash_password
     from pindb.database.user import User
+    from tests.helpers.passwords import hashed as hash_password
 
     user = User(
         username=MINIMAL_USER_USERNAME,
@@ -170,8 +160,8 @@ def test_user(db_session: Session, seed_currencies):
 @pytest.fixture
 def admin_user(db_session: Session, seed_currencies):
     """Admin user, flushed but not committed."""
-    from pindb.auth import hash_password
     from pindb.database.user import User
+    from tests.helpers.passwords import hashed as hash_password
 
     user = User(
         username="adminuser",
@@ -187,8 +177,8 @@ def admin_user(db_session: Session, seed_currencies):
 @pytest.fixture
 def editor_user(db_session: Session, seed_currencies):
     """Non-admin editor user. Creates pending entities; can edit own pending entries."""
-    from pindb.auth import hash_password
     from pindb.database.user import User
+    from tests.helpers.passwords import hashed as hash_password
 
     user = User(
         username="editoruser",
@@ -204,8 +194,8 @@ def editor_user(db_session: Session, seed_currencies):
 @pytest.fixture
 def other_editor_user(db_session: Session, seed_currencies):
     """A second editor, for ownership boundary tests."""
-    from pindb.auth import hash_password
     from pindb.database.user import User
+    from tests.helpers.passwords import hashed as hash_password
 
     user = User(
         username="editor2",
@@ -306,8 +296,8 @@ def other_editor_client(
 @pytest.fixture
 def test_user_full_profile(db_session: Session, seed_currencies, admin_user):
     """Second regular user with favorites, lists, personal sets, and tradeables seeded."""
-    from pindb.auth import hash_password
     from pindb.database.user import User
+    from tests.helpers.passwords import hashed as hash_password
 
     user = User(
         username=FULL_PROFILE_USER_USERNAME,

@@ -41,6 +41,7 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-env>=1.1.3",
     "pytest-playwright>=0.5.0",
+    "pytest-timeout>=2.3.0",
     "pytest-xdist>=3.8.0",
     "rich>=15.0.0",
     "testcontainers[postgres]>=4.8.0",
@@ -56,6 +57,11 @@ pythonpath = "src"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# Generous: a test item's setup can include the session-scoped Postgres
+# testcontainer plus `alembic upgrade head` (~40s under xdist contention).
+timeout = 300
+# signal-based timeouts are POSIX-only; "thread" is the portable method.
+timeout_method = "thread"
 env = [
     "DATABASE_CONNECTION=postgresql+asyncpg://placeholder:placeholder@localhost/placeholder",
     "DATABASE_CONNECTION_SYNC=postgresql+psycopg://placeholder:placeholder@localhost/placeholder",

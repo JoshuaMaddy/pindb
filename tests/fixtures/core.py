@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib
 import os
-from csv import DictReader
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -35,31 +34,12 @@ _search_update = importlib.import_module("pindb.search.update")
 _search_search = importlib.import_module("pindb.search.search")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_CURRENCY_ROWS: list[dict[str, int | str]] | None = None
 
 
 def is_unit_or_e2e_test(request) -> bool:
     return "tests" in request.node.path.parts and (
         "unit" in request.node.path.parts or "e2e" in request.node.path.parts
     )
-
-
-def currency_rows() -> list[dict[str, int | str]]:
-    global _CURRENCY_ROWS
-    if _CURRENCY_ROWS is None:
-        currencies_path = (
-            REPO_ROOT / "src" / "pindb" / "database" / "data" / "currencies.csv"
-        )
-        with currencies_path.open(newline="") as currencies_file:
-            _CURRENCY_ROWS = [
-                {
-                    "id": int(row["id"]),
-                    "name": row["name"],
-                    "code": row["code"],
-                }
-                for row in DictReader(currencies_file)
-            ]
-    return _CURRENCY_ROWS
 
 
 class AutoCommitSession(Session):

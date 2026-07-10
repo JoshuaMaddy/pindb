@@ -1,59 +1,56 @@
-"""Postgres testcontainer, engines, connection, session patching."""
+"""Per-worker database cloned from the shared template, engines, session patching."""
 
 from __future__ import annotations
 
 import os
-import subprocess
 from collections.abc import Generator
 
 import pytest
-from sqlalchemy import Connection, Engine, create_engine, text
+from sqlalchemy import Connection, Engine, create_engine
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from tests.fixtures import core
+from tests.fixtures import _pg, core
 
 
-@pytest.fixture(scope="session")
-def pg_container():
-    """Spin up a real Postgres 17 container for the entire test session."""
-    from testcontainers.postgres import PostgresContainer
-
-    with PostgresContainer("postgres:17-alpine") as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def test_engine(pg_container) -> Generator[Engine, None, None]:
+def pg_target(config: pytest.Config) -> tuple[str, str]:
     """
-    Create a SQLAlchemy engine pointed at the testcontainers Postgres,
-    then run alembic migrations (the real ones, not create_all).
+    The shared Postgres URL and template database name, published by the controller.
+
+    Under xdist they arrive through ``workerinput``; for ``-n 0`` / ``-p no:xdist``
+    there is no worker, so the controller also mirrors them into the environment.
     """
-    url: str = pg_container.get_connection_url().replace(
-        "postgresql+psycopg2://", "postgresql+psycopg://"
+    workerinput = getattr(config, "workerinput", {})
+    base_url = workerinput.get("pindb_pg_base_url") or os.environ.get(
+        _pg.PG_BASE_URL_ENV
     )
-    async_url: str = url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
+    template = workerinput.get("pindb_tmpl_db") or os.environ.get(_pg.TEMPLATE_DB_ENV)
+    if not base_url or not template:
+        raise RuntimeError(
+            "Postgres was never provisioned; the rootdir conftest decided this run "
+            "needed no database. See conftest.py::_wants_db."
+        )
+    return base_url, template
+
+
+@pytest.fixture(scope="session")
+def test_engine(request: pytest.FixtureRequest) -> Generator[Engine, None, None]:
+    """
+    Engine bound to this worker's own database, cloned from the migrated template.
+
+    The clone is a Postgres file copy, so no alembic run happens here.
+    """
+    base_url, template = pg_target(request.config)
+    url = _pg.clone_template(base_url, template, _pg.worker_db_name())
+
     engine = create_engine(url, echo=False)
-
-    env = {
-        **os.environ,
-        "DATABASE_CONNECTION": async_url,
-        "DATABASE_CONNECTION_SYNC": url,
-    }
-    subprocess.run(
-        ["uv", "run", "alembic", "upgrade", "head"],
-        env=env,
-        check=True,
-        cwd=str(core.REPO_ROOT),
-    )
-
     yield engine
     engine.dispose()
 
 
 @pytest.fixture(scope="session")
 def test_async_engine(test_engine: Engine) -> Generator[AsyncEngine, None, None]:
-    """Async engine pointed at the same testcontainer database as ``test_engine``."""
+    """Async engine pointed at the same worker database as ``test_engine``."""
     import asyncio
 
     sync_url = test_engine.url.render_as_string(hide_password=False)
@@ -75,7 +72,14 @@ def db_connection(test_engine: Engine) -> Generator[Connection, None, None]:
 
 @pytest.fixture(scope="session")
 def truncate_sql() -> str:
-    """Precomputed cleanup SQL for integration tests."""
+    """
+    Precomputed cleanup SQL for integration tests.
+
+    ``currencies`` cannot be preserved by omitting it: it carries AuditMixin FKs to
+    ``users``, so ``TRUNCATE users ... CASCADE`` takes it along regardless. Instead
+    it is restored from the FK-free copy the template build left behind — one
+    server-side statement, no rows shipped from Python.
+    """
     from pindb.database.base import Base
 
     table_names = [
@@ -83,7 +87,11 @@ def truncate_sql() -> str:
         for table in reversed(Base.metadata.sorted_tables)
         if table.name != "alembic_version"
     ]
-    return f"TRUNCATE TABLE {', '.join(table_names)} RESTART IDENTITY CASCADE"
+    return (
+        f"TRUNCATE TABLE {', '.join(table_names)} RESTART IDENTITY CASCADE;"
+        " INSERT INTO currencies (id, name, code, created_at)"
+        f" SELECT id, name, code, created_at FROM {_pg.CURRENCY_SEED_TABLE};"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -125,5 +133,5 @@ def patch_session_maker(request: pytest.FixtureRequest) -> Generator[None, None,
     core.pindb_database.async_session_maker.kw.clear()
     core.pindb_database.async_session_maker.kw.update(original_async_kw)
 
-    db_connection.execute(text(cleanup_sql))
+    db_connection.exec_driver_sql(cleanup_sql)
     db_connection.commit()

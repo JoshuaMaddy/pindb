@@ -14,9 +14,9 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from pindb.auth import hash_password
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
+from tests.helpers.passwords import hashed as hash_password
 
 
 def _patch_google(monkeypatch, userinfo: dict[str, Any]) -> None:

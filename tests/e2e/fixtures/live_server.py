@@ -39,36 +39,38 @@ def _wait_for_http(url: str, timeout: float = 30.0) -> None:
 
 
 @pytest.fixture(scope="session")
-def e2e_pg_container():
-    from testcontainers.postgres import PostgresContainer
+def e2e_database_url(request: pytest.FixtureRequest) -> str:
+    """
+    This worker's own database, cloned from the run-wide migrated template.
 
-    with PostgresContainer("postgres:17-alpine") as pg:
-        yield pg
+    Shares the controller's single Postgres container with the integration suite,
+    so e2e pays neither a container startup nor an alembic chain per worker.
+    """
+    from tests.fixtures import _pg
+    from tests.fixtures.database import pg_target
+
+    base_url, template = pg_target(request.config)
+    return _pg.clone_template(base_url, template, _pg.worker_db_name("pindb_e2e"))
 
 
 @pytest.fixture(scope="session")
-def e2e_meili_container():
-    from datetime import timedelta
+def e2e_meili_url(request: pytest.FixtureRequest) -> str:
+    """
+    The run-wide shared Meilisearch server, provisioned by the rootdir conftest.
 
-    from testcontainers.core.container import DockerContainer
-    from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+    Workers isolate by index name (see ``live_server``), so one server replaces
+    the previous eight per-worker containers.
+    """
+    from tests.fixtures import _meili
 
-    container = (
-        DockerContainer("getmeili/meilisearch:v1.11")
-        .with_env("MEILI_MASTER_KEY", "e2e-meili-key")
-        .with_env("MEILI_ENV", "development")
-        .with_exposed_ports(7700)
-        .waiting_for(
-            LogMessageWaitStrategy("Server listening").with_startup_timeout(
-                timedelta(seconds=30)
-            )
+    workerinput = getattr(request.config, "workerinput", {})
+    url = workerinput.get("pindb_meili_url") or os.environ.get(_meili.MEILI_URL_ENV)
+    if not url:
+        raise RuntimeError(
+            "Meilisearch was never provisioned; e2e runs must select tests with "
+            "-m e2e so conftest.py::_wants_meili starts the shared server."
         )
-    )
-    container.start()
-    try:
-        yield container
-    finally:
-        container.stop()
+    return url
 
 
 @pytest.fixture(scope="session")
@@ -82,27 +84,29 @@ def e2e_image_dir() -> Generator[Path, None, None]:
 
 @pytest.fixture(scope="session")
 def live_server(
-    e2e_pg_container, e2e_meili_container, e2e_image_dir
+    e2e_database_url, e2e_meili_url, e2e_image_dir
 ) -> Generator[str, None, None]:
     """Launch the app in a uvicorn subprocess and yield its base URL."""
+    from tests.fixtures import _meili
+
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
 
-    pg_url = e2e_pg_container.get_connection_url().replace(
-        "postgresql+psycopg2://", "postgresql+psycopg://"
-    )
+    pg_url = e2e_database_url
     async_pg_url = pg_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
-    meili_host = e2e_meili_container.get_container_host_ip()
-    meili_port = e2e_meili_container.get_exposed_port(7700)
-    meili_url = f"http://{meili_host}:{meili_port}"
+
+    # Per-worker index on the shared server; dropped first so a kept container
+    # (PINDB_TEST_KEEP_PG=1) never leaks documents from a previous run.
+    meili_index = f"pins_e2e_{os.environ.get('PYTEST_XDIST_WORKER', 'main')}"
+    _meili.delete_index(e2e_meili_url, meili_index)
 
     env = {
         **os.environ,
         "DATABASE_CONNECTION": async_pg_url,
         "DATABASE_CONNECTION_SYNC": pg_url,
-        "MEILISEARCH_KEY": "e2e-meili-key",
-        "MEILISEARCH_URL": meili_url,
-        "MEILISEARCH_INDEX": "pins_e2e",
+        "MEILISEARCH_KEY": _meili.MEILI_MASTER_KEY,
+        "MEILISEARCH_URL": e2e_meili_url,
+        "MEILISEARCH_INDEX": meili_index,
         "SECRET_KEY": "e2e-secret-key-for-playwright-tests-only",
         "IMAGE_DIRECTORY": str(e2e_image_dir),
         "IMAGE_BACKEND": "filesystem",
@@ -117,18 +121,12 @@ def live_server(
     show_server_logs = os.environ.get("E2E_SHOW_SERVER_LOGS", "0") == "1"
     uvicorn_log_level = os.environ.get("E2E_UVICORN_LOG_LEVEL", "warning")
 
+    # db_isolation.py builds its psycopg DSN from DATABASE_CONNECTION.
     prev_db = os.environ.get("DATABASE_CONNECTION")
     prev_db_sync = os.environ.get("DATABASE_CONNECTION_SYNC")
     os.environ["DATABASE_CONNECTION"] = pg_url
     os.environ["DATABASE_CONNECTION_SYNC"] = pg_url
     try:
-        subprocess.run(
-            ["uv", "run", "alembic", "upgrade", "head"],
-            env=env,
-            check=True,
-            cwd=str(REPO_ROOT),
-        )
-
         proc = subprocess.Popen(
             [
                 sys.executable,

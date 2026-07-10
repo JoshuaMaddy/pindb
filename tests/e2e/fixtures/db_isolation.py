@@ -75,7 +75,15 @@ def db_handle(_e2e_pg_conn) -> Callable[..., list[tuple]]:
 
 
 @pytest.fixture(autouse=True)
-def _truncate_e2e_state(_e2e_pg_conn) -> Iterator[None]:
+def _truncate_e2e_state(request: pytest.FixtureRequest) -> Iterator[None]:
+    # tests/conftest.py registers this module as a plugin, which makes an autouse
+    # fixture apply to the whole suite. Requesting _e2e_pg_conn eagerly would drag
+    # live_server — Postgres, Meilisearch, uvicorn — into every unit test.
+    if "e2e" not in request.node.path.parts:
+        yield
+        return
+
+    _e2e_pg_conn = request.getfixturevalue("_e2e_pg_conn")
     yield
 
     import psycopg

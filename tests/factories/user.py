@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import factory
 
-from pindb.auth import hash_password
 from pindb.database.user import User
 from tests.factories.base import BaseFactory
+from tests.helpers.passwords import hashed as hash_password
 
 
 class UserFactory(BaseFactory):

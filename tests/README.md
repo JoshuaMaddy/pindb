@@ -4,11 +4,36 @@ The suite is organised into three layers that trade fidelity for speed:
 
 | Layer | Directory | Marker | External deps | Typical run time |
 |---|---|---|---|---|
-| Unit | `tests/unit/` | `unit` | none | <1 s |
-| Integration | `tests/integration/` | `integration` | Postgres (testcontainers) | 15–90 s |
-| End-to-end | `tests/e2e/` | `e2e` | Postgres + Meilisearch (testcontainers), Playwright browser, real uvicorn | 1–5 min |
+| Unit | `tests/unit/` | `unit` | none | ~8 s |
+| Integration | `tests/integration/` | `integration` | Postgres (shared container) | ~35 s |
+| End-to-end | `tests/e2e/` | `e2e` | Postgres + Meilisearch (shared containers), Playwright browser, real uvicorn | ~40 s |
 
 By default `pyproject.toml` sets `-m "not e2e"`, so `uv run pytest` runs only unit + integration.
+
+## Parallelism & containers (how the suite is fast)
+
+Every run is **parallel by default** — the rootdir `conftest.py` sets `-n min(8, cores)`
+with `dist=load` unless you pass `-n` yourself. `-n 0` and `-p no:xdist` still work.
+
+One Postgres container serves the whole run. The xdist **controller** starts it,
+migrates a *template* database once (`pindb_tmpl_<alembic head>`), and each worker
+clones it with `CREATE DATABASE ... TEMPLATE` (~200 ms file copy — no per-worker
+alembic). E2E runs additionally get one shared Meilisearch server; workers isolate
+by index name (`pins_e2e_<worker>`).
+
+Local knobs (CI sets neither and gets throwaway containers):
+
+- `PINDB_TEST_KEEP_PG=1` — reattach to long-lived `pindb-test-pg` / `pindb-test-meili`
+  containers, creating them on first use. Reruns skip container startup *and* the
+  migration chain (the template is keyed on the alembic head). Remove with
+  `docker rm -f pindb-test-pg pindb-test-meili`.
+- `PINDB_TEST_PG_URL` — point at an existing Postgres (e.g. `docker-compose.dev.yaml`);
+  nothing is started or stopped. `PINDB_TEST_MEILI_URL` is the e2e equivalent.
+
+**Fork-bomb guard (do not remove):** xdist workers also fire `pytest_cmdline_main`
+after resetting `numprocesses` to `None`; without the `workerinput` guard in the
+rootdir `conftest.py`, every worker would become a controller and spawn 8 more
+workers, exponentially (this really happened — ~1,500 processes).
 
 ### Integration file naming (convention for new tests)
 
@@ -27,9 +52,13 @@ uv run pytest tests/unit/ -q
 ```bash
 uv run pytest
 ```
-Requires Docker (for the Postgres testcontainer). Each test runs inside a
+Requires Docker (for the shared Postgres container). Each test runs inside a
 transaction that is rolled back at teardown — the DB state is fully isolated
 per test.
+
+User fixtures hash constant passwords through `tests/helpers/passwords.py`
+(`lru_cache`d argon2) — one real hash per password per worker instead of per
+test. Tests exercising hashing itself keep calling `pindb.auth.hash_password`.
 
 ### End-to-end (Playwright)
 E2E tests are **opt-in** — they require real Meilisearch + Postgres
@@ -49,14 +78,8 @@ uv run pytest -m e2e
 uv run pytest -m e2e --durations=30
 ```
 
-**Parallel workers** (`pytest-xdist` — each worker spins up its own Postgres,
-Meilisearch, and uvicorn, so avoid `-n` higher than your machine can sustain):
-
-```bash
-uv run pytest -m e2e -n auto
-```
-
-On typical laptops, `-n 2` or `-n 4` often beats `auto` when Docker is CPU-bound.
+Parallel is the default (shared Postgres + Meilisearch; per-worker uvicorn and
+browser). Pass `-n 0` to debug single-process.
 
 To run everything in one go:
 ```bash
@@ -72,7 +95,8 @@ No DB, no network, no file I/O beyond tempfiles.
 ### Integration
 All integration tests use the shared `tests/conftest.py`, which registers fixture plugins under `tests/fixtures/` (`database`, `search`, `app_lifecycle`, `clients`, `users`, `images`, `autouse`) after bootstrap imports in `tests/fixtures/core.py`. Together they provide:
 
-- A session-scoped Postgres 17 testcontainer + Alembic-migrated schema.
+- A per-worker database cloned from the run-wide migrated template
+  (see “Parallelism & containers” above).
 - Per-test transaction isolation via a single connection + savepoint.
 - Function-scoped `TestClient`s:
   - `client` — unauthenticated
@@ -97,8 +121,9 @@ kwargs.
 ### End-to-end
 Lives in `tests/e2e/` and is automatically tagged with the `e2e` marker via
 `pytest_collection_modifyitems`. The session-scoped `live_server` fixture
-starts a real Postgres + Meilisearch pair via testcontainers, runs Alembic,
-then launches uvicorn in a subprocess. Seeded user fixtures
+clones this worker's database from the shared template, points at the shared
+Meilisearch server with a per-worker index, then launches uvicorn in a
+subprocess. Seeded user fixtures
 (`e2e_admin_session`, `e2e_editor_session`, and the corresponding Playwright
 `admin_browser_context` / `editor_browser_context`) sign up a fresh account
 over HTTP and promote it to admin/editor with direct SQL.
