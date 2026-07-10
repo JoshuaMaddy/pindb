@@ -15,6 +15,7 @@ description: Use this skill when touching UI color classes in PinDB templates, J
 6. Use semantic pending colors (`pending-dark`, `pending-main`, and hover counterparts) for approvals-queue UX — banners, badges, and notes tied to “pending approval” or “pending edit”, same layering patterns as `error-*` but amber-based.
 7. Use semantic success colors (`success-dark`, `success-main`, and hover counterparts) for additive/affirmative states — diff additions, confirmations — same layering patterns as `error-*` but green-based.
 8. Do not introduce raw `pin-base-*`, custom mixes, or opacity-based new colors.
+9. **Text color does not inherit.** `input.css` has `@layer base { * { @apply text-base-text } }`, which sets `color` on every element directly. A `text-*` utility on a wrapper (`ul`, `div`, `td`) styles only that element — children fall back to `base-text`. Put the color class on the element that holds the text (`li`, `span`, `p`).
 
 ## Semantic Token Intent
 

@@ -9,13 +9,21 @@ from htpy import Element, Node, div, i, li, table, tbody, td, th, thead, tr, ul
 from pindb.database.pending_edit_utils import PendingChange
 
 _CELL: str = "px-4 py-2 whitespace-pre-wrap break-words"
+_HEAD: str = "px-4 py-2 font-medium text-lightest-hover"
 
 
 def _delta_list(items: Sequence[str], sign: str, class_: str) -> Node:
-    """Render one side of a list-field delta as signed entries, or an em dash."""
+    """Render one side of a list-field delta as signed entries, or an em dash.
+
+    The color class goes on each ``li``, not the ``ul``: the base layer's
+    ``* { @apply text-base-text }`` sets color on every element directly, so a
+    color set on an ancestor is never inherited.
+    """
     if not items:
         return "—"
-    return ul(class_=f"space-y-0.5 {class_}")[[li[f"{sign} {item}"] for item in items]]
+    return ul(class_="space-y-0.5")[
+        [li(class_=class_)[f"{sign} {item}"] for item in items]
+    ]
 
 
 def _change_row(change: PendingChange) -> Element:
@@ -50,10 +58,10 @@ def pending_changes_table(changes: Sequence[PendingChange]) -> Element | None:
         div(class_="overflow-x-auto")[
             table(class_="w-full text-sm border-collapse")[
                 thead[
-                    tr(class_="border-b border-lightest text-left text-lightest-hover")[
-                        th(class_="px-4 py-2 font-medium")["Field"],
-                        th(class_="px-4 py-2 font-medium")["Before"],
-                        th(class_="px-4 py-2 font-medium")["After"],
+                    tr(class_="border-b border-lightest text-left")[
+                        th(class_=_HEAD)["Field"],
+                        th(class_=_HEAD)["Before"],
+                        th(class_=_HEAD)["After"],
                     ]
                 ],
                 tbody[[_change_row(change) for change in changes]],
