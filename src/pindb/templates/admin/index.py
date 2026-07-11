@@ -28,6 +28,8 @@ def admin_panel_page(request: Request, pending_count: int = 0) -> Element:
                 _tags_bulk_section(request),
                 hr,
                 _search_section(),
+                hr,
+                _stats_section(),
             ],
             flex=True,
             col=True,
@@ -111,6 +113,29 @@ def _tags_bulk_section(request: Request) -> Element:
     ]
 
 
+def _trigger_form(action: str, icon: str, label: str) -> Element:
+    """Fire-and-forget POST button for a background job (no-JS fallback intact)."""
+    return form(
+        method="post",
+        action=action,
+        hx_post=action,
+        hx_swap="none",
+        **{"data-htmx-submit-guard": ""},
+    )[
+        button(
+            type="submit",
+            class_="btn btn-primary",
+        )[
+            i(
+                data_lucide=icon,
+                class_="inline-block w-4 h-4 mr-1",
+                aria_hidden="true",
+            ),
+            label,
+        ]
+    ]
+
+
 def _search_section() -> Element:
     return div(class_="flex flex-col gap-2")[
         page_heading(
@@ -122,23 +147,29 @@ def _search_section() -> Element:
             "Synchronize the Meilisearch index with the current database state. "
             "This re-indexes all pins and removes stale entries."
         ],
-        form(
-            method="post",
+        _trigger_form(
             action="/admin/search/sync",
-            hx_post="/admin/search/sync",
-            hx_swap="none",
-            **{"data-htmx-submit-guard": ""},
-        )[
-            button(
-                type="submit",
-                class_="btn btn-primary",
-            )[
-                i(
-                    data_lucide="refresh-cw",
-                    class_="inline-block w-4 h-4 mr-1",
-                    aria_hidden="true",
-                ),
-                "Sync Search Index",
-            ]
+            icon="refresh-cw",
+            label="Sync Search Index",
+        ),
+    ]
+
+
+def _stats_section() -> Element:
+    return div(class_="flex flex-col gap-2")[
+        page_heading(
+            icon="trophy",
+            text="Stats & Achievements",
+            level=2,
+        ),
+        p(class_="text-sm")[
+            "Recompute every user's contribution stats from source and award any "
+            "achievements they have earned. Routes keep these fresh already; this "
+            "heals a missed refresh without waiting for the hourly sweep."
         ],
+        _trigger_form(
+            action="/admin/stats/refresh",
+            icon="refresh-cw",
+            label="Refresh User Stats",
+        ),
     ]

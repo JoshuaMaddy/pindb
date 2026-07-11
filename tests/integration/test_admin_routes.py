@@ -31,6 +31,18 @@ class TestAdminSearchSync:
         assert response.status_code in (200, 302, 303)
 
 
+@pytest.mark.integration
+class TestAdminStatsRefresh:
+    def test_stats_refresh_requires_admin(self, client, auth_client, editor_client):
+        assert_admin_only_post(
+            "/admin/stats/refresh", client, auth_client, editor_client
+        )
+
+    def test_admin_triggers_stats_refresh(self, admin_client):
+        response = admin_client.post("/admin/stats/refresh")
+        assert response.status_code in (200, 302, 303)
+
+
 _CREATE_PATHS = [
     "/create/",
     "/create/artist",
