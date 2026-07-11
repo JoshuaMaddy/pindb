@@ -47,7 +47,7 @@ services:
       - .env
     environment:
       <<: *app_env
-    entrypoint: ["uv", "run", "alembic", "upgrade", "head"]
+    entrypoint: ["/app/.venv/bin/python", "-m", "alembic", "upgrade", "head"]
     restart: "no"
     depends_on:
       postgres:
