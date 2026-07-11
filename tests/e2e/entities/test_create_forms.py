@@ -50,7 +50,9 @@ class TestEntityFormClientValidation:
         page.goto(f"{live_server}/create/artist")
         page.wait_for_load_state("load")
 
-        page.locator("#simple-entity-submit").click(force=True)
+        submit = page.locator("#simple-entity-submit")
+        expect(submit).to_have_attribute("aria-disabled", "true")
+        submit.click(force=True)
         expect(page.get_by_text("Enter an artist name.", exact=True)).to_be_visible()
 
     def test_tag_empty_submit_shows_hint(
