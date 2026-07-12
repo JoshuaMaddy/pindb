@@ -23,6 +23,9 @@ const EXTRA_KEBAB = new Set([
   /* pending approve button: icon comes from _ACTION_SPECS as data_lucide=<var>,
      so the scanner never sees "check" as a literal */
   "check",
+  /* needs-changes: _ACTION_SPECS dict lookup again, plus the message-body icon
+     map in templates/messages/render.py */
+  "message-square-warning",
   "copyright",
   "user",
   "paw-print",

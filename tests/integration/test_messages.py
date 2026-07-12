@@ -34,9 +34,9 @@ from pindb.database.message_queries import (
 )
 from pindb.database.user import User
 from pindb.models.message_body import (
+    ChangesRequestedBody,
     ContributionBody,
     MessageBodyAdapter,
-    PinRejectionBody,
     TextBody,
 )
 from pindb.templates.messages.render import message_target_url
@@ -90,7 +90,7 @@ class TestMessageBodyRoundTrip:
         [
             TextBody(text="hello world"),
             TextBody(text="linked", redirect_url="/user/me#badges"),
-            PinRejectionBody(reason="blurry image", pin_id=42),
+            ChangesRequestedBody(reason="blurry image", pin_id=42),
             ContributionBody(summary="added 3 pins", points=3),
         ],
     )
@@ -122,8 +122,8 @@ class TestMessageTargetUrl:
         request = MagicMock()
         request.url_for.side_effect = AssertionError("url_for must not be called")
         message = Message(
-            category=MessageCategory.pin_rejection,
-            body=PinRejectionBody(reason="dupe", pin_id=7, redirect_url="/go"),
+            category=MessageCategory.changes_requested,
+            body=ChangesRequestedBody(reason="dupe", pin_id=7, redirect_url="/go"),
             related_entity_type=EntityType.pin,
             related_entity_id=7,
         )
@@ -354,8 +354,8 @@ class TestConstraints:
 
     def test_related_entity_requires_both_or_neither(self, db_session):
         message = Message(
-            category=MessageCategory.pin_rejection,
-            body=PinRejectionBody(reason="dupe"),
+            category=MessageCategory.changes_requested,
+            body=ChangesRequestedBody(reason="dupe"),
             related_entity_type=EntityType.pin,
         )
         with pytest.raises(IntegrityError):
@@ -365,8 +365,8 @@ class TestConstraints:
 
     def test_related_entity_both_set_is_allowed(self, db_session):
         message = Message(
-            category=MessageCategory.pin_rejection,
-            body=PinRejectionBody(reason="dupe", pin_id=7),
+            category=MessageCategory.changes_requested,
+            body=ChangesRequestedBody(reason="dupe", pin_id=7),
             related_entity_type=EntityType.pin,
             related_entity_id=7,
         )

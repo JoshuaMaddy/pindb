@@ -17,6 +17,7 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
     get_head_edit,
+    reopen_rejected_edits,
 )
 from pindb.database.pin import Pin
 from pindb.database.shop import Shop
@@ -65,6 +66,11 @@ async def submit_pending_edit(
                 message="No changes to save.",
             )
         )
+
+    # Only now that we know the editor actually changed something: reopen the chain
+    # they were asked to fix so this edit stacks on it. Autoflush makes the cleared
+    # rows visible to the get_head_edit SELECT below.
+    await reopen_rejected_edits(session, entity_table, entity_id)
 
     head = await get_head_edit(session, entity_table, entity_id)
     session.add(

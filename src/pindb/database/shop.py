@@ -114,6 +114,7 @@ class Shop(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             "description": self.description,
             "active": self.active,
             "is_pending": self.is_pending,
+            "is_rejected": self.is_rejected,
         }
 
     def __rich_repr__(self) -> Result:

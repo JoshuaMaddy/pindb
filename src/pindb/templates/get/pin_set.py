@@ -14,6 +14,9 @@ from pindb.database.user import User
 from pindb.routes._urls import pin_set_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
+from pindb.templates.components.display.changes_requested_banner import (
+    changes_requested_banner,
+)
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
@@ -21,7 +24,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def pin_set_page(
@@ -57,12 +60,27 @@ def pin_set_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_pin_sets"), "Pin Sets"),
-                        pending_label(pin_set.name, pin_set.is_pending),
+                        review_label(
+                            pin_set.name,
+                            is_pending=pin_set.is_pending,
+                            is_rejected=pin_set.is_rejected,
+                        ),
                     ]
+                ),
+                pin_set.is_rejected
+                and changes_requested_banner(
+                    reason=pin_set.rejection_reason,
+                    edit_url=str(request.url_for("get_edit_set", set_id=pin_set.id))
+                    if can_edit
+                    else None,
                 ),
                 page_heading(
                     icon="layout-grid",
-                    text=pending_label(titlecase(pin_set.name), pin_set.is_pending),
+                    text=review_label(
+                        titlecase(pin_set.name),
+                        is_pending=pin_set.is_pending,
+                        is_rejected=pin_set.is_rejected,
+                    ),
                     extras=[
                         (user is not None and (user.is_admin or user.is_editor))
                         and icon_button(

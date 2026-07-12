@@ -132,6 +132,7 @@ async def get_tag(
             pending_chain_exists,
             viewing_pending,
             pending_changes,
+            edit_change_request,
         ) = await maybe_apply_pending_view(
             session=session,
             entity=tag_obj,
@@ -189,6 +190,7 @@ async def get_tag(
                     has_pending_chain=pending_chain_exists,
                     viewing_pending=viewing_pending,
                     pending_changes=pending_changes,
+                    edit_change_request=edit_change_request,
                 )
             )
         )

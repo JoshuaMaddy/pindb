@@ -50,7 +50,7 @@ from pindb.utils import (
     domain_from_url,
     format_currency_code,
     format_pin_dimension_mm,
-    pending_label,
+    review_label,
 )
 
 
@@ -167,7 +167,9 @@ def _shops(pin: Pin, request: Request) -> Element:
         items=[
             pill_link(
                 href=str(shop_url(request=request, shop=shop)),
-                text=pending_label(shop.name, shop.is_pending),
+                text=review_label(
+                    shop.name, is_pending=shop.is_pending, is_rejected=shop.is_rejected
+                ),
             )
             for shop in sorted(pin.shops, key=lambda shop: shop.name)
         ],
@@ -184,7 +186,11 @@ def _artists(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(artist_url(request=request, artist=artist)),
-                text=pending_label(artist.name, artist.is_pending),
+                text=review_label(
+                    artist.name,
+                    is_pending=artist.is_pending,
+                    is_rejected=artist.is_rejected,
+                ),
             )
             for artist in sorted(pin.artists, key=lambda artist: artist.name)
         ],
@@ -215,7 +221,11 @@ def _variants(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(pin_url(request=request, pin=variant)),
-                text=pending_label(variant.name, variant.is_pending),
+                text=review_label(
+                    variant.name,
+                    is_pending=variant.is_pending,
+                    is_rejected=variant.is_rejected,
+                ),
             )
             for variant in sorted(pin.variants, key=lambda v: v.name)
         ],
@@ -232,7 +242,9 @@ def _unauthorized_copies(pin: Pin, request: Request) -> Element | None:
         items=[
             pill_link(
                 href=str(pin_url(request=request, pin=copy)),
-                text=pending_label(copy.name, copy.is_pending),
+                text=review_label(
+                    copy.name, is_pending=copy.is_pending, is_rejected=copy.is_rejected
+                ),
             )
             for copy in sorted(pin.unauthorized_copies, key=lambda c: c.name)
         ],
@@ -324,7 +336,11 @@ def _pin_sets(
         items=[
             pill_link(
                 href=str(pin_set_url(request=request, pin_set=ps)),
-                text=pending_label(titlecase(ps.name), ps.is_pending),
+                text=review_label(
+                    titlecase(ps.name),
+                    is_pending=ps.is_pending,
+                    is_rejected=ps.is_rejected,
+                ),
             )
             for ps in visible_pin_sets
         ],
@@ -339,7 +355,11 @@ def _tags(pin: Pin, request: Request) -> Element:
         items=[
             pill_link(
                 href=str(tag_url(request=request, tag=tag)),
-                text=pending_label(tag.display_name, tag.is_pending),
+                text=review_label(
+                    tag.display_name,
+                    is_pending=tag.is_pending,
+                    is_rejected=tag.is_rejected,
+                ),
                 icon=CATEGORY_ICONS.get(tag.category, "tag"),
                 color_classes=CATEGORY_COLORS.get(
                     tag.category, "bg-main text-base-text"

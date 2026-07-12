@@ -188,6 +188,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             "description": self.description,
             "category": self.category.value,
             "is_pending": self.is_pending,
+            "is_rejected": self.is_rejected,
             "aliases": [a.alias for a in self.aliases],
         }
 

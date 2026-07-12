@@ -16,14 +16,18 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def pending_label(text: str, is_pending: bool) -> str:
-    """Prefix *text* with ``"(P) "`` when *is_pending* is true.
+def review_label(text: str, *, is_pending: bool, is_rejected: bool = False) -> str:
+    """Prefix *text* with its review-state marker: ``"(P) "`` or ``"(C) "``.
 
-    Single source of truth for the pending-entity marker shown in selection
-    lists, links, and headings. Callers pass the already-resolved display text
-    (``entity.name``, ``tag.display_name``, ``titlecase(name)``, a search-hit
-    field, ...) so the helper stays agnostic to where the label comes from.
+    Single source of truth for the review-state marker shown in selection lists,
+    links, and headings. ``(P)`` is pending approval; ``(C)`` is needs-changes — a
+    reviewer sent it back, and only editors and admins can see it at all. Callers
+    pass the already-resolved display text (``entity.name``, ``tag.display_name``,
+    ``titlecase(name)``, a search-hit field, ...) so the helper stays agnostic to
+    where the label comes from.
     """
+    if is_rejected:
+        return f"(C) {text}"
     return f"(P) {text}" if is_pending else text
 
 

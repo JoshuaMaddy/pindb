@@ -71,10 +71,12 @@ Core entities inherit `AuditMixin` (`database/audit_mixin.py`): `created_at/by`,
 | Viewer | Sees |
 |---|---|
 | Guest / regular user | `approved_at IS NOT NULL` and `rejected_at IS NULL` |
-| Editor | Approved + pending (`rejected_at IS NULL`) |
+| Editor | Every review state — approved + pending + needs-changes (no predicate at all) |
 | Admin | Same as editor; `.execution_options(include_pending=True)` for approval views |
 
-Pending items appear in form selection lists with `(P) ` name prefix.
+Needs-changes rows stay visible to editors on purpose: the submitter has to read the feedback and fix the entry. Hiding them makes the change request impossible to act on.
+
+Review-state markers in selection lists/headings come from `utils.py::review_label` — `(P) ` pending, `(C) ` needs-changes. Meili documents carry `is_pending`/`is_rejected` so `search_entity_options` can prefix without a DB roundtrip.
 
 **Excluded from audit:** `UserSession` (ephemeral), all join tables, `ChangeLog` itself.
 
@@ -153,7 +155,20 @@ Edit permissions (`routes/_guards.py::assert_editor_can_edit`): admins always al
 
 Approval queue at `/admin/pending` (`routes/approve.py`):
 - Approving Pin cascades to pending shops/artists/tags on *that* pin — does NOT bulk-approve other pins referencing those entities.
-- Rejection sets `rejected_at` (editor can still see/fix).
+
+### Needs Changes (the third review state)
+
+**DB `rejected_*` ≡ UI "Needs Changes".** The columns kept their original names (renaming is unsafe under blue/green); everything user-facing says "Needs Changes", and the admin button says *Request changes*. Not a terminal state — it is a review conversation.
+
+- **Reason is mandatory.** All three reject routes (`/reject`, `/reject-edits`, `/reject-bulk`) take a `reason` form field, validated `>= MIN_CHANGE_REQUEST_LENGTH` (25, in `database/pending_mixin.py`) after `.strip()`. The client-side gate is the `request-changes-modal` island; the route check is the real one.
+- The reason is stored on the entity/edit (`rejection_reason`) **and** sent to the submitter as a `Message` (`MessageCategory.changes_requested`, `ChangesRequestedBody`). The column is current state; the message is the notification. Both — the editor may archive the message, and the queue/banner need the reason without joining `messages`.
+- **Editing clears the flag** (`_guards.py::clear_rejection_on_resubmit`, called from the direct-edit branch of `routes/edit/*`), returning the entry to Pending. An admin editing a flagged entry does *not* clear it.
+- **Edit chains:** `get_edit_chain`/`get_head_edit` include needs-changes edits — a flagged edit is still the tip of the chain, so the edit form prefills from it, a resubmission stacks on it (`reopen_rejected_edits`), and approving a flagged chain applies it. Only the queue's own section queries split pending (`rejected_at IS NULL`) from needs-changes (`IS NOT NULL`).
+- **Meili:** reject calls `sync_entity`, **not** `delete_one` — needs-changes entries stay indexed like pending ones so the editor can find them. Meili is only an id source; the ORM filter is the visibility gate.
+- **No stats refresh on reject:** only approved entries count, and an entry only reaches needs-changes from pending.
+- The nav/heading pending counts exclude needs-changes (`routes/admin/_pending_count.py`) — those entries are waiting on their submitter, not on an admin.
+
+Wire value note: `MessageCategory.changes_requested` deliberately persists as `"pin_rejection"` — `messages.category` is `VARCHAR(13)` sized to it, and the SQLAlchemy `Enum` uses `values_callable` to store `.value` rather than the member name. Renaming the member alone would have written an 17-char string into a 13-char column.
 
 ## User Pin Lists
 

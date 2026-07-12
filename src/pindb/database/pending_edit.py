@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 from rich.repr import Result
-from sqlalchemy import ForeignKey, Index, text
+from sqlalchemy import ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, MappedAsDataclass, mapped_column
@@ -54,6 +54,7 @@ class PendingEdit(PendingStateMixin, MappedAsDataclass, Base):
     rejected_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), default=None
     )
+    rejection_reason: Mapped[str | None] = mapped_column(Text, default=None)
 
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("pending_edits.id"), default=None

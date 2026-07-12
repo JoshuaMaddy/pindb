@@ -32,6 +32,7 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
     get_head_edit,
+    reopen_rejected_edits,
 )
 from pindb.database.pin import Pin
 from pindb.database.tag import Tag, apply_pin_tags
@@ -280,6 +281,9 @@ async def _apply_to_pin(
         patch = compute_patch(old_snapshot, new_snapshot)
         if not patch:
             return
+        # Same resubmit rule as the single-entity edit form: a real change to a chain
+        # a reviewer sent back reopens it, and this edit stacks on top.
+        await reopen_rejected_edits(session, "pins", pin.id)
         head = await get_head_edit(session, "pins", pin.id)
         session.add(
             PendingEdit(

@@ -14,6 +14,7 @@ from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.templates.admin._pending_shared import (
     action_buttons,
     action_form_button,
+    request_changes_button,
     section_header,
 )
 
@@ -97,7 +98,11 @@ def _bulk_group_card(*, group: BulkGroupView) -> Element:
             action_form_button(
                 action="approve", url=approve_url, label="Approve bundle"
             ),
-            action_form_button(action="reject", url=reject_url, label="Reject bundle"),
+            request_changes_button(
+                url=reject_url,
+                entity_label="this bulk bundle",
+                label="Request changes",
+            ),
             action_form_button(action="delete", url=delete_url, label="Delete bundle"),
         ),
     ]

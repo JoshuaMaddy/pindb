@@ -196,12 +196,24 @@ class PendingQueuePage(_PageBase):
             row.locator(f"form[action*='/admin/pending/approve/{entity_type}/']"),
         )
 
-    def reject_entity(self, entity_type: str, name: str) -> None:
+    def open_change_request(self, name: str) -> Locator:
+        """Open the change-request dialog from a row, returning the dialog's form.
+
+        The reject action is the only queue action with a body, so it goes through
+        the ``request-changes-modal`` island rather than a bare inline form. The
+        form only exists in the DOM once the dialog is open.
+        """
         row = self.row_for_entity(name)
-        submit_pending_action(
-            self.page,
-            row.locator(f"form[action*='/admin/pending/reject/{entity_type}/']"),
-        )
+        row.get_by_role("button", name="Request changes").first.click()
+        form = self.page.locator("form[action*='/admin/pending/reject']")
+        form.wait_for(state="visible")
+        return form
+
+    def request_changes(self, entity_type: str, name: str, reason: str) -> None:
+        del entity_type  # the dialog is opened from the row, not by action URL
+        form = self.open_change_request(name)
+        form.locator("textarea[name='reason']").fill(reason)
+        submit_pending_action(self.page, form)
 
     def delete_entity(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)
@@ -219,12 +231,13 @@ class PendingQueuePage(_PageBase):
             row.locator(f"form[action*='/admin/pending/approve-edits/{entity_type}/']"),
         )
 
-    def reject_edits(self, entity_type: str, name: str) -> None:
-        row = self.row_for_entity(name)
-        submit_pending_action(
-            self.page,
-            row.locator(f"form[action*='/admin/pending/reject-edits/{entity_type}/']"),
-        )
+    def request_changes_to_edits(
+        self, entity_type: str, name: str, reason: str
+    ) -> None:
+        del entity_type  # the dialog is opened from the row, not by action URL
+        form = self.open_change_request(name)
+        form.locator("textarea[name='reason']").fill(reason)
+        submit_pending_action(self.page, form)
 
     def delete_edits(self, entity_type: str, name: str) -> None:
         row = self.row_for_entity(name)

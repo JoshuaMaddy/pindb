@@ -24,6 +24,7 @@ from pindb.templates.admin._pending_shared import (
     action_buttons,
     action_form_button,
     pending_table,
+    request_changes_button,
     section_header,
 )
 
@@ -105,8 +106,10 @@ def _edit_group_row(
                 action_form_button(
                     action="approve", url=approve_url, title="Approve edits"
                 ),
-                action_form_button(
-                    action="reject", url=reject_url, title="Reject edits"
+                request_changes_button(
+                    url=reject_url,
+                    entity_label=f"the pending edits to {name}",
+                    title="Request changes to these edits",
                 ),
                 action_form_button(
                     action="delete", url=delete_url, title="Delete edits"

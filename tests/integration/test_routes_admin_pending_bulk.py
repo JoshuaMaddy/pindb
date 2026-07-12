@@ -77,6 +77,9 @@ class TestAdminPendingBulkActions:
 
         response = admin_client.post(
             f"/admin/pending/reject-bulk/{bulk_id}",
+            data={
+                "reason": "The description is missing; please add one before this can be approved."
+            },
             follow_redirects=False,
         )
         assert response.status_code == 303
