@@ -15,14 +15,18 @@ values into ``change_log.patch`` while we are trying to remove them.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.database.artist import Artist
 from pindb.database.change_log import ChangeLog
+from pindb.database.content_report import ContentReport, ReportTargetType
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
 from pindb.database.joins import (
+    display_image_pins,
     pin_set_memberships,
     pin_sets_links,
     user_favorite_pin_sets,
@@ -38,6 +42,7 @@ from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
+from pindb.database.user_display import UserDisplay, UserDisplayImage
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_stats import UserAchievement, UserStats
 from pindb.database.user_wanted_pin import UserWantedPin
@@ -58,6 +63,8 @@ _AUDIT_MODELS = (
     UserOwnedPin,
     UserWantedPin,
     Message,
+    UserDisplay,
+    UserDisplayImage,
 )
 _AUDIT_FIELDS = ("created_by_id", "updated_by_id", "deleted_by_id")
 
@@ -66,7 +73,7 @@ _PENDING_MODELS = (Artist, Shop, Tag, PinSet, Pin)
 _PENDING_FIELDS = ("approved_by_id", "rejected_by_id")
 
 
-async def erase_user_account(session: AsyncSession, user_id: int) -> None:
+async def erase_user_account(session: AsyncSession, user_id: int) -> list[UUID]:
     """Erase a user account and anonymise all audit references to it.
 
     Run inside a transactional session (``async_session_maker.begin()``). The
@@ -80,9 +87,21 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
     5. Messages addressed to the user are hard-deleted (nobody else can
        see them), messages they sent are anonymised (``sender_id`` NULL),
        and their message receipts are removed.
-    6. Join-table rows (favorites), OAuth linkages, sessions, and
+    6. The display page, its photos, and their pin taggings are hard-deleted.
+       Reports *about* those photos go with them; reports *filed by* the user
+       survive, anonymised — an abuse report should outlive its reporter.
+    7. Join-table rows (favorites), OAuth linkages, sessions, and
        per-user pin-list rows are deleted outright.
-    7. The user row itself is deleted.
+    8. The user row itself is deleted.
+
+    Returns:
+        list[UUID]: Image guids whose stored bytes must now be deleted. Display
+            photos are pictures of someone's home, so erasure has to reach the
+            storage backend too — but blob deletion is irreversible and must not
+            happen inside the transaction, where a rollback would leave rows
+            pointing at bytes that no longer exist. Callers pass these to
+            ``file_handler.delete_image`` **after** the session commits, the same
+            ordering the Meili and stats sync rules use.
     """
     # 1. Anonymise AuditMixin FKs across every inheriting table.
     for model in _AUDIT_MODELS:
@@ -151,7 +170,67 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
         delete(MessageReceipt).where(MessageReceipt.user_id == user_id)
     )
 
-    # 6. Drop user-owned data.
+    # 6. The display page and its photos. Unlike pin art — which belongs to
+    #    catalog pins that survive the user, anonymised — these are personal
+    #    photographs that nothing else references once the account is gone.
+    #    Bulk statements bypass the ORM cascade, so each level is deleted by
+    #    hand, deepest first.
+    orphaned_image_guids: list[UUID] = []
+    display_ids = list(
+        (
+            await session.scalars(
+                select(UserDisplay.id).where(UserDisplay.user_id == user_id)
+            )
+        ).all()
+    )
+    if display_ids:
+        image_rows = (
+            await session.execute(
+                select(UserDisplayImage.id, UserDisplayImage.image_guid).where(
+                    UserDisplayImage.display_id.in_(display_ids)
+                )
+            )
+        ).all()
+        image_ids = [image_id for image_id, _ in image_rows]
+        orphaned_image_guids = [guid for _, guid in image_rows]
+        if image_ids:
+            await session.execute(
+                delete(display_image_pins).where(
+                    display_image_pins.c.display_image_id.in_(image_ids)
+                )
+            )
+            # ContentReport points at its target with a plain (type, id) pair and
+            # no foreign key, so nothing cascades and no FK check will ever catch
+            # this. Reports filed *against* these photos have to go with them or
+            # they dangle at rows that no longer exist.
+            await session.execute(
+                delete(ContentReport).where(
+                    ContentReport.target_type == ReportTargetType.display_image,
+                    ContentReport.target_id.in_(image_ids),
+                )
+            )
+            await session.execute(
+                delete(UserDisplayImage).where(UserDisplayImage.id.in_(image_ids))
+            )
+        await session.execute(
+            delete(UserDisplay).where(UserDisplay.id.in_(display_ids))
+        )
+
+    # Reports the user *filed* survive, anonymised: an abuse report is about
+    # someone else's content and an admin may still need to act on it. This is
+    # why reporter_id is nullable.
+    await session.execute(
+        update(ContentReport)
+        .where(ContentReport.reporter_id == user_id)
+        .values(reporter_id=None)
+    )
+    await session.execute(
+        update(ContentReport)
+        .where(ContentReport.resolved_by_id == user_id)
+        .values(resolved_by_id=None)
+    )
+
+    # 7. Drop the rest of the user-owned data.
     await session.execute(
         delete(user_favorite_pins).where(user_favorite_pins.c.user_id == user_id)
     )
@@ -171,6 +250,8 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> None:
         delete(UserAchievement).where(UserAchievement.user_id == user_id)
     )
 
-    # 7. Delete the user row. All references above are gone, so no FK
+    # 8. Delete the user row. All references above are gone, so no FK
     #    violation.
     await session.execute(delete(User).where(User.id == user_id))
+
+    return orphaned_image_guids

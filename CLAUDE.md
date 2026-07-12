@@ -80,7 +80,7 @@ Needs-changes rows stay visible to editors on purpose: the submitter has to read
 
 Review-state markers in selection lists/headings come from `utils.py::review_label` — `(P) ` pending, `(C) ` needs-changes. Meili documents carry `is_pending`/`is_rejected` so `search_entity_options` can prefix without a DB roundtrip.
 
-**Excluded from audit:** `UserSession` (ephemeral), all join tables, `ChangeLog` itself.
+**Excluded from audit:** `UserSession` (ephemeral), all join tables, `ChangeLog` itself, `ContentReport` (carries no `AuditMixin` at all). `Message`, `UserDisplay` and `UserDisplayImage` keep the audit timestamps but set `__change_log_exclude__` — their content is personal and would otherwise be copied into `change_log.patch`, where it outlives erasure.
 
 ## Architecture Conventions
 
@@ -137,6 +137,7 @@ return HTMLResponse(content=str(template(pin=pin)))
 - Pin has `front_image_guid` (required), `back_image_guid` (optional) — UUIDs.
 - Thumbnails: objects `{uuid}.thumb.{w}` for `w ∈ {50, 100, 200, 400, 600}` (WebP, long-edge fit), generated eagerly at ingest. Legacy data may still have `{uuid}.thumbnail` (256px WebP); `GET /get/image/{guid}?thumbnail=true` prefers `.thumb.200` then falls back to `.thumbnail`.
 - `GET /get/image/{guid}?w=N` serves a sized thumb when `N` is in that set. Templates use `pin_thumbnail_img()`: `src` is the smallest stored width (fallback), `srcset` lists all widths with `w` descriptors, `sizes` is a comma-separated media-query list (first match wins) per layout.
+- `file_handler.delete_image(guid)` irreversibly removes the original **and all five thumbs**. Only account erasure calls it — see "User Displays". Ordinary deletes soft-delete the row and leave the bytes.
 - Two backends (mutually exclusive): `filesystem` or `r2` (Cloudflare R2).
 - R2 with `r2_public_url` set → redirects; else proxies bytes. Filesystem → `FileResponse`.
 - 20 MB upload limit; EXIF/ICC/XMP stripped on ingest (`_strip_metadata`) prevents GPS/device leaks.
@@ -185,6 +186,30 @@ Approval queue at `/admin/pending` (`routes/approve.py`):
 - The nav/heading pending counts exclude needs-changes (`routes/admin/_pending_count.py`) — those entries are waiting on their submitter, not on an admin.
 
 Wire value note: `MessageCategory.changes_requested` deliberately persists as `"pin_rejection"` — `messages.category` is `VARCHAR(13)` sized to it, and the SQLAlchemy `Enum` uses `values_callable` to store `.value` rather than the member name. Renaming the member alone would have written an 17-char string into a 13-char column.
+
+## User Displays
+
+Photos of a user's *real-life* pin display, at the shareable public page `GET /user/{username}/display`. The point is organic promotion: the link unfurls in Discord with the user's cover photo plus PinDB branding, and the "Pins in this display" strip carries the click back into the catalog. Everything lives in `routes/user/displays.py` + `templates/user/display_{page,edit,layouts}.py` + the `display-editor` island.
+
+- **`UserDisplay` is 1:1 with a user, created lazily** (`_get_or_create_display`, `pg_insert ... ON CONFLICT DO NOTHING` on the unique `user_id`) — not at signup, or every account that never uses the feature leaves a dead row. **The cover photo is simply the image at the lowest `position`**; there is no `cover_image_id` (it would be a circular FK needing a fixup on every cover delete).
+- **A user with no display is a 200 empty state, never a 404** — a shared link must not break.
+- **Route ordering trap:** `/user/me/display/edit` and `/user/{username}/display` are the same shape, so `me` matches `{username}`. The `/me/...` routes are declared first *within* `displays.py`, and the router is included before `router.py`'s `/{username}` catch-all. Get it wrong and every owner route 404s with "User not found" — a routing bug that reads like a template bug.
+- **The pin picker has its own options endpoint** (`GET /user/me/display/pin-options`). `/get/options/{entity_type}` is `require_editor`-gated on purpose (it reads Meili with no ORM re-hydration and would leak pending entities), so a regular user tagging pins in their own photo would get a 403 from it. This one goes through `search_pin`, which re-hydrates via the ORM so `_filter_deleted` applies.
+- **`pin_ids` is `list[str]`, not `list[int]`.** An empty list serializes to *no form field at all*, so an int list cannot distinguish "don't touch the pins" from "remove them all" — both arrive absent, and untagging the last pin silently no-ops. The client sends a single empty string to mean *explicitly none*.
+- **Layouts** (`display_layouts.py`): `collage` / `grid` / `vertical` / `carousel`, plus a per-image `feature` size hint = span-2. Collage is a CSS **grid** with `grid-flow-dense`, not columns-masonry — multi-column CSS cannot span an item across columns, and the feature hint is a requirement. `auto-rows-[...]` is load-bearing: without an explicit row height `row-span-2` means nothing. In the fixed-height cover layouts the caption is **overlaid on the photo** (a below-image caption spills out of its cell); `vertical` keeps it below.
+- **Enum columns pass `length=32` explicitly.** `native_enum=False` otherwise sizes the VARCHAR to the longest value that exists *today* (`"carousel"` → `VARCHAR(8)`), so the next layout anyone adds needs a migration to widen it. This is the `messages.category` `VARCHAR(13)` story, pre-empted.
+- **`UserDisplay`/`UserDisplayImage` set `__change_log_exclude__`** (like `Message`): the audit diff would otherwise copy captions, titles and image guids into `change_log.patch`, where they survive account erasure.
+- **Erasure hard-deletes the photos *and their bytes*.** `erase_user_account` returns the orphaned guids and the caller passes them to `file_handler.delete_image` **after the transaction commits** (blob deletion is irreversible; a rollback would otherwise leave rows pointing at bytes that are gone). Pin art is different — it belongs to catalog pins that outlive the account — but a display photo is a picture of someone's home and nothing else references it. The per-image delete route only *soft*-deletes and leaves the bytes.
+- **No Meili sync and no `refresh_user_stats`.** Displays are not a tracked entity type, and a photo of your own shelf is not a contribution to the catalog. Don't "fix" the omissions.
+- **Share card:** `og_image.py::build_user_display_og_image` (route branch `user_display` in `routes/get/og_image.py`, keyed on **user id**). The cover photo is cover-fit full-bleed under two scrims — a flat wash plus a bottom gradient — with the wordmark *drawn as text*, since the `opengraph-image-blank.webp` asset has it baked into an opaque background and cannot be layered over a photo. It loads the **original**, not a 600px thumb: the pin card contain-fits a small image, but this one scales a photo up to a 1200px frame. No photos → falls back to the blank-template card.
+
+## Content Reports
+
+`ContentReport` (`database/content_report.py`) is a generic `(target_type, target_id)` report → `/admin/reports` queue (`routes/admin/reports.py`). Only `display_image` is wired up today; the enum carries the rest so pins/tags extend without a schema change. Filing requires a signed-in account; `UniqueConstraint(reporter_id, target_type, target_id)` absorbs duplicate reports via `ON CONFLICT DO NOTHING` rather than 500ing.
+
+**The pointer has no foreign key.** Nothing cascades, and no FK check will ever remind you. So: every path that deletes a reportable row must close the reports naming it (erasure deletes them; the admin "Remove content" action marks *every* open report on that target `actioned`), and the queue must render when a target has already vanished. Reports a user *filed* survive their account erasure, anonymised — `reporter_id` is nullable precisely for that.
+
+`ContentReport` carries no `AuditMixin` (so it is excluded from audit like `ChangeLog`) and its `created_at` has a `server_default` — it is written by a Core `ON CONFLICT` insert, which bypasses the ORM's `default_factory` entirely. Same reason `MessageReceipt` has one.
 
 ## User Pin Lists
 

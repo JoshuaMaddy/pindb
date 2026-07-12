@@ -111,6 +111,19 @@ tag_implications = Table(
     ),
 )
 
+display_image_pins = Table(
+    "display_image_pins",
+    Base.metadata,
+    Column(
+        "display_image_id",
+        Integer,
+        ForeignKey("user_display_images.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
+    Index("ix_display_image_pins_pin_id", "pin_id"),
+)
+
 pin_variants = Table(
     "pin_variants",
     Base.metadata,

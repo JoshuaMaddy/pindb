@@ -51,6 +51,23 @@ _SQUARE_CORNER_RADIUS: int = 50
 # User list OG: 2×4 grid; same square size and x-positions as entity row.
 _USER_GRID_ROW_Y: tuple[int, int] = (30, 348)  # 30 + 252 + 66 = 348; 348+252+30=630
 
+# User display OG: the cover photo fills the frame, so everything drawn on top
+# needs a scrim under it. Social previews render around 500px wide against
+# whatever the user photographed, which can be anything.
+_SCRIM_RGB: tuple[int, int, int] = (0, 0, 0)
+_SCRIM_FLAT_ALPHA: int = 110
+_SCRIM_GRADIENT_ALPHA: int = 200
+_SCRIM_GRADIENT_HEIGHT: int = 280
+_DISPLAY_MARGIN_X: int = 56
+_DISPLAY_MARGIN_BOTTOM: int = 48
+_DISPLAY_LINE_GAP: int = 14
+_WORDMARK_TOP: int = 44
+_WORDMARK_FONT_SIZE: int = 52
+_DISPLAY_TITLE_FONT_SIZE: int = 72
+_DISPLAY_SUBTITLE_FONT_SIZE: int = 44
+_MIN_DISPLAY_FONT_SIZE: int = 28
+_DISPLAY_TEXT_MAX_WIDTH: int = _IMAGE_SIZE[0] - (2 * _DISPLAY_MARGIN_X)
+
 # The "PinDB" wordmark on the base ends near y=156; leave a small gap, then
 # vertically center the entity-name text in the band above the squares.
 _TITLE_BAND_TOP: int = 168
@@ -108,6 +125,42 @@ def _draw_title(canvas: Image.Image, name: str) -> None:
     draw.text((x, y), display_text, fill=_TITLE_TEXT_FILL, font=font)
 
 
+def _fit_text_to_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    start_size: int,
+    min_size: int,
+    max_width: int,
+) -> tuple[ImageFont.FreeTypeFont, str]:
+    """Largest font size at or below *start_size* that fits, else ellipsized."""
+    for size in range(start_size, min_size - 1, -_TITLE_FONT_STEP):
+        font = _title_font(size)
+        if draw.textlength(text, font=font) <= max_width:
+            return font, text
+    font = _title_font(min_size)
+    truncated = text
+    while truncated and draw.textlength(truncated + "…", font=font) > max_width:
+        truncated = truncated[:-1]
+    return font, (truncated + "…") if truncated else text
+
+
+@lru_cache(maxsize=1)
+def _bottom_gradient_scrim() -> Image.Image:
+    """Transparent-to-dark band across the bottom, for text legibility."""
+    width, height = _IMAGE_SIZE
+    mask = Image.new("L", (1, _SCRIM_GRADIENT_HEIGHT))
+    for y in range(_SCRIM_GRADIENT_HEIGHT):
+        alpha = int(_SCRIM_GRADIENT_ALPHA * (y / (_SCRIM_GRADIENT_HEIGHT - 1)))
+        mask.putpixel((0, y), alpha)
+    band_alpha = mask.resize((width, _SCRIM_GRADIENT_HEIGHT))
+
+    scrim = Image.new("RGBA", _IMAGE_SIZE, (*_SCRIM_RGB, 0))
+    band = Image.new("RGBA", (width, _SCRIM_GRADIENT_HEIGHT), (*_SCRIM_RGB, 255))
+    band.putalpha(band_alpha)
+    scrim.paste(band, (0, height - _SCRIM_GRADIENT_HEIGHT))
+    return scrim
+
+
 def _rounded_square_mask(size: int, radius: int) -> Image.Image:
     """Build an alpha mask for a square with rounded corners."""
     mask = Image.new("L", (size, size), 0)
@@ -122,8 +175,8 @@ def _square_mask_cached(size: int, radius: int) -> Image.Image:
     return _rounded_square_mask(size, radius)
 
 
-def _cover_fit(image: Image.Image, size: int) -> Image.Image:
-    """Resize *image* to ``size x size`` using object-fit-cover semantics.
+def _cover_fit_rect(image: Image.Image, width: int, height: int) -> Image.Image:
+    """Resize *image* to ``width x height`` using object-fit-cover semantics.
 
     Preserves an alpha channel when the source has one — pin art is sometimes
     die-cut against a transparent background, and we want those holes to
@@ -132,13 +185,18 @@ def _cover_fit(image: Image.Image, size: int) -> Image.Image:
     has_alpha = image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info
     src = image.convert("RGBA" if has_alpha else "RGB")
     src_w, src_h = src.size
-    scale = max(size / src_w, size / src_h)
-    new_w = max(size, int(round(src_w * scale)))
-    new_h = max(size, int(round(src_h * scale)))
+    scale = max(width / src_w, height / src_h)
+    new_w = max(width, int(round(src_w * scale)))
+    new_h = max(height, int(round(src_h * scale)))
     resized = src.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    left = (new_w - size) // 2
-    top = (new_h - size) // 2
-    return resized.crop((left, top, left + size, top + size))
+    left = (new_w - width) // 2
+    top = (new_h - height) // 2
+    return resized.crop((left, top, left + width, top + height))
+
+
+def _cover_fit(image: Image.Image, size: int) -> Image.Image:
+    """Square cover-fit — the pin-thumbnail slot case."""
+    return _cover_fit_rect(image, size, size)
 
 
 def _empty_square(size: int) -> Image.Image:
@@ -253,6 +311,86 @@ def build_user_list_og_image(pin_image_bytes: Sequence[bytes]) -> bytes:
 
     buffer = io.BytesIO()
     canvas.save(buffer, format="WEBP", quality=85, method=4)
+    return buffer.getvalue()
+
+
+def build_user_display_og_image(
+    cover_image_bytes: bytes | None, username: str, title: str | None = None
+) -> bytes:
+    """Render the share card for a user's display page.
+
+    This card is the whole point of the Displays feature: it is what unfurls when
+    someone pastes their display link into Discord. The user's cover photo fills
+    the frame, a scrim keeps the overlaid text legible against an arbitrarily
+    bright shadowbox photo, and the PinDB wordmark rides along on every share.
+
+    The wordmark is *drawn as text* rather than lifted from
+    ``opengraph-image-blank.webp`` — that asset has it baked into an opaque
+    background and cannot be layered over a photo.
+
+    Args:
+        cover_image_bytes: Raw bytes of the display's first photo. ``None`` (or
+            undecodable) falls back to the standard blank-template card, so a
+            display with no photos still shares as something.
+        username: Used for the "@name's pin display" line.
+        title: The display's own title, drawn above the username line when set.
+
+    Returns:
+        Encoded WebP bytes (1200x630, sRGB).
+    """
+    width, height = _IMAGE_SIZE
+
+    if cover_image_bytes:
+        try:
+            with Image.open(io.BytesIO(cover_image_bytes)) as src:
+                photo = _cover_fit_rect(src, width, height).convert("RGB")
+        except (OSError, ValueError):
+            photo = None
+    else:
+        photo = None
+
+    if photo is None:
+        canvas = _blank_template().copy()
+        _draw_title(canvas, f"@{username}")
+        buffer = io.BytesIO()
+        canvas.save(buffer, format="WEBP", quality=85, method=4)
+        return buffer.getvalue()
+
+    canvas = photo.convert("RGBA")
+    # Two scrims, because one is not enough. The flat wash tames the whole frame
+    # (a display photo is usually bright and busy); the bottom gradient guarantees
+    # contrast under the text regardless of what happens to be in that corner.
+    canvas = Image.alpha_composite(
+        canvas, Image.new("RGBA", _IMAGE_SIZE, (*_SCRIM_RGB, _SCRIM_FLAT_ALPHA))
+    )
+    canvas = Image.alpha_composite(canvas, _bottom_gradient_scrim())
+
+    draw = ImageDraw.Draw(canvas)
+    draw.text(
+        (_DISPLAY_MARGIN_X, _WORDMARK_TOP),
+        "PinDB",
+        fill=_TITLE_TEXT_FILL,
+        font=_title_font(_WORDMARK_FONT_SIZE),
+    )
+
+    lines: list[tuple[str, int]] = []
+    if title:
+        lines.append((title, _DISPLAY_TITLE_FONT_SIZE))
+    lines.append((f"@{username}'s pin display", _DISPLAY_SUBTITLE_FONT_SIZE))
+
+    baseline = height - _DISPLAY_MARGIN_BOTTOM
+    for text, size in reversed(lines):
+        font, fitted = _fit_text_to_width(
+            draw, text, size, _MIN_DISPLAY_FONT_SIZE, _DISPLAY_TEXT_MAX_WIDTH
+        )
+        line_height = font.getbbox(fitted)[3]
+        baseline -= line_height + _DISPLAY_LINE_GAP
+        draw.text(
+            (_DISPLAY_MARGIN_X, baseline), fitted, fill=_TITLE_TEXT_FILL, font=font
+        )
+
+    buffer = io.BytesIO()
+    canvas.convert("RGB").save(buffer, format="WEBP", quality=85, method=4)
     return buffer.getvalue()
 
 

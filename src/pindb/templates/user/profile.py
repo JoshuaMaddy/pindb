@@ -9,6 +9,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
+from pindb.database.user_display import UserDisplayImage
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.templates.base import html_base
@@ -17,6 +18,7 @@ from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.user.profile_sections import (
     _collection_section,
+    _display_section,
     _favorites_section,
     _sets_section,
     _tradeable_section,
@@ -41,6 +43,8 @@ def user_profile_page(
     wanted_count: int,
     tradeable_entries: list[UserOwnedPin],
     tradeable_count: int,
+    display_images: list[UserDisplayImage],
+    display_image_count: int,
     current_user: User | None,
 ) -> Element:
     username: str = profile_user.username
@@ -59,6 +63,16 @@ def user_profile_page(
                     heading_id="user-profile-heading",
                 ),
                 achievement_badge_row(highest_tiers=achievements),
+                hr,
+                # First section: it's the showcase, and the reason someone lands
+                # on this profile from a shared link.
+                _display_section(
+                    request=request,
+                    images=display_images,
+                    total=display_image_count,
+                    profile_user=profile_user,
+                    current_user=current_user,
+                ),
                 hr,
                 _favorites_section(
                     request=request,

@@ -17,6 +17,11 @@ from pindb.database.artist import Artist, ArtistAlias
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.change_log import ChangeLog
+from pindb.database.content_report import (
+    ContentReport,
+    ReportStatus,
+    ReportTargetType,
+)
 from pindb.database.currency import Currency
 from pindb.database.entity_type import EntityType
 from pindb.database.grade import Grade
@@ -36,6 +41,12 @@ from pindb.database.shop import Shop, ShopAlias
 from pindb.database.tag import Tag, TagAlias, TagCategory
 from pindb.database.user import User
 from pindb.database.user_auth_provider import UserAuthProvider
+from pindb.database.user_display import (
+    DisplayImageSize,
+    DisplayLayout,
+    UserDisplay,
+    UserDisplayImage,
+)
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_stats import UserAchievement, UserStats
 from pindb.database.user_wanted_pin import UserWantedPin
@@ -53,7 +64,10 @@ __all__: list[str] = [
     "PendingMixin",
     "Base",
     "ChangeLog",
+    "ContentReport",
     "Currency",
+    "DisplayImageSize",
+    "DisplayLayout",
     "Grade",
     "Link",
     "Message",
@@ -63,6 +77,8 @@ __all__: list[str] = [
     "PendingEdit",
     "Pin",
     "PinSet",
+    "ReportStatus",
+    "ReportTargetType",
     "Shop",
     "ShopAlias",
     "Tag",
@@ -71,6 +87,8 @@ __all__: list[str] = [
     "User",
     "UserAchievement",
     "UserAuthProvider",
+    "UserDisplay",
+    "UserDisplayImage",
     "UserOwnedPin",
     "UserSession",
     "UserStats",

@@ -13,7 +13,14 @@ from fastapi.routing import APIRouter
 from sqlalchemy import func, select
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
-from pindb.database import PinSet, User, UserAchievement, async_session_maker
+from pindb.database import (
+    PinSet,
+    User,
+    UserAchievement,
+    UserDisplay,
+    UserDisplayImage,
+    async_session_maker,
+)
 from pindb.database.erasure import erase_user_account
 from pindb.database.joins import pin_set_memberships
 from pindb.database.pin_previews import PinPreviews, load_pin_previews
@@ -25,6 +32,8 @@ from pindb.database.user_pin_queries import (
     get_owned_entries,
     get_wanted_entries,
 )
+from pindb.file_handler import delete_image
+from pindb.routes.user.displays import router as displays_router
 from pindb.routes.user.lists import router as lists_router
 from pindb.routes.user.sets import router as sets_router
 from pindb.templates.user.profile import user_profile_page
@@ -84,7 +93,14 @@ async def delete_own_account(
         user: User | None = await session.get(User, current_user.id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        await erase_user_account(session=session, user_id=current_user.id)
+        orphaned_guids = await erase_user_account(
+            session=session, user_id=current_user.id
+        )
+    # After the transaction commits, never inside it: blob deletion is
+    # irreversible, and a rollback would otherwise leave rows pointing at bytes
+    # that no longer exist.
+    for guid in orphaned_guids:
+        delete_image(guid)
     response = RedirectResponse(url="/", status_code=303)
     clear_session_cookie(response)
     return response
@@ -94,6 +110,7 @@ async def delete_own_account(
 # /user/me/sets/new and /user/{username}/favorites resolve to them first.
 router.include_router(sets_router)
 router.include_router(lists_router)
+router.include_router(displays_router)
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +182,22 @@ async def get_user_profile(
             entity_ids=[pin_set.id for pin_set in personal_sets],
         )
 
+        # Bounded by MAX_DISPLAY_IMAGES, so the whole set is cheap to load; the
+        # strip shows the first few.
+        display_images: list[UserDisplayImage] = list(
+            (
+                await db.scalars(
+                    select(UserDisplayImage)
+                    .join(
+                        UserDisplay,
+                        UserDisplay.id == UserDisplayImage.display_id,
+                    )
+                    .where(UserDisplay.user_id == user.id)
+                    .order_by(UserDisplayImage.position.asc())
+                )
+            ).all()
+        )
+
         achievement_rows = (
             await db.execute(
                 select(
@@ -195,6 +228,8 @@ async def get_user_profile(
                     wanted_count=wanted_count,
                     tradeable_entries=tradeable_entries,
                     tradeable_count=tradeable_count,
+                    display_images=display_images[:PROFILE_PREVIEW_LIMIT],
+                    display_image_count=len(display_images),
                     current_user=current_user,
                 )
             )

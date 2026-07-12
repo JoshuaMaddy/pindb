@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from pindb.database.pin_set import PinSet
     from pindb.database.session import UserSession
     from pindb.database.user_auth_provider import UserAuthProvider
+    from pindb.database.user_display import UserDisplay
     from pindb.database.user_owned_pin import UserOwnedPin
     from pindb.database.user_wanted_pin import UserWantedPin
 
@@ -76,6 +77,15 @@ class User(AuditMixin, MappedAsDataclass, Base):
         default_factory=list,
         cascade="all, delete-orphan",
         foreign_keys="[UserWantedPin.user_id]",
+    )
+    # Created lazily when the user first opens the display editor, so accounts
+    # that never touch the feature have no row.
+    display: Mapped[UserDisplay | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="[UserDisplay.user_id]",
+        init=False,
+        default=None,
     )
 
     def __hash__(self) -> int:

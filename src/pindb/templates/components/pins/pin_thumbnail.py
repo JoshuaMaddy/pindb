@@ -60,6 +60,23 @@ def thumb_image_url(request: Request, guid: UUID, w: int) -> str:
     return f"{prefix}{guid}{suffix}{separator}w={w}"
 
 
+def image_url_prefix(request: Request) -> str:
+    """The ``/get/image/`` prefix a client can concatenate a guid onto.
+
+    Only valid because the route has no suffix after the guid; asserted, so a
+    route change fails loudly here rather than producing broken URLs in an island.
+    """
+    prefix, suffix = _image_url_parts(request)
+    assert not suffix, "get_image route gained a path suffix after {guid}"
+    return prefix
+
+
+def full_image_url(request: Request, guid: UUID) -> str:
+    """Public URL for the stored original (no ``?w=``) — what the lightbox opens."""
+    prefix, suffix = _image_url_parts(request)
+    return f"{prefix}{guid}{suffix}"
+
+
 def _srcset_value(request: Request, guid: UUID) -> str:
     """Comma-separated ``url 50w, url 100w, ...`` for the given pin image."""
     prefix, suffix = _image_url_parts(request)
