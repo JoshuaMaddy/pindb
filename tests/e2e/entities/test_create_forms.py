@@ -12,6 +12,7 @@ import pytest
 from playwright.sync_api import expect
 
 from pindb.database.tag import normalize_tag_name
+from tests.e2e.island_helpers import wait_for_islands
 
 
 def _browser(role: str, admin_browser_context, editor_browser_context):
@@ -31,6 +32,9 @@ class TestEntityFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/shop")
         page.wait_for_load_state("load")
+        # The aliases multi-select sits right above the submit button; clicking
+        # before it mounts means clicking where the button *used* to be.
+        wait_for_islands(page)
 
         submit = page.locator("#simple-entity-submit")
         expect(submit).to_have_attribute("aria-disabled", "true")
@@ -49,6 +53,7 @@ class TestEntityFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/artist")
         page.wait_for_load_state("load")
+        wait_for_islands(page)
 
         submit = page.locator("#simple-entity-submit")
         expect(submit).to_have_attribute("aria-disabled", "true")
@@ -65,6 +70,7 @@ class TestEntityFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/tag")
         page.wait_for_load_state("load")
+        wait_for_islands(page)
 
         page.locator("#tag-form-submit").click(force=True)
         expect(page.get_by_text("Enter a tag name.", exact=True)).to_be_visible()
@@ -79,6 +85,7 @@ class TestEntityFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/pin_set")
         page.wait_for_load_state("load")
+        wait_for_islands(page)
 
         page.locator("#pin-set-create-submit").click(force=True)
         expect(

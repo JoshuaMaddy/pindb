@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
+from tests.e2e.island_helpers import wait_for_islands
 from tests.e2e.pins._helpers import png_bytes
 from tests.e2e.select_helpers import (
     multi_add,
@@ -42,6 +43,12 @@ def _wait_for_grade_inputs_ready(page: Page) -> None:
     )
 
 
+def _wait_for_pin_form_ready(page: Page) -> None:
+    """Grades rendered *and* every island mounted — both shift the submit button."""
+    _wait_for_grade_inputs_ready(page)
+    wait_for_islands(page)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("role", ["editor", "admin"])
 class TestPinFormClientValidation:
@@ -55,7 +62,7 @@ class TestPinFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/pin")
         page.wait_for_load_state("load")
-        _wait_for_grade_inputs_ready(page)
+        _wait_for_pin_form_ready(page)
 
         submit = page.locator("#pin-form-submit")
         expect(submit).to_have_attribute("aria-disabled", "true")
@@ -80,7 +87,7 @@ class TestPinFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/pin")
         page.wait_for_load_state("load")
-        _wait_for_grade_inputs_ready(page)
+        _wait_for_pin_form_ready(page)
 
         page.locator("#pin-form-submit").click(force=True)
         expect(page.get_by_text("Enter a name for this pin.")).to_be_visible()
@@ -103,7 +110,7 @@ class TestPinFormClientValidation:
         page = _browser(role, admin_browser_context, editor_browser_context).new_page()
         page.goto(f"{live_server}/create/pin")
         page.wait_for_load_state("load")
-        _wait_for_grade_inputs_ready(page)
+        _wait_for_pin_form_ready(page)
 
         submit = page.locator("#pin-form-submit")
         expect(submit).to_have_attribute("aria-disabled", "true")
