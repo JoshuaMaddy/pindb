@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import Request
 from htpy import Element
 
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
@@ -23,6 +24,7 @@ from pindb.templates.list.base import (
 def pin_sets_list_section(
     request: Request,
     pin_sets: Sequence[PinSet],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -34,6 +36,7 @@ def pin_sets_list_section(
     items = entity_list_items(
         request=request,
         entities=pin_sets,
+        previews=previews,
         view=view,
         url_of=lambda pin_set: pin_set_url(request=request, pin_set=pin_set),
     )
@@ -55,6 +58,7 @@ def pin_sets_list_section(
 def pin_sets_list(
     request: Request,
     pin_sets: Sequence[PinSet],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -75,6 +79,7 @@ def pin_sets_list(
         section=pin_sets_list_section(
             request=request,
             pin_sets=pin_sets,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

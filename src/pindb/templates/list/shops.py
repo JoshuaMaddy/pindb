@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import Request
 from htpy import Element
 
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.shop import Shop
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
@@ -23,6 +24,7 @@ from pindb.templates.list.base import (
 def shops_list_section(
     request: Request,
     shops: Sequence[Shop],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -34,6 +36,7 @@ def shops_list_section(
     items = entity_list_items(
         request=request,
         entities=shops,
+        previews=previews,
         view=view,
         url_of=lambda shop: shop_url(request=request, shop=shop),
     )
@@ -55,6 +58,7 @@ def shops_list_section(
 def shops_list(
     request: Request,
     shops: Sequence[Shop],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -75,6 +79,7 @@ def shops_list(
         section=shops_list_section(
             request=request,
             shops=shops,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

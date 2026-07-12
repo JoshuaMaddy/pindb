@@ -6,6 +6,7 @@ from fastapi import Request
 from htpy import Element, a, div, i, p, section, span
 
 from pindb.database.pin import Pin
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
@@ -92,6 +93,7 @@ def _sets_section(
     *,
     request: Request,
     sets: list[PinSet],
+    set_previews: PinPreviews,
     profile_user: User,
     current_user: User | None,
 ) -> Element:
@@ -123,12 +125,12 @@ def _sets_section(
                 href=pin_set_url(request=request, pin_set=pin_set),
                 wrap_in_anchor=False,
                 content=div(class_="flex gap-2 w-full")[
-                    thumbnail_grid(request, pin_set.pins),
+                    thumbnail_grid(request, set_previews.pins(pin_set.id)),
                     div[
                         p[
                             pin_set.name,
                             span(class_="text-lightest-hover ml-1")[
-                                f"({len(pin_set.pins)})"
+                                f"({set_previews.count(pin_set.id)})"
                             ],
                         ],
                         p(class_="text-lightest-hover")[pin_set.description],

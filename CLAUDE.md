@@ -115,6 +115,12 @@ return HTMLResponse(content=str(template(pin=pin)))
 
 **Columns survive session close; relationships don't.** `pin.name`/`pin.id` safe; `pin.shops` → `DetachedInstanceError`.
 
+**Never `selectinload(X.pins)` to feed an entity list card** (`database/pin_previews.py`). Tag/shop/artist/pin-set cards show a pin count and four thumbnails; eager-loading the relationship to get them hydrates every attached `Pin` — 60k ORM objects to draw 400 images on a 100-entity page. Routes call `load_pin_previews(...)` and templates take `previews.count(id)` / `previews.pins(id)`; `entity_grid_card` and `thumbnail_grid` take an explicit `pin_count` and a pre-sampled `pins` list, and never call `len()` on a relationship.
+
+**The pin count is viewer-dependent, so it cannot be denormalized onto a column.** `_filter_deleted` hides soft-deleted rows from everyone and unapproved ones from non-editors, so the same tag legitimately shows a different count to a guest and to an editor. `load_pin_previews` selects `Pin` as a mapped entity precisely so that filter applies to its queries too (covered by `tests/integration/test_pin_previews.py`).
+
+**Every pin-facing join table is indexed on its non-pin column** (`ix_pins_tags_tag_id` and friends, declared in `database/joins.py`). The composite PK leads with `pin_id`, so it cannot serve the "which pins belong to this tag" direction that every list page, detail page, and preview loader asks — without these it is a sequential scan of the whole join table. A correlated `COUNT(*)` over a join table to answer "does this entity have any pins" is likewise a scan-per-row: use `EXISTS`, which the index answers as an index-only probe.
+
 ### HTMX
 - Routes check `request.headers.get("HX-Request")` to return fragments vs full pages.
 - `RedirectResponse(..., status_code=303)` for form-to-redirect.

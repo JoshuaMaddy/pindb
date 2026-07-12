@@ -8,9 +8,10 @@ from fastapi import Query, Request
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from pindb.database import async_session_maker
+from pindb.database.joins import pin_set_memberships
+from pindb.database.pin_previews import PinPreviews, load_pin_previews
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.models.list_view import EntityListView
@@ -68,18 +69,25 @@ async def get_list_pin_sets(
                     select(PinSet)
                     .outerjoin(User, PinSet.owner_id == User.id)
                     .where(PinSet.owner_id.is_(None))
-                    .options(selectinload(PinSet.pins))
                     .order_by(order_by)
                     .limit(DEFAULT_PER_PAGE)
                     .offset(offset)
                 )
             ).all()
 
+        previews: PinPreviews = await load_pin_previews(
+            session,
+            join_table=pin_set_memberships,
+            entity_column=pin_set_memberships.c.set_id,
+            entity_ids=[pin_set.id for pin_set in pin_sets],
+        )
+
         return list_response(
             request,
             full=pin_sets_list,
             section=pin_sets_list_section,
             pin_sets=pin_sets,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

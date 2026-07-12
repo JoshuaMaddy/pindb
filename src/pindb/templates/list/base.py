@@ -11,6 +11,7 @@ from htpy import Element, VoidElement, a, div, hr, i, input, p, span
 from starlette.datastructures import URL
 
 from pindb.database.artist import Artist
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.models.list_view import EntityListView
@@ -225,22 +226,25 @@ def entity_list_items(
     *,
     request: Request,
     entities: Sequence[_BrowseEntity],
+    previews: PinPreviews,
     view: EntityListView,
     url_of: Callable[[_BrowseEntity], URL],
 ) -> list[Element]:
     """Grid or detailed cards for a simple browse entity (shop / artist / pin set).
 
     These three render identically apart from their canonical URL, so the only
-    per-entity input is ``url_of``. ``name``/``description``/``pins``/
-    ``is_pending`` are read directly. (Tags differ — category badge, extra
-    filter — and keep their own builders.)
+    per-entity input is ``url_of``. ``name``/``description``/``is_pending`` are read
+    directly; pin counts and thumbnails come from ``previews`` rather than the
+    entity's ``pins`` relationship, which is not loaded here. (Tags differ —
+    category badge, extra filter — and keep their own builders.)
     """
     if view == EntityListView.grid:
         return [
             entity_grid_card(
                 request=request,
                 href=str(url_of(entity)),
-                pins=entity.pins,
+                pins=previews.pins(entity.id),
+                pin_count=previews.count(entity.id),
                 name=review_label(
                     entity.name,
                     is_pending=entity.is_pending,
@@ -253,7 +257,7 @@ def entity_list_items(
         card(
             href=url_of(entity),
             content=div(class_="flex gap-2 w-full")[
-                thumbnail_grid(request=request, pins=entity.pins),
+                thumbnail_grid(request=request, pins=previews.pins(entity.id)),
                 div[
                     p(class_="text-lg")[
                         review_label(
@@ -262,7 +266,7 @@ def entity_list_items(
                             is_rejected=entity.is_rejected,
                         ),
                         span(class_="text-lightest-hover ml-1")[
-                            f"({len(entity.pins)})"
+                            f"({previews.count(entity.id)})"
                         ],
                     ],
                     p(class_="text-lightest-hover")[entity.description],

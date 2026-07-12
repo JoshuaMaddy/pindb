@@ -1,6 +1,13 @@
-"""SQLAlchemy ``Table`` association objects (many-to-many, excluded from audit)."""
+"""SQLAlchemy ``Table`` association objects (many-to-many, excluded from audit).
 
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, Table
+Each pin-facing join table carries an index on its *non-pin* column. The composite
+primary key leads with ``pin_id``, so it cannot serve the "which pins belong to
+this tag/shop/artist/set" direction — which is the one every list page, detail
+page, and preview loader queries. Without these, those all sequential-scan the
+join table.
+"""
+
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, Integer, Table
 
 from pindb.database.base import Base
 
@@ -9,6 +16,7 @@ pins_shops = Table(
     Base.metadata,
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("shop_id", Integer, ForeignKey("shops.id"), primary_key=True),
+    Index("ix_pins_shops_shop_id", "shop_id"),
 )
 
 pins_artists = Table(
@@ -16,6 +24,7 @@ pins_artists = Table(
     Base.metadata,
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("artists_id", Integer, ForeignKey("artists.id"), primary_key=True),
+    Index("ix_pins_artists_artists_id", "artists_id"),
 )
 
 pin_set_memberships = Table(
@@ -24,6 +33,7 @@ pin_set_memberships = Table(
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("set_id", Integer, ForeignKey("pin_sets.id"), primary_key=True),
     Column("position", Integer, nullable=False, server_default="0"),
+    Index("ix_pin_set_memberships_set_id", "set_id"),
 )
 
 pins_tags = Table(
@@ -32,6 +42,7 @@ pins_tags = Table(
     Column("pin_id", Integer, ForeignKey("pins.id"), primary_key=True),
     Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
     Column("implied_by_tag_id", Integer, ForeignKey("tags.id"), nullable=True),
+    Index("ix_pins_tags_tag_id", "tag_id"),
 )
 
 shops_links = Table(

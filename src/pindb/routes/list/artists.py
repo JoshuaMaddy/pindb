@@ -8,9 +8,10 @@ from fastapi import Query, Request
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from pindb.database import Artist, async_session_maker
+from pindb.database.joins import pins_artists
+from pindb.database.pin_previews import PinPreviews, load_pin_previews
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.routes.list._render import list_response
@@ -54,18 +55,25 @@ async def get_list_artists(
             artists = (
                 await session.scalars(
                     select(Artist)
-                    .options(selectinload(Artist.pins))
                     .order_by(order_by)
                     .limit(DEFAULT_PER_PAGE)
                     .offset(offset)
                 )
             ).all()
 
+        previews: PinPreviews = await load_pin_previews(
+            session,
+            join_table=pins_artists,
+            entity_column=pins_artists.c.artists_id,
+            entity_ids=[artist.id for artist in artists],
+        )
+
         return list_response(
             request,
             full=artists_list,
             section=artists_list_section,
             artists=artists,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

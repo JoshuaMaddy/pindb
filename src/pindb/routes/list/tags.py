@@ -8,11 +8,11 @@ from fastapi import Query, Request
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import exists, func, select
 
 from pindb.database import async_session_maker
 from pindb.database.joins import pins_tags
+from pindb.database.pin_previews import PinPreviews, load_pin_previews
 from pindb.database.tag import Tag, TagCategory
 from pindb.model_utils import empty_str_to_none
 from pindb.models.list_view import EntityListView
@@ -46,12 +46,12 @@ async def get_list_tags(
     elif sort == SortOrder.oldest:
         order_parts = (Tag.created_at.asc(),)
     else:
-        pin_count_sq = (
-            select(func.count())
-            .select_from(pins_tags)
-            .where(pins_tags.c.tag_id == Tag.id)
-        ).scalar_subquery()
-        order_parts = ((pin_count_sq == 0).asc(), Tag.name.asc())
+        # Tags with pins sort ahead of empty ones. Whether the tag has *any* pin is
+        # all that matters, so EXISTS (an index probe on ix_pins_tags_tag_id that
+        # stops at the first hit) answers it — the COUNT subquery this replaces had
+        # to tally every row of every tag before the LIMIT could be applied.
+        has_pins = exists().where(pins_tags.c.tag_id == Tag.id)
+        order_parts = (has_pins.desc(), Tag.name.asc())
 
     async with async_session_maker() as session:
         if q:
@@ -64,19 +64,29 @@ async def get_list_tags(
             )
             tags: Sequence[Tag] = tags_list_result
         else:
-            total_count = await session.scalar(select(func.count(Tag.id))) or 0
-            stmt = select(Tag).options(selectinload(Tag.pins)).order_by(*order_parts)
+            count_stmt = select(func.count(Tag.id))
+            stmt = select(Tag).order_by(*order_parts)
             if category:
+                count_stmt = count_stmt.where(Tag.category == category)
                 stmt = stmt.where(Tag.category == category)
+            total_count = await session.scalar(count_stmt) or 0
             tags = (
                 await session.scalars(stmt.limit(DEFAULT_PER_PAGE).offset(offset))
             ).all()
+
+        previews: PinPreviews = await load_pin_previews(
+            session,
+            join_table=pins_tags,
+            entity_column=pins_tags.c.tag_id,
+            entity_ids=[tag.id for tag in tags],
+        )
 
         return list_response(
             request,
             full=tags_list,
             section=tags_list_section,
             tags=tags,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

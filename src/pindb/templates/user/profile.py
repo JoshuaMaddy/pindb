@@ -6,6 +6,7 @@ from fastapi import Request
 from htpy import Element, hr
 
 from pindb.database.pin import Pin
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
 from pindb.database.user_owned_pin import UserOwnedPin
@@ -33,6 +34,7 @@ def user_profile_page(
     favorite_pins: list[Pin],
     favorite_count: int,
     personal_sets: list[PinSet],
+    set_previews: PinPreviews,
     owned_pins: list[UserOwnedPin],
     owned_count: int,
     wanted_pins: list[UserWantedPin],
@@ -68,6 +70,7 @@ def user_profile_page(
                 _sets_section(
                     request=request,
                     sets=personal_sets,
+                    set_previews=set_previews,
                     profile_user=profile_user,
                     current_user=current_user,
                 ),
