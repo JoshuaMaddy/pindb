@@ -28,6 +28,8 @@ def entity_grid_card(
     name: str,
     badge: BaseElement | None = None,
     allow_overflow: bool = False,
+    name_text_class: str = "text-sm",
+    additional_classes: str = "",
 ) -> Element:
     """Card for one entity: 2×2 thumbnail grid, name, pin count, optional badge.
 
@@ -57,16 +59,23 @@ def entity_grid_card(
     return a(
         href=href,
         class_=f"no-underline text-base-text rounded-xl overflow-clip bg-main {'max-md:overflow-visible' if allow_overflow else ''} "
-        "border border-lightest hover:scale-[102%] hover:border-accent transition-all duration-100 ease-linear flex flex-col relative",
+        "border border-lightest hover:scale-[102%] hover:border-accent transition-all duration-100 ease-linear flex flex-col relative "
+        f"{additional_classes}",
     )[
         div(
             class_="grid grid-cols-2 grid-rows-2 gap-2 w-full aspect-square p-2",
             aria_hidden="true",
         )[*images],
-        div(class_="p-2 text-sm font-medium flex items-center justify-between gap-1")[
-            div()[
+        div(
+            class_=f"p-2 {name_text_class} font-medium flex items-center justify-between gap-1"
+        )[
+            div(class_="min-w-0 wrap-break-word")[
                 name,
-                span(class_="text-lightest-hover ml-1")[f"({pin_count})"],
+                # nowrap so a long name breaking across lines cannot also split the
+                # count itself into "(2" / "2)".
+                span(class_="text-lightest-hover ml-1 whitespace-nowrap")[
+                    f"({pin_count})"
+                ],
             ],
             badge and badge,
         ],
