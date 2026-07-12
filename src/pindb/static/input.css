@@ -630,6 +630,81 @@
 /* Theme picker: solid moon + filled sun disc. Base `* { color: base-text }` applies to
    svg path/circle too, so shapes must inherit the wrapper span’s `text-amber-*` color. */
 @layer components {
+  /* Action buttons (admin panel, pending queue, bulk grids).
+
+     Transparent fill with a semantic border + text that tints on hover — the same
+     shape the Svelte dialogs use, so a queue row and a modal read as one system.
+     Variant = intent: primary is the accent CTA, warning the amber approvals ramp,
+     error the destructive one. Hovers are guarded with :not(:disabled) so a
+     disabled button does not light up under the cursor. */
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded border border-lightest bg-transparent px-3 py-1.5 text-sm leading-none text-base-text no-underline;
+  }
+
+  /* Text color does not inherit — @layer base sets `color` on every element — so
+     without this an icon inside a variant button falls back to base-text instead
+     of taking the button's color.
+
+     The svg's *children* need it too, not just the svg: Lucide paths draw with
+     `stroke="currentColor"`, and `currentColor` resolves against each element's own
+     `color`. Style only the svg and every path inside it still renders base-text. */
+  .btn :is(i, svg),
+  .btn svg * {
+    color: inherit;
+  }
+
+  .btn:not(:disabled):hover {
+    @apply border-lightest-hover bg-main-hover;
+  }
+
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
+  .btn-sm {
+    @apply gap-0.5 px-2 py-1 text-xs;
+  }
+
+  .btn-primary {
+    @apply border-accent text-accent;
+  }
+
+  .btn-primary:not(:disabled):hover {
+    @apply border-accent bg-lighter-hover;
+  }
+
+  .btn-secondary {
+    @apply border-lightest text-lightest-hover;
+  }
+
+  .btn-secondary:not(:disabled):hover {
+    @apply border-accent bg-main-hover text-base-text;
+  }
+
+  .btn-warning {
+    @apply border-pending-dark text-pending-main;
+  }
+
+  .btn-warning:not(:disabled):hover {
+    @apply border-pending-dark-hover bg-pending-dark-hover;
+  }
+
+  .btn-error {
+    @apply border-error-dark text-error-main;
+  }
+
+  .btn-error:not(:disabled):hover {
+    @apply border-error-dark-hover bg-error-dark-hover;
+  }
+
+  .btn-ghost {
+    @apply border-transparent text-lightest-hover;
+  }
+
+  .btn-ghost:not(:disabled):hover {
+    @apply bg-lighter-hover text-base-text;
+  }
+
   /* Achievement badges: family-colored chip with a faceted "metal" border.
      Three background layers (top to bottom):
        1. padding-box chip fill (family color)
