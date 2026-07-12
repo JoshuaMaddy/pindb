@@ -66,13 +66,26 @@ def pytest_collection_modifyitems(config, items):
 # `timeout=...` kwargs.
 _DEFAULT_ACTION_TIMEOUT_MS = 5_000
 _DEFAULT_EXPECT_TIMEOUT_MS = 5_000
+
+# Navigation gets a longer leash than actions. A failing *locator* is waiting on
+# something that will never arrive, so 5s is the right amount of patience. A
+# navigation is waiting on the page, and ~33 specs navigate with
+# `wait_until="networkidle"`, which needs 500ms of *zero* network activity: the
+# islands lazily `import()` their chunks and several pages fetch their select
+# options on load, so the settle point sits a long way after first paint. Under
+# xdist the workers share a CPU and that can overrun 5s, timing out `goto` on
+# whichever spec drew the short straw — the intermittent
+# "Page.goto: Timeout 5000ms exceeded" that has been blamed on flaky tests.
+# This costs nothing on a healthy run; it only stops the suite from giving up
+# on a page that was still loading.
+_DEFAULT_NAVIGATION_TIMEOUT_MS = 20_000
 _HTTP_TIMEOUT = httpx.Timeout(15.0)
 
 
 def _configure_context_timeouts(context) -> None:
-    """Apply the fast-fail action/navigation timeouts to a context."""
+    """Apply the fast-fail action timeouts, with a longer navigation window."""
     context.set_default_timeout(_DEFAULT_ACTION_TIMEOUT_MS)
-    context.set_default_navigation_timeout(_DEFAULT_ACTION_TIMEOUT_MS)
+    context.set_default_navigation_timeout(_DEFAULT_NAVIGATION_TIMEOUT_MS)
 
 
 @pytest.fixture(autouse=True)
