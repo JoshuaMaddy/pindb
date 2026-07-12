@@ -1,7 +1,12 @@
-# Import Script
+# Import Script (historical)
 
-Run `import_csv.py` to bulk-import pins from `import.csv` placed in this directory.
-Images must be in a sibling `Images/` folder.
+> **`import_csv.py` no longer exists.** Bulk import moved into the app: admins
+> use the grid editor at `/bulk/pin` (`src/pindb/routes/bulk/pin.py` + the
+> `bulk-import` island), which uploads images one at a time and posts the rows
+> as JSON. Shops/tags/artists typed into a cell are created inline.
+>
+> The format below is kept because `import.csv` and `Images/` are still in this
+> directory — it describes what those files hold, not a script you can run.
 
 ## CSV Format
 

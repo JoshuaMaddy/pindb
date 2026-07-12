@@ -21,7 +21,7 @@ npm run islands:check   # when frontend/ touched
 - **Frontend:** htpy, HTMX, Tailwind CSS 4, Svelte 5 islands (TypeScript), Lucide icons. Alpine.js and Tom Select fully removed — complex widgets are islands; pure show/hide disclosures use the delegated `data-disclosure` pattern in `templates/js/shell/pindb_shell.js`.
 - **Select widgets:** all enhanced selects are the native `frontend/lib/MultiSelect.svelte` component (chips, dropdown, remote load via `/get/options/*` or `/bulk/options/*`, create-on-type, tag category branding from `window.TagCategoryData`). Bulk grids use it as a plain component; page forms render a server `<select>` followed by the `multi-select` enhancer island (`island("multi-select", props={"selectId": ...})`), which adopts the select — moves it inside the widget, keeps it synced, dispatches real bubbling `change` events (HTMX `hx-trigger="change"`, form gates and form-persist saves all keep working). Gate check is `pindbSelectHasItems` (reads the underlying select). E2E drives selects only through `tests/e2e/select_helpers.py`, never widget internals. Meilisearch note: index uids all derive from `MEILISEARCH_INDEX` (base name) — `<base>`, `<base>_tags`, `<base>_artists`, `<base>_shops`, `<base>_pin_sets` — so parallel test workers on one Meili server stay isolated; renaming means indexes rebuild on next sync after deploy.
 - **Database:** PostgreSQL 17, Meilisearch
-- **Migrations:** Alembic (runs on container start, not app startup)
+- **Migrations:** Alembic (one-shot `migrate` compose service, once per deploy — not container start, not app startup)
 - **Tooling:** UV, Ruff, ty, Oxlint
 - **CSS build:** Node.js **20+** required (Tailwind v4 `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
 - **Icon color inheritance (load-bearing, `input.css` `@layer base`):** the default text color is set on `html` and **must never** be reasserted as `* { color: … }`. A universal `color` declaration matches every element, and a matched declaration beats inheritance, so `color` stops cascading entirely — a Lucide `<svg>` (and each `<path>` it strokes with `currentColor`) then resolves `currentColor` against its *own* base-text color, not the colored button/banner/chip around it, and **every icon everywhere renders base text**. `color: inherit` on the svg alone doesn't rescue it: the plain `<div>`/`<span>` between icon and colored ancestor is pinned to base-text by the same rule. Elements the UA colors itself (`a`, form controls, `svg`) are reset to `color: inherit` there — that reset is what the old `*` rule was really buying. To give an icon a color that differs from its container, put a `text-*` utility on the icon (utilities layer beats base) or use a component class rule; do not add per-component `color: inherit` patches (`.btn`, `.theme-appearance-icon` used to carry one each).
@@ -59,10 +59,11 @@ Key files where behavior not obvious from name:
 
 Core entities inherit `AuditMixin` (`database/audit_mixin.py`): `created_at/by`, `updated_at/by`, `deleted_at/by`. All fields `init=False` to avoid dataclass field-ordering conflicts — declare as `class Foo(PendingMixin, AuditMixin, MappedAsDataclass, Base)`.
 
-**How works** (`audit_events.py`, three SQLAlchemy session events):
+**How works** (`audit_events.py`, five SQLAlchemy session events):
 1. `before_flush` — sets audit timestamps/user_ids; captures diff for ChangeLog; auto-approves `PendingMixin` entities when creator is admin.
 2. `after_flush` — writes `ChangeLog` row with JSON patch `{"field": {"old": v, "new": v}}`.
 3. `do_orm_execute` — filters soft-deleted + unapproved rows from SELECTs via `with_loader_criteria`.
+4. `after_rollback` / `after_soft_rollback` — `_discard_pending_audit` drops the entries `before_flush` queued. Without it a rolled-back flush leaves the queue populated and the next successful flush writes ChangeLog rows for changes that never landed.
 
 **Current user** threaded `attach_user_middleware` → `set_audit_user()` / `set_audit_user_flags()` → ContextVars (`_audit_user_id`, `_audit_user_is_admin`, `_audit_user_is_editor`) → event handlers. No route changes needed.
 
@@ -215,7 +216,7 @@ Entry: `database/erasure.py::erase_user_account(session, user_id)`.
 ## Legal Pages & Footer
 - `routes/legal.py` serves `/about`, `/privacy`, `/terms` (public). Templates in `templates/legal/`, shared "not legal advice" banner in `_shared.py`.
 - `templates/components/shell/footer.py` rendered by `html_base()` on every full page (not HTMX fragments). Shows version from `pindb.__version__` via `importlib.metadata` and `CONFIGURATION.contact_email`.
-- Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.flex-grow.min-h-screen`.
+- Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.min-h-screen.relative.z-5` (`templates/base.py`).
 - Copyright: project name only ("PinDB"), no person named.
 
 ## Key Entities (non-obvious)
@@ -226,6 +227,10 @@ Entry: `database/erasure.py::erase_user_account(session, user_id)`.
 ## Deployment (Docker)
 
 App services use `env_file: .env`. Values under `environment:` in `docker-compose.yaml` override `.env` keys so DB URL, Meilisearch URL/key, `image_directory` stay correct for in-network service names (`postgres`, `meilisearch`).
+
+**The image is built in CI, not on the host.** `.github/workflows/release.yml` builds and pushes `ghcr.io/joshuamaddy/pindb` on every push to `main` (tags: `latest`, `sha-<full-sha>`, branch name, and `v*` git tags). All four app services — `app_blue`, `app_green`, `migrate`, `scheduler` — share **one** image via the `x-app-image` YAML anchor, pinned to `ghcr.io/joshuamaddy/pindb:${IMAGE_TAG:-latest}`. `deploy.sh` and `bootstrap.sh` `docker compose pull` it; neither builds. So a host deploy only picks up code that has landed on `main` **and** finished its Release run — `git pull` on the host refreshes compose/Caddyfile/scripts, *not* the app.
+
+One image for every service is what keeps `migrate` from going stale: Alembic runs from the same build as the web containers, so it can never miss a revision they expect.
 
 Production image multi-stage: Node asset stage copies `scripts/` and runs
 `npm run build` (`css:build` + `vendor:build` + Rolldown Lucide), copies
@@ -253,7 +258,9 @@ NPM (separate stack) -> host:8000 -> proxy (Caddy) -> app_blue:8000  (one of
 ./scripts/deploy.sh
 ```
 
-Builds **app_blue, app_green, migrate, scheduler** (each Compose service gets own image tag — building only app colors leaves `migrate` stale so Alembic misses new revisions), runs migrations, starts idle color, waits for healthy, stops old color, restarts scheduler. Aborts without killing live color if new one fails healthcheck. State (which color live) in `.deploy-active-color` — gitignored, host-local, default `blue`.
+Pulls `ghcr.io/joshuamaddy/pindb:${IMAGE_TAG:-latest}`, runs migrations (`migrate` profile), starts idle color, waits for healthy, smoke-tests `/healthz` through Caddy, stops old color, restarts scheduler. Aborts without killing live color if new one fails healthcheck. State (which color live) in `.deploy-active-color` — gitignored, host-local, default `blue`.
+
+**Rollback / pinning:** `IMAGE_TAG` selects what gets pulled, so any past build is one deploy away — `IMAGE_TAG=sha-<full-sha> ./scripts/deploy.sh`. Note this rolls back *code only*; a migration already applied stays applied, which is exactly why the migration-discipline rules below are load-bearing.
 
 ### Bootstrap (first time only — has ~5–15s of NPM 502s)
 
@@ -261,7 +268,7 @@ Builds **app_blue, app_green, migrate, scheduler** (each Compose service gets ow
 ./scripts/bootstrap.sh
 ```
 
-Validates `.env`, builds, releases host:8000 from any legacy single-`app` container, brings up postgres + meili (waits for healthy), runs migrations, starts active color (default `blue`), then `scheduler` + `proxy`. Idempotent — safe to re-run.
+Validates `.env`, pulls the image from ghcr.io (`docker login ghcr.io` first if the package is private), releases host:8000 from any legacy single-`app` container, brings up postgres + meili (waits for healthy), runs migrations, starts active color (default `blue`), then `scheduler` + `proxy`. Idempotent — safe to re-run.
 
 ### Restart hardening
 
@@ -295,7 +302,15 @@ During swap, old + new app containers run against same DB simultaneously ~10–3
 - **Unsafe same-release:** `DROP COLUMN` still read by old code, `ALTER COLUMN ... NOT NULL` on column old code leaves NULL, rename column/table, incompatible type change, remove enum value.
 - **Split unsafe changes across two deploys:** (1) add new col nullable, dual-write. (2) backfill, flip reads. (3) drop old col.
 
-Container startup: `docker-entrypoint.sh` now just `uvicorn pindb:app --host 0.0.0.0 --port 8000 --proxy-headers`. Migrations belong in `compose run --rm migrate`, never entrypoint (would race during blue/green overlap).
+Container startup: `docker-entrypoint.sh` now just `uvicorn pindb:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'`. Migrations belong in `compose run --rm migrate`, never entrypoint (would race during blue/green overlap).
+
+The `migrate` service overrides `entrypoint:` with the full `alembic upgrade head` argv, so trailing args are *appended to that command*, not substituted for it. Any other Alembic command needs the entrypoint replaced:
+
+```bash
+docker compose --profile migrate run --rm --entrypoint /app/.venv/bin/python migrate -m alembic current
+```
 
 ## Bulk Import
-CSV import via `scripts/import_csv.py`. See `scripts/README.md` for column format and grade encoding.
+In-app, admin-only: `GET /bulk/pin` (grid editor, `bulk-import` island) → `POST /bulk/pin/image` per image → `POST /bulk/pin` with the rows as JSON (`routes/bulk/pin.py`). Entity cells resolve through `/bulk/options/{entity_type}` and `_get_or_create`, so a typed-in shop/tag/artist is created inline.
+
+The old `scripts/import_csv.py` CSV importer no longer exists; `scripts/README.md` documents its format for reference only (a `scripts/import.csv` and `scripts/Images/` still sit in the tree).
