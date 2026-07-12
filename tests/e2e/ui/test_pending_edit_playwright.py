@@ -92,13 +92,16 @@ class TestPendingEditReject:
         editor_page.wait_for_load_state("load")
 
         admin_page.goto(f"{live_server}/admin/pending")
-        submit_pending_action(
-            admin_page,
-            admin_page.locator(
-                "form[action*='/admin/pending/reject-edits/shop/']"
-            ).first,
+        admin_page.get_by_role("button", name="Request changes").first.click()
+        form = admin_page.locator("form[action*='/admin/pending/reject-edits/shop/']")
+        form.wait_for(state="visible")
+        form.locator("textarea[name='reason']").fill(
+            "This rename drops the trading name; please keep it in the title."
         )
+        submit_pending_action(admin_page, form)
 
+        # The canonical row is untouched — an edit change request never applies the
+        # proposed edit, it just sends it back to the editor.
         admin_page.goto(f"{live_server}/list/shops")
         expect(admin_page.get_by_text("RejectMe")).to_be_visible()
         expect(admin_page.get_by_text("RejectMe (renamed)")).to_have_count(0)

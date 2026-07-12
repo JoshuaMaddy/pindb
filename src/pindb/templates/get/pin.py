@@ -21,6 +21,9 @@ from pindb.routes._urls import pin_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.changes_requested_banner import (
+    changes_requested_banner,
+)
 from pindb.templates.components.display.pending_changes_table import (
     pending_changes_table,
 )
@@ -35,7 +38,7 @@ from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
 from pindb.templates.get.pin_fragments import favorite_button, set_row
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 __all__ = ["pin_page", "favorite_button", "set_row"]
 
@@ -67,6 +70,7 @@ def pin_page(
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
     pending_changes: Sequence[PendingChange] = (),
+    edit_change_request: str | None = None,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     canonical_url = str(pin_url(request=request, pin=pin))
@@ -106,6 +110,7 @@ def pin_page(
                 canonical_url=canonical_url,
                 pending_url=pending_url,
                 pending_changes=pending_changes,
+                edit_change_request=edit_change_request,
             ),
             pin_lightbox(),
         ],
@@ -125,13 +130,26 @@ def _page_layout(
     canonical_url: str,
     pending_url: str,
     pending_changes: Sequence[PendingChange],
+    edit_change_request: str | None = None,
 ) -> Element:
     return div(
         class_="mx-auto px-10 my-5 gap-2 w-full grid grid-cols-1 md:gap-8 md:grid-cols-2 md:max-w-[160ch]"
     )[
         div(class_="md:col-span-2")[
             back_link(),
+            pin.is_rejected
+            and changes_requested_banner(
+                reason=pin.rejection_reason,
+                edit_url=str(request.url_for("get_edit_pin", id=pin.id)),
+            ),
+            edit_change_request
+            and changes_requested_banner(
+                reason=edit_change_request,
+                edit_url=str(request.url_for("get_edit_pin", id=pin.id)),
+                is_edit=True,
+            ),
             has_pending_chain
+            and not edit_change_request
             and pending_edit_banner(
                 viewing_pending=viewing_pending,
                 canonical_url=canonical_url,
@@ -140,7 +158,9 @@ def _page_layout(
             viewing_pending and pending_changes_table(pending_changes),
             page_heading(
                 icon="circle-star",
-                text=pending_label(pin.name, pin.is_pending),
+                text=review_label(
+                    pin.name, is_pending=pin.is_pending, is_rejected=pin.is_rejected
+                ),
                 full_width=True,
                 extras=fragment[
                     user

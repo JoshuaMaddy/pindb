@@ -45,7 +45,7 @@ from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.pin_image_alt import pin_front_image_alt
 from pindb.templates.types import Content
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 PAGE_SIZE: int = 24
 
@@ -167,7 +167,9 @@ def _pin_button(request: Request, pin: Pin) -> Element:
                 back=str(request.url)
             )
         ),
-        text=pending_label(pin.name, pin.is_pending),
+        text=review_label(
+            pin.name, is_pending=pin.is_pending, is_rejected=pin.is_rejected
+        ),
     )
 
 
@@ -180,7 +182,9 @@ def _shop_links(request: Request, shops: set[Shop]) -> Element:
         [
             pill_link(
                 href=str(shop_url(request=request, shop=shop)),
-                text=pending_label(shop.name, shop.is_pending),
+                text=review_label(
+                    shop.name, is_pending=shop.is_pending, is_rejected=shop.is_rejected
+                ),
             )
             for shop in sorted(shops, key=lambda shop: shop.name)
         ]
@@ -196,7 +200,11 @@ def _artist_links(request: Request, artists: set[Artist]) -> Element:
         [
             pill_link(
                 href=str(artist_url(request=request, artist=artist)),
-                text=pending_label(artist.name, artist.is_pending),
+                text=review_label(
+                    artist.name,
+                    is_pending=artist.is_pending,
+                    is_rejected=artist.is_rejected,
+                ),
             )
             for artist in sorted(artists, key=lambda artist: artist.name)
         ]

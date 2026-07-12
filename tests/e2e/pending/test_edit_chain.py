@@ -120,7 +120,7 @@ class TestEditChainBuildup:
 
 @pytest.mark.slow
 class TestEditChainNegative:
-    def test_reject_edits_keeps_chain_invisible_but_preserved(
+    def test_change_request_on_edits_flags_chain_and_resubmit_reopens_it(
         self,
         editor_browser_context,
         admin_browser_context,
@@ -128,6 +128,13 @@ class TestEditChainNegative:
         make_shop,
         db_handle,
     ):
+        """A sent-back edit chain stays the editor's working draft.
+
+        It is still the tip of the chain, so the edit form prefills from it and a
+        resubmission stacks on top — rather than orphaning the flagged edit and
+        starting again from the canonical row.
+        """
+        reason = "This rename drops the trading name; keep it in the title."
         shop = make_shop("RejectKept", approved=True)
         shop_id = int(shop["id"])
 
@@ -136,31 +143,27 @@ class TestEditChainNegative:
         ).submit(name="RejectKept v2")
 
         admin_page = admin_browser_context.new_page()
-        PendingQueuePage(admin_page, live_server).goto().reject_edits(
-            "shop", "RejectKept"
+        PendingQueuePage(admin_page, live_server).goto().request_changes_to_edits(
+            "shop", "RejectKept", reason
         )
 
-        # Chain still exists in DB but is marked rejected — get_edit_chain
-        # filters rejected edits, so editor's edit page should fall back to
-        # the canonical snapshot.
         rows = _pending_edits(db_handle, shop_id)
         assert len(rows) == 1
         assert rows[0][4] is not None, "rejected_at set"
         assert rows[0][3] is None, "approved_at not set"
 
-        # Editor opens the edit page again and sees canonical name.
+        # The editor still sees their own proposal, not the canonical name — they
+        # were asked to fix it, so that is what they have to edit.
         editor_page = editor_browser_context.new_page()
         edit_page = ShopEditPage(editor_page, live_server).goto(shop_id)
-        assert edit_page.name_value() == "RejectKept"
+        assert edit_page.name_value() == "RejectKept v2"
 
-        # Submitting a fresh edit creates a new chain (separate from rejected).
         edit_page.submit(name="RejectKept v3")
         rows = _pending_edits(db_handle, shop_id)
-        assert len(rows) == 2, "rejected edit retained, plus the new pending one"
-        rejected_count = sum(1 for r in rows if r[4] is not None)
-        pending_count = sum(1 for r in rows if r[3] is None and r[4] is None)
-        assert rejected_count == 1
-        assert pending_count == 1
+        assert len(rows) == 2, "the flagged edit is reopened, plus the new one"
+        assert all(row[4] is None for row in rows), (
+            "chain reopened, nothing left flagged"
+        )
 
     def test_delete_edits_wipes_chain_and_canonical_unchanged(
         self,

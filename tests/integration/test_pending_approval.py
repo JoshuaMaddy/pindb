@@ -179,24 +179,35 @@ class TestPendingActionHtmxFragment:
         assert "Fragment Cascade Pin" not in response.text
         assert "Fragment Cascade Shop" not in response.text
 
-    def test_reject_returns_fragment_without_acted_row(
+    def test_reject_returns_fragment_with_row_moved_to_needs_changes(
         self, admin_client, db_session, editor_user
     ):
+        """The swapped fragment moves the row to Needs Changes rather than dropping it.
+
+        The entry is not gone — it is waiting on its submitter — so it stays on the
+        page, under the Needs Changes section, alongside the reason they were given.
+        """
         shop = ShopFactory(
             name="Fragment Reject Shop",
             approved=False,
             created_by=editor_user,
         )
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
+        reason = (
+            "The description is missing; please add one before this can be approved."
+        )
 
         response = admin_client.post(
             f"/admin/pending/reject/shop/{shop_id}",
+            data={"reason": reason},
             headers=HTMX_HEADERS,
             follow_redirects=False,
         )
         assert response.status_code == 200
         assert 'id="pending-content"' in response.text
-        assert "Fragment Reject Shop" not in response.text
+        assert "Needs Changes" in response.text
+        assert "Fragment Reject Shop" in response.text
+        assert reason in response.text
 
     def test_delete_returns_fragment_without_acted_row(
         self, admin_client, db_session, editor_user
@@ -283,7 +294,11 @@ class TestRejectEndpoint:
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
 
         response = admin_client.post(
-            f"/admin/pending/reject/shop/{shop_id}", follow_redirects=False
+            f"/admin/pending/reject/shop/{shop_id}",
+            data={
+                "reason": "The description is missing; please add one before this can be approved."
+            },
+            follow_redirects=False,
         )
         assert response.status_code == 303
 
@@ -304,7 +319,11 @@ class TestRejectEndpoint:
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
 
         admin_client.post(
-            f"/admin/pending/reject/shop/{shop_id}", follow_redirects=False
+            f"/admin/pending/reject/shop/{shop_id}",
+            data={
+                "reason": "The description is missing; please add one before this can be approved."
+            },
+            follow_redirects=False,
         )
 
         response = anon_client.get(f"/get/shop/{shop_id}", follow_redirects=False)

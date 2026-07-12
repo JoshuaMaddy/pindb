@@ -3,10 +3,10 @@ FastAPI routes: `routes/approve.py`.
 """
 
 from datetime import datetime
-from typing import Any, cast
+from typing import Annotated, Any, cast
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import select
@@ -18,18 +18,25 @@ from pindb.auth import require_admin
 from pindb.database import Artist, Pin, PinSet, Shop, Tag, async_session_maker
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.entity_type import EntityType
+from pindb.database.message import Message, MessageCategory
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_edit_utils import (
     apply_snapshot_to_entity,
     get_edit_chain,
     get_effective_snapshot,
 )
-from pindb.database.pending_mixin import PendingAuditEntity, PendingMixin
+from pindb.database.pending_mixin import (
+    MIN_CHANGE_REQUEST_LENGTH,
+    PendingAuditEntity,
+    PendingMixin,
+)
 from pindb.database.user import User
+from pindb.models.message_body import ChangesRequestedBody
 from pindb.routes._pin_shared import PIN_SELECTINLOADS
 from pindb.search.update import delete_one, sync_entity, sync_pin_with_deps
 from pindb.templates.admin.pending import (
     BulkGroupView,
+    NeedsChangesView,
     pending_content,
     pending_page,
 )
@@ -42,6 +49,62 @@ _MODEL_TO_ENTITY_TYPE: dict[type, EntityType] = {et.model: et for et in EntityTy
 
 def _entity_type_of(entity: object) -> EntityType | None:
     return _MODEL_TO_ENTITY_TYPE.get(type(entity))
+
+
+def _validate_reason(reason: str) -> str:
+    """The real gate on the change request — the client-side counter is only UX."""
+    cleaned = reason.strip()
+    if len(cleaned) < MIN_CHANGE_REQUEST_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Explain what needs to change in at least "
+                f"{MIN_CHANGE_REQUEST_LENGTH} characters."
+            ),
+        )
+    return cleaned
+
+
+def _entity_name(entity: object) -> str | None:
+    name = getattr(entity, "name", None)
+    return name if isinstance(name, str) else None
+
+
+def _request_changes_message(
+    session: AsyncSession,
+    *,
+    recipient_id: int | None,
+    sender_id: int | None,
+    reason: str,
+    entity_type: EntityType | None = None,
+    entity_id: int | None = None,
+    entity_name: str | None = None,
+    is_edit: bool = False,
+) -> None:
+    """Notify a submitter that a reviewer wants changes.
+
+    No-op when the submitter is unknown (an erased account nulls ``created_by_id``).
+    ``related_entity_type`` and ``related_entity_id`` are both-or-neither per the
+    ``Message`` check constraint; when set, the inbox deep-links to the entity.
+    """
+    if recipient_id is None:
+        return
+    linked = entity_type is not None and entity_id is not None
+    session.add(
+        Message(
+            category=MessageCategory.changes_requested,
+            body=ChangesRequestedBody(
+                reason=reason,
+                entity_type=entity_type,
+                entity_name=entity_name,
+                is_edit=is_edit,
+            ),
+            recipient_id=recipient_id,
+            sender_id=sender_id,
+            related_entity_type=entity_type if linked else None,
+            related_entity_id=entity_id if linked else None,
+        )
+    )
 
 
 class _BulkGroupBucket:
@@ -291,18 +354,61 @@ async def _collect_pending_view(session: AsyncSession) -> dict[str, Any]:
         if edit.created_by_id is not None:
             creator_ids.add(edit.created_by_id)
 
-    # Resolve entity names for each edit group
+    # Needs-changes: entries a reviewer sent back. They sit in their own section
+    # rather than the per-type ones — the ball is in the submitter's court, not the
+    # admin's — and they are deliberately not grouped into bulk bundles, since each
+    # is fixed individually.
+    needs_changes_entities: list[tuple[str, PendingAuditEntity]] = []
+    for entity_type_enum in EntityType:
+        rows = (
+            await session.scalars(
+                select(entity_type_enum.model)
+                .where(
+                    entity_type_enum.model.rejected_at.is_not(None),
+                    entity_type_enum.model.deleted_at.is_(None),
+                )
+                .order_by(entity_type_enum.model.rejected_at.desc())
+                .execution_options(**opts)  # type: ignore[arg-type]
+            )
+        ).all()
+        for row in rows:
+            entity = cast(PendingAuditEntity, row)
+            needs_changes_entities.append((entity_type_enum.slug, entity))
+            if entity.created_by_id is not None:
+                creator_ids.add(entity.created_by_id)
+
+    needs_changes_edits = (
+        await session.scalars(
+            select(PendingEdit)
+            .where(
+                PendingEdit.approved_at.is_(None),
+                PendingEdit.rejected_at.is_not(None),
+            )
+            .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
+        )
+    ).all()
+    needs_changes_edit_groups: dict[tuple[str, int], list[PendingEdit]] = {}
+    for edit in needs_changes_edits:
+        needs_changes_edit_groups.setdefault(
+            (edit.entity_type, edit.entity_id), []
+        ).append(edit)
+        if edit.created_by_id is not None:
+            creator_ids.add(edit.created_by_id)
+
+    # Resolve entity names for each edit group (pending and needs-changes alike)
     group_entities: dict[tuple[str, int], PendingAuditEntity] = {}
     pending_opts: Any = {"include_pending": True}
-    for (table_name, entity_id), _edits in edit_groups.items():
+    for table_name, entity_id in [*edit_groups, *needs_changes_edit_groups]:
         entity_type = EntityType.from_table_name(table_name)
         if entity_type is None:
             continue
-        entity = await session.get(
+        entity_row = await session.get(
             entity_type.model, entity_id, execution_options=pending_opts
         )
-        if entity is not None:
-            group_entities[(table_name, entity_id)] = cast(PendingAuditEntity, entity)
+        if entity_row is not None:
+            group_entities[(table_name, entity_id)] = cast(
+                PendingAuditEntity, entity_row
+            )
 
     creators: dict[int, User] = {}
     if creator_ids:
@@ -337,6 +443,11 @@ async def _collect_pending_view(session: AsyncSession) -> dict[str, Any]:
         "edit_groups": edit_groups,
         "edit_group_entities": group_entities,
         "bulk_groups": bulk_view_groups,
+        "needs_changes": NeedsChangesView(
+            entities=needs_changes_entities,
+            edits=needs_changes_edit_groups,
+            edit_entities=group_entities,
+        ),
     }
 
 
@@ -405,17 +516,35 @@ async def reject_entity(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    reason: Annotated[str, Form()],
     current_user: User = Depends(require_admin),
 ) -> Response:
+    """Flag a pending entry as needing changes, and tell its submitter why."""
+    cleaned = _validate_reason(reason)
     now = utc_now()
     async with async_session_maker.begin() as session:
         entity = await _get_pending_entity(session, entity_type, entity_id)
         if entity.rejected_at is None:
             entity.rejected_at = now  # type: ignore[misc]
             entity.rejected_by_id = current_user.id  # type: ignore[misc]
+            entity.rejection_reason = cleaned  # type: ignore[misc]
+            _request_changes_message(
+                session,
+                recipient_id=entity.created_by_id,
+                sender_id=current_user.id,
+                reason=cleaned,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_name=_entity_name(entity),
+            )
 
-    await delete_one(entity_type, entity_id)
+    # Re-index rather than evict: needs-changes entries stay searchable for the
+    # editors who have to fix them, exactly like pending ones. Meilisearch is only
+    # an id source — the ORM query filter is what hides them from everyone else.
+    await sync_entity(entity_type, entity_id)
 
+    # No stats refresh: only approved entries count toward a user's contributions,
+    # and an entry can only reach needs-changes from pending, so nothing changed.
     return await _pending_action_response(request)
 
 
@@ -491,15 +620,37 @@ async def reject_pending_edits(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    reason: Annotated[str, Form()],
     current_user: User = Depends(require_admin),
 ) -> Response:
+    """Flag an edit chain as needing changes, and tell everyone who contributed to it."""
+    cleaned = _validate_reason(reason)
     now = utc_now()
     table_name = entity_type.table_name
     async with async_session_maker.begin() as session:
         chain = await get_edit_chain(session, table_name, entity_id)
-        for edit in chain:
-            edit.rejected_at = now
-            edit.rejected_by_id = current_user.id
+        if chain:
+            entity = await _get_pending_entity(session, entity_type, entity_id)
+            name = _entity_name(entity)
+
+            for edit in chain:
+                edit.rejected_at = now
+                edit.rejected_by_id = current_user.id
+                edit.rejection_reason = cleaned
+
+            # The chain can stack edits from several editors; each of them has to
+            # know, but none of them twice.
+            for author_id in {edit.created_by_id for edit in chain}:
+                _request_changes_message(
+                    session,
+                    recipient_id=author_id,
+                    sender_id=current_user.id,
+                    reason=cleaned,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    entity_name=name,
+                    is_edit=True,
+                )
 
     return await _pending_action_response(request)
 
@@ -616,10 +767,16 @@ async def approve_bulk(
 async def reject_bulk(
     request: Request,
     bulk_id: UUID,
+    reason: Annotated[str, Form()],
     current_user: User = Depends(require_admin),
 ) -> Response:
+    """Flag every entry in a bulk bundle, with one message per distinct submitter."""
+    cleaned = _validate_reason(reason)
     now = utc_now()
-    to_delete: list[tuple[EntityType, int]] = []
+    to_sync: list[tuple[EntityType, int]] = []
+    # submitter -> the entries of theirs this bundle flagged. A bundle can span
+    # several submitters, and one of them may own several entries in it.
+    affected: dict[int, list[tuple[EntityType, int, str | None]]] = {}
 
     async with async_session_maker.begin() as session:
         bulk_entities = await _collect_bulk_entities(session, bulk_id)
@@ -627,17 +784,41 @@ async def reject_bulk(
             if entity.rejected_at is None and entity.approved_at is None:
                 entity.rejected_at = now  # type: ignore[misc]
                 entity.rejected_by_id = current_user.id  # type: ignore[misc]
+                entity.rejection_reason = cleaned  # type: ignore[misc]
                 et = _entity_type_of(entity)
                 if et is not None:
-                    to_delete.append((et, entity.id))
+                    to_sync.append((et, entity.id))
+                    if entity.created_by_id is not None:
+                        affected.setdefault(entity.created_by_id, []).append(
+                            (et, entity.id, _entity_name(entity))
+                        )
 
         bulk_edits = await _collect_bulk_edits(session, bulk_id)
         for edit in bulk_edits:
             edit.rejected_at = now
             edit.rejected_by_id = current_user.id
+            edit.rejection_reason = cleaned
+            if edit.created_by_id is not None:
+                affected.setdefault(edit.created_by_id, [])
 
-    for et, eid in to_delete:
-        await delete_one(et, eid)
+        for recipient_id, entries in affected.items():
+            # Deep-link only when it is unambiguous which entry to open; a bundle
+            # spanning several of a submitter's entries gets one un-linked message
+            # rather than a link that silently picks a favourite.
+            single = entries[0] if len(entries) == 1 else None
+            _request_changes_message(
+                session,
+                recipient_id=recipient_id,
+                sender_id=current_user.id,
+                reason=cleaned,
+                entity_type=single[0] if single else None,
+                entity_id=single[1] if single else None,
+                entity_name=single[2] if single else None,
+            )
+
+    # Re-index rather than evict — see reject_entity.
+    for et, eid in to_sync:
+        await sync_entity(et, eid)
 
     return await _pending_action_response(request)
 

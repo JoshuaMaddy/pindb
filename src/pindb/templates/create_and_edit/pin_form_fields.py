@@ -36,7 +36,7 @@ from pindb.templates.components.forms.name_availability import (
     name_check_attrs,
 )
 from pindb.templates.components.islands import island
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def _enhanced_select(
@@ -270,7 +270,13 @@ def _shops_input(
                     option(
                         value=str(shop.id),
                         selected=shop in pin.shops if pin else False,
-                    )[pending_label(shop.name, shop.is_pending)]
+                    )[
+                        review_label(
+                            shop.name,
+                            is_pending=shop.is_pending,
+                            is_rejected=shop.is_rejected,
+                        )
+                    ]
                     for shop in shops
                 ]
             ],
@@ -384,7 +390,13 @@ def _tag_ids_input(
                         value=str(tag.id),
                         selected=tag in pin.tags if pin else False,
                         data_category=tag.category.value,
-                    )[pending_label(tag.display_name, tag.is_pending)]
+                    )[
+                        review_label(
+                            tag.display_name,
+                            is_pending=tag.is_pending,
+                            is_rejected=tag.is_rejected,
+                        )
+                    ]
                     for tag in sorted(tags, key=lambda tag: (tag.category, tag.name))
                 ]
             ],
@@ -415,7 +427,13 @@ def _artist_ids_input(
                     option(
                         value=str(artist.id),
                         selected=artist in pin.artists if pin else False,
-                    )[pending_label(artist.name, artist.is_pending)]
+                    )[
+                        review_label(
+                            artist.name,
+                            is_pending=artist.is_pending,
+                            is_rejected=artist.is_rejected,
+                        )
+                    ]
                     for artist in artists
                 ]
             ],
@@ -444,7 +462,13 @@ def _pin_sets_ids_input(
                     option(
                         value=str(pin_set.id),
                         selected=pin_set in pin.sets if pin else False,
-                    )[pending_label(pin_set.name, pin_set.is_pending)]
+                    )[
+                        review_label(
+                            pin_set.name,
+                            is_pending=pin_set.is_pending,
+                            is_rejected=pin_set.is_rejected,
+                        )
+                    ]
                     for pin_set in pin_sets
                 ]
             ],
@@ -459,7 +483,11 @@ def _pin_option(*, pin_obj: Pin) -> Element:
         value=str(pin_obj.id),
         selected=True,
         data_thumbnail=f"/get/image/{pin_obj.front_image_guid}?w=100",
-    )[pending_label(pin_obj.name, pin_obj.is_pending)]
+    )[
+        review_label(
+            pin_obj.name, is_pending=pin_obj.is_pending, is_rejected=pin_obj.is_rejected
+        )
+    ]
 
 
 def _variant_pins_input(

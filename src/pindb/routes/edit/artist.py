@@ -25,7 +25,11 @@ from pindb.database.pending_edit_utils import (
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
-from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._guards import (
+    assert_editor_can_edit,
+    clear_rejection_on_resubmit,
+    needs_pending_edit,
+)
 from pindb.routes._urls import slugify_for_url
 from pindb.routes.edit._pending_helpers import (
     apply_simple_aliased_direct_edit,
@@ -120,6 +124,7 @@ async def post_edit_artist(
             )
 
         LOGGER.info("Editing artist id=%d name=%r", id, name)
+        clear_rejection_on_resubmit(artist, current_user)
         await apply_simple_aliased_direct_edit(
             entity=artist,
             name=name,

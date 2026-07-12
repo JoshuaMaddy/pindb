@@ -16,6 +16,9 @@ from pindb.routes._urls import tag_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.changes_requested_banner import (
+    changes_requested_banner,
+)
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.display.linked_items_row import linked_items_row
 from pindb.templates.components.display.pending_changes_table import (
@@ -35,7 +38,7 @@ from pindb.templates.components.tags.tag_branding import (
     CATEGORY_ICONS,
     category_badge,
 )
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 _RELATION_CAP = 5
 
@@ -44,7 +47,9 @@ def _relation_pills(tags: list[Tag], request: Request) -> list[Element]:
     return [
         pill_link(
             href=str(tag_url(request=request, tag=t)),
-            text=pending_label(t.display_name, t.is_pending),
+            text=review_label(
+                t.display_name, is_pending=t.is_pending, is_rejected=t.is_rejected
+            ),
             icon=CATEGORY_ICONS.get(t.category, "tag"),
             color_classes=CATEGORY_COLORS.get(t.category, "bg-main text-base-text"),
             hover_classes=CATEGORY_HOVER_CLASSES.get(
@@ -134,9 +139,12 @@ def tag_page(
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
     pending_changes: Sequence[PendingChange] = (),
+    edit_change_request: str | None = None,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    display_name = pending_label(tag.display_name, tag.is_pending)
+    display_name = review_label(
+        tag.display_name, is_pending=tag.is_pending, is_rejected=tag.is_rejected
+    )
     canonical_url = str(tag_url(request=request, tag=tag))
     pending_url = canonical_url + "?version=pending"
     return html_base(
@@ -159,7 +167,19 @@ def tag_page(
                         display_name,
                     ]
                 ),
+                tag.is_rejected
+                and changes_requested_banner(
+                    reason=tag.rejection_reason,
+                    edit_url=str(request.url_for("get_edit_tag", id=tag.id)),
+                ),
+                edit_change_request
+                and changes_requested_banner(
+                    reason=edit_change_request,
+                    edit_url=str(request.url_for("get_edit_tag", id=tag.id)),
+                    is_edit=True,
+                ),
                 has_pending_chain
+                and not edit_change_request
                 and pending_edit_banner(
                     viewing_pending=viewing_pending,
                     canonical_url=canonical_url,

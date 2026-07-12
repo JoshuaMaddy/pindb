@@ -18,6 +18,7 @@ from pindb.database.tag import Tag
 from pindb.database.user import User
 from pindb.templates.admin.pending_bulk import BulkGroupView, _bulk_groups_section
 from pindb.templates.admin.pending_entities import _sections
+from pindb.templates.admin.pending_needs_changes import NeedsChangesView
 from pindb.templates.base import html_base
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
@@ -39,6 +40,7 @@ def pending_content(
     edit_groups: dict[tuple[str, int], list[PendingEdit]] | None = None,
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity] | None = None,
     bulk_groups: list[BulkGroupView] | None = None,
+    needs_changes: NeedsChangesView | None = None,
 ) -> Element:
     """The swappable region of the pending queue.
 
@@ -50,6 +52,10 @@ def pending_content(
     edit_groups = edit_groups or {}
     edit_group_entities = edit_group_entities or {}
     bulk_groups = bulk_groups or []
+    needs_changes = needs_changes or NeedsChangesView()
+    # The heading count is the admin's workload, so needs-changes entries are left
+    # out — they are waiting on their submitter, and counting them here would keep
+    # the badge permanently above zero. Matches routes/admin/_pending_count.py.
     total = (
         len(pending_pins)
         + len(pending_shops)
@@ -81,6 +87,7 @@ def pending_content(
             edit_groups=edit_groups,
             edit_group_entities=edit_group_entities,
             bulk_groups=bulk_groups,
+            needs_changes=needs_changes,
             local_date_formatter=_local_date,
             bulk_groups_section=_bulk_groups_section,
         ),
@@ -98,6 +105,7 @@ def pending_page(
     edit_groups: dict[tuple[str, int], list[PendingEdit]] | None = None,
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity] | None = None,
     bulk_groups: list[BulkGroupView] | None = None,
+    needs_changes: NeedsChangesView | None = None,
 ) -> Element:
     return html_base(
         title="Pending Approvals",
@@ -113,6 +121,7 @@ def pending_page(
                 edit_groups=edit_groups,
                 edit_group_entities=edit_group_entities,
                 bulk_groups=bulk_groups,
+                needs_changes=needs_changes,
             ),
             flex=True,
             col=True,

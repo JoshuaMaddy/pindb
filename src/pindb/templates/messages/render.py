@@ -16,9 +16,9 @@ from pindb.database.message import Message
 from pindb.markdown_utils import render_md
 from pindb.models.message_body import (
     AchievementBody,
+    ChangesRequestedBody,
     ContributionBody,
     MessageBody,
-    PinRejectionBody,
     TextBody,
 )
 from pindb.templates.components.achievements.badge import achievement_badge
@@ -37,17 +37,40 @@ _ENTITY_ROUTE: dict[EntityType, str] = {
 # Non-achievement variants get a plain Lucide glyph.
 _ICON_NAMES: dict[type, str] = {
     TextBody: "mail",
-    PinRejectionBody: "circle-x",
+    ChangesRequestedBody: "message-square-warning",
     ContributionBody: "sparkles",
 }
+
+# Display names for the needs-changes title. EntityType values are snake_case
+# slugs, so pin_set has to be spelled out rather than titlecased.
+_ENTITY_DISPLAY_NAMES: dict[EntityType, str] = {
+    EntityType.pin: "pin",
+    EntityType.shop: "shop",
+    EntityType.artist: "artist",
+    EntityType.tag: "tag",
+    EntityType.pin_set: "pin set",
+}
+
+
+def _changes_requested_title(body: ChangesRequestedBody) -> str:
+    """ "Changes requested on your pin submission", or the closest we can get.
+
+    ``entity_type`` is absent on rows written before the flow was generalized, so
+    fall back to wording that reads correctly without it.
+    """
+    if body.entity_type is None:
+        return "Changes requested on your submission"
+    noun = _ENTITY_DISPLAY_NAMES[body.entity_type]
+    what = f"edit to a {noun}" if body.is_edit else f"{noun} submission"
+    return f"Changes requested on your {what}"
 
 
 def message_title(body: MessageBody) -> str:
     """Human-readable title derived from the body variant."""
     if isinstance(body, AchievementBody):
         return f"Achievement unlocked: {body.name}"
-    if isinstance(body, PinRejectionBody):
-        return "Pin submission rejected"
+    if isinstance(body, ChangesRequestedBody):
+        return _changes_requested_title(body)
     if isinstance(body, ContributionBody):
         return "Contribution recorded"
     if isinstance(body, TextBody):
@@ -78,7 +101,7 @@ def render_message_body(body: MessageBody) -> Node:
         return span(class_="text-lightest-hover")[
             f"{body.threshold}+ {body.unit_label}"
         ]
-    if isinstance(body, PinRejectionBody):
+    if isinstance(body, ChangesRequestedBody):
         return render_md(body.reason)
     if isinstance(body, ContributionBody):
         suffix = f" (+{body.points})" if body.points is not None else ""

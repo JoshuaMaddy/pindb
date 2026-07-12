@@ -34,7 +34,7 @@ from pindb.templates.base import html_base
 from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def bulk_edit_page(
@@ -112,7 +112,9 @@ def _tag_section(
     preview_url = str(request.url_for("get_tag_implication_preview"))
     tag_options = [
         option(value=str(tag.id), data_category=tag.category.value)[
-            pending_label(tag.display_name, tag.is_pending)
+            review_label(
+                tag.display_name, is_pending=tag.is_pending, is_rejected=tag.is_rejected
+            )
         ]
         for tag in sorted(tags, key=lambda t: (t.category, t.name))
     ]

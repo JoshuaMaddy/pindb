@@ -27,7 +27,11 @@ from pindb.database.tag import (
 )
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
-from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._guards import (
+    assert_editor_can_edit,
+    clear_rejection_on_resubmit,
+    needs_pending_edit,
+)
 from pindb.routes._urls import slugify_for_url
 from pindb.routes.edit._pending_helpers import submit_pending_edit
 from pindb.search.update import sync_entity
@@ -122,6 +126,7 @@ async def post_edit_tag(
             )
 
         LOGGER.info("Editing tag id=%d name=%r category=%s", id, name, category.value)
+        clear_rejection_on_resubmit(tag, current_user)
         tag.name = normalize_tag_name(name)
         tag.description = description or None
         tag.category = category

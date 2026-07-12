@@ -3,10 +3,13 @@ Descriptive ``alt`` strings for pin photographs in templates.
 """
 
 from pindb.database.pin import Pin
+from pindb.utils import review_label
 
 
 def _pin_display_name(pin: Pin) -> str:
-    return f"(P) {pin.name}" if pin.is_pending else pin.name
+    return review_label(
+        pin.name, is_pending=pin.is_pending, is_rejected=pin.is_rejected
+    )
 
 
 def pin_front_image_alt(pin: Pin) -> str:

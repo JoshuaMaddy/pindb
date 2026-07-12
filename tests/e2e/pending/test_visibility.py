@@ -153,8 +153,8 @@ class TestPendingVisibility:
 
 
 @pytest.mark.slow
-class TestRejectedVisibility:
-    def test_rejected_shop_hidden_from_everyone_in_default_views(
+class TestNeedsChangesVisibility:
+    def test_needs_changes_shop_hidden_from_the_public_but_shown_to_reviewers(
         self,
         anon_browser_context,
         regular_user_browser_context,
@@ -165,20 +165,22 @@ class TestRejectedVisibility:
         db_handle,
         admin_user_id,
     ):
+        """Needs-changes behaves exactly like pending: staff see it, the public does not.
+
+        The submitter has to be able to find the entry to fix it, so hiding it from
+        editors would make the change request impossible to act on.
+        """
         make_shop("RejectedShop", approved=False)
         rows = db_handle("SELECT id FROM shops WHERE name = 'RejectedShop'")
         shop_id = rows[0][0]
         _reject_via_admin(db_handle, shop_id, admin_user_id)
 
-        # Filtered from default list view for anon, user, editor, AND admin
-        # (admin needs include_pending=True to see rejected items, which
-        # only the approval queue uses).
-        for ctx in (
-            anon_browser_context,
-            regular_user_browser_context,
-            editor_browser_context,
-            admin_browser_context,
-        ):
+        for ctx in (anon_browser_context, regular_user_browser_context):
             assert not _shop_visible_in_list(ctx, live_server, "RejectedShop"), (
-                f"rejected shop leaked into list view for {ctx}"
+                f"needs-changes shop leaked into a public list view for {ctx}"
+            )
+
+        for ctx in (editor_browser_context, admin_browser_context):
+            assert _shop_visible_in_list(ctx, live_server, "RejectedShop"), (
+                f"needs-changes shop hidden from a reviewer's list view for {ctx}"
             )

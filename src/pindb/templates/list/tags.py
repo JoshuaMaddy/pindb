@@ -21,7 +21,7 @@ from pindb.templates.list.base import (
     list_page,
     list_search_input,
 )
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def _grid_items(
@@ -33,7 +33,9 @@ def _grid_items(
             request=request,
             href=str(tag_url(request=request, tag=tag)),
             pins=tag.pins,
-            name=pending_label(tag.display_name, tag.is_pending),
+            name=review_label(
+                tag.display_name, is_pending=tag.is_pending, is_rejected=tag.is_rejected
+            ),
             badge=category_badge(
                 tag.category,
                 additional_classes="max-md:absolute max-md:-top-2 max-md:-right-2",
@@ -55,7 +57,11 @@ def _detailed_items(
                 thumbnail_grid(request=request, pins=tag.pins),
                 div(class_="flex gap-2")[
                     p(class_="text-lg")[
-                        pending_label(tag.display_name, tag.is_pending),
+                        review_label(
+                            tag.display_name,
+                            is_pending=tag.is_pending,
+                            is_rejected=tag.is_rejected,
+                        ),
                         span(class_="text-lightest-hover ml-1")[f"({len(tag.pins)})"],
                     ],
                     category_badge(tag.category),

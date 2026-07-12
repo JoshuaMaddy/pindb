@@ -173,6 +173,7 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             "name": self.name,
             "front_image_guid": str(self.front_image_guid),
             "is_pending": self.is_pending,
+            "is_rejected": self.is_rejected,
             "shops": _ordered_unique_strings(shop.name for shop in self.shops),
             "shop_aliases": _ordered_unique_strings(
                 al.alias for shop in self.shops for al in shop.aliases

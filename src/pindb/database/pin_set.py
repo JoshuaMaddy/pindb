@@ -93,6 +93,7 @@ class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             "description": self.description,
             "owner_id": self.owner_id,
             "is_pending": self.is_pending,
+            "is_rejected": self.is_rejected,
         }
 
     def __rich_repr__(self) -> Result:

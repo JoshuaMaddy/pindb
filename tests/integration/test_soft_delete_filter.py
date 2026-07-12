@@ -83,7 +83,7 @@ class TestSoftDeleteFilter:
         assert "Approved Shop" in names
         assert "Pending Shop" not in names
 
-    def test_editor_sees_pending_but_not_rejected(
+    def test_editor_sees_every_review_state(
         self,
         db_session,
         editor_user,
@@ -91,13 +91,18 @@ class TestSoftDeleteFilter:
         pending_shop,
         rejected_shop,
     ):
+        """Needs-changes entries stay visible to editors.
+
+        The submitter has to be able to read the reviewer's feedback and edit the
+        entry to resubmit it, which is impossible if the row is filtered away.
+        """
         set_audit_user(editor_user.id)
         set_audit_user_flags(is_admin=False, is_editor=True)
 
         names = _names(db_session)
         assert "Approved Shop" in names
         assert "Pending Shop" in names
-        assert "Rejected Shop" not in names
+        assert "Rejected Shop" in names
 
     def test_admin_matches_regular_user_visibility_by_default(
         self,

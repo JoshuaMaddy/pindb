@@ -155,7 +155,15 @@ def apply_patch(snapshot: dict[str, Any], patch: dict[str, Any]) -> dict[str, An
 async def get_edit_chain(
     session: AsyncSession, entity_type: str, entity_id: int
 ) -> list[PendingEdit]:
-    """Unapproved, unrejected pending edits for an entity, oldest first."""
+    """Unapproved pending edits for an entity, oldest first.
+
+    Needs-changes edits are included: being sent back does not remove an edit from
+    the chain, it just flags it. Everyone who reads the chain wants them — the edit
+    form prefills from the proposal the editor was asked to fix, resubmitting diffs
+    against it, and approving a flagged chain applies it. The admin queue keeps
+    pending and needs-changes edits in separate sections using its own queries
+    (``rejected_at IS NULL`` / ``IS NOT NULL``), not this helper.
+    """
     return list(
         (
             await session.scalars(
@@ -164,7 +172,6 @@ async def get_edit_chain(
                     PendingEdit.entity_type == entity_type,
                     PendingEdit.entity_id == entity_id,
                     PendingEdit.approved_at.is_(None),
-                    PendingEdit.rejected_at.is_(None),
                 )
                 .order_by(PendingEdit.created_at.asc(), PendingEdit.id.asc())
             )
@@ -172,17 +179,53 @@ async def get_edit_chain(
     )
 
 
+async def reopen_rejected_edits(
+    session: AsyncSession, entity_type: str, entity_id: int
+) -> int:
+    """Clear the needs-changes flag on an entity's rejected edit chain.
+
+    Called when an editor submits a fresh edit for the entity: the reviewer asked
+    for changes and they are making them, so the flagged chain reopens and the new
+    edit stacks on top of it. Without this the chain would be invisible to
+    ``get_edit_chain`` (which only returns open edits), the new edit would start a
+    second chain from the canonical row, and the flagged one would sit in the queue
+    forever.
+
+    Returns the number of edits reopened.
+    """
+    rejected = list(
+        (
+            await session.scalars(
+                select(PendingEdit).where(
+                    PendingEdit.entity_type == entity_type,
+                    PendingEdit.entity_id == entity_id,
+                    PendingEdit.approved_at.is_(None),
+                    PendingEdit.rejected_at.is_not(None),
+                )
+            )
+        ).all()
+    )
+    for edit in rejected:
+        edit.rejected_at = None
+        edit.rejected_by_id = None
+        edit.rejection_reason = None
+    return len(rejected)
+
+
 async def get_head_edit(
     session: AsyncSession, entity_type: str, entity_id: int
 ) -> PendingEdit | None:
-    """Most recent unapproved edit for an entity, or None."""
+    """Most recent unapproved edit for an entity, or None.
+
+    Includes needs-changes edits, for the same reason ``get_edit_chain`` does: a
+    flagged edit is still the tip of the chain, and a resubmission stacks on it.
+    """
     return await session.scalar(
         select(PendingEdit)
         .where(
             PendingEdit.entity_type == entity_type,
             PendingEdit.entity_id == entity_id,
             PendingEdit.approved_at.is_(None),
-            PendingEdit.rejected_at.is_(None),
         )
         .order_by(PendingEdit.created_at.desc(), PendingEdit.id.desc())
         .limit(1)
@@ -412,13 +455,18 @@ async def maybe_apply_pending_view(
     entity_table: str,
     current_user: object,
     version: str | None,
-) -> tuple[bool, bool, list[PendingChange]]:
-    """Returns ``(pending_chain_exists, viewing_pending, pending_changes)``.
+) -> tuple[bool, bool, list[PendingChange], str | None]:
+    """Returns ``(pending_chain_exists, viewing_pending, pending_changes, change_request)``.
 
     If the viewer is allowed to see pending edits *and* requested
     ``?version=pending``, mutates ``entity`` in-memory to reflect the pending
     chain and returns the field-wise before/after diff for display. The
     mutation happens inside ``session.no_autoflush``.
+
+    ``change_request`` is the reviewer's reason when the chain has been sent back
+    for changes, else ``None``. It is what tells the editor, on the entity page,
+    that their proposed edit needs work — the entity row itself is untouched by an
+    edit rejection, so ``entity.is_rejected`` says nothing about it.
     """
     can_see_pending = current_user is not None and (
         getattr(current_user, "is_editor", False)
@@ -426,8 +474,14 @@ async def maybe_apply_pending_view(
     )
     viewing_pending = version == "pending" and can_see_pending
 
-    pending_chain_exists = can_see_pending and await has_pending_edits(
-        session, entity_table, entity.id
+    head = (
+        await get_head_edit(session, entity_table, entity.id)
+        if can_see_pending
+        else None
+    )
+    pending_chain_exists = head is not None
+    change_request = (
+        head.rejection_reason if head is not None and head.is_rejected else None
     )
 
     pending_changes: list[PendingChange] = []
@@ -443,7 +497,7 @@ async def maybe_apply_pending_view(
         with session.no_autoflush:
             await apply_snapshot_in_memory(entity, effective, session)
 
-    return pending_chain_exists, viewing_pending, pending_changes
+    return pending_chain_exists, viewing_pending, pending_changes, change_request
 
 
 # ---------------------------------------------------------------------------

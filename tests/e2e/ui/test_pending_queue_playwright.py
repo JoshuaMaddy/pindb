@@ -30,7 +30,7 @@ class TestPendingQueueContent:
         expect(row).to_be_visible()
         expect(row).to_contain_text("e2e_editor_pw")
         expect(row.get_by_role("button", name="Approve")).to_be_visible()
-        expect(row.get_by_role("button", name="Reject")).to_be_visible()
+        expect(row.get_by_role("button", name="Request changes")).to_be_visible()
         expect(row.get_by_role("button", name="Delete")).to_be_visible()
 
 

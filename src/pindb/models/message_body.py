@@ -12,6 +12,8 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field, TypeAdapter
 
+from pindb.database.entity_type import EntityType
+
 
 class MessageBodyBase(BaseModel):
     """Fields shared by every body variant.
@@ -33,16 +35,25 @@ class TextBody(MessageBodyBase):
     text: str
 
 
-class PinRejectionBody(MessageBodyBase):
-    """Explains why a pending pin submission or edit was rejected.
+class ChangesRequestedBody(MessageBodyBase):
+    """A reviewer's request for changes to a pending submission or edit.
 
     The canonical entity reference lives on the ``Message`` row
-    (``related_entity_type`` / ``related_entity_id``); ``pin_id`` here is a
-    convenience echo for rendering.
+    (``related_entity_type`` / ``related_entity_id``); ``entity_type`` and
+    ``entity_name`` here are convenience echoes for rendering the title without a
+    DB roundtrip, and ``pin_id`` is a legacy echo kept for rows written before the
+    flow covered every entity type.
+
+    The ``type`` discriminator likewise stays ``"pin_rejection"``: it is the value
+    already on disk, and a container running the previous release would fail to
+    validate an unrecognized one during the blue/green overlap.
     """
 
     type: Literal["pin_rejection"] = "pin_rejection"
     reason: str
+    entity_type: EntityType | None = None
+    entity_name: str | None = None
+    is_edit: bool = False
     pin_id: int | None = None
 
 
@@ -66,7 +77,7 @@ class AchievementBody(MessageBodyBase):
 
 
 MessageBody = Annotated[
-    Union[TextBody, PinRejectionBody, ContributionBody, AchievementBody],
+    Union[TextBody, ChangesRequestedBody, ContributionBody, AchievementBody],
     Field(discriminator="type"),
 ]
 

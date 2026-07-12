@@ -42,7 +42,7 @@ from pindb.search.search import (
 )
 from pindb.search.update import sync_pin_with_deps
 from pindb.templates.bulk.pin import bulk_pin_page
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 LOGGER = user_logger("pindb.routes.bulk.pin")
 
@@ -147,9 +147,10 @@ async def get_bulk_options(
         tag_options = [
             {
                 "value": str(hit["name"]),
-                "text": pending_label(
+                "text": review_label(
                     str(hit.get("display_name") or hit["name"]),
-                    bool(hit.get("is_pending")),
+                    is_pending=bool(hit.get("is_pending")),
+                    is_rejected=bool(hit.get("is_rejected")),
                 ),
                 "category": str(hit.get("category", "")),
             }
@@ -169,7 +170,9 @@ async def get_bulk_options(
             tag_options.append(
                 {
                     "value": tag.name,
-                    "text": pending_label(tag.name, tag.is_pending),
+                    "text": review_label(
+                        tag.name, is_pending=tag.is_pending, is_rejected=tag.is_rejected
+                    ),
                     "category": tag.category.value,
                 }
             )

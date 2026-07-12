@@ -24,7 +24,7 @@ from pindb.templates.components.listing.view_toggle import view_toggle
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.entity_grid_card import entity_grid_card
 from pindb.templates.components.pins.thumbnail_grid import thumbnail_grid
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 SECTION_ID: str = "entity-list-section"
 DEFAULT_PER_PAGE: int = 100
@@ -241,7 +241,11 @@ def entity_list_items(
                 request=request,
                 href=str(url_of(entity)),
                 pins=entity.pins,
-                name=pending_label(entity.name, entity.is_pending),
+                name=review_label(
+                    entity.name,
+                    is_pending=entity.is_pending,
+                    is_rejected=entity.is_rejected,
+                ),
             )
             for entity in entities
         ]
@@ -252,7 +256,11 @@ def entity_list_items(
                 thumbnail_grid(request=request, pins=entity.pins),
                 div[
                     p(class_="text-lg")[
-                        pending_label(entity.name, entity.is_pending),
+                        review_label(
+                            entity.name,
+                            is_pending=entity.is_pending,
+                            is_rejected=entity.is_rejected,
+                        ),
                         span(class_="text-lightest-hover ml-1")[
                             f"({len(entity.pins)})"
                         ],

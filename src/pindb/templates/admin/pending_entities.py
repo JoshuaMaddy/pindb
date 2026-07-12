@@ -25,15 +25,21 @@ from pindb.templates.admin._pending_shared import (
     action_buttons,
     action_form_button,
     pending_table,
+    request_changes_button,
     section_header,
 )
 from pindb.templates.admin.pending_bulk import BulkGroupView
 from pindb.templates.admin.pending_edits import _edit_groups_section
+from pindb.templates.admin.pending_needs_changes import (
+    NeedsChangesView,
+    needs_changes_section,
+)
 
 # Shared column widths so every per-entity section (pins, shops, artists, tags,
 # pin sets) lines its columns up vertically. ``None`` = flexible (Name absorbs
 # the remaining width). Order matches the columns list in ``_entity_section``.
-_ENTITY_COL_WIDTHS: tuple[str | None, ...] = (None, "9rem", "8rem", "16rem")
+# Actions has to fit Approve + Request changes + Delete on one line.
+_ENTITY_COL_WIDTHS: tuple[str | None, ...] = (None, "9rem", "8rem", "21rem")
 
 
 def _sections(
@@ -47,6 +53,7 @@ def _sections(
     edit_groups: dict[tuple[str, int], list[PendingEdit]],
     edit_group_entities: dict[tuple[str, int], PendingAuditEntity],
     bulk_groups: Sequence[BulkGroupView],
+    needs_changes: NeedsChangesView,
     local_date_formatter: Callable[[datetime | None], Element | str],
     bulk_groups_section: Callable[..., Element],
 ) -> list[Element | VoidElement]:
@@ -95,12 +102,25 @@ def _sections(
         sections.append(bulk_groups_section(bulk_groups=bulk_groups))
         sections.append(hr)
 
+    # The empty state is about the admin's own queue, so it is decided before the
+    # needs-changes section is added: entries waiting on their submitter are not
+    # work for the admin, and hiding "All clear." because of them would be a lie.
     if not sections:
         sections.append(
             div(class_="text-lightest-hover text-center py-8")[
                 i(data_lucide="check-circle", class_="inline-block w-8 h-8 mb-2"),
                 p["No pending entries. All clear."],
             ]
+        )
+
+    if len(needs_changes):
+        sections.append(hr)
+        sections.append(
+            needs_changes_section(
+                view=needs_changes,
+                creators=creators,
+                local_date_formatter=local_date_formatter,
+            )
         )
 
     return sections
@@ -174,7 +194,7 @@ def _entity_row(
         td(class_="py-2")[
             action_buttons(
                 action_form_button(action="approve", url=approve_url),
-                action_form_button(action="reject", url=reject_url),
+                request_changes_button(url=reject_url, entity_label=name),
                 action_form_button(action="delete", url=delete_url),
             )
         ],

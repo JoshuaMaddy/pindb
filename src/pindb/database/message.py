@@ -50,7 +50,12 @@ class MessageCategory(StrEnum):
     announcement = auto()
     direct = auto()
     contribution = auto()
-    pin_rejection = auto()
+    # A reviewer asked the submitter to change a pending entry. The stored value
+    # stays "pin_rejection": it predates the flow being generalized to every
+    # entity type, the VARCHAR(13) column is sized exactly to it, and a container
+    # running the previous release would raise on an unrecognized value during the
+    # blue/green overlap. Renaming the member alone costs nothing.
+    changes_requested = "pin_rejection"
     # "achievement" (11 chars) fits the existing VARCHAR(13) sized to
     # "pin_rejection"; adding a member needs no migration (native_enum=False,
     # no CHECK constraint).
@@ -98,6 +103,12 @@ class Message(AuditMixin, MappedAsDataclass, Base):
             MessageCategory,
             name="messagecategory",
             native_enum=False,
+            # Persist ``.value``, not the default ``.name``. Every member's value
+            # equals its name except ``changes_requested``, which deliberately
+            # stores the legacy ``"pin_rejection"`` — so this writes exactly the
+            # same strings as before while letting the member be named for what it
+            # now does. Column stays VARCHAR(13) (longest value: "pin_rejection").
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
     )
     body: Mapped[MessageBody] = mapped_column(PydanticJSON(MessageBodyAdapter))

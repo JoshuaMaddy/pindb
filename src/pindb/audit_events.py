@@ -240,8 +240,9 @@ def _discard_pending_audit(session: Session, *args: object) -> None:
 def _filter_deleted(execute_state: ORMExecuteState) -> None:
     """Hide soft-deleted and (for most users) unapproved rows from SELECTs.
 
-    Honors ``execution_options(include_deleted=True)`` and
-    ``include_pending=True`` for admin approval views.
+    Editors and admins see every review state; guests and regular users see only
+    approved, non-needs-changes rows. Honors ``execution_options(
+    include_deleted=True)`` and ``include_pending=True`` for admin approval views.
     """
     if not execute_state.is_select:
         return
@@ -255,27 +256,22 @@ def _filter_deleted(execute_state: ORMExecuteState) -> None:
             )
         )
 
-    if not execute_state.execution_options.get("include_pending", False):
-        if _audit_user_is_editor.get():
-            # Editors see approved + pending, not rejected
-            execute_state.statement = execute_state.statement.options(
-                with_loader_criteria(
-                    PendingMixin,
-                    lambda cls: cls.rejected_at.is_(None),
-                    include_aliases=True,
-                )
+    # Editors and admins see every review state — approved, pending, and
+    # needs-changes (``rejected_at`` set). Needs-changes rows stay visible to
+    # them on purpose: the submitter has to be able to read the reviewer's
+    # feedback and edit the entry to resubmit it. Everyone else sees only
+    # approved content.
+    if not (
+        execute_state.execution_options.get("include_pending", False)
+        or _audit_user_is_editor.get()
+    ):
+        execute_state.statement = execute_state.statement.options(
+            with_loader_criteria(
+                PendingMixin,
+                lambda cls: cls.approved_at.is_not(None) & cls.rejected_at.is_(None),
+                include_aliases=True,
             )
-        else:
-            # Regular users and guests see only approved items
-            execute_state.statement = execute_state.statement.options(
-                with_loader_criteria(
-                    PendingMixin,
-                    lambda cls: (
-                        cls.approved_at.is_not(None) & cls.rejected_at.is_(None)
-                    ),
-                    include_aliases=True,
-                )
-            )
+        )
 
 
 def register_audit_events() -> None:

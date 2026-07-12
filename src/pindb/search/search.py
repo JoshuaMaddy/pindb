@@ -17,7 +17,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag, TagCategory
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 # Every index uid derives from the configured base so parallel test workers
 # (which point separate app instances at one shared Meilisearch server with
@@ -257,7 +257,11 @@ async def search_entity_options(
         text = str(hit.get("display_name") or hit["name"])
         item: dict[str, str] = {
             "value": str(hit["id"]),
-            "text": pending_label(text, bool(hit.get("is_pending"))),
+            "text": review_label(
+                text,
+                is_pending=bool(hit.get("is_pending")),
+                is_rejected=bool(hit.get("is_rejected")),
+            ),
         }
         if "category" in hit:
             item["category"] = str(hit["category"])

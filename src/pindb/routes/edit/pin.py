@@ -28,7 +28,11 @@ from pindb.file_handler import save_image
 from pindb.htmx_toast import htmx_error_toast, hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import MagnitudeParseError, parse_magnitude_mm
-from pindb.routes._guards import assert_editor_can_edit, needs_pending_edit
+from pindb.routes._guards import (
+    assert_editor_can_edit,
+    clear_rejection_on_resubmit,
+    needs_pending_edit,
+)
 from pindb.routes._pin_shared import (
     PIN_SELECTINLOADS,
     PinFormParams,
@@ -186,8 +190,9 @@ async def post_edit_pin(
                 redirect_route="get_pin",
             )
 
-        # Direct edit — admin, or editor on their own pending-new entry.
+        # Direct edit — admin, or editor on their own pending / needs-changes entry.
         LOGGER.info("Editing pin id=%d name=%r", id, fields.name)
+        clear_rejection_on_resubmit(pin, current_user)
         pin_shops, pin_sets, pin_artists = await load_pin_relations(
             session=session,
             shop_ids=fields.shop_ids,

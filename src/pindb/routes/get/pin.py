@@ -74,6 +74,7 @@ async def get_pin(
             pending_chain_exists,
             viewing_pending,
             pending_changes,
+            edit_change_request,
         ) = await maybe_apply_pending_view(
             session=session,
             entity=pin_obj,
@@ -143,5 +144,6 @@ async def get_pin(
                 has_pending_chain=pending_chain_exists,
                 viewing_pending=viewing_pending,
                 pending_changes=pending_changes,
+                edit_change_request=edit_change_request,
             )
         )

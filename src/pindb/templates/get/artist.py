@@ -14,6 +14,9 @@ from pindb.routes._urls import artist_url
 from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.display.audit_timestamps import audit_timestamps
+from pindb.templates.components.display.changes_requested_banner import (
+    changes_requested_banner,
+)
 from pindb.templates.components.display.description_block import description_block
 from pindb.templates.components.display.linked_items_row import linked_items_row
 from pindb.templates.components.display.pending_changes_table import (
@@ -26,7 +29,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def artist_page(
@@ -39,6 +42,7 @@ def artist_page(
     has_pending_chain: bool = False,
     viewing_pending: bool = False,
     pending_changes: Sequence[PendingChange] = (),
+    edit_change_request: str | None = None,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     canonical_url = str(artist_url(request=request, artist=artist))
@@ -60,10 +64,26 @@ def artist_page(
                     entries=[
                         (request.url_for("get_list_index"), "List"),
                         (request.url_for("get_list_artists"), "Artists"),
-                        pending_label(artist.name, artist.is_pending),
+                        review_label(
+                            artist.name,
+                            is_pending=artist.is_pending,
+                            is_rejected=artist.is_rejected,
+                        ),
                     ]
                 ),
+                artist.is_rejected
+                and changes_requested_banner(
+                    reason=artist.rejection_reason,
+                    edit_url=str(request.url_for("get_edit_artist", id=artist.id)),
+                ),
+                edit_change_request
+                and changes_requested_banner(
+                    reason=edit_change_request,
+                    edit_url=str(request.url_for("get_edit_artist", id=artist.id)),
+                    is_edit=True,
+                ),
                 has_pending_chain
+                and not edit_change_request
                 and pending_edit_banner(
                     viewing_pending=viewing_pending,
                     canonical_url=canonical_url,
@@ -72,7 +92,11 @@ def artist_page(
                 viewing_pending and pending_changes_table(pending_changes),
                 page_heading(
                     icon="palette",
-                    text=pending_label(artist.name, artist.is_pending),
+                    text=review_label(
+                        artist.name,
+                        is_pending=artist.is_pending,
+                        is_rejected=artist.is_rejected,
+                    ),
                     full_width=True,
                     extras=fragment[
                         user

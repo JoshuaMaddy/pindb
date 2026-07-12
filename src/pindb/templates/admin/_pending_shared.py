@@ -24,14 +24,27 @@ from htpy import (
     tr,
 )
 
+from pindb.database.pending_mixin import MIN_CHANGE_REQUEST_LENGTH
+from pindb.templates.components.dialogs.request_changes_modal import (
+    request_changes_modal,
+)
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 
 # action key -> (lucide icon, button variant class, default label)
 _ACTION_SPECS: dict[str, tuple[str, str, str]] = {
     "approve": ("check", "btn-primary", "Approve"),
-    "reject": ("x", "btn-warning", "Reject"),
+    "reject": ("message-square-warning", "btn-warning", "Request changes"),
     "delete": ("trash-2", "btn-error", "Delete"),
 }
+
+
+def _action_button(*, action: str, label: str | None = None, title: str | None = None):
+    icon, variant, default_label = _ACTION_SPECS[action]
+    text = label or default_label
+    return button(type="submit", class_=f"btn btn-sm {variant}", title=title or text)[
+        i(data_lucide=icon, class_="inline-block w-3 h-3 mr-1"),
+        text,
+    ]
 
 
 def action_form_button(
@@ -43,20 +56,30 @@ def action_form_button(
     updates without a full-page reload (which would reset the scroll position).
     ``method``/``action`` remain as a no-JS fallback that redirects to the page.
     """
-    icon, variant, default_label = _ACTION_SPECS[action]
-    text = label or default_label
     return form(
         method="post",
         action=url,
         hx_post=url,
         hx_target="#pending-content",
         hx_swap="outerHTML",
-    )[
-        button(type="submit", class_=f"btn btn-sm {variant}", title=title or text)[
-            i(data_lucide=icon, class_="inline-block w-3 h-3 mr-1"),
-            text,
-        ]
-    ]
+    )[_action_button(action=action, label=label, title=title)]
+
+
+def request_changes_button(
+    *, url: str, entity_label: str, label: str | None = None, title: str | None = None
+) -> Element:
+    """The reject action, gated behind the change-request dialog.
+
+    Unlike the other actions this one carries a body — the reviewer's explanation —
+    so it cannot be a bare zero-input form. The dialog posts to the same
+    ``/admin/pending/reject*`` route and swaps ``#pending-content`` the same way.
+    """
+    return request_changes_modal(
+        trigger=_action_button(action="reject", label=label, title=title),
+        form_action=url,
+        entity_label=entity_label,
+        min_length=MIN_CHANGE_REQUEST_LENGTH,
+    )
 
 
 def action_buttons(*buttons: Element) -> Element:

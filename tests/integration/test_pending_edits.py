@@ -142,7 +142,11 @@ class TestRejectPendingEdits:
         )
 
         response = admin_client.post(
-            f"/admin/pending/reject-edits/shop/{shop_id}", follow_redirects=False
+            f"/admin/pending/reject-edits/shop/{shop_id}",
+            data={
+                "reason": "The description is missing; please add one before this can be approved."
+            },
+            follow_redirects=False,
         )
         assert response.status_code == 303
 

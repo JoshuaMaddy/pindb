@@ -34,7 +34,7 @@ from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
-from pindb.utils import pending_label
+from pindb.utils import review_label
 
 
 def _duplicate_notice(source_display_name: str) -> Element:
@@ -175,7 +175,13 @@ def tag_form(
                                     data_icon=CATEGORY_ICONS.get(t.category, "tag"),
                                     data_color=CATEGORY_COLORS.get(t.category, ""),
                                     data_category=t.category.value,
-                                )[pending_label(t.name, t.is_pending)]
+                                )[
+                                    review_label(
+                                        t.name,
+                                        is_pending=t.is_pending,
+                                        is_rejected=t.is_rejected,
+                                    )
+                                ]
                                 for t in selected_implications
                             ]
                         ],
