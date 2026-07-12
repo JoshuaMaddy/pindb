@@ -7,6 +7,11 @@
     color?: string;
     thumbnail?: string;
   };
+
+  // Per-instance suffix for listbox/option ids: bulk grids mount one widget
+  // per row with no id/name, and duplicate DOM ids break aria-activedescendant
+  // (and any id-based lookup) on every row but the first.
+  let instances = 0;
 </script>
 
 <script lang="ts">
@@ -103,10 +108,16 @@
   let query = $state("");
   let open = $state(false);
   let active = $state(0);
-  let dropStyle = $state("");
+  let loading = $state(false);
 
   const isSingle = $derived(!multiple || tagSingleMode);
   const hasRemote = $derived(Boolean(loadFn) || Boolean(loadUrl));
+
+  const uid = ++instances;
+  // id/name are static per mount (islands remount on swap).
+  // svelte-ignore state_referenced_locally
+  const listboxId = `${id || name || `multiselect-${uid}`}-listbox`;
+  const optionId = (index: number) => `${listboxId}-opt-${index}`;
 
   function categoryData(): CategoryData {
     return (
@@ -209,7 +220,21 @@
     });
   }
 
+  // Closing always drops the query: a stale one keeps the filter live and,
+  // in single mode, hides the selected chip behind the text the user typed.
+  function close(): void {
+    open = false;
+    query = "";
+    active = 0;
+  }
+
   function selectOption(option: Option): void {
+    if (items.some((item) => item.value === option.value)) {
+      // Keyed {#each} — a duplicate value is a hard render error, not a
+      // cosmetic double chip.
+      if (!multiple) close();
+      return;
+    }
     items = multiple ? [...items, option] : [option];
     query = "";
     active = 0;
@@ -245,9 +270,33 @@
     inputEl?.focus();
   }
 
+  // The chevron is the one part of the control that toggles: clicking the
+  // text area of an open widget means "put the caret here", not "close".
+  function onChevronClick(event: MouseEvent): void {
+    event.stopPropagation();
+    if (open) {
+      // No refocus here — its mousedown is prevented, so the input never lost
+      // focus, and calling focus() again would fire onfocus and reopen.
+      close();
+      return;
+    }
+    open = true;
+    inputEl?.focus();
+  }
+
+  // Buttons inside the control take focus on mousedown, which would blur the
+  // input (and, for the chip "×", leave focus on a node that's about to be
+  // removed). Keep focus on the input; the click still fires.
+  function keepFocus(event: MouseEvent): void {
+    event.preventDefault();
+  }
+
   function onKeydown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
-      open = false;
+      if (!open) return;
+      // Don't let a dropdown-closing Escape also close the modal around it.
+      event.stopPropagation();
+      close();
       return;
     }
     if (event.key === "ArrowDown") {
@@ -258,7 +307,13 @@
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      active = Math.max(active - 1, 0);
+      if (!open) open = true;
+      else active = Math.max(active - 1, 0);
+      return;
+    }
+    if (open && (event.key === "Home" || event.key === "End")) {
+      event.preventDefault();
+      active = event.key === "Home" ? 0 : Math.max(optionCount - 1, 0);
       return;
     }
     if (event.key === "Enter") {
@@ -267,14 +322,20 @@
       pickActive();
       return;
     }
-    if (
-      event.key === "Backspace" &&
-      multiple &&
-      !query &&
-      items.length > 0
-    ) {
+    if (event.key === "Backspace" && !query && items.length > 0) {
+      // Single mode has no chip "×" — backspace is the only way to clear it.
       removeItem(items[items.length - 1].value);
     }
+  }
+
+  // Tab (or any focus move out of the widget) closes. Clicks inside the
+  // dropdown never reach here: its mousedown is prevented, so the input
+  // keeps focus and the click lands on a live option.
+  function onFocusOut(event: FocusEvent): void {
+    if (!open) return;
+    const next = event.relatedTarget as Node | null;
+    if (next && (rootEl.contains(next) || dropEl?.contains(next))) return;
+    close();
   }
 
   // Adopt: pull the server-rendered select inside this component (so the
@@ -305,6 +366,7 @@
     const seq = ++loadSeq;
     loadTimer = setTimeout(async () => {
       let results: Option[] = [];
+      loading = true;
       try {
         if (loadFn) {
           results = await loadFn(trimmed);
@@ -319,6 +381,7 @@
         results = [];
       }
       if (seq !== loadSeq) return;
+      loading = false;
       const known = new Set(
         untrack(() => loaded).map((option) => option.value),
       );
@@ -327,12 +390,17 @@
       );
       if (fresh.length) loaded = [...loaded, ...fresh];
     }, 250);
-    return () => clearTimeout(loadTimer);
+    return () => {
+      clearTimeout(loadTimer);
+      loading = false;
+    };
   });
 
   // External value writes (paste-column, draft restore) rebuild the items.
+  // De-duplicated: values arrive from clipboard/draft JSON, and the keyed
+  // {#each} over items throws on a repeated key.
   $effect(() => {
-    const snapshot = [...value];
+    const snapshot = [...new Set(value)];
     untrack(() => {
       const current = items.map((item) => item.value);
       if (JSON.stringify(snapshot) === JSON.stringify(current)) return;
@@ -380,32 +448,112 @@
 
   // Fixed positioning escapes overflow-clipped containers (bulk tables) the
   // way dropdownParent="body" did for Tom Select.
-  function positionDropdown(): void {
-    if (!controlEl) return;
-    const rect = controlEl.getBoundingClientRect();
-    dropStyle =
-      `position:fixed;left:${rect.left}px;top:${rect.bottom + 2}px;` +
-      `min-width:${rect.width}px;max-width:24rem;`;
+  const GAP = 2;
+  const EDGE = 8;
+  const MAX_DROP_HEIGHT = 256; // matches the max-h-64 class
+
+  // The style is written straight to the element, not through state: the two
+  // passes below must measure the layout the first pass produced, and a
+  // state-bound style attribute only lands after the effect flush.
+  function applyDropStyle(
+    left: number,
+    anchor: string,
+    minWidth: number,
+    maxHeight: number,
+  ): void {
+    if (!dropEl) return;
+    dropEl.style.cssText =
+      `position:fixed;left:${left}px;${anchor};` +
+      `min-width:${minWidth}px;max-width:24rem;max-height:${maxHeight}px;`;
   }
+
+  function positionDropdown(): void {
+    if (!controlEl || !dropEl) return;
+    const rect = controlEl.getBoundingClientRect();
+    const natural = Math.min(dropEl.scrollHeight, MAX_DROP_HEIGHT);
+    const below = window.innerHeight - rect.bottom - GAP - EDGE;
+    const above = rect.top - GAP - EDGE;
+    // Flip above the control only when the list genuinely doesn't fit below
+    // and there is more room up there.
+    const flip = natural > below && above > below;
+    const maxHeight = Math.max(
+      96,
+      Math.min(MAX_DROP_HEIGHT, flip ? above : below),
+    );
+    const width = dropEl.offsetWidth || rect.width;
+    const left = Math.max(
+      EDGE,
+      Math.min(rect.left, window.innerWidth - width - EDGE),
+    );
+    // `wantTop` is the dropdown's top edge below the control, its bottom edge
+    // when flipped.
+    const anchorFor = (edge: number) =>
+      flip ? `bottom:${window.innerHeight - edge}px` : `top:${edge}px`;
+    const wantTop = flip ? rect.top - GAP : rect.bottom + GAP;
+    applyDropStyle(left, anchorFor(wantTop), rect.width, maxHeight);
+
+    // A transformed/filtered/contained ancestor (modal, card, animated
+    // container) becomes the containing block for position:fixed, so those
+    // viewport coordinates land offset and the dropdown drifts over the
+    // control. Measure where it actually ended up and correct by the delta.
+    const actual = dropEl.getBoundingClientRect();
+    const dx = left - actual.left;
+    const dy = flip
+      ? wantTop - actual.bottom
+      : wantTop - actual.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    applyDropStyle(left + dx, anchorFor(wantTop + dy), rect.width, maxHeight);
+  }
+
+  // Re-anchor whenever the list or the control changes size: adding a chip
+  // wraps the control onto a second line, and a dropdown pinned to the old
+  // rect then sits on top of it.
+  $effect(() => {
+    if (!open) return;
+    void optionCount;
+    void items.length;
+    positionDropdown();
+  });
 
   $effect(() => {
     if (!open) return;
-    active = 0;
-    positionDropdown();
     const reposition = () => positionDropdown();
     const onDocPointer = (event: PointerEvent) => {
       const target = event.target as Node;
       if (rootEl.contains(target) || dropEl?.contains(target)) return;
-      open = false;
+      close();
     };
+    const observer = new ResizeObserver(reposition);
+    observer.observe(controlEl);
+    if (dropEl) observer.observe(dropEl);
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
     document.addEventListener("pointerdown", onDocPointer, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
       document.removeEventListener("pointerdown", onDocPointer, true);
     };
+  });
+
+  // Keep the highlight inside the list as it shrinks under the query, and
+  // scroll it into view so arrow-key nav doesn't run off the visible area.
+  $effect(() => {
+    const count = optionCount;
+    void query;
+    untrack(() => {
+      const clamped = Math.min(active, Math.max(count - 1, 0));
+      if (clamped !== active) active = clamped;
+    });
+  });
+
+  $effect(() => {
+    if (!open) return;
+    const index = active;
+    dropEl
+      ?.querySelector(`[data-index="${index}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   });
 
   const singleBrandColor = $derived(
@@ -424,11 +572,13 @@
   const chipClass = "inline-flex items-center gap-1 rounded-lg border px-1.5";
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   data-multiselect
   bind:this={rootEl}
   class="relative min-w-0 {className}"
   data-selected-category={tagSingleMode ? items[0]?.category : undefined}
+  onfocusout={onFocusOut}
 >
   {#if !adoptedSelect}
     <select
@@ -479,9 +629,14 @@
             type="button"
             class="ml-0.5 inline-flex cursor-pointer appearance-none items-center rounded-none border-0 border-l border-current bg-transparent px-1.5 text-current"
             aria-label="Remove {item.text}"
+            onmousedown={keepFocus}
             onclick={(event) => {
               event.stopPropagation();
               removeItem(item.value);
+              // Keyboard activation (detail 0) leaves focus on a button that
+              // is about to be removed — put it back on the input. A mouse
+              // click must not, or every chip removal would open the list.
+              if (event.detail === 0) inputEl?.focus();
             }}
           >
             <X class="h-3 w-3" />
@@ -495,31 +650,55 @@
       autocomplete="off"
       role="combobox"
       aria-expanded={open}
-      aria-controls="{id || name || 'multiselect'}-listbox"
+      aria-haspopup="listbox"
+      aria-autocomplete="list"
+      aria-controls={listboxId}
+      aria-activedescendant={open && optionCount > 0
+        ? optionId(active)
+        : undefined}
       class="flex-1 border-0 bg-transparent p-0 text-base-text outline-none {isSingle
         ? 'w-0 min-w-0'
         : 'min-w-8'}"
       placeholder={items.length === 0 ? placeholder : ""}
       bind:value={query}
-      onfocus={() => (open = true)}
+      oninput={() => (open = true)}
       onkeydown={onKeydown}
     />
     {#if isSingle}
-      <ChevronDown class="h-4 w-4 shrink-0 opacity-70" />
+      <button
+        type="button"
+        tabindex="-1"
+        aria-label={open ? "Close options" : "Show options"}
+        class="inline-flex shrink-0 cursor-pointer appearance-none items-center border-0 bg-transparent p-0 text-current"
+        onmousedown={keepFocus}
+        onclick={onChevronClick}
+      >
+        <ChevronDown
+          class="h-4 w-4 shrink-0 opacity-70 transition-transform {open
+            ? 'rotate-180'
+            : ''}"
+        />
+      </button>
     {/if}
   </div>
 
   {#if open}
     <!-- position:fixed escapes overflow-clipped table containers; the high
          z-index needs no body portal (a portal would detach the subtree from
-         Svelte's root-scoped event delegation and dead-click every option). -->
+         Svelte's root-scoped event delegation and dead-click every option).
+         Its style is written imperatively by positionDropdown(), which needs
+         to measure the layout it produced — see the two-pass note there.
+         Each option prevents its own mousedown (not the container's, which
+         would also swallow scrollbar drags) so clicking one never blurs the
+         input — a blur closes the list out from under the click. -->
     <div
       data-ms-dropdown
       bind:this={dropEl}
-      id="{id || name || 'multiselect'}-listbox"
+      id={listboxId}
       role="listbox"
+      aria-multiselectable={multiple}
+      tabindex="-1"
       class="z-[100] max-h-64 overflow-y-auto rounded-lg border border-lightest bg-lighter shadow-lg"
-      style={dropStyle}
     >
       {#each filtered as option, index (option.value)}
         {@const optionBrand = brand(option)}
@@ -527,13 +706,16 @@
         <div
           data-selectable
           data-value={option.value}
+          data-index={index}
+          id={optionId(index)}
           role="option"
-          aria-selected={index === active}
+          aria-selected={items.some((item) => item.value === option.value)}
           tabindex="-1"
           class="cursor-pointer px-2 py-1.5 text-base-text {index === active
             ? 'bg-lighter-hover'
             : 'bg-lighter'}"
           onmouseenter={() => (active = index)}
+          onmousedown={keepFocus}
           onclick={() => selectOption(option)}
         >
           {#if tagMode || tagSingleMode}
@@ -565,14 +747,17 @@
         <div
           data-selectable
           data-ms-create
+          data-index={filtered.length}
+          id={optionId(filtered.length)}
           role="option"
-          aria-selected={active === filtered.length}
+          aria-selected="false"
           tabindex="-1"
           class="cursor-pointer px-2 py-1.5 text-base-text {active ===
           filtered.length
             ? 'bg-lighter-hover'
             : 'bg-lighter'}"
           onmouseenter={() => (active = filtered.length)}
+          onmousedown={keepFocus}
           onclick={createFromQuery}
         >
           Add <span class="font-semibold">{query.trim()}</span>…
@@ -580,11 +765,15 @@
       {/if}
       {#if optionCount === 0}
         <div class="no-results px-2 py-1.5 text-lightest-hover">
-          {query.trim()
-            ? "No results found"
-            : hasRemote
-              ? "Start typing to search…"
-              : "No options"}
+          {#if loading}
+            Searching…
+          {:else if query.trim()}
+            No results found
+          {:else if hasRemote}
+            Start typing to search…
+          {:else}
+            No options
+          {/if}
         </div>
       {/if}
     </div>
