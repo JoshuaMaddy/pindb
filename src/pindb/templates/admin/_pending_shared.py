@@ -1,19 +1,19 @@
 """Shared htpy components for the admin pending-approval sections.
 
-Approve/reject/delete buttons, the count badge, section headers, and the
-scrolling table header are identical across the pending entity/edit/bulk
-sections; defining them once keeps styling and action wiring in sync.
+The count badge, section headers, and the scrolling table header are identical
+across the pending entity/edit/bulk sections; defining them once keeps styling in
+sync. The approve/reject/delete buttons themselves live in
+``components/display/review_actions.py`` — the entity detail pages render the same
+three actions — and are re-exported here for the queue sections.
 """
 
 from collections.abc import Sequence
 
 from htpy import (
     Element,
-    button,
     col,
     colgroup,
     div,
-    form,
     h2,
     i,
     span,
@@ -24,67 +24,21 @@ from htpy import (
     tr,
 )
 
-from pindb.database.pending_mixin import MIN_CHANGE_REQUEST_LENGTH
-from pindb.templates.components.dialogs.request_changes_modal import (
-    request_changes_modal,
+from pindb.templates.components.display.review_actions import (
+    action_buttons,
+    action_form_button,
+    request_changes_button,
 )
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 
-# action key -> (lucide icon, button variant class, default label)
-_ACTION_SPECS: dict[str, tuple[str, str, str]] = {
-    "approve": ("check", "btn-primary", "Approve"),
-    "reject": ("message-square-warning", "btn-warning", "Request changes"),
-    "delete": ("trash-2", "btn-error", "Delete"),
-}
-
-
-def _action_button(*, action: str, label: str | None = None, title: str | None = None):
-    icon, variant, default_label = _ACTION_SPECS[action]
-    text = label or default_label
-    return button(type="submit", class_=f"btn btn-sm {variant}", title=title or text)[
-        i(data_lucide=icon, class_="inline-block w-3 h-3 mr-1"),
-        text,
-    ]
-
-
-def action_form_button(
-    *, action: str, url: str, label: str | None = None, title: str | None = None
-) -> Element:
-    """A single POST form wrapping an icon button for an approve/reject/delete action.
-
-    ``hx-post`` swaps the whole ``#pending-content`` region in place so the queue
-    updates without a full-page reload (which would reset the scroll position).
-    ``method``/``action`` remain as a no-JS fallback that redirects to the page.
-    """
-    return form(
-        method="post",
-        action=url,
-        hx_post=url,
-        hx_target="#pending-content",
-        hx_swap="outerHTML",
-    )[_action_button(action=action, label=label, title=title)]
-
-
-def request_changes_button(
-    *, url: str, entity_label: str, label: str | None = None, title: str | None = None
-) -> Element:
-    """The reject action, gated behind the change-request dialog.
-
-    Unlike the other actions this one carries a body — the reviewer's explanation —
-    so it cannot be a bare zero-input form. The dialog posts to the same
-    ``/admin/pending/reject*`` route and swaps ``#pending-content`` the same way.
-    """
-    return request_changes_modal(
-        trigger=_action_button(action="reject", label=label, title=title),
-        form_action=url,
-        entity_label=entity_label,
-        min_length=MIN_CHANGE_REQUEST_LENGTH,
-    )
-
-
-def action_buttons(*buttons: Element) -> Element:
-    """Horizontal row wrapping the action buttons for one pending row/card."""
-    return div(class_="flex gap-2")[list(buttons)]
+__all__ = [
+    "action_buttons",
+    "action_form_button",
+    "count_badge",
+    "pending_table",
+    "request_changes_button",
+    "section_header",
+]
 
 
 def count_badge(count: int) -> Element:

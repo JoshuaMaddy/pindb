@@ -8,6 +8,7 @@ from fastapi import Request
 from htpy import Element, fragment
 from titlecase import titlecase
 
+from pindb.database.entity_type import EntityType
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
@@ -18,6 +19,7 @@ from pindb.templates.components.display.changes_requested_banner import (
     changes_requested_banner,
 )
 from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.display.review_actions import review_actions_bar
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
@@ -39,6 +41,13 @@ def pin_set_page(
     can_edit: bool = user is not None and (pin_set.owner_id == user.id or user.is_admin)
     can_delete: bool = user is not None and (
         pin_set.owner_id == user.id or user.is_admin
+    )
+    # An admin looking at an unapproved set rules on it from the review bar, which
+    # carries its own Delete; a second Delete in the heading would only be ambiguous.
+    in_review: bool = (
+        user is not None
+        and user.is_admin
+        and (pin_set.is_pending or pin_set.is_rejected)
     )
     canonical_url = str(pin_set_url(request=request, pin_set=pin_set))
     share_description: str = pin_set.description or f"View {pin_set.name} on PinDB."
@@ -74,6 +83,13 @@ def pin_set_page(
                     if can_edit
                     else None,
                 ),
+                in_review
+                and review_actions_bar(
+                    entity_type=EntityType.pin_set,
+                    entity_id=pin_set.id,
+                    entity_name=pin_set.name,
+                    is_rejected=pin_set.is_rejected,
+                ),
                 page_heading(
                     icon="layout-grid",
                     text=review_label(
@@ -99,6 +115,7 @@ def pin_set_page(
                                 ),
                             ),
                             can_delete
+                            and not in_review
                             and confirm_modal(
                                 trigger=icon_button(
                                     icon="trash-2", title="Delete set", variant="danger"

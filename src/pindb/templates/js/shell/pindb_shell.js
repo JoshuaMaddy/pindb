@@ -86,6 +86,34 @@
     if (window.lucide) {
       lucide.createIcons();
     }
+    // ── Admin review bar (approve / request changes / delete) ───────────
+    // The bar sits on a pending entry's own detail page and posts to
+    // /admin/pending/* with ?after=back, which answers 204 + this HX-Trigger
+    // (routes/approve.py REVIEW_DONE_EVENT). Ruling on the entry makes the page
+    // showing it meaningless, so walk back to wherever the admin came from —
+    // usually the queue. That page is stale by definition (it still lists the
+    // entry), and a back/forward navigation may restore it from the bfcache
+    // without ever hitting the server, so flag a reload for the page we land on.
+    var REVIEW_RELOAD_KEY = "pindb:reload-on-back";
+    document.body.addEventListener("pindb:review-action-done", function () {
+      if (history.length > 1 && document.referrer) {
+        sessionStorage.setItem(REVIEW_RELOAD_KEY, "1");
+        history.back();
+      } else {
+        // Opened cold (new tab, pasted link): nowhere to go back to.
+        window.location.assign("/admin/pending");
+      }
+    });
+    window.addEventListener("pageshow", function (evt) {
+      if (sessionStorage.getItem(REVIEW_RELOAD_KEY) === null) {
+        return;
+      }
+      sessionStorage.removeItem(REVIEW_RELOAD_KEY);
+      var nav = performance.getEntriesByType("navigation")[0];
+      if (evt.persisted || (nav && nav.type === "back_forward")) {
+        window.location.reload();
+      }
+    });
     // ── Disclosure widgets (replaces Alpine {open} toggles) ─────────────
     // [data-disclosure] root wraps [data-disclosure-trigger] and a
     // [data-disclosure-panel] toggled via the `hidden` class. Delegated

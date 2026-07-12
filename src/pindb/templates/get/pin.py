@@ -11,6 +11,7 @@ from fastapi import Request
 from htpy import Element, div, fragment, script
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
+from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -28,6 +29,7 @@ from pindb.templates.components.display.pending_changes_table import (
     pending_changes_table,
 )
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
+from pindb.templates.components.display.review_actions import review_actions_bar
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.back_link import back_link
@@ -132,6 +134,13 @@ def _page_layout(
     pending_changes: Sequence[PendingChange],
     edit_change_request: str | None = None,
 ) -> Element:
+    # An admin looking at an unapproved entry rules on it from the review bar, which
+    # carries its own Delete. The heading's Delete posts to /delete/{type}/{id},
+    # which cannot even see an unapproved row (the ORM filter hides it), so leaving
+    # it up would offer a second, silently broken Delete.
+    in_review: bool = (
+        user is not None and user.is_admin and (pin.is_pending or pin.is_rejected)
+    )
     return div(
         class_="mx-auto px-10 my-5 gap-2 w-full grid grid-cols-1 md:gap-8 md:grid-cols-2 md:max-w-[160ch]"
     )[
@@ -156,6 +165,13 @@ def _page_layout(
                 pending_url=pending_url,
             ),
             viewing_pending and pending_changes_table(pending_changes),
+            in_review
+            and review_actions_bar(
+                entity_type=EntityType.pin,
+                entity_id=pin.id,
+                entity_name=pin.name,
+                is_rejected=pin.is_rejected,
+            ),
             page_heading(
                 icon="circle-star",
                 text=review_label(
@@ -183,6 +199,7 @@ def _page_layout(
                     ),
                     user
                     and user.is_admin
+                    and not in_review
                     and confirm_modal(
                         trigger=icon_button(
                             icon="trash-2",

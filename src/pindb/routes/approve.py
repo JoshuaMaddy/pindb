@@ -44,6 +44,11 @@ from pindb.utils import utc_now
 
 router = APIRouter(prefix="/admin/pending", dependencies=[Depends(require_admin)])
 
+# Fired at the review bar on an entity detail page (``after=back`` posts) so the
+# shell can send the admin back to the page they came from. Kept in step with the
+# listener in ``templates/js/shell/pindb_shell.js``.
+REVIEW_DONE_EVENT: str = "pindb:review-action-done"
+
 _MODEL_TO_ENTITY_TYPE: dict[type, EntityType] = {et.model: et for et in EntityType}
 
 
@@ -460,6 +465,7 @@ async def get_pending_queue(request: Request) -> HTMLResponse:
 
 async def _pending_action_response(
     request: Request,
+    after: str | None = None,
 ) -> Response:
     """Response after an approve/reject/delete post.
 
@@ -467,7 +473,17 @@ async def _pending_action_response(
     the queue (including cascaded rows and count badges) updates without a
     full-page navigation and the scroll position is preserved. No-JS callers
     get a 303 back to the full page.
+
+    ``after=back`` is what the admin review bar on an entry's *detail* page sends
+    (``components/display/review_actions.py``): there is no queue on that page to
+    swap into, and the entry the admin is looking at is gone from view the moment
+    they rule on it, so the response carries no body — just the trigger that walks
+    the admin back to wherever they came from. No-JS callers land on the queue.
     """
+    if after == "back":
+        if request.headers.get("HX-Request"):
+            return Response(status_code=204, headers={"HX-Trigger": REVIEW_DONE_EVENT})
+        return RedirectResponse(url="/admin/pending", status_code=303)
     if request.headers.get("HX-Request"):
         async with async_session_maker() as session:
             view = await _collect_pending_view(session)
@@ -480,6 +496,7 @@ async def approve_entity(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    after: str | None = None,
     current_user: User = Depends(require_admin),
 ) -> Response:
     now = utc_now()
@@ -508,7 +525,7 @@ async def approve_entity(
         await sync_entity(entity_type, entity_id)
     await refresh_users_stats(affected_creators)
 
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 @router.post("/reject/{entity_type}/{entity_id}")
@@ -517,6 +534,7 @@ async def reject_entity(
     entity_type: EntityType,
     entity_id: int,
     reason: Annotated[str, Form()],
+    after: str | None = None,
     current_user: User = Depends(require_admin),
 ) -> Response:
     """Flag a pending entry as needing changes, and tell its submitter why."""
@@ -545,7 +563,7 @@ async def reject_entity(
 
     # No stats refresh: only approved entries count toward a user's contributions,
     # and an entry can only reach needs-changes from pending, so nothing changed.
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 @router.post("/delete/{entity_type}/{entity_id}")
@@ -553,6 +571,7 @@ async def delete_pending_entity(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    after: str | None = None,
     current_user: User = Depends(require_admin),
 ) -> Response:
     now = utc_now()
@@ -566,7 +585,7 @@ async def delete_pending_entity(
     await delete_one(entity_type, entity_id)
     await refresh_users_stats([creator_id])
 
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 # ---------------------------------------------------------------------------

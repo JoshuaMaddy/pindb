@@ -8,6 +8,7 @@ from fastapi import Request
 from htpy import Element, a, br, code, div, fragment, h2
 
 from pindb.database import Artist, User
+from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.routes._urls import artist_url
@@ -23,6 +24,7 @@ from pindb.templates.components.display.pending_changes_table import (
     pending_changes_table,
 )
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
+from pindb.templates.components.display.review_actions import review_actions_bar
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
@@ -46,6 +48,13 @@ def artist_page(
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     canonical_url = str(artist_url(request=request, artist=artist))
+    # An admin looking at an unapproved entry rules on it from the review bar, which
+    # carries its own Delete. The heading's Delete posts to /delete/{type}/{id},
+    # which cannot even see an unapproved row (the ORM filter hides it), so leaving
+    # it up would offer a second, silently broken Delete.
+    in_review: bool = (
+        user is not None and user.is_admin and (artist.is_pending or artist.is_rejected)
+    )
     pending_url = canonical_url + "?version=pending"
     return html_base(
         title=artist.name,
@@ -90,6 +99,13 @@ def artist_page(
                     pending_url=pending_url,
                 ),
                 viewing_pending and pending_changes_table(pending_changes),
+                in_review
+                and review_actions_bar(
+                    entity_type=EntityType.artist,
+                    entity_id=artist.id,
+                    entity_name=artist.name,
+                    is_rejected=artist.is_rejected,
+                ),
                 page_heading(
                     icon="palette",
                     text=review_label(
@@ -115,6 +131,7 @@ def artist_page(
                         ),
                         user
                         and user.is_admin
+                        and not in_review
                         and confirm_modal(
                             trigger=icon_button(
                                 icon="trash-2",
