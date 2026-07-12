@@ -129,7 +129,9 @@ def pytest_configure(config: pytest.Config) -> None:
         else:
             container, base_url = _pg.start_throwaway_container()
 
-    template = _pg.build_template(base_url)
+    # e2e runs get the seeded user cast baked into the template (own template
+    # name), so no worker has to sign anyone up or log anyone in.
+    template = _pg.build_template(base_url, seed_e2e=_wants_meili(config))
 
     config.stash[_PG_CONTAINER] = container
     config.stash[_PG_BASE_URL] = base_url

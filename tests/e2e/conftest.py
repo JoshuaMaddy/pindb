@@ -5,10 +5,11 @@ Session-scoped fixtures spin up:
   * a Meilisearch container (mounted as a real search backend)
   * a uvicorn subprocess serving the real FastAPI app against those containers
 
-Session-scoped Playwright contexts (admin/editor/second editor/regular) sign up
-once per run and reuse the same logged-in browser context across tests; table
-truncation between tests preserves users and sessions. Anonymous contexts stay
-function-scoped to avoid cookie bleed.
+Session-scoped Playwright contexts (admin/editor/second editor/regular) are
+authenticated from the session tokens seeded into the template database
+(``tests/fixtures/e2e_users.py``) — no signup, no login — and reused across
+tests; table truncation between tests preserves users and sessions. Anonymous
+contexts stay function-scoped to avoid cookie bleed.
 
 E2E tests are opt-in: they're skipped by default (`addopts = -m "not e2e"`),
 run them with `uv run pytest -m e2e`.
@@ -20,13 +21,14 @@ not share ports, databases, or browsers.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+
+from tests.fixtures import e2e_users
 
 # Fixture plugins (live_server, db_isolation) are registered from the top-level
 # tests/conftest.py — pytest no longer allows ``pytest_plugins`` in a
@@ -134,89 +136,55 @@ def _patch_browser_new_context(browser):
 
 
 # ---------------------------------------------------------------------------
-# Per-test user seeding via the live HTTP API
+# Authenticated fixtures
+#
+# The user cast and its session tokens are seeded into the template database
+# every worker clones (tests/fixtures/e2e_users.py), so nothing here signs up or
+# logs in — a context or client is authenticated by being handed the cookie. That
+# removed six argon2 hashes and six argon2 verifies from every worker's session
+# setup, which was the bulk of the suite's wall clock.
 # ---------------------------------------------------------------------------
 
 
-# Strong placeholder passwords that satisfy the policy (>=12 chars, 3+ classes,
-# non-obvious). Used across all e2e fixtures.
-_E2E_ADMIN_PASSWORD = "E2e-Admin-Secret-9!"
-_E2E_EDITOR_PASSWORD = "E2e-Editor-Secret-9!"
-_E2E_EDITOR_PASSWORD_2 = "E2e-Editor-Secret-2-9!"
-_E2E_REGULAR_PASSWORD = "E2e-Regular-Secret-9!"
+# Kept as module-level names because tests import them to drive the real login
+# form (password-policy and auth flows).
+_E2E_ADMIN_PASSWORD = e2e_users.ADMIN.password
+_E2E_EDITOR_PASSWORD = e2e_users.EDITOR.password
+_E2E_EDITOR_PASSWORD_2 = e2e_users.EDITOR_2.password
+_E2E_REGULAR_PASSWORD = e2e_users.REGULAR.password
 
 
-def _signup(base_url: str, username: str, password: str) -> httpx.Client:
-    client = httpx.Client(base_url=base_url, follow_redirects=False)
-    signup = client.post(
-        "/auth/signup",
-        data={
-            "username": username,
-            "password": password,
-            "email": f"{username}@x.test",
-        },
+def _authed_client(base_url: str, user: e2e_users.E2EUser) -> httpx.Client:
+    """An httpx client already holding *user*'s seeded session cookie."""
+    return httpx.Client(
+        base_url=base_url,
+        follow_redirects=False,
+        timeout=_HTTP_TIMEOUT,
+        cookies={e2e_users.SESSION_COOKIE: user.token},
     )
-    # 303 = first-time success, 200/400 = re-signup rejected (username taken);
-    # anything else (401 CSRF break, 500 server error) would silently produce a
-    # logged-out client that later fails with confusing 401s.
-    assert signup.status_code in (200, 303, 400), (
-        f"signup of {username!r} returned {signup.status_code}: {signup.text[:300]!r}"
+
+
+def _authed_context(browser, base_url: str, user: e2e_users.E2EUser):
+    """A Playwright context already holding *user*'s seeded session cookie."""
+    context = browser.new_context(
+        base_url=base_url, storage_state=user.storage_state(base_url)
     )
-    # Login in case signup didn't set the cookie (re-signup path).
-    login = client.post(
-        "/auth/login", data={"username": username, "password": password}
-    )
-    assert login.status_code in (200, 303), (
-        f"login of {username!r} returned {login.status_code}: {login.text[:300]!r}"
-    )
-    return client
+    _configure_context_timeouts(context)
+    return context
 
 
 @pytest.fixture
-def e2e_admin_session(live_server):
-    """Create (or reuse) an admin user and return a logged-in httpx.Client.
-
-    Admin is granted directly via SQL — the running app's lifespan only
-    bootstraps hardcoded usernames, not arbitrary ones.
-    """
-    import psycopg
-
-    username = "e2e_admin"
-    password = _E2E_ADMIN_PASSWORD
-    client = _signup(live_server, username, password)
-
-    # Promote to admin+editor directly in the DB.
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_admin = TRUE, is_editor = TRUE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    return client
+def e2e_admin_session(live_server) -> Iterator[httpx.Client]:
+    """A logged-in admin httpx.Client (seeded user, seeded session)."""
+    with _authed_client(live_server, e2e_users.ADMIN_HTTP) as client:
+        yield client
 
 
 @pytest.fixture
-def e2e_editor_session(live_server):
-    """Create an editor user (non-admin) and return a logged-in httpx.Client."""
-    import psycopg
-
-    username = "e2e_editor"
-    password = _E2E_EDITOR_PASSWORD
-    client = _signup(live_server, username, password)
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_editor = TRUE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    return client
+def e2e_editor_session(live_server) -> Iterator[httpx.Client]:
+    """A logged-in non-admin editor httpx.Client (seeded user, seeded session)."""
+    with _authed_client(live_server, e2e_users.EDITOR_HTTP) as client:
+        yield client
 
 
 # ---------------------------------------------------------------------------
@@ -224,48 +192,10 @@ def e2e_editor_session(live_server):
 # ---------------------------------------------------------------------------
 
 
-def _login_browser(browser_context, base_url: str, username: str, password: str):
-    page = browser_context.new_page()
-    page.goto(f"{base_url}/auth/login", wait_until="load")
-    page.fill("input[name='username']", username)
-    page.fill("input[name='password']", password)
-    page.click("button[type='submit']")
-    # "load" is enough for SSR + redirect; "networkidle" waits on idle network
-    # and is much slower without improving assertions (expect() auto-waits).
-    page.wait_for_load_state("load")
-    page.close()
-
-
 @pytest.fixture(scope="session")
 def admin_browser_context(browser, live_server):
     """Playwright context pre-logged-in as an admin."""
-    import psycopg
-
-    username = "e2e_admin_pw"
-    password = _E2E_ADMIN_PASSWORD
-
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        client.post(
-            "/auth/signup",
-            data={
-                "username": username,
-                "password": password,
-                "email": f"{username}@x.test",
-            },
-        )
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_admin = TRUE, is_editor = TRUE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    context = browser.new_context(base_url=live_server)
-    _configure_context_timeouts(context)
-    _login_browser(context, live_server, username, password)
+    context = _authed_context(browser, live_server, e2e_users.ADMIN)
     try:
         yield context
     finally:
@@ -275,33 +205,7 @@ def admin_browser_context(browser, live_server):
 @pytest.fixture(scope="session")
 def editor_browser_context(browser, live_server):
     """Playwright context pre-logged-in as a non-admin editor."""
-    import psycopg
-
-    username = "e2e_editor_pw"
-    password = _E2E_EDITOR_PASSWORD
-
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        client.post(
-            "/auth/signup",
-            data={
-                "username": username,
-                "password": password,
-                "email": f"{username}@x.test",
-            },
-        )
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_editor = TRUE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    context = browser.new_context(base_url=live_server)
-    _configure_context_timeouts(context)
-    _login_browser(context, live_server, username, password)
+    context = _authed_context(browser, live_server, e2e_users.EDITOR)
     try:
         yield context
     finally:
@@ -313,71 +217,11 @@ def editor_browser_context(browser, live_server):
 # ---------------------------------------------------------------------------
 
 
-def _ensure_http_user(
-    live_server: str, username: str, password: str, *, admin: bool, editor: bool
-) -> None:
-    """Idempotently sign up and promote a helper user via HTTP + direct SQL.
-
-    Used so HTTP setup helpers (``make_shop`` / ``make_artist`` / ``make_tag``)
-    work even in tests that don't request the matching
-    ``admin_browser_context`` / ``editor_browser_context`` fixture.
-    """
-    import psycopg
-
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        signup = client.post(
-            "/auth/signup",
-            data={
-                "username": username,
-                "password": password,
-                "email": f"{username}@x.test",
-            },
-        )
-        assert signup.status_code in (200, 303, 400), (
-            f"signup of {username!r} returned {signup.status_code}: "
-            f"{signup.text[:300]!r}"
-        )
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_admin = %s, is_editor = %s WHERE username = %s",
-                (admin, admin or editor, username),
-            )
-            conn.commit()
-
-
 @pytest.fixture(scope="session")
-def _http_setup_users(live_server):
-    """Session-scoped seed of the admin/editor users used by HTTP helpers."""
-    _ensure_http_user(
-        live_server, "e2e_admin_pw", _E2E_ADMIN_PASSWORD, admin=True, editor=True
-    )
-    _ensure_http_user(
-        live_server, "e2e_editor_pw", _E2E_EDITOR_PASSWORD, admin=False, editor=True
-    )
-
-
-@pytest.fixture(scope="session")
-def admin_http_client(
-    live_server, _http_setup_users
-) -> Generator[httpx.Client, None, None]:
-    """One logged-in admin httpx client per worker (avoids burning /auth/login rate limits)."""
-    client = httpx.Client(
-        base_url=live_server, follow_redirects=False, timeout=_HTTP_TIMEOUT
-    )
-    login = client.post(
-        "/auth/login",
-        data={"username": "e2e_admin_pw", "password": _E2E_ADMIN_PASSWORD},
-    )
-    assert login.status_code == 303, (
-        f"e2e admin HTTP login failed: {login.status_code} {login.text[:500]!r}"
-    )
-    try:
+def admin_http_client(live_server) -> Generator[httpx.Client, None, None]:
+    """One admin httpx client per worker, holding the seeded session cookie."""
+    with _authed_client(live_server, e2e_users.ADMIN) as client:
         yield client
-    finally:
-        client.close()
 
 
 @pytest.fixture(scope="session")
@@ -395,24 +239,10 @@ def anon_http_client(live_server) -> Generator[httpx.Client, None, None]:
 
 
 @pytest.fixture(scope="session")
-def editor_http_client(
-    live_server, _http_setup_users
-) -> Generator[httpx.Client, None, None]:
-    """One logged-in editor httpx client per worker."""
-    client = httpx.Client(
-        base_url=live_server, follow_redirects=False, timeout=_HTTP_TIMEOUT
-    )
-    login = client.post(
-        "/auth/login",
-        data={"username": "e2e_editor_pw", "password": _E2E_EDITOR_PASSWORD},
-    )
-    assert login.status_code == 303, (
-        f"e2e editor HTTP login failed: {login.status_code} {login.text[:500]!r}"
-    )
-    try:
+def editor_http_client(live_server) -> Generator[httpx.Client, None, None]:
+    """One editor httpx client per worker, holding the seeded session cookie."""
+    with _authed_client(live_server, e2e_users.EDITOR) as client:
         yield client
-    finally:
-        client.close()
 
 
 def _create_entity_http(
@@ -567,33 +397,7 @@ def make_pin(
 @pytest.fixture(scope="session")
 def second_editor_browser_context(browser, live_server) -> Iterator:
     """A second non-admin editor for cross-ownership / concurrency tests."""
-    import psycopg
-
-    username = "e2e_editor_pw_2"
-    password = _E2E_EDITOR_PASSWORD_2
-
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        client.post(
-            "/auth/signup",
-            data={
-                "username": username,
-                "password": password,
-                "email": f"{username}@x.test",
-            },
-        )
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_editor = TRUE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    context = browser.new_context(base_url=live_server)
-    _configure_context_timeouts(context)
-    _login_browser(context, live_server, username, password)
+    context = _authed_context(browser, live_server, e2e_users.EDITOR_2)
     try:
         yield context
     finally:
@@ -603,33 +407,7 @@ def second_editor_browser_context(browser, live_server) -> Iterator:
 @pytest.fixture(scope="session")
 def regular_user_browser_context(browser, live_server) -> Iterator:
     """A logged-in user with no admin/editor roles."""
-    import psycopg
-
-    username = "e2e_regular"
-    password = _E2E_REGULAR_PASSWORD
-
-    with httpx.Client(base_url=live_server, follow_redirects=False) as client:
-        client.post(
-            "/auth/signup",
-            data={
-                "username": username,
-                "password": password,
-                "email": f"{username}@x.test",
-            },
-        )
-
-    pg_url = os.environ.get("DATABASE_CONNECTION", "")
-    with psycopg.connect(pg_url.replace("+psycopg", "")) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET is_admin = FALSE, is_editor = FALSE WHERE username = %s",
-                (username,),
-            )
-            conn.commit()
-
-    context = browser.new_context(base_url=live_server)
-    _configure_context_timeouts(context)
-    _login_browser(context, live_server, username, password)
+    context = _authed_context(browser, live_server, e2e_users.REGULAR)
     try:
         yield context
     finally:

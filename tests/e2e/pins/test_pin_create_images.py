@@ -29,6 +29,19 @@ def _png_payload() -> dict[str, str | bytes]:
     }
 
 
+def _goto_pin_form(page, url: str) -> None:
+    """Open a pin form and wait for the ``pin-images`` island to have mounted.
+
+    Not ``wait_until="networkidle"``: that waits for 500ms of silent network on a
+    page that pulls in islands, lucide and the webp encoder, and the context's
+    navigation timeout is 5s — under CI load it is a coin flip, and it flaked
+    exactly that way. The preview boxes are rendered by the island itself, so
+    waiting on one is both deterministic and the thing these tests actually need.
+    """
+    page.goto(url, wait_until="load")
+    page.locator("#front_image_preview").wait_for(state="visible")
+
+
 def _fill_required_non_image_fields(page, shop_name: str, tag_name: str) -> None:
     """Satisfy the client gate through the select widget UI."""
     page.locator("#name").fill("ImageIslandPin")
@@ -52,7 +65,7 @@ class TestPinImageUpload:
         shop = make_shop("ImgShop")
         tag = make_tag("img-tag")
         page = admin_browser_context.new_page()
-        page.goto(f"{live_server}/create/pin", wait_until="networkidle")
+        _goto_pin_form(page, f"{live_server}/create/pin")
 
         page.locator("#front_image").set_input_files([_png_payload()])
         # Preview renders a data URL after the (async) webp transcode.
@@ -87,7 +100,7 @@ class TestPinImageUpload:
 
     def test_paste_upload_shows_back_preview(self, admin_browser_context, live_server):
         page = admin_browser_context.new_page()
-        page.goto(f"{live_server}/create/pin", wait_until="networkidle")
+        _goto_pin_form(page, f"{live_server}/create/pin")
 
         page.hover("#back_image_preview")
         png_b64 = io.BytesIO(tiny_png_bytes()).getvalue()
@@ -115,7 +128,7 @@ class TestPinImageUpload:
     ):
         pin = make_pin("BackImagePin", tag_names=["backimg-tag"])
         page = admin_browser_context.new_page()
-        page.goto(f"{live_server}/edit/pin/{pin['id']}", wait_until="networkidle")
+        _goto_pin_form(page, f"{live_server}/edit/pin/{pin['id']}")
 
         page.locator("#back_image").set_input_files([_png_payload()])
         page.wait_for_function(
@@ -139,7 +152,7 @@ class TestPinImageUpload:
         self, admin_browser_context, live_server, assert_screenshot
     ):
         page = admin_browser_context.new_page()
-        page.goto(f"{live_server}/create/pin", wait_until="networkidle")
+        _goto_pin_form(page, f"{live_server}/create/pin")
         assert_screenshot(
             page.locator("#pin-form > div").first,
             "pin-images-empty",

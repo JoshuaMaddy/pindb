@@ -24,6 +24,8 @@ from typing import Any
 from sqlalchemy import Connection, create_engine, text
 from sqlalchemy.engine import make_url
 
+from tests.fixtures import e2e_users
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 PG_IMAGE = "postgres:17-alpine"
@@ -186,9 +188,22 @@ def _template_is_ready(connection: Connection, name: str) -> bool:
     return comment == _TEMPLATE_READY_COMMENT
 
 
-def build_template(base_url: str) -> str:
+def template_name(*, seed_e2e: bool) -> str:
+    """Template database name for this alembic head and seed set.
+
+    The e2e cast lives in its own template: integration tests assert against user
+    tables and would see six accounts they never created. Keying the name on both
+    the head and the seed version means a checkout that changes either builds a
+    fresh template instead of silently reusing a stale one.
     """
-    Ensure ``pindb_tmpl_<head>`` exists, is migrated, and holds the seed data.
+    if not seed_e2e:
+        return f"pindb_tmpl_{head_revision()}"
+    return f"pindb_tmpl_{head_revision()}_e2e{e2e_users.SEED_VERSION}"
+
+
+def build_template(base_url: str, *, seed_e2e: bool = False) -> str:
+    """
+    Ensure the template database exists, is migrated, and holds the seed data.
 
     Returns the template database name. Idempotent: a template that already
     carries the "ready" comment is reused untouched, so a rerun against a kept
@@ -197,7 +212,7 @@ def build_template(base_url: str) -> str:
     Every engine opened here is disposed before returning — Postgres will not
     copy a template that has a live session.
     """
-    template = f"pindb_tmpl_{head_revision()}"
+    template = template_name(seed_e2e=seed_e2e)
     admin = _admin_engine(base_url)
     try:
         with admin.connect() as connection:
@@ -213,7 +228,7 @@ def build_template(base_url: str) -> str:
                         f'DROP DATABASE "{template}" WITH (FORCE)'
                     )
                 connection.exec_driver_sql(f'CREATE DATABASE "{template}"')
-                _populate_template(base_url, template)
+                _populate_template(base_url, template, seed_e2e=seed_e2e)
                 connection.exec_driver_sql(
                     f"COMMENT ON DATABASE \"{template}\" IS '{_TEMPLATE_READY_COMMENT}'"
                 )
@@ -226,10 +241,12 @@ def build_template(base_url: str) -> str:
         admin.dispose()
 
 
-def _populate_template(base_url: str, template: str) -> None:
+def _populate_template(base_url: str, template: str, *, seed_e2e: bool) -> None:
     template_url = swap_db(base_url, template)
     alembic_upgrade_inprocess(template_url)
     seed_currencies(template_url)
+    if seed_e2e:
+        e2e_users.seed_e2e_users(template_url)
 
 
 def clone_template(base_url: str, template: str, dbname: str) -> str:
