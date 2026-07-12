@@ -6,7 +6,6 @@ from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, code, div, fragment, i, p, span
-from titlecase import titlecase
 
 from pindb.database import User
 from pindb.database.entity_type import EntityType
@@ -40,7 +39,7 @@ from pindb.templates.components.tags.tag_branding import (
     CATEGORY_ICONS,
     category_badge,
 )
-from pindb.utils import review_label
+from pindb.utils import pretty_titlecase, review_label
 
 _RELATION_CAP = 5
 
@@ -107,7 +106,7 @@ def tag_implication_preview(resolved: set[Tag], selected: set[Tag]) -> Element:
         extra = "opacity-60 ring-1 ring-inset ring-white/20" if implied else ""
         return span(
             class_=f"inline-flex items-center gap-1 p-1.5 rounded text-xs {color} {extra}",
-            title=titlecase(tag.category.value),
+            title=pretty_titlecase(tag.category.value),
         )[
             i(data_lucide=icon_name, class_=f"w-4 h-4 shrink-0 {color}"),
             tag.display_name,

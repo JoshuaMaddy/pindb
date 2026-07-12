@@ -20,7 +20,6 @@ from htpy import (
     p,
     ul,
 )
-from titlecase import titlecase
 
 from pindb.database.user import User
 from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
@@ -29,6 +28,7 @@ from pindb.templates.base import html_base
 from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.forms.error_message import error_message
 from pindb.templates.components.layout.centered import centered_div
+from pindb.utils import pretty_titlecase
 
 _PROVIDER_LABELS = {
     OAuthProvider.google: "Google",
@@ -46,7 +46,7 @@ def _provider_section(
     linked_by_provider = {link.provider: link for link in linked_providers}
     rows: list[Element] = []
     for provider in enabled_providers:
-        label_text = _PROVIDER_LABELS.get(provider, titlecase(provider.value))
+        label_text = _PROVIDER_LABELS.get(provider, pretty_titlecase(provider.value))
         link = linked_by_provider.get(provider)
         if link is not None:
             detail_parts: list[str] = []

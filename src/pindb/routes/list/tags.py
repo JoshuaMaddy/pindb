@@ -5,8 +5,8 @@ FastAPI routes: `routes/list/tags.py`.
 from typing import Annotated, Sequence
 
 from fastapi import Query, Request
+from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from htpy.starlette import HtpyResponse
 from pydantic import BeforeValidator
 from sqlalchemy import exists, func, select
 
@@ -37,7 +37,7 @@ async def get_list_tags(
         BeforeValidator(empty_str_to_none),
     ] = None,
     sort: SortOrder = Query(default=SortOrder.name),
-) -> HtpyResponse:
+) -> HTMLResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_tags"))
 

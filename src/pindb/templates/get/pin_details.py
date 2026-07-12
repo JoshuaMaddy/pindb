@@ -27,7 +27,6 @@ from htpy import (
     thead,
     tr,
 )
-from titlecase import titlecase
 
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
@@ -50,6 +49,7 @@ from pindb.utils import (
     domain_from_url,
     format_currency_code,
     format_pin_dimension_mm,
+    pretty_titlecase,
     review_label,
 )
 
@@ -337,7 +337,7 @@ def _pin_sets(
             pill_link(
                 href=str(pin_set_url(request=request, pin_set=ps)),
                 text=review_label(
-                    titlecase(ps.name),
+                    pretty_titlecase(ps.name),
                     is_pending=ps.is_pending,
                     is_rejected=ps.is_rejected,
                 ),
@@ -453,5 +453,5 @@ def _funding(pin: Pin) -> Element | None:
     return icon_list_item(
         icon="hand-coins",
         name="Funding",
-        value=titlecase(pin.funding_type),
+        value=pretty_titlecase(pin.funding_type),
     )

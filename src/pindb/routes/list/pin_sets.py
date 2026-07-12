@@ -5,8 +5,8 @@ FastAPI routes: `routes/list/pin_sets.py`.
 from typing import Sequence
 
 from fastapi import Query, Request
+from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 
 from pindb.database import async_session_maker
@@ -31,7 +31,7 @@ async def get_list_pin_sets(
     view: EntityListView = Query(default=EntityListView.grid),
     q: str = Query(default=""),
     sort: SortOrder = Query(default=SortOrder.name),
-) -> HtpyResponse:
+) -> HTMLResponse:
     offset: int = (page - 1) * DEFAULT_PER_PAGE
     base_url: str = str(request.url_for("get_list_pin_sets"))
 

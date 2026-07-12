@@ -1,9 +1,35 @@
 """Small shared helpers: time, URLs, and currency display."""
 
+import re
 from datetime import datetime, timezone
 from urllib.parse import ParseResult, urlparse
 
 from babel.numbers import format_currency
+from titlecase import titlecase as _titlecase
+
+_DIMENSION_RE = re.compile(r"^[123]d$", re.IGNORECASE)
+
+_ACRONYM_OVERRIDES: dict[str, str] = {
+    "uv": "UV",
+}
+
+
+def _pretty_titlecase_callback(word: str, **kwargs: object) -> str | None:
+    lower = word.lower()
+    if lower in _ACRONYM_OVERRIDES:
+        return _ACRONYM_OVERRIDES[lower]
+    if _DIMENSION_RE.match(word):
+        return word.upper()
+    return None
+
+
+def pretty_titlecase(text: str) -> str:
+    """Title-case *text*, uppercasing known acronyms (``UV``) and dimensions (``1D``/``2D``/``3D``).
+
+    Single source of truth for slug-to-display-name conversion — use instead of
+    calling ``titlecase()`` directly so every label gets the same overrides.
+    """
+    return _titlecase(text, callback=_pretty_titlecase_callback)
 
 
 def utc_now() -> datetime:

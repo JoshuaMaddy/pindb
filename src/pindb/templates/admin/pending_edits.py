@@ -14,7 +14,6 @@ from htpy import (
     td,
     tr,
 )
-from titlecase import titlecase
 
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit import PendingEdit
@@ -27,6 +26,7 @@ from pindb.templates.admin._pending_shared import (
     request_changes_button,
     section_header,
 )
+from pindb.utils import pretty_titlecase
 
 
 def _edit_groups_section(
@@ -95,7 +95,7 @@ def _edit_group_row(
         td(class_="py-2 pr-6")[
             a(href=pending_view_url)[name],
             span(class_="block text-xs text-lighter-hover")[
-                f"{titlecase(slug.replace('_', ' '))}"
+                f"{pretty_titlecase(slug.replace('_', ' '))}"
             ],
         ],
         td(class_="py-2 pr-6")[str(len(chain))],

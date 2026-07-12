@@ -21,7 +21,6 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
-from titlecase import titlecase
 
 from pindb.achievements import refresh_user_stats
 from pindb.auth import AdminUser, EditorUser
@@ -53,6 +52,7 @@ from pindb.routes.bulk._helpers import (
 )
 from pindb.search.search import search_pin
 from pindb.templates.bulk.edit import bulk_edit_page
+from pindb.utils import pretty_titlecase
 
 router = APIRouter(prefix="/bulk-edit")
 
@@ -83,7 +83,7 @@ async def get_bulk_edit_entity(
             content=str(
                 bulk_edit_page(
                     post_url=post_url,
-                    source_label=f"{titlecase(source_type.value.replace('_', ' '))}: {source_name}",
+                    source_label=f"{pretty_titlecase(source_type.value.replace('_', ' '))}: {source_name}",
                     source_description=(
                         f"Apply changes to every pin in this "
                         f"{source_type.value.replace('_', ' ')}."

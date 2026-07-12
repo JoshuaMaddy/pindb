@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from htpy import Element, a, div, p, span, td, tr
-from titlecase import titlecase
 
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit import PendingEdit
@@ -19,6 +18,7 @@ from pindb.templates.admin._pending_shared import (
     pending_table,
     section_header,
 )
+from pindb.utils import pretty_titlecase
 
 # Name / Type / Submitted by / Requested changes / Actions. No "Request changes"
 # button here, so Actions only has to fit Approve + Delete.
@@ -125,7 +125,7 @@ def _entity_row(
             ],
         ],
         td(class_="py-2 pr-6 text-lighter-hover text-xs")[
-            titlecase(entity_type_slug.replace("_", " "))
+            pretty_titlecase(entity_type_slug.replace("_", " "))
         ],
         td(class_="py-2 pr-6 text-lighter-hover")[
             _creator_name(entity.created_by_id, creators)

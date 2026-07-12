@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from fastapi import Request
 from htpy import Element
-from titlecase import titlecase
 
 from pindb.database.tag import TagCategory
 from pindb.templates.base import html_base
 from pindb.templates.components.islands import island
 from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
+from pindb.utils import pretty_titlecase
 
 
 def bulk_tag_page(
@@ -30,7 +30,7 @@ def bulk_tag_page(
         "categories": [
             {
                 "value": cat.value,
-                "text": titlecase(cat.value),
+                "text": pretty_titlecase(cat.value),
                 "color": CATEGORY_COLORS[cat],
                 "icon": CATEGORY_ICONS[cat],
             }
