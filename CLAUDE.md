@@ -24,6 +24,7 @@ npm run islands:check   # when frontend/ touched
 - **Migrations:** Alembic (runs on container start, not app startup)
 - **Tooling:** UV, Ruff, ty, Oxlint
 - **CSS build:** Node.js **20+** required (Tailwind v4 `@tailwindcss/oxide` native addon). `npm ci` then `npm run css:build` or `npm run css:watch`. Node 18 fails with "Cannot find native binding".
+- **Icon color inheritance (load-bearing, `input.css` `@layer base`):** the default text color is set on `html` and **must never** be reasserted as `* { color: … }`. A universal `color` declaration matches every element, and a matched declaration beats inheritance, so `color` stops cascading entirely — a Lucide `<svg>` (and each `<path>` it strokes with `currentColor`) then resolves `currentColor` against its *own* base-text color, not the colored button/banner/chip around it, and **every icon everywhere renders base text**. `color: inherit` on the svg alone doesn't rescue it: the plain `<div>`/`<span>` between icon and colored ancestor is pinned to base-text by the same rule. Elements the UA colors itself (`a`, form controls, `svg`) are reset to `color: inherit` there — that reset is what the old `*` rule was really buying. To give an icon a color that differs from its container, put a `text-*` utility on the icon (utilities layer beats base) or use a component class rule; do not add per-component `color: inherit` patches (`.btn`, `.theme-appearance-icon` used to carry one each).
 - **Lucide (JS):** `npm run build` / `vendor:build` runs `scripts/lucide/build-lucide.mjs` (Rolldown) tree-shakes `lucide` from auto-generated icon list. New dynamic names: add literal in templates or entry in `EXTRA_KEBAB` in that script.
 - **Pin image WebP (JS):** `vendor:build` runs `scripts/build-webp-encode.mjs` (Rolldown + `@jsquash/webp`) → `static/vendor/pindb-webp/` (ESM + `.wasm`). Pin create/edit and bulk pin import load it for optional client-side WebP before upload.
 
@@ -155,6 +156,8 @@ Edit permissions (`routes/_guards.py::assert_editor_can_edit`): admins always al
 
 Approval queue at `/admin/pending` (`routes/approve.py`):
 - Approving Pin cascades to pending shops/artists/tags on *that* pin — does NOT bulk-approve other pins referencing those entities.
+- The same three actions also sit on an unapproved entry's **detail page** for admins (`review_actions_bar`, `templates/components/display/review_actions.py`, rendered by all five `templates/get/*` pages) — an admin who opens a submission to look at it can rule on it there. They post to the same `/admin/pending/{approve,reject,delete}/…` routes with **`?after=back`**, which answers `204` + `HX-Trigger: pindb:review-action-done` instead of the `#pending-content` fragment; the shell (`templates/js/shell/pindb_shell.js`) walks the admin one step back in history and flags a reload so the page they land on isn't restored stale from the bfcache. Needs-changes entries get Approve + Delete only, mirroring the queue's own section.
+- While that bar is up, the heading's own Delete icon is suppressed: `/delete/{entity_type}/{id}` uses a plain `session.get` with no `include_pending`, so it cannot see an unapproved row at all — two Deletes, one of them a silent no-op.
 
 ### Needs Changes (the third review state)
 

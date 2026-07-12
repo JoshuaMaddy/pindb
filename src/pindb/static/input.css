@@ -627,8 +627,6 @@
   }
 }
 
-/* Theme picker: solid moon + filled sun disc. Base `* { color: base-text }` applies to
-   svg path/circle too, so shapes must inherit the wrapper span’s `text-amber-*` color. */
 @layer components {
   /* Action buttons (admin panel, pending queue, bulk grids).
 
@@ -641,17 +639,8 @@
     @apply inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded border border-lightest bg-transparent px-3 py-1.5 text-sm leading-none text-base-text no-underline;
   }
 
-  /* Text color does not inherit — @layer base sets `color` on every element — so
-     without this an icon inside a variant button falls back to base-text instead
-     of taking the button's color.
-
-     The svg's *children* need it too, not just the svg: Lucide paths draw with
-     `stroke="currentColor"`, and `currentColor` resolves against each element's own
-     `color`. Style only the svg and every path inside it still renders base-text. */
-  .btn :is(i, svg),
-  .btn svg * {
-    color: inherit;
-  }
+  /* Icons inside a variant button take the button's color via the global icon
+     inheritance rule in @layer base — no per-component patch needed here. */
 
   .btn:not(:disabled):hover {
     @apply border-lightest-hover bg-main-hover;
@@ -987,14 +976,8 @@
     --badge-metal-shine: var(--color-metal-platinum-shine);
   }
 
-  .theme-appearance-icon {
-    color: inherit;
-  }
-
-  .theme-appearance-icon :is(path, circle) {
-    color: inherit;
-  }
-
+  /* Color comes from the global icon inheritance rule in @layer base; these only
+     restyle the shapes (solid moon, filled sun disc) that Lucide draws as strokes. */
   .theme-appearance-moon path {
     fill: currentColor;
     stroke: none;
@@ -1014,8 +997,38 @@
 }
 
 @layer base {
-  * {
+  /* Default text color cascades from the root. Deliberately NOT `* { color: … }`.
+     Load-bearing — this is the fix for the whole "the Lucide icon is base-text
+     again" class of bugs.
+
+     A universal `color` declaration matches every element, and a matched
+     declaration always beats inheritance, so `color` would never cascade at all.
+     A Lucide `<svg>` (and every `<path>`/`<circle>` it draws with
+     `stroke="currentColor"`) would then resolve `currentColor` against its own
+     base-text color rather than the colored button/banner/chip around it — the icon
+     renders base-text no matter what the container says. `color: inherit` on the svg
+     alone does not save it either: the plain `<div>`/`<span>` wrapper between icon
+     and colored ancestor was itself pinned to base-text by the same rule.
+
+     So: set the default once at the root and let it inherit. Elements the user agent
+     colors on its own (links, form controls, svg) are reset to `inherit` below, which
+     is what `*` was really buying. Anything that wants a *different* color still wins
+     — a `text-*` utility (utilities layer beats base) or a component class rule. */
+  html {
     @apply text-base-text;
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  optgroup,
+  option,
+  i[data-lucide],
+  svg,
+  svg * {
+    color: inherit;
   }
 
   button,
