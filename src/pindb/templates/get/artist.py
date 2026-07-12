@@ -5,7 +5,7 @@ htpy page and fragment builders: `templates/get/artist.py`.
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, a, br, code, div, fragment, h2
+from htpy import Element, code, fragment
 
 from pindb.database import Artist, User
 from pindb.database.entity_type import EntityType
@@ -19,6 +19,7 @@ from pindb.templates.components.display.changes_requested_banner import (
     changes_requested_banner,
 )
 from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.display.entity_links import entity_links
 from pindb.templates.components.display.linked_items_row import linked_items_row
 from pindb.templates.components.display.pending_changes_table import (
     pending_changes_table,
@@ -165,16 +166,7 @@ def artist_page(
                         for a in sorted(artist.aliases, key=lambda a: a.alias)
                     ],
                 ),
-                fragment[
-                    bool(len(artist.links))
-                    and div[
-                        h2["Links"],
-                        *[
-                            fragment[a(href=link.path)[link.path], br]
-                            for link in artist.links
-                        ],
-                    ]
-                ],
+                entity_links(artist.links),
                 paginated_pin_grid(
                     request=request,
                     pins=pins,
