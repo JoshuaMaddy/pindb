@@ -11,11 +11,12 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.routing import APIRouter
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from pindb.auth import AuthenticatedUser, CurrentUser, clear_session_cookie
 from pindb.database import PinSet, User, UserAchievement, async_session_maker
 from pindb.database.erasure import erase_user_account
+from pindb.database.joins import pin_set_memberships
+from pindb.database.pin_previews import PinPreviews, load_pin_previews
 from pindb.database.user_pin_queries import (
     count_favorites,
     count_owned,
@@ -153,10 +154,15 @@ async def get_user_profile(
                 await db.scalars(
                     select(PinSet)
                     .where(PinSet.owner_id == user.id)
-                    .options(selectinload(PinSet.pins))
                     .order_by(PinSet.name)
                 )
             ).all()
+        )
+        set_previews: PinPreviews = await load_pin_previews(
+            db,
+            join_table=pin_set_memberships,
+            entity_column=pin_set_memberships.c.set_id,
+            entity_ids=[pin_set.id for pin_set in personal_sets],
         )
 
         achievement_rows = (
@@ -182,6 +188,7 @@ async def get_user_profile(
                     favorite_pins=favorite_pins,
                     favorite_count=favorite_count,
                     personal_sets=personal_sets,
+                    set_previews=set_previews,
                     owned_pins=owned_pins,
                     owned_count=owned_count,
                     wanted_pins=wanted_pins,

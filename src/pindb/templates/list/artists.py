@@ -8,6 +8,7 @@ from fastapi import Request
 from htpy import Element
 
 from pindb.database.artist import Artist
+from pindb.database.pin_previews import PinPreviews
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
 from pindb.routes._urls import artist_url
@@ -23,6 +24,7 @@ from pindb.templates.list.base import (
 def artists_list_section(
     request: Request,
     artists: Sequence[Artist],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -34,6 +36,7 @@ def artists_list_section(
     items = entity_list_items(
         request=request,
         entities=artists,
+        previews=previews,
         view=view,
         url_of=lambda artist: artist_url(request=request, artist=artist),
     )
@@ -55,6 +58,7 @@ def artists_list_section(
 def artists_list(
     request: Request,
     artists: Sequence[Artist],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -75,6 +79,7 @@ def artists_list(
         section=artists_list_section(
             request=request,
             artists=artists,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

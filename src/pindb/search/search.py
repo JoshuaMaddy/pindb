@@ -174,11 +174,7 @@ async def search_tags(
     ids, total = await _search_index(TAGS_INDEX, query, offset, limit, filter_str)
     if not ids:
         return [], total
-    rows = (
-        await session.scalars(
-            select(Tag).where(Tag.id.in_(ids)).options(selectinload(Tag.pins))
-        )
-    ).all()
+    rows = (await session.scalars(select(Tag).where(Tag.id.in_(ids)))).all()
     tags_by_id: dict[int, Tag] = {t.id: t for t in rows}
     return [tags_by_id[i] for i in ids if i in tags_by_id], total
 
@@ -192,11 +188,7 @@ async def search_artists(
     ids, total = await _search_index(ARTISTS_INDEX, query, offset, limit)
     if not ids:
         return [], total
-    rows = (
-        await session.scalars(
-            select(Artist).where(Artist.id.in_(ids)).options(selectinload(Artist.pins))
-        )
-    ).all()
+    rows = (await session.scalars(select(Artist).where(Artist.id.in_(ids)))).all()
     artists_by_id: dict[int, Artist] = {a.id: a for a in rows}
     return [artists_by_id[i] for i in ids if i in artists_by_id], total
 
@@ -210,11 +202,7 @@ async def search_shops(
     ids, total = await _search_index(SHOPS_INDEX, query, offset, limit)
     if not ids:
         return [], total
-    rows = (
-        await session.scalars(
-            select(Shop).where(Shop.id.in_(ids)).options(selectinload(Shop.pins))
-        )
-    ).all()
+    rows = (await session.scalars(select(Shop).where(Shop.id.in_(ids)))).all()
     shops_by_id: dict[int, Shop] = {s.id: s for s in rows}
     return [shops_by_id[i] for i in ids if i in shops_by_id], total
 
@@ -230,11 +218,7 @@ async def search_pin_sets(
     ids, total = await _search_index(PIN_SETS_INDEX, query, offset, limit, filter_str)
     if not ids:
         return [], total
-    rows = (
-        await session.scalars(
-            select(PinSet).where(PinSet.id.in_(ids)).options(selectinload(PinSet.pins))
-        )
-    ).all()
+    rows = (await session.scalars(select(PinSet).where(PinSet.id.in_(ids)))).all()
     pin_sets_by_id: dict[int, PinSet] = {ps.id: ps for ps in rows}
     return [pin_sets_by_id[i] for i in ids if i in pin_sets_by_id], total
 

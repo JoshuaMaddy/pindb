@@ -2,7 +2,6 @@
 htpy page and fragment builders: `templates/components/pins/entity_grid_card.py`.
 """
 
-from random import sample
 from typing import Sequence
 
 from fastapi import Request
@@ -24,16 +23,19 @@ _CORNER_CLASSES: list[str] = [
 def entity_grid_card(
     request: Request,
     href: str,
-    pins: Sequence[Pin] | set[Pin],
+    pins: Sequence[Pin],
+    pin_count: int,
     name: str,
     badge: BaseElement | None = None,
     allow_overflow: bool = False,
 ) -> Element:
-    pin_list: list[Pin] = list(pins)
-    pin_count: int = len(pin_list)
-    if len(pin_list) > 4:
-        pin_list = sample(population=pin_list, k=4)
+    """Card for one entity: 2×2 thumbnail grid, name, pin count, optional badge.
 
+    ``pins`` is the sample to draw (at most four; see
+    ``database.pin_previews.load_pin_previews``) and ``pin_count`` is how many the
+    entity actually has. The two are separate because loading every pin just to
+    call ``len`` on it is what made the list pages slow.
+    """
     images: list[VoidElement | Element] = [
         pin_thumbnail_img(
             request,
@@ -47,7 +49,7 @@ def entity_grid_card(
             alt=pin_front_image_alt(pin),
             class_=f"object-cover w-full h-full aspect-square bg-lighter {_CORNER_CLASSES[index]}",
         )
-        for index, pin in enumerate(pin_list)
+        for index, pin in enumerate(pins[: len(_CORNER_CLASSES)])
     ]
     while len(images) < 4:
         images.append(div(class_=f"bg-lighter {_CORNER_CLASSES[len(images)]}"))

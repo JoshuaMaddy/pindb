@@ -7,6 +7,7 @@ from typing import Sequence
 from fastapi import Request
 from htpy import Element, div, input, option, p, select, span
 
+from pindb.database.pin_previews import PinPreviews
 from pindb.database.tag import Tag, TagCategory
 from pindb.models.list_view import EntityListView
 from pindb.models.sort_order import SortOrder
@@ -27,12 +28,14 @@ from pindb.utils import review_label
 def _grid_items(
     request: Request,
     tags: Sequence[Tag],
+    previews: PinPreviews,
 ) -> list[Element]:
     return [
         entity_grid_card(
             request=request,
             href=str(tag_url(request=request, tag=tag)),
-            pins=tag.pins,
+            pins=previews.pins(tag.id),
+            pin_count=previews.count(tag.id),
             name=review_label(
                 tag.display_name, is_pending=tag.is_pending, is_rejected=tag.is_rejected
             ),
@@ -49,12 +52,13 @@ def _grid_items(
 def _detailed_items(
     request: Request,
     tags: Sequence[Tag],
+    previews: PinPreviews,
 ) -> list[Element]:
     return [
         card(
             href=tag_url(request=request, tag=tag),
             content=div(class_="flex gap-2 w-full items-start")[
-                thumbnail_grid(request=request, pins=tag.pins),
+                thumbnail_grid(request=request, pins=previews.pins(tag.id)),
                 div(class_="flex gap-2")[
                     p(class_="text-lg")[
                         review_label(
@@ -62,7 +66,9 @@ def _detailed_items(
                             is_pending=tag.is_pending,
                             is_rejected=tag.is_rejected,
                         ),
-                        span(class_="text-lightest-hover ml-1")[f"({len(tag.pins)})"],
+                        span(class_="text-lightest-hover ml-1")[
+                            f"({previews.count(tag.id)})"
+                        ],
                     ],
                     category_badge(tag.category),
                 ],
@@ -112,6 +118,7 @@ def _tag_search_controls(
 def tags_list_section(
     request: Request,
     tags: Sequence[Tag],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -122,9 +129,9 @@ def tags_list_section(
     per_page: int = DEFAULT_PER_PAGE,
 ) -> Element:
     items: list[Element] = (
-        _grid_items(request=request, tags=tags)
+        _grid_items(request=request, tags=tags, previews=previews)
         if view == EntityListView.grid
-        else _detailed_items(request=request, tags=tags)
+        else _detailed_items(request=request, tags=tags, previews=previews)
     )
     extra: dict[str, str] = {}
     if q:
@@ -154,6 +161,7 @@ def tags_list_section(
 def tags_list(
     request: Request,
     tags: Sequence[Tag],
+    previews: PinPreviews,
     view: EntityListView,
     page: int,
     total_count: int,
@@ -175,6 +183,7 @@ def tags_list(
         section=tags_list_section(
             request=request,
             tags=tags,
+            previews=previews,
             view=view,
             page=page,
             total_count=total_count,

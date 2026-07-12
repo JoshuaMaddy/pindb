@@ -2,31 +2,28 @@
 htpy page and fragment builders: `templates/components/pins/thumbnail_grid.py`.
 """
 
-from random import sample
-from typing import Sequence, cast
+from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, VoidElement, div
 
-from pindb.database import Pin, PinSet
+from pindb.database import Pin
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.pin_image_alt import pin_front_image_alt
+
+_TILES: int = 4
 
 
 def thumbnail_grid(
     request: Request,
-    pins: PinSet | Sequence[Pin] | set[Pin],
+    pins: Sequence[Pin],
 ) -> Element:
-    if isinstance(pins, PinSet):
-        pin_list: list[Pin] = list(pins.pins)
-    elif isinstance(pins, set):
-        pin_list = list(cast(set[Pin], pins))
-    else:
-        pin_list = list(pins)
+    """2×2 thumbnail tile for an entity, padded with blanks when short.
 
-    if len(pin_list) > 4:
-        pin_list = sample(pin_list, k=4)
-
+    ``pins`` is already the sample to draw — callers get it from
+    ``database.pin_previews.load_pin_previews`` rather than passing a whole
+    relationship collection.
+    """
     elements: list[VoidElement | Element] = [
         pin_thumbnail_img(
             request,
@@ -35,10 +32,10 @@ def thumbnail_grid(
             alt=pin_front_image_alt(pin),
             class_="object-cover aspect-square w-full h-full bg-lighter",
         )
-        for pin in pin_list
+        for pin in pins[:_TILES]
     ]
 
-    while len(elements) < 4:
+    while len(elements) < _TILES:
         elements.append(div(class_="bg-lighter"))
 
     return div(
