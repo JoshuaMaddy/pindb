@@ -6,7 +6,6 @@ from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, div, p, script
-from titlecase import titlecase
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.currency import Currency
@@ -14,6 +13,7 @@ from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
 from pindb.models import AcquisitionType, FundingType
 from pindb.templates.base import html_base
 from pindb.templates.components.islands import island
+from pindb.utils import pretty_titlecase
 
 _OPTIONAL_COLS: list[tuple[str, str]] = [
     ("artists", "Artists"),
@@ -47,11 +47,12 @@ def bulk_pin_page(
         ),
         "currencies": [{"value": c.id, "text": c.code} for c in currencies],
         "acquisitionTypes": [
-            {"value": a, "text": titlecase(a.replace("_", " "))}
+            {"value": a, "text": pretty_titlecase(a.replace("_", " "))}
             for a in AcquisitionType
         ],
         "fundingTypes": [
-            {"value": f, "text": titlecase(f.replace("_", " "))} for f in FundingType
+            {"value": f, "text": pretty_titlecase(f.replace("_", " "))}
+            for f in FundingType
         ],
         "defaultCurrencyId": 999,
         "magnitudeInputPattern": MAGNITUDE_INPUT_PATTERN,

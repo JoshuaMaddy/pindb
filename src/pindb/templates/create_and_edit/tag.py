@@ -21,7 +21,6 @@ from htpy import (
     span,
 )
 from markupsafe import Markup
-from titlecase import titlecase
 
 from pindb.database.tag import Tag, TagCategory
 from pindb.templates.base import html_base
@@ -34,7 +33,7 @@ from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.tags.tag_branding import CATEGORY_COLORS, CATEGORY_ICONS
-from pindb.utils import review_label
+from pindb.utils import pretty_titlecase, review_label
 
 
 def _duplicate_notice(source_display_name: str) -> Element:
@@ -151,7 +150,7 @@ def tag_form(
                                     data_icon=CATEGORY_ICONS[cat],
                                     data_color=CATEGORY_COLORS[cat],
                                     data_category=cat.value,
-                                )[titlecase(cat.value)]
+                                )[pretty_titlecase(cat.value)]
                                 for cat in TagCategory
                             ]
                         ],

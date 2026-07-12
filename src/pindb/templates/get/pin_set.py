@@ -6,7 +6,6 @@ from typing import Sequence
 
 from fastapi import Request
 from htpy import Element, fragment
-from titlecase import titlecase
 
 from pindb.database.entity_type import EntityType
 from pindb.database.pin import Pin
@@ -26,7 +25,7 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
 from pindb.templates.components.seo.opengraph import opengraph_head
-from pindb.utils import review_label
+from pindb.utils import pretty_titlecase, review_label
 
 
 def pin_set_page(
@@ -93,7 +92,7 @@ def pin_set_page(
                 page_heading(
                     icon="layout-grid",
                     text=review_label(
-                        titlecase(pin_set.name),
+                        pretty_titlecase(pin_set.name),
                         is_pending=pin_set.is_pending,
                         is_rejected=pin_set.is_rejected,
                     ),

@@ -14,12 +14,12 @@ from htpy import (
     label,
     p,
 )
-from titlecase import titlecase
 
 from pindb.database.user_auth_provider import OAuthProvider
 from pindb.templates.base import html_base
 from pindb.templates.components.forms.error_message import error_message
 from pindb.templates.components.layout.centered import centered_div
+from pindb.utils import pretty_titlecase
 
 _PROVIDER_LABELS = {
     OAuthProvider.google: "Google",
@@ -36,7 +36,7 @@ def oauth_onboarding_page(
     email: str | None,
     error: str | None = None,
 ) -> Element:
-    provider_label = _PROVIDER_LABELS.get(provider, titlecase(provider.value))
+    provider_label = _PROVIDER_LABELS.get(provider, pretty_titlecase(provider.value))
 
     return html_base(
         title="Choose Username",

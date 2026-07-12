@@ -32,13 +32,13 @@ from sqlalchemy.orm import (
     object_session,
     relationship,
 )
-from titlecase import titlecase
 
 from pindb.database._aliases import replace_aliases
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
 from pindb.database.joins import pins_tags, tag_implications
 from pindb.database.pending_mixin import PendingMixin
+from pindb.utils import pretty_titlecase
 
 if TYPE_CHECKING:
     from pindb.database.pin import Pin
@@ -169,7 +169,7 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
 
     @property
     def display_name(self) -> str:
-        return titlecase(self.name.replace("_", " "))
+        return pretty_titlecase(self.name.replace("_", " "))
 
     def __hash__(self) -> int:
         return hash(self.name) + (self.id or 0)

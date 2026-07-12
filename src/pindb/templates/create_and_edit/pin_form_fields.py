@@ -14,15 +14,12 @@ from htpy import (
     div,
     fragment,
     h2,
-    i,
     input,
     label,
     option,
-    p,
     select,
     span,
 )
-from titlecase import titlecase
 
 from pindb.database import Artist, Shop, Tag
 from pindb.database.currency import Currency
@@ -36,7 +33,7 @@ from pindb.templates.components.forms.name_availability import (
     name_check_attrs,
 )
 from pindb.templates.components.islands import island
-from pindb.utils import review_label
+from pindb.utils import pretty_titlecase, review_label
 
 
 def _enhanced_select(
@@ -305,7 +302,7 @@ def _acquisition_input(*, pin: Pin | None) -> list[Element | VoidElement]:
                         selected=acquisition_type == pin.acquisition_type
                         if pin
                         else False,
-                    )[titlecase(acquisition_type.replace("_", " "))]
+                    )[pretty_titlecase(acquisition_type.replace("_", " "))]
                     for acquisition_type in AcquisitionType
                 ]
             ],
@@ -612,7 +609,7 @@ def _funding_input(*, pin: Pin | None) -> list[Element | VoidElement]:
                     option(
                         value=funding_type,
                         selected=funding_type == pin.funding_type if pin else False,
-                    )[titlecase(funding_type.replace("_", " "))]
+                    )[pretty_titlecase(funding_type.replace("_", " "))]
                     for funding_type in FundingType
                 ]
             ],

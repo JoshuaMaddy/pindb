@@ -23,7 +23,6 @@ from htpy import (
     select,
     span,
 )
-from titlecase import titlecase
 
 from pindb.database.tag import Tag
 from pindb.model_utils import MAGNITUDE_INPUT_PATTERN
@@ -34,7 +33,7 @@ from pindb.templates.base import html_base
 from pindb.templates.components.islands import island
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
-from pindb.utils import review_label
+from pindb.utils import pretty_titlecase, review_label
 
 
 def bulk_edit_page(
@@ -195,7 +194,7 @@ def _scalar_section() -> Fragment:
                 widget=_enum_select(
                     name="acquisition_type_value",
                     values=[
-                        (m.value, titlecase(m.value.replace("_", " ")))
+                        (m.value, pretty_titlecase(m.value.replace("_", " ")))
                         for m in AcquisitionType
                     ],
                 ),
@@ -207,7 +206,7 @@ def _scalar_section() -> Fragment:
                     name="funding_type_value",
                     values=[("", "— none —")]
                     + [
-                        (m.value, titlecase(m.value.replace("_", " ")))
+                        (m.value, pretty_titlecase(m.value.replace("_", " ")))
                         for m in FundingType
                     ],
                 ),

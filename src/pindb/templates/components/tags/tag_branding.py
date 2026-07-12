@@ -3,9 +3,9 @@ htpy page and fragment builders: `templates/components/tags/tag_branding.py`.
 """
 
 from htpy import Element, i, span
-from titlecase import titlecase
 
 from pindb.database.tag import TagCategory
+from pindb.utils import pretty_titlecase
 
 CATEGORY_COLORS: dict[TagCategory, str] = {
     TagCategory.general: "bg-tag-general text-tag-general-fg fill-tag-general-fg stroke-tag-general-fg border-tag-general-fg",
@@ -47,7 +47,7 @@ CATEGORY_HOVER_CLASSES: dict[TagCategory, str] = {
 def category_badge(category: TagCategory, additional_classes: str = "") -> Element:
     color = CATEGORY_COLORS.get(category, "bg-tag-general text-tag-general-fg")
     icon_name = CATEGORY_ICONS.get(category, "tag")
-    label = titlecase(category.value)
+    label = pretty_titlecase(category.value)
     return span(
         class_=f"p-1.5 rounded text-xs font-medium border {color} {additional_classes}",
         title=label,
