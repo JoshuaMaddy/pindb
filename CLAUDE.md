@@ -121,6 +121,12 @@ return HTMLResponse(content=str(template(pin=pin)))
 
 **Every pin-facing join table is indexed on its non-pin column** (`ix_pins_tags_tag_id` and friends, declared in `database/joins.py`). The composite PK leads with `pin_id`, so it cannot serve the "which pins belong to this tag" direction that every list page, detail page, and preview loader asks — without these it is a sequential scan of the whole join table. A correlated `COUNT(*)` over a join table to answer "does this entity have any pins" is likewise a scan-per-row: use `EXISTS`, which the index answers as an index-only probe.
 
+### Rendering responses (load-bearing on big pages)
+
+**On a page with many components, render with `HTMLResponse(content=str(template(...)))`, not `HtpyResponse(template(...))`.** `HtpyResponse` streams the element tree node by node; a 100-card list page is tens of thousands of async chunk yields pumped through anyio memory streams and the middleware stack, which measured **~4x the cost of just building the string** (`/list/tags` 435ms → 61ms). It also renders *lazily* — after the route returns and its `async with session_maker()` block has closed — so any relationship the template touches raises `DetachedInstanceError`; `str()` inside the session block does not. `routes/list/_render.py` and every `get/*` page render this way. `HtpyResponse` stays fine for small fragments.
+
+**`request.url_for` is a reverse lookup over every route in the app** — not a string format, and ~180x slower than one. Never call it in a per-item loop. `templates/components/pins/pin_thumbnail.py` was calling it 6x per image (src + 5 `srcset` widths) — ~1450 lookups and ~150ms on one list page; it now resolves the route once per request, caches `(prefix, suffix)` on `request.state`, and interpolates. `tests/unit/test_pin_thumbnail_srcset.py` asserts the output stays byte-identical to `url_for` — that assertion is what makes the shortcut safe if the route ever moves.
+
 ### HTMX
 - Routes check `request.headers.get("HX-Request")` to return fragments vs full pages.
 - `RedirectResponse(..., status_code=303)` for form-to-redirect.
