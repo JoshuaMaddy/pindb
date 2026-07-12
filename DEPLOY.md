@@ -5,6 +5,19 @@ new versions, and managing the running stack by hand. The application uses a
 zero-downtime blue/green Docker setup fronted by Caddy; see
 [`CLAUDE.md`](./CLAUDE.md) for architecture detail.
 
+**The host never builds the image.** GitHub Actions
+([`.github/workflows/release.yml`](./.github/workflows/release.yml)) builds and
+pushes `ghcr.io/joshuamaddy/pindb` on every push to `main`. The host pulls it.
+Two consequences worth internalising before you deploy anything:
+
+- Code reaches production only after it has landed on `main` **and** its Release
+  run has gone green. `git pull` on the host updates compose files, the
+  Caddyfile, and `scripts/` — not the application.
+- `app_blue`, `app_green`, `migrate`, and `scheduler` all run the *same* image
+  (the `x-app-image` anchor in `docker-compose.yaml`), tagged
+  `${IMAGE_TAG:-latest}`. Alembic therefore always runs the same build as the
+  web containers.
+
 ---
 
 ## 1. From-Zero Host Setup
@@ -61,7 +74,18 @@ BOOTSTRAP_ADMIN_USERNAMES=alice,bob
 
 These users are promoted to admin on app startup (after they sign up).
 
-### 1.5 Run bootstrap
+### 1.5 Log in to ghcr.io (only if the package is private)
+
+`bootstrap.sh` and `deploy.sh` both pull from `ghcr.io`. A public package needs
+no auth; a private one does:
+
+```bash
+echo "$GITHUB_PAT" | docker login ghcr.io -u <your-github-username> --password-stdin
+```
+
+The PAT needs `read:packages`.
+
+### 1.6 Run bootstrap
 
 ```bash
 ./scripts/bootstrap.sh
@@ -70,8 +94,8 @@ These users are promoted to admin on app startup (after they sign up).
 This will:
 
 1. Validate `.env` and Docker prerequisites.
-2. Build the four service images (`app_blue`, `app_green`, `migrate`,
-   `scheduler`).
+2. Pull `ghcr.io/joshuamaddy/pindb:${IMAGE_TAG:-latest}` — the one image every
+   app service runs.
 3. Release host port 8000 from any legacy single-`app` container (no-op on a
    fresh host).
 4. Start postgres + meilisearch and wait for them to be healthy.
@@ -83,7 +107,7 @@ This will:
 
 Bootstrap is idempotent. If it fails partway, fix the issue and re-run.
 
-### 1.6 Install the systemd unit (recommended)
+### 1.7 Install the systemd unit (recommended)
 
 Without this, a host reboot will revive whatever containers were running before
 shutdown — including the *inactive* color, which causes drift between the
@@ -99,7 +123,7 @@ sudo systemctl enable --now pindb.service
 The unit runs `scripts/start.sh`, which reads `.deploy-active-color` and
 brings up only the active color, plus stops/removes the inactive one.
 
-### 1.7 Point your reverse proxy at host:8000
+### 1.8 Point your reverse proxy at host:8000
 
 Caddy listens on host port `8000`. If you run NPM (Nginx Proxy Manager) or
 another upstream reverse proxy for TLS, point its `pindb` proxy entry at
@@ -109,26 +133,49 @@ another upstream reverse proxy for TLS, point its `pindb` proxy entry at
 
 ## 2. Daily Deploys (Code Updates)
 
+Merge to `main`, wait for the **Release** workflow to finish pushing the image,
+then on the host:
+
 ```bash
 cd /root/pindb
-git pull
+git pull                # compose/Caddyfile/scripts only — the app comes from the registry
 ./scripts/deploy.sh
+```
+
+Deploying before Release finishes just re-pulls the *previous* `latest` and
+swaps colors for nothing. Check it first:
+
+```bash
+gh run list --workflow release.yml --branch main --limit 1
 ```
 
 `deploy.sh` does a blue/green swap:
 
 1. Reads `.deploy-active-color` to determine current color.
-2. Builds new images for both colors, `migrate`, and `scheduler`.
+2. Pulls `ghcr.io/joshuamaddy/pindb:${IMAGE_TAG:-latest}` for both colors,
+   `migrate`, and `scheduler` — one image, so they cannot drift apart.
 3. Runs Alembic migrations once (`migrate` profile).
 4. Starts the *idle* color alongside the live one (`--force-recreate`).
 5. Polls Docker for the new container to report `healthy` (~90s window).
 6. Smoke-tests `http://localhost:8000/healthz` through Caddy.
 7. Stops + removes the old color.
 8. Restarts `scheduler` on the new image.
-9. Updates `.deploy-active-color`.
+9. Ensures `proxy` is up, then updates `.deploy-active-color`.
 
 If the new color never goes healthy, deploy aborts — the live color keeps
 serving and the new container's logs are dumped to stderr.
+
+### Rollback
+
+`IMAGE_TAG` chooses what gets pulled, so any previous build is one deploy away.
+Release tags every build `sha-<full-commit-sha>`:
+
+```bash
+IMAGE_TAG=sha-<full-sha-of-good-commit> ./scripts/deploy.sh
+```
+
+This rolls back **code only**. Migrations that already ran stay applied — which
+is the whole reason the migration rules below exist.
 
 ### Migration discipline
 
@@ -210,10 +257,22 @@ spin a fresh container, swap, and update the state file.
 
 ### 3.7 Run Alembic by hand
 
+The `migrate` service sets `entrypoint:` to the complete `alembic upgrade head`
+argv, so anything you append is passed *to that command* as extra arguments —
+it does not replace it. Only the bare form works as-is:
+
 ```bash
-docker compose --profile migrate run --rm migrate                      # upgrade head
-docker compose --profile migrate run --rm migrate uv run alembic current
-docker compose --profile migrate run --rm migrate uv run alembic downgrade -1
+docker compose --profile migrate run --rm migrate     # upgrade head
+```
+
+For any other Alembic command, override the entrypoint:
+
+```bash
+docker compose --profile migrate run --rm \
+  --entrypoint /app/.venv/bin/python migrate -m alembic current
+
+docker compose --profile migrate run --rm \
+  --entrypoint /app/.venv/bin/python migrate -m alembic downgrade -1
 ```
 
 ### 3.8 Open a psql shell
@@ -268,13 +327,18 @@ docker compose --profile "$OTHER" rm -f "app_$OTHER"
 ./scripts/start.sh
 ```
 
-If that fails, check `.deploy-active-color` is set and the image was built:
+If that fails, check `.deploy-active-color` is set and the image is present
+locally:
 
 ```bash
-docker images | grep pindb-app_
-docker compose --profile blue --profile green build app_blue app_green
+docker images | grep ghcr.io/joshuamaddy/pindb
+docker compose --profile blue --profile green --profile migrate pull \
+  app_blue app_green migrate scheduler
 ./scripts/start.sh
 ```
+
+A pull that fails with `denied` / `unauthorized` means the ghcr package is
+private and this host is not logged in — see §1.5.
 
 ### 4.4 Image upload returns `PermissionError`
 
