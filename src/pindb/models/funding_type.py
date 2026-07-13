@@ -7,3 +7,4 @@ class FundingType(StrEnum):
     self = auto()
     crowdfunded = auto()
     sponsored = auto()
+    pay_for_production = auto()
