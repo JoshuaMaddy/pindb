@@ -8,8 +8,9 @@ from fastapi.routing import APIRouter
 
 from pindb.auth import require_admin
 from pindb.database import async_session_maker
-from pindb.routes.admin import search, stats, tag_bulk, users
+from pindb.routes.admin import reports, search, stats, tag_bulk, users
 from pindb.routes.admin._pending_count import count_pending
+from pindb.routes.admin._report_count import count_open_reports
 from pindb.routes.admin.tag_bulk import (
     BulkTagUpsertBody,
     BulkTagUpsertResult,
@@ -25,11 +26,19 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
 async def get_admin_panel(request: Request) -> HTMLResponse:
     async with async_session_maker() as session:
         pending_count = await count_pending(session)
+        report_count = await count_open_reports(session)
     return HTMLResponse(
-        content=str(admin_panel_page(request=request, pending_count=pending_count))
+        content=str(
+            admin_panel_page(
+                request=request,
+                pending_count=pending_count,
+                report_count=report_count,
+            )
+        )
     )
 
 
+router.include_router(reports.router)
 router.include_router(search.router)
 router.include_router(stats.router)
 router.include_router(tag_bulk.router)

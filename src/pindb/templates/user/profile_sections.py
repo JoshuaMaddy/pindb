@@ -9,6 +9,7 @@ from pindb.database.pin import Pin
 from pindb.database.pin_previews import PinPreviews
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
+from pindb.database.user_display import UserDisplayImage
 from pindb.database.user_owned_pin import UserOwnedPin
 from pindb.database.user_wanted_pin import UserWantedPin
 from pindb.routes._urls import pin_set_url
@@ -18,6 +19,7 @@ from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.card import card
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.pins.pin_preview_card import pin_preview_card
+from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
 from pindb.templates.components.pins.thumbnail_grid import thumbnail_grid
 from pindb.templates.user.pin_list_pages import unique_pins
 
@@ -47,7 +49,11 @@ def _pin_preview_row(
         div(
             class_=(
                 "grid grid-flow-col grid-rows-[1fr_max-content]"
-                " [grid-auto-columns:128px] gap-2 h-full pl-1 pr-16 [overflow-x:clip]"
+                # Narrower cards on small screens so more than ~2 fit in view —
+                # 128px was tuned for desktop and left mobile showing barely
+                # more than one card at a time.
+                " [grid-auto-columns:100px] sm:[grid-auto-columns:128px]"
+                " gap-2 h-full pl-1 pr-16 [overflow-x:clip]"
             )
         )[[pin_preview_card(request=request, pin=pin) for pin in pins],],
         div(
@@ -57,6 +63,79 @@ def _pin_preview_row(
             )
         ),
         _see_all_card(url=see_all_url, label=see_all_label),
+    ]
+
+
+def _display_section(
+    *,
+    request: Request,
+    images: list[UserDisplayImage],
+    total: int,
+    profile_user: User,
+    current_user: User | None,
+) -> Element:
+    """Photo strip linking to the user's shareable display page."""
+    username: str = profile_user.username
+    is_own_profile: bool = (
+        current_user is not None and current_user.id == profile_user.id
+    )
+    see_all_url: str = str(request.url_for("get_user_display", username=username))
+
+    return section(
+        class_="flex flex-col gap-2",
+        aria_labelledby="profile-display-heading",
+    )[
+        page_heading(
+            icon="frame",
+            text=f"Display ({total})",
+            extras=[
+                is_own_profile
+                and icon_button(
+                    icon="pencil",
+                    title="Edit display",
+                    href=str(request.url_for("get_edit_user_display")),
+                ),
+            ],
+            level=2,
+            heading_id="profile-display-heading",
+        ),
+        div(class_="relative")[
+            div(
+                class_=(
+                    "grid grid-flow-col [grid-auto-columns:128px] gap-2"
+                    " pl-1 pr-16 [overflow-x:clip]"
+                )
+            )[
+                [
+                    a(href=see_all_url, class_="block")[
+                        pin_thumbnail_img(
+                            request,
+                            image.image_guid,
+                            sizes="128px",
+                            alt=image.caption or f"A photo of {username}'s pin display",
+                            class_="h-32 w-32 rounded-lg object-cover",
+                        )
+                    ]
+                    for image in images
+                ]
+            ],
+            div(
+                class_=(
+                    "absolute right-0 top-0 bottom-0 w-44 z-10 pointer-events-none"
+                    " bg-gradient-to-r from-transparent to-[var(--color-darker)]"
+                )
+            ),
+            _see_all_card(
+                url=see_all_url,
+                label=f"See {username}'s full display",
+            ),
+        ]
+        if total > 0
+        else empty_state(
+            "No display photos yet — show off your setup."
+            if is_own_profile
+            else "No display photos yet."
+        ),
     ]
 
 

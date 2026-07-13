@@ -141,6 +141,14 @@ class FilesystemBackend:
         path = self._dir / key
         return path if path.is_file() else None
 
+    def delete(self, key: str) -> None:
+        """Remove *key* from disk. Missing files are not an error.
+
+        Args:
+            key (str): Filename fragment under the backend directory.
+        """
+        (self._dir / key).unlink(missing_ok=True)
+
     def list_keys(self) -> list[str]:
         """List stored original image keys (bare UUID filenames only).
 
@@ -192,6 +200,17 @@ class R2Backend:
             return response["Body"].read()
         except ClientError:
             return None
+
+    def delete(self, key: str) -> None:
+        """Remove *key* from the bucket. Missing objects are not an error.
+
+        Args:
+            key (str): Object key in the bucket.
+        """
+        try:
+            self._client.delete_object(Bucket=self._bucket, Key=key)
+        except ClientError:
+            pass
 
     def public_url(self, key: str) -> str | None:
         """Return a public HTTPS URL for *key* when ``r2_public_url`` is set.
@@ -286,6 +305,25 @@ def load_image(key: str) -> bytes | None:
         bytes | None: Object bytes, or ``None`` if missing.
     """
     return get_backend().load(key)
+
+
+def delete_image(guid: uuid.UUID | str) -> None:
+    """Irreversibly remove an image and every derived thumbnail from storage.
+
+    Deleting a row that references an image does *not* call this — soft-deleted
+    rows stay recoverable and the audit filter already hides them from readers.
+    This exists for account erasure, where the promise is that the bytes are
+    gone: a display photo is a picture of someone's home, not catalog content.
+
+    Args:
+        guid (uuid.UUID | str): Original image key.
+    """
+    backend = get_backend()
+    guid_str = str(guid)
+    backend.delete(guid_str)
+    backend.delete(f"{guid_str}{THUMBNAIL_SUFFIX}")
+    for width in THUMBNAIL_SIZES:
+        backend.delete(thumbnail_storage_key(guid_str, width))
 
 
 def sniff_image_mime(data: bytes) -> str:

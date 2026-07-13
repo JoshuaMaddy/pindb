@@ -51,6 +51,7 @@ from pindb.routes import (  # noqa: E402
     legal,
     list,
     messages,
+    report,
     search,
     user,
 )
@@ -194,3 +195,4 @@ app.include_router(bulk.router)
 app.include_router(legal.router)
 app.include_router(docs.router)
 app.include_router(messages.router)
+app.include_router(report.router)

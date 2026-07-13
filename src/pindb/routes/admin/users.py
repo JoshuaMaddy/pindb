@@ -13,6 +13,7 @@ from pindb.auth import AdminUser
 from pindb.database import async_session_maker
 from pindb.database.erasure import erase_user_account
 from pindb.database.user import User
+from pindb.file_handler import delete_image
 from pindb.templates.admin.users import admin_users_page
 
 router = APIRouter()
@@ -92,5 +93,9 @@ async def delete_account(user_id: int, current_user: AdminUser) -> RedirectRespo
         user: User | None = await session.get(User, user_id)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        await erase_user_account(session=session, user_id=user_id)
+        orphaned_guids = await erase_user_account(session=session, user_id=user_id)
+    # See delete_own_account: blob deletion happens after the commit, never
+    # inside the transaction.
+    for guid in orphaned_guids:
+        delete_image(guid)
     return RedirectResponse(url="/admin/users", status_code=303)

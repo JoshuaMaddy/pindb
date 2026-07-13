@@ -31,6 +31,8 @@ from pindb.database import (
     Shop,
     Tag,
     User,
+    UserDisplay,
+    UserDisplayImage,
     UserOwnedPin,
     UserWantedPin,
     async_session_maker,
@@ -51,6 +53,7 @@ from pindb.file_handler import (
 from pindb.og_image import (
     build_entity_og_image,
     build_pin_og_image,
+    build_user_display_og_image,
     build_user_list_og_image,
 )
 
@@ -204,6 +207,40 @@ async def get_og_image(entity_type: str, id: int) -> Response:
         if raw is None:
             raise HTTPException(status_code=404, detail="Image not found")
         webp_bytes = build_pin_og_image(raw)
+        return Response(
+            content=webp_bytes,
+            media_type="image/webp",
+            headers={"Cache-Control": _OG_CACHE_CONTROL},
+        )
+
+    if entity_type == "user_display":
+        async with async_session_maker() as session:
+            user = await session.get(User, id)
+            if user is None:
+                raise HTTPException(status_code=404, detail="Entity not found")
+            row = (
+                await session.execute(
+                    select(UserDisplay.title, UserDisplayImage.image_guid)
+                    .join(
+                        UserDisplayImage,
+                        UserDisplayImage.display_id == UserDisplay.id,
+                        isouter=True,
+                    )
+                    .where(UserDisplay.user_id == id)
+                    .order_by(UserDisplayImage.position.asc())
+                    .limit(1)
+                )
+            ).first()
+        title = row[0] if row else None
+        cover_guid = row[1] if row else None
+        # The cover is scaled up to fill a 1200px-wide frame, so unlike the pin
+        # card — which contain-fits a small thumb — this reads the original.
+        cover_bytes = load_image(str(cover_guid)) if cover_guid else None
+        webp_bytes = build_user_display_og_image(
+            cover_image_bytes=cover_bytes,
+            username=user.username,
+            title=title,
+        )
         return Response(
             content=webp_bytes,
             media_type="image/webp",

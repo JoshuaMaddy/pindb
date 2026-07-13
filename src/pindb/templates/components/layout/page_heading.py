@@ -30,7 +30,13 @@ def page_heading(
         i(data_lucide=icon, class_="shrink-0", aria_hidden="true"),
         heading_el,
     ]
-    outer: str = "flex flex-col gap-2 min-w-0 sm:flex-row sm:items-baseline sm:gap-2"
+    # `items-baseline` between title_row and extras looked right for text but
+    # not for icon-only buttons: a button's reported baseline is its icon's own
+    # (bottom-edge) baseline plus the button's own padding, which doesn't land
+    # on the heading text's baseline — the buttons floated visibly high.
+    # `items-center` centers them against the row instead, which is what an
+    # icon action button next to a heading actually wants.
+    outer: str = "flex flex-col gap-2 min-w-0 sm:flex-row sm:items-center sm:gap-2"
     if full_width:
         outer += " w-full"
 
