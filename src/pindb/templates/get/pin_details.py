@@ -453,5 +453,5 @@ def _funding(pin: Pin) -> Element | None:
     return icon_list_item(
         icon="hand-coins",
         name="Funding",
-        value=pretty_titlecase(pin.funding_type),
+        value=pretty_titlecase(pin.funding_type.replace("_", " ")),
     )
