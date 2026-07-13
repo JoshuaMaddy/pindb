@@ -59,5 +59,16 @@ docker compose up -d --no-deps scheduler
 echo "==> Ensuring proxy is up"
 docker compose up -d --no-deps proxy
 
+echo "==> Pruning dangling images and build cache"
+# Every deploy pulls a new ghcr.io/joshuamaddy/pindb:latest layer set and
+# leaves the previous one dangling (untagged, unreferenced) — nothing on this
+# host ever cleaned that up, so it silently ate the whole disk over enough
+# deploys (see incident: prod hit 100% full, image uploads started failing
+# with ENOSPC). `docker image prune -f`/`docker builder prune -f` only touch
+# dangling images and build cache, never a running container, a tagged image
+# still in use, or a volume — safe to run unconditionally on every deploy.
+docker image prune -f
+docker builder prune -f
+
 echo "$NEXT" > "$STATE_FILE"
 echo "==> Deploy complete; $NEXT now live"

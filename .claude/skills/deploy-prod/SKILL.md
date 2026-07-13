@@ -60,7 +60,11 @@ Use a long timeout (image pull can be minutes). What it does (`scripts/deploy.sh
 4. Brings up the **idle** color alongside live, waits ≤90s for `/healthz` healthy.
 5. Smoke-tests `http://localhost:8000/healthz` through the proxy.
 6. Stops+removes the old color, recreates `scheduler` on the new image, ensures `proxy` up.
-7. Writes the new color to `.deploy-active-color`.
+7. `docker image prune -f` + `docker builder prune -f` — every deploy pulls a new image layer set
+   and leaves the previous one dangling; nothing else on the host cleans that up. Only touches
+   dangling images and build cache, never a running container, a tagged image still in use, or a
+   volume.
+8. Writes the new color to `.deploy-active-color`.
 
 **Abort behavior is safe:** if the new color never goes healthy, deploy.sh stops the new color and
 leaves the old one live (exits 1). No downtime, no manual rollback needed — investigate logs and
@@ -83,6 +87,13 @@ To pin exactly what shipped, compare the running image digest to CI, or check th
 if surfaced by the app version/footer.
 
 ## Gotchas
+- **Disk fills up from dangling images if deploy.sh's prune step is ever skipped/removed.** Each
+  deploy pulls a new `ghcr.io/joshuamaddy/pindb:latest` layer set; the old one becomes dangling and
+  nothing else on the host cleans it up. Hit 100% full once (2026-07-12), which surfaced as pin/
+  display image uploads 500ing with `OSError: [Errno 28] No space left on device` in
+  `file_handler.py::save` — nothing wrong with the upload code, the disk was just full. Check with
+  `ssh pindb 'df -h /; docker system df'`; fix with `docker image prune -f && docker builder prune -f`
+  (now automated as the last step of `deploy.sh`).
 - **Deploying stale image:** ran `deploy.sh` before Release finished → `:latest` is old. Re-run once
   CI completes.
 - **Only one color runs normally**; both are up for ~10–30s mid-swap. During that window old + new
