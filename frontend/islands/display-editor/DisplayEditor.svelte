@@ -10,7 +10,6 @@
   const WEBP_QUALITY = 95;
 
   const LAYOUTS: { value: string; label: string }[] = [
-    { value: "collage", label: "Collage" },
     { value: "grid", label: "Grid" },
     { value: "vertical", label: "Vertical" },
     { value: "carousel", label: "Carousel" },
@@ -209,6 +208,7 @@
           total={images.length}
           {thumbUrlPrefix}
           {pinOptionsUrl}
+          showSizeControls={currentLayout === "grid"}
           onUpdate={persistUpdate}
           onDelete={removeImage}
           {onDragStart}

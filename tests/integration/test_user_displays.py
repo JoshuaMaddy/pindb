@@ -102,7 +102,7 @@ class TestDisplayEditing:
             f"/user/me/display/images/{image['id']}",
             data={
                 "caption": "  My shadow box  ",
-                "size_hint": "feature",
+                "size_hint": "wide",
                 "pin_ids": [str(display_pin.id)],
             },
         )
@@ -111,7 +111,7 @@ class TestDisplayEditing:
         db_session.expire_all()
         row = db_session.get(UserDisplayImage, image["id"])
         assert row.caption == "My shadow box"
-        assert row.size_hint is DisplayImageSize.feature
+        assert row.size_hint is DisplayImageSize.wide
         assert [pin.id for pin in row.pins] == [display_pin.id]
 
         # Untagging the last pin has to stick. An empty list sends no form field

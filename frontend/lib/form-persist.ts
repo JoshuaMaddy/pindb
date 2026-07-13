@@ -12,7 +12,11 @@ export function isReloadNavigation(): boolean {
   const entry = performance.getEntriesByType(
     "navigation",
   )[0] as PerformanceNavigationTiming | undefined;
-  return entry?.type === "reload";
+  // "back_forward" is included alongside "reload": bfcache is supposed to make
+  // this a non-issue for back/forward nav, but the legacy script's own
+  // `beforeunload` listener disables bfcache in Firefox/Safari (and sometimes
+  // Chrome), forcing a real reload that this restore path must also handle.
+  return entry?.type === "reload" || entry?.type === "back_forward";
 }
 
 /** Persisted field payload, or null when absent/unparseable/not a reload. */

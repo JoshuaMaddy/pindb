@@ -1,5 +1,6 @@
-// Reload-only form persistence. Saves every named form field (including
-// island-rendered inputs) to sessionStorage; restores on reload-type loads.
+// Form persistence for reload and back/forward navigation. Saves every named
+// form field (including island-rendered inputs) to sessionStorage; restores on
+// reload and back/forward loads.
 // Svelte islands restore their own subtrees from the same payload (see
 // frontend/lib/form-persist.ts) — the generic restore below skips them.
 //
@@ -56,9 +57,14 @@
     save();
   });
 
-  // ── Restore (reload loads only) ─────────────────────────────────────────
-
-  if (navType !== "reload") {
+  // ── Restore (reload + back/forward loads) ───────────────────────────────
+  // Back/forward *should* be a no-op here: the browser's bfcache restores the
+  // page's live JS state without ever re-running this script. But this file's
+  // own `beforeunload` listener above disables bfcache in Firefox/Safari (and
+  // sometimes Chrome), which forces a real reload on back/forward instead —
+  // so treat "back_forward" the same as "reload" rather than assuming bfcache
+  // always caught it.
+  if (navType !== "reload" && navType !== "back_forward") {
     sessionStorage.removeItem(STORAGE_KEY);
     return;
   }

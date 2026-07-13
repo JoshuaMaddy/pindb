@@ -46,6 +46,9 @@ router = APIRouter(prefix="/user", tags=["user"])
 
 
 PROFILE_PREVIEW_LIMIT: int = 10
+# Collection gets more room than the other preview strips — just a UX call, no
+# technical reason the others couldn't grow too.
+PROFILE_COLLECTION_PREVIEW_LIMIT: int = 20
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +146,7 @@ async def get_user_profile(
         owned_pins = await get_owned_entries(
             session=db,
             user_id=user.id,
-            limit=PROFILE_PREVIEW_LIMIT,
+            limit=PROFILE_COLLECTION_PREVIEW_LIMIT,
             eager_pin_relationships=True,
         )
 

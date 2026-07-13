@@ -31,6 +31,7 @@ from pindb.database.user_display import (
     MAX_DISPLAY_IMAGES,
     DisplayImageSize,
     DisplayLayout,
+    ObjectFit,
     UserDisplay,
     UserDisplayImage,
 )
@@ -57,7 +58,7 @@ async def _get_or_create_display(session: AsyncSession, user_id: int) -> UserDis
         pg_insert(UserDisplay)
         .values(
             user_id=user_id,
-            layout=DisplayLayout.collage.value,
+            layout=DisplayLayout.grid.value,
             # A Core insert bypasses the ORM, so AuditMixin's `default_factory`
             # never fires and `created_at` (NOT NULL) would be null.
             created_at=utc_now(),
@@ -101,6 +102,7 @@ def _image_payload(image: UserDisplayImage) -> dict[str, Any]:
         "guid": str(image.image_guid),
         "caption": image.caption or "",
         "sizeHint": image.size_hint.value,
+        "objectFit": image.object_fit.value,
         "position": image.position,
         "pins": [
             {"value": str(pin.id), "text": pin.name}
@@ -160,7 +162,9 @@ async def post_update_user_display(
         return Response(status_code=204)
     return redirect_or_htmx_toast(
         request=request,
-        redirect_url=str(request.url_for("get_edit_user_display")),
+        redirect_url=str(
+            request.url_for("get_user_display", username=current_user.username)
+        ),
         message="Display updated.",
     )
 
@@ -196,6 +200,14 @@ async def post_user_display_image(
             display_id=display.id,
             image_guid=guid,
             position=(max_position + 1) if max_position is not None else 0,
+            # Matches what each layout always rendered before object_fit was
+            # overridable — `grid` cropped, everything else letterboxed — then
+            # stays put if the display's layout changes later.
+            object_fit=(
+                ObjectFit.cover
+                if display.layout is DisplayLayout.grid
+                else ObjectFit.contain
+            ),
         )
         db.add(row)
         await db.flush()
@@ -239,6 +251,7 @@ async def post_update_user_display_image(
     current_user: AuthenticatedUser,
     caption: Annotated[str | None, Form()] = None,
     size_hint: Annotated[str | None, Form()] = None,
+    object_fit: Annotated[str | None, Form()] = None,
     pin_ids: Annotated[list[str] | None, Form()] = None,
 ) -> Response:
     """Patch one photo. Every field is optional; only what is sent gets touched.
@@ -251,6 +264,8 @@ async def post_update_user_display_image(
     """
     if size_hint is not None and size_hint not in DisplayImageSize:
         raise HTTPException(status_code=422, detail="Invalid size_hint")
+    if object_fit is not None and object_fit not in ObjectFit:
+        raise HTTPException(status_code=422, detail="Invalid object_fit")
 
     async with async_session_maker.begin() as db:
         image = await _load_own_image(db, image_id, current_user)
@@ -258,6 +273,8 @@ async def post_update_user_display_image(
             image.caption = caption.strip() or None
         if size_hint is not None:
             image.size_hint = DisplayImageSize(size_hint)
+        if object_fit is not None:
+            image.object_fit = ObjectFit(object_fit)
         if pin_ids is not None:
             wanted = [int(value) for value in pin_ids if value.strip()]
             # Replace wholesale — the client always sends the full set.
@@ -354,13 +371,6 @@ async def get_user_display(
         # A user with no display is a 200 empty state, never a 404 — a shared
         # link must not break, and the owner needs somewhere to land.
         images = list(display.images) if display else []
-        tagged_pins: list[Pin] = []
-        seen_pin_ids: set[int] = set()
-        for image in images:
-            for pin in image.pins:
-                if pin.id not in seen_pin_ids:
-                    seen_pin_ids.add(pin.id)
-                    tagged_pins.append(pin)
 
         return HTMLResponse(
             content=str(
@@ -369,7 +379,6 @@ async def get_user_display(
                     profile_user=profile_user,
                     display=display,
                     images=images,
-                    tagged_pins=tagged_pins,
                     current_user=current_user,
                 )
             )

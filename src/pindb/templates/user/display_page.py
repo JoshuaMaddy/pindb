@@ -12,14 +12,13 @@ not break, and the owner needs somewhere to land.
 from __future__ import annotations
 
 from fastapi import Request
-from htpy import Element, a, div, fragment, hr, p, script, section
+from htpy import Element, a, div, fragment, hr, link, p, script, section
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.content_report import (
     MIN_REPORT_REASON_LENGTH,
     ReportTargetType,
 )
-from pindb.database.pin import Pin
 from pindb.database.user import User
 from pindb.database.user_display import DisplayLayout, UserDisplay, UserDisplayImage
 from pindb.templates.base import html_base
@@ -42,23 +41,58 @@ def _share_description(display: UserDisplay | None, username: str) -> str:
     return f"See {username}'s real-life pin display on PinDB."
 
 
-def _tagged_pins_section(*, request: Request, pins: list[Pin]) -> Element:
+def _image_pin_strip(
+    *, request: Request, image: UserDisplayImage, index: int
+) -> Element:
+    """One photo's own row of tagged pins — same pin can appear in several rows."""
+    label = image.caption or f"Photo {index + 1}"
+    pins = sorted(image.pins, key=lambda pin: pin.id)
+    return div(class_="flex flex-col gap-1.5")[
+        p(class_="text-sm text-lightest-hover wrap-break-word")[label],
+        div(
+            class_=(
+                "grid grid-flow-col grid-rows-[1fr_max-content]"
+                # `overflow-x: auto` forces `overflow-y` to compute as `auto` too
+                # (CSS coerces a `visible` axis to `auto` whenever its sibling
+                # axis isn't `visible`) — with no vertical room, the pin card's
+                # hover tilt/scale (`.pin-3d-card`, `input.css`) then gets
+                # clipped and can spawn a page-level vertical scrollbar. `py-3`
+                # gives the hover transform room to bleed into padding instead
+                # of hitting that clip edge, so nothing needs clipping or
+                # scrolling in the first place.
+                " [grid-auto-columns:192px] gap-2 px-1 py-3 overflow-x-auto"
+            )
+        )[[pin_preview_card(request=request, pin=pin) for pin in pins]],
+    ]
+
+
+def _tagged_pins_section(
+    *, request: Request, images: list[UserDisplayImage]
+) -> Element | None:
+    """One strip per photo, instead of one deduped strip for the whole display.
+
+    The same pin can legitimately appear under more than one photo — it's the
+    photo that's the context for "why is this pin here", so collapsing repeats
+    across photos would throw that context away.
+    """
+    tagged = [(index, image) for index, image in enumerate(images) if image.pins]
+    if not tagged:
+        return None
+    total = sum(len(image.pins) for _, image in tagged)
     return section(
-        class_="flex flex-col gap-2",
+        class_="flex flex-col gap-4",
         aria_labelledby="display-pins-heading",
     )[
         page_heading(
             icon="pin",
-            text=f"Pins in this display ({len(pins)})",
+            text=f"Pins in this display ({total})",
             level=2,
             heading_id="display-pins-heading",
         ),
-        div(
-            class_=(
-                "grid grid-flow-col grid-rows-[1fr_max-content]"
-                " [grid-auto-columns:128px] gap-2 pl-1 overflow-x-auto"
-            )
-        )[[pin_preview_card(request=request, pin=pin) for pin in pins]],
+        [
+            _image_pin_strip(request=request, image=image, index=index)
+            for index, image in tagged
+        ],
     ]
 
 
@@ -88,14 +122,13 @@ def user_display_page(
     profile_user: User,
     display: UserDisplay | None,
     images: list[UserDisplayImage],
-    tagged_pins: list[Pin],
     current_user: User | None,
 ) -> Element:
     username: str = profile_user.username
     is_own_display: bool = (
         current_user is not None and current_user.id == profile_user.id
     )
-    layout: DisplayLayout = display.layout if display else DisplayLayout.collage
+    layout: DisplayLayout = display.layout if display else DisplayLayout.grid
     heading: str = (display.title if display and display.title else None) or (
         f"{username}'s Display"
     )
@@ -106,7 +139,15 @@ def user_display_page(
 
     head: Content = [
         # Vendored Swiper must load (deferred, document order) before the boot
-        # script runs — same ordering contract as the pin page.
+        # script runs — same ordering contract as the pin page. The stylesheet is
+        # load-bearing too: without it `.swiper-wrapper`/`.swiper-slide` have no
+        # flex layout or overflow clipping, so slides stack instead of sliding.
+        link(
+            rel="stylesheet",
+            href=f"/static/vendor/swiper.min.css?v={STATIC_CACHE_BUSTER}",
+        )
+        if is_carousel
+        else None,
         script(
             src=f"/static/vendor/swiper.min.js?v={STATIC_CACHE_BUSTER}",
             defer=True,
@@ -131,6 +172,7 @@ def user_display_page(
         if is_carousel
         else ("pins/pin_lightbox.js",)
     )
+    pins_section: Element | None = _tagged_pins_section(request=request, images=images)
 
     body: Content = [
         page_heading(
@@ -166,10 +208,8 @@ def user_display_page(
             if is_own_display
             else "No display photos yet."
         ),
-        hr if tagged_pins else None,
-        _tagged_pins_section(request=request, pins=tagged_pins)
-        if tagged_pins
-        else None,
+        hr if pins_section else None,
+        pins_section,
         _report_bar(request=request, images=images)
         if (current_user is not None and not is_own_display and images)
         else None,

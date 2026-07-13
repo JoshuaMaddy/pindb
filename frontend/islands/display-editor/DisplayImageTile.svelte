@@ -1,12 +1,33 @@
 <script lang="ts">
   import GripVertical from "@lucide/svelte/icons/grip-vertical";
   import Trash2 from "@lucide/svelte/icons/trash-2";
-  import Maximize2 from "@lucide/svelte/icons/maximize-2";
 
   import MultiSelect from "../../lib/MultiSelect.svelte";
-  import type { DisplayImage, PinOption, SizeHint } from "./types";
+  import type { DisplayImage, ObjectFit, PinOption, SizeHint } from "./types";
 
   const CAPTION_DEBOUNCE_MS = 600;
+
+  // Every shape is a rectangle a grid cell can actually cover — no 3-tile
+  // option, since no rectangle spans exactly 3 cells. Mirrors
+  // `_SPAN_CLASSES` in `templates/user/display_layouts.py`.
+  const SIZES: { value: SizeHint; label: string; title: string }[] = [
+    { value: "normal", label: "1×1", title: "Normal (1 tile)" },
+    { value: "wide", label: "2×1", title: "Wide (2 tiles)" },
+    { value: "tall", label: "1×2", title: "Tall (2 tiles)" },
+    { value: "large", label: "2×2", title: "Large (4 tiles)" },
+  ];
+
+  // Unlike size, fit applies in every layout — it's how the photo fills
+  // whatever box its layout gives it, not a grid-specific span.
+  const FITS: { value: ObjectFit; label: string; title: string }[] = [
+    { value: "cover", label: "Cover", title: "Cover — fills the box, cropped" },
+    {
+      value: "contain",
+      label: "Contain",
+      title: "Contain — whole photo visible, letterboxed",
+    },
+    { value: "fill", label: "Fill", title: "Fill — stretched to the box" },
+  ];
 
   let {
     image,
@@ -14,6 +35,7 @@
     total,
     thumbUrlPrefix,
     pinOptionsUrl,
+    showSizeControls,
     onUpdate,
     onDelete,
     onDragStart,
@@ -26,6 +48,7 @@
     total: number;
     thumbUrlPrefix: string;
     pinOptionsUrl: string;
+    showSizeControls: boolean;
     onUpdate: (id: number, patch: FormData) => Promise<void>;
     onDelete: (id: number) => void;
     onDragStart: (index: number) => void;
@@ -57,6 +80,13 @@
     image.sizeHint = next;
     const body = new FormData();
     body.append("size_hint", next);
+    void onUpdate(image.id, body);
+  }
+
+  function setFit(next: ObjectFit): void {
+    image.objectFit = next;
+    const body = new FormData();
+    body.append("object_fit", next);
     void onUpdate(image.id, body);
   }
 
@@ -136,18 +166,41 @@
     />
   </div>
 
-  <div class="flex shrink-0 items-center gap-2">
-    <button
-      type="button"
-      class="cursor-pointer rounded border p-1.5 {image.sizeHint === 'feature'
-        ? 'border-accent text-accent'
-        : 'border-lightest text-base-text hover:border-accent'}"
-      aria-pressed={image.sizeHint === "feature"}
-      title="Feature this photo (spans two columns)"
-      onclick={() => setSize(image.sizeHint === "feature" ? "normal" : "feature")}
-    >
-      <Maximize2 class="h-4 w-4" />
-    </button>
+  <div class="flex shrink-0 flex-col items-end gap-1.5">
+    {#if showSizeControls}
+      <div class="flex gap-1" role="group" aria-label="Tile size">
+        {#each SIZES as size (size.value)}
+          <button
+            type="button"
+            class="cursor-pointer rounded border px-1.5 py-1 text-xs {image.sizeHint ===
+            size.value
+              ? 'border-accent text-accent'
+              : 'border-lightest text-base-text hover:border-accent'}"
+            aria-pressed={image.sizeHint === size.value}
+            title={size.title}
+            onclick={() => setSize(size.value)}
+          >
+            {size.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
+    <div class="flex gap-1" role="group" aria-label="Image fit">
+      {#each FITS as fit (fit.value)}
+        <button
+          type="button"
+          class="cursor-pointer rounded border px-1.5 py-1 text-xs {image.objectFit ===
+          fit.value
+            ? 'border-accent text-accent'
+            : 'border-lightest text-base-text hover:border-accent'}"
+          aria-pressed={image.objectFit === fit.value}
+          title={fit.title}
+          onclick={() => setFit(fit.value)}
+        >
+          {fit.label}
+        </button>
+      {/each}
+    </div>
     <button
       type="button"
       class="cursor-pointer rounded border border-error-dark p-1.5 text-error-main hover:border-error-dark-hover"

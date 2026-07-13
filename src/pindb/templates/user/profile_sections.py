@@ -49,7 +49,11 @@ def _pin_preview_row(
         div(
             class_=(
                 "grid grid-flow-col grid-rows-[1fr_max-content]"
-                " [grid-auto-columns:128px] gap-2 h-full pl-1 pr-16 [overflow-x:clip]"
+                # Narrower cards on small screens so more than ~2 fit in view —
+                # 128px was tuned for desktop and left mobile showing barely
+                # more than one card at a time.
+                " [grid-auto-columns:100px] sm:[grid-auto-columns:128px]"
+                " gap-2 h-full pl-1 pr-16 [overflow-x:clip]"
             )
         )[[pin_preview_card(request=request, pin=pin) for pin in pins],],
         div(

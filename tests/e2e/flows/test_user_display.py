@@ -65,8 +65,8 @@ def test_build_a_display_and_share_it(
     caption.fill("The top shelf")
     caption.blur()  # commits without waiting out the debounce
 
-    # Feature the first photo — the span-2 hint the collage layout reads.
-    first_tile.locator("button[title^='Feature']").click()
+    # Widen the first photo — the span-2 size hint the grid layout reads.
+    first_tile.locator("button[title^='Wide']").click()
     expect(first_tile.locator("button[aria-pressed='true']")).to_be_visible()
 
     # Tag a pin. Through the helpers, never the widget internals.
@@ -108,7 +108,7 @@ def test_build_a_display_and_share_it(
         expect(public.locator("meta[property='og:image']")).to_have_attribute(
             "content", re.compile(r"/get/og-image/user_display/\d+$")
         )
-        assert_screenshot(public, "display-page-collage")
+        assert_screenshot(public, "display-page-default")
     finally:
         anon.close()
 
@@ -125,7 +125,7 @@ def test_each_layout_renders(editor_browser_context, live_server, assert_screens
     page = _open_editor(editor_browser_context, live_server)
     _pick_photos(page, 3)
     first_tile = page.locator(_TILE).first
-    first_tile.locator("button[title^='Feature']").click()
+    first_tile.locator("button[title^='Wide']").click()
     expect(first_tile.locator("button[aria-pressed='true']")).to_be_visible()
 
     for layout in ("Grid", "Vertical"):

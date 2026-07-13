@@ -48,17 +48,38 @@ if TYPE_CHECKING:
 class DisplayLayout(StrEnum):
     """How a display page arranges its photos."""
 
-    collage = auto()
     grid = auto()
     vertical = auto()
     carousel = auto()
 
 
 class DisplayImageSize(StrEnum):
-    """Per-photo size hint. ``feature`` spans two columns in collage/grid."""
+    """Per-photo size hint: how many grid tiles the photo spans (1-4).
+
+    Grid-only — ``vertical`` and ``carousel`` render every photo at natural
+    width regardless of this field. A grid cell is a rectangle, so the shapes
+    are ``normal`` 1x1, ``wide``/``tall`` 2x1, and ``large`` 2x2; there is no
+    3-tile option because no rectangle covers exactly 3 cells.
+    """
 
     normal = auto()
-    feature = auto()
+    wide = auto()
+    tall = auto()
+    large = auto()
+
+
+class ObjectFit(StrEnum):
+    """Per-photo CSS ``object-fit``, applies in every layout.
+
+    Set once at upload time from the display's current layout (``cover`` for
+    ``grid``, ``contain`` elsewhere — matching what each layout always did
+    before this was overridable) and freely editable afterwards; changing the
+    layout later does not retroactively touch photos already uploaded.
+    """
+
+    cover = auto()
+    contain = auto()
+    fill = auto()
 
 
 # A display is a personal page, not a catalog: the cap exists to keep the page
@@ -106,8 +127,8 @@ class UserDisplay(AuditMixin, MappedAsDataclass, Base):
             length=_ENUM_LENGTH,
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
-        default=DisplayLayout.collage,
-        server_default=DisplayLayout.collage.value,
+        default=DisplayLayout.grid,
+        server_default=DisplayLayout.grid.value,
     )
 
     user: Mapped[User] = relationship(
@@ -177,6 +198,17 @@ class UserDisplayImage(AuditMixin, MappedAsDataclass, Base):
         default=DisplayImageSize.normal,
         server_default=DisplayImageSize.normal.value,
     )
+    object_fit: Mapped[ObjectFit] = mapped_column(
+        SQLAlchemyEnum(
+            ObjectFit,
+            name="objectfit",
+            native_enum=False,
+            length=_ENUM_LENGTH,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=ObjectFit.cover,
+        server_default=ObjectFit.cover.value,
+    )
 
     display: Mapped[UserDisplay] = relationship(
         back_populates="images",
@@ -202,6 +234,7 @@ class UserDisplayImage(AuditMixin, MappedAsDataclass, Base):
             yield "image_guid", str(self.image_guid)
             yield "position", self.position
             yield "size_hint", self.size_hint
+            yield "object_fit", self.object_fit
             yield "caption", self.caption, None
         except Exception:
             yield "detached", True

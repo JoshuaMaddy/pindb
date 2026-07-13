@@ -1,4 +1,6 @@
-export type SizeHint = "normal" | "feature";
+export type SizeHint = "normal" | "wide" | "tall" | "large";
+
+export type ObjectFit = "cover" | "contain" | "fill";
 
 export type PinOption = { value: string; text: string };
 
@@ -7,6 +9,7 @@ export type DisplayImage = {
   guid: string;
   caption: string;
   sizeHint: SizeHint;
+  objectFit: ObjectFit;
   position: number;
   pins: PinOption[];
 };

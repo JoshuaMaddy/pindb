@@ -8,7 +8,7 @@ column, and HTMX fragments live in sibling modules.
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div, fragment, script
+from htpy import Element, div, fragment, link, script
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.entity_type import EntityType
@@ -83,7 +83,14 @@ def pin_page(
         template_js_extra=("pins/pin_swiper.js", "pins/pin_lightbox.js"),
         head_content=[
             # Vendored Swiper must load (deferred, document order) before
-            # pins/pin_swiper.js boots the carousel.
+            # pins/pin_swiper.js boots the carousel. The stylesheet is
+            # load-bearing too: without it `.swiper-wrapper`/`.swiper-slide` have
+            # no flex layout or overflow clipping, so slides stack instead of
+            # sliding.
+            link(
+                rel="stylesheet",
+                href=f"/static/vendor/swiper.min.css?v={STATIC_CACHE_BUSTER}",
+            ),
             script(
                 src=f"/static/vendor/swiper.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
