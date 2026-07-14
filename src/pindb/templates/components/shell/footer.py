@@ -18,7 +18,13 @@ def footer() -> Element:
     link_cls: str = "text-base-text hover:text-accent hover:cursor-pointer"
 
     return footer_el(
-        class_="mt-8 bg-darker text-base-text text-sm px-5 py-6 relative z-10 border-t border-lightest"
+        # No z-index: `main` (`templates/base.py`) is `relative z-5`, a stacking
+        # context of its own — any `position:fixed` overlay inside it (e.g. the
+        # MultiSelect dropdown) composites *within* that z-5 context regardless
+        # of its own z-index, so a footer stacked above z-5 would permanently
+        # bury every such overlay. Footer and main never overlap in normal flow,
+        # so dropping this has no visible effect outside that trap.
+        class_="mt-8 bg-darker text-base-text text-sm px-5 py-6 border-t border-lightest"
     )[
         div(class_="max-w-5xl mx-auto flex flex-col gap-3")[
             div(

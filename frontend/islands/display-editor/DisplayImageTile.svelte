@@ -162,6 +162,7 @@
       multiple
       placeholder="Pins in this photo…"
       loadFn={loadPinOptions}
+      trustRemote
       onValueChange={savePins}
     />
   </div>

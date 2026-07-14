@@ -68,6 +68,7 @@
     tagSingleMode = false,
     adoptedSelect = null,
     class: className = "",
+    trustRemote = false,
     onValueChange,
     onOptionCreate,
   }: {
@@ -93,6 +94,13 @@
      */
     adoptedSelect?: HTMLSelectElement | null;
     class?: string;
+    /**
+     * Skip the client-side substring re-filter on remote results. Use when a
+     * match can come from a field never shown as `text` (e.g. a pin matched
+     * by tag/shop/artist) — otherwise a real server hit whose display text
+     * doesn't literally contain the query gets discarded client-side.
+     */
+    trustRemote?: boolean;
     onValueChange?: (values: string[], selected: Option[]) => void;
     onOptionCreate?: (option: Option) => void;
   } = $props();
@@ -168,9 +176,14 @@
   const filtered = $derived.by(() => {
     const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const taken = new Set(items.map((item) => item.value));
+    const loadedValues = new Set(loaded.map((option) => option.value));
     return pool
       .filter((option) => {
         if (multiple && taken.has(option.value)) return false;
+        // Remote hits are already query-matched server-side, possibly via a
+        // field this option never surfaces as `text` — re-checking the query
+        // as a substring of `text` here would wrongly discard real matches.
+        if (trustRemote && loadedValues.has(option.value)) return true;
         if (!tokens.length) return true;
         const text = option.text.toLowerCase();
         return tokens.every((token) => text.includes(token));
@@ -382,6 +395,13 @@
       }
       if (seq !== loadSeq) return;
       loading = false;
+      if (trustRemote) {
+        // Each query gets its own server-side match set; carrying prior
+        // queries' hits forward would show them unfiltered forever (trustRemote
+        // skips the text re-check that would otherwise have pruned them).
+        loaded = results ?? [];
+        return;
+      }
       const known = new Set(
         untrack(() => loaded).map((option) => option.value),
       );
@@ -470,12 +490,15 @@
   function positionDropdown(): void {
     if (!controlEl || !dropEl) return;
     const rect = controlEl.getBoundingClientRect();
-    const natural = Math.min(dropEl.scrollHeight, MAX_DROP_HEIGHT);
     const below = window.innerHeight - rect.bottom - GAP - EDGE;
     const above = rect.top - GAP - EDGE;
-    // Flip above the control only when the list genuinely doesn't fit below
-    // and there is more room up there.
-    const flip = natural > below && above > below;
+    // Decided against the worst-case height, not the current result count:
+    // using the actual (current) content height here made the side flip
+    // mid-typing as results arrived — empty/short state fits below, a real
+    // result list doesn't, so the dropdown flopped from below to above the
+    // moment hits came back. Judging "would the fullest possible list fit
+    // below" instead keeps the side stable for the whole time it's open.
+    const flip = MAX_DROP_HEIGHT > below && above > below;
     const maxHeight = Math.max(
       96,
       Math.min(MAX_DROP_HEIGHT, flip ? above : below),
