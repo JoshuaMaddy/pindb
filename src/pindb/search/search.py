@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Sequence
 
 from meilisearch_python_sdk import AsyncIndex
 from meilisearch_python_sdk.models.search import SearchResults
@@ -120,9 +121,32 @@ class PinSearchResult(BaseModel):
         return cls.model_validate(normalized)
 
 
-async def search_pin(query: str, session: AsyncSession) -> list[Pin] | None:
-    """Search pins in Meilisearch and hydrate ORM rows in hit order (with shops/artists)."""
-    search_results: SearchResults = await PIN_INDEX.search(query=query)  # type: ignore[assignment]
+def _exclude_filter(exclude_ids: Sequence[int] | None) -> str | None:
+    """Meili filter excluding a set of ids, or None if nothing to exclude."""
+    if not exclude_ids:
+        return None
+    ids = ", ".join(str(i) for i in exclude_ids)
+    return f"id NOT IN [{ids}]"
+
+
+async def search_pin(
+    query: str,
+    session: AsyncSession,
+    exclude_ids: Sequence[int] | None = None,
+) -> list[Pin] | None:
+    """Search pins in Meilisearch and hydrate ORM rows in hit order (with shops/artists).
+
+    ``exclude_ids`` is applied in the Meili query itself (not after fetching) so
+    a caller excluding already-selected pins still gets a full page of fresh
+    results instead of the result cap being eaten by hits it would discard.
+    """
+    filter_str = _exclude_filter(exclude_ids)
+    if filter_str is not None:
+        search_results: SearchResults = await PIN_INDEX.search(  # type: ignore[assignment]
+            query=query, filter=filter_str
+        )
+    else:
+        search_results = await PIN_INDEX.search(query=query)  # type: ignore[assignment]
     raw = _search_results_to_raw(search_results)
     result = PinSearchResult.from_raw(raw)
 
@@ -227,13 +251,21 @@ async def search_entity_options(
     index: AsyncIndex,
     query: str,
     limit: int = 50,
+    exclude_ids: Sequence[int] | None = None,
 ) -> list[dict[str, str]]:
     """Search an entity index and return Tom Select option dicts.
 
     Hits come directly from meili (no DB roundtrip). is_pending is stored
     in the document so the (P) prefix can be applied without a DB query.
+    ``exclude_ids`` filters already-selected entities out of the Meili query
+    itself, so a caller excluding them still gets a full page of fresh
+    results instead of the result cap being eaten by hits it would discard.
     """
-    raw_sr = await index.search(query, limit=limit)  # type: ignore[call-arg]
+    filter_str = _exclude_filter(exclude_ids)
+    if filter_str is not None:
+        raw_sr = await index.search(query, limit=limit, filter=filter_str)  # type: ignore[call-arg]
+    else:
+        raw_sr = await index.search(query, limit=limit)  # type: ignore[call-arg]
     raw = _search_results_to_raw(raw_sr)
     hits = meilisearch_hit_dicts(raw)
     results: list[dict[str, str]] = []

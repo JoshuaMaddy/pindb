@@ -324,6 +324,7 @@ async def get_display_pin_options(
     request: Request,
     current_user: AuthenticatedUser,
     q: str = Query(default=""),
+    exclude: list[int] = Query(default=[]),
 ) -> JSONResponse:
     """Pin autocomplete for the display editor, open to any signed-in user.
 
@@ -331,11 +332,15 @@ async def get_display_pin_options(
     Meilisearch directly with no DB re-hydration and would hand pending entities
     to anyone who asked. ``search_pin`` re-hydrates through the ORM, so the audit
     loader filter applies and a regular user never sees an unapproved pin.
+
+    ``exclude`` is the photo's already-tagged pins — filtered in the Meili query
+    itself so the fixed result cap doesn't fill up with pins the client would
+    just discard as already-selected, starving the rest of the matches.
     """
     if not q.strip():
         return JSONResponse(content=[])
     async with async_session_maker() as db:
-        pins = await search_pin(query=q.strip(), session=db) or []
+        pins = await search_pin(query=q.strip(), session=db, exclude_ids=exclude) or []
         return JSONResponse(
             content=[
                 {

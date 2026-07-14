@@ -104,8 +104,14 @@
   }
 
   async function loadPinOptions(query: string): Promise<PinOption[]> {
+    // Exclude pins already tagged on this photo server-side: otherwise the
+    // fixed result cap fills up with hits MultiSelect discards as
+    // already-selected, and the rest of the matches never surface.
+    const excludeParams = pinIds
+      .map((id) => `exclude=${encodeURIComponent(id)}`)
+      .join("&");
     const response = await fetch(
-      `${pinOptionsUrl}?q=${encodeURIComponent(query)}`,
+      `${pinOptionsUrl}?q=${encodeURIComponent(query)}${excludeParams ? `&${excludeParams}` : ""}`,
     );
     if (!response.ok) return [];
     return (await response.json()) as PinOption[];

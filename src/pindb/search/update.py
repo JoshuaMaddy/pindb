@@ -97,17 +97,26 @@ async def setup_index() -> None:
             "shop_aliases",
             "description",
         ],
+        # id filterable so option pickers (variants, display photo pins, ...)
+        # can exclude already-selected pins server-side — otherwise the fixed
+        # result cap fills up with hits the client throws away as "already
+        # selected" and the rest of the matches never surface.
+        filterable=["id"],
     )
     await _create_index(
         uid=f"{_INDEX_BASE}_tags",
         searchable=["display_name", "name", "aliases", "category"],
-        filterable=["category"],
+        filterable=["category", "id"],
     )
     await _create_index(
-        uid=f"{_INDEX_BASE}_artists", searchable=["name", "aliases", "description"]
+        uid=f"{_INDEX_BASE}_artists",
+        searchable=["name", "aliases", "description"],
+        filterable=["id"],
     )
     await _create_index(
-        uid=f"{_INDEX_BASE}_shops", searchable=["name", "aliases", "description"]
+        uid=f"{_INDEX_BASE}_shops",
+        searchable=["name", "aliases", "description"],
+        filterable=["id"],
     )
     await _create_index(
         uid=f"{_INDEX_BASE}_pin_sets",
@@ -115,7 +124,7 @@ async def setup_index() -> None:
         # owner_id is already in the document; making it filterable lets the
         # public list filter to global sets (owner_id IS NULL) in Meili so
         # pagination/total stay correct.
-        filterable=["owner_id"],
+        filterable=["owner_id", "id"],
     )
 
 

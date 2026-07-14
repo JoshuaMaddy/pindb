@@ -385,8 +385,15 @@
           results = await loadFn(trimmed);
         } else {
           const separator = loadUrl.includes("?") ? "&" : "?";
+          // Exclude already-selected items server-side: otherwise the fixed
+          // result cap fills up with hits `filtered` below would just discard
+          // as "already taken", starving the rest of the matches from ever
+          // being fetched.
+          const excludeParams = untrack(() => items)
+            .map((item) => `exclude=${encodeURIComponent(item.value)}`)
+            .join("&");
           const response = await fetch(
-            `${loadUrl}${separator}q=${encodeURIComponent(trimmed)}`,
+            `${loadUrl}${separator}q=${encodeURIComponent(trimmed)}${excludeParams ? `&${excludeParams}` : ""}`,
           );
           results = response.ok ? await response.json() : [];
         }

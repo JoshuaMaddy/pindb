@@ -205,7 +205,7 @@ class TestSecurityPage:
 class TestEntityOptionsAuth:
     """/get/options reads pending entities straight from Meili — editor-gated."""
 
-    async def _fake_options(self, *, index, query):
+    async def _fake_options(self, *, index, query, exclude_ids=None):
         return [{"value": "1", "label": "Opt One"}]
 
     def test_guest_rejected(self, anon_client):
