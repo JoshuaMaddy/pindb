@@ -38,6 +38,7 @@ from pindb.database.user_display import (
 from pindb.file_handler import save_image
 from pindb.htmx_toast import redirect_or_htmx_toast
 from pindb.search.search import search_pin
+from pindb.templates.components.pins.pin_thumbnail import thumb_image_url
 from pindb.templates.user.display_edit import display_edit_page
 from pindb.templates.user.display_page import user_display_page
 from pindb.utils import utc_now
@@ -95,7 +96,7 @@ async def _load_own_image(
     return image
 
 
-def _image_payload(image: UserDisplayImage) -> dict[str, Any]:
+def _image_payload(request: Request, image: UserDisplayImage) -> dict[str, Any]:
     """Serialize an image for the editor island's props / upload response."""
     return {
         "id": image.id,
@@ -105,7 +106,11 @@ def _image_payload(image: UserDisplayImage) -> dict[str, Any]:
         "objectFit": image.object_fit.value,
         "position": image.position,
         "pins": [
-            {"value": str(pin.id), "text": pin.name}
+            {
+                "value": str(pin.id),
+                "text": pin.name,
+                "thumbnail": thumb_image_url(request, pin.front_image_guid, w=50),
+            }
             for pin in sorted(image.pins, key=lambda pin: pin.id)
         ],
     }
@@ -123,7 +128,7 @@ async def get_edit_user_display(
 ) -> HTMLResponse:
     async with async_session_maker.begin() as db:
         display = await _get_or_create_display(db, current_user.id)
-        images = [_image_payload(image) for image in display.images]
+        images = [_image_payload(request, image) for image in display.images]
         content = str(
             display_edit_page(
                 request=request,
@@ -171,6 +176,7 @@ async def post_update_user_display(
 
 @router.post("/me/display/image", response_model=None, name="post_user_display_image")
 async def post_user_display_image(
+    request: Request,
     current_user: AuthenticatedUser,
     image: UploadFile = Form(),
 ) -> JSONResponse:
@@ -211,7 +217,7 @@ async def post_user_display_image(
         )
         db.add(row)
         await db.flush()
-        payload = _image_payload(row)
+        payload = _image_payload(request, row)
 
     return JSONResponse(content=payload)
 
@@ -315,6 +321,7 @@ async def post_delete_user_display_image(
     name="get_display_pin_options",
 )
 async def get_display_pin_options(
+    request: Request,
     current_user: AuthenticatedUser,
     q: str = Query(default=""),
 ) -> JSONResponse:
@@ -331,7 +338,11 @@ async def get_display_pin_options(
         pins = await search_pin(query=q.strip(), session=db) or []
         return JSONResponse(
             content=[
-                {"value": str(pin.id), "text": pin.name}
+                {
+                    "value": str(pin.id),
+                    "text": pin.name,
+                    "thumbnail": thumb_image_url(request, pin.front_image_guid, w=50),
+                }
                 for pin in pins[:_PIN_OPTIONS_LIMIT]
             ]
         )

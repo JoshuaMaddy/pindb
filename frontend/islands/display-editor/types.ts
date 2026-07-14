@@ -2,7 +2,7 @@ export type SizeHint = "normal" | "wide" | "tall" | "large";
 
 export type ObjectFit = "cover" | "contain" | "fill";
 
-export type PinOption = { value: string; text: string };
+export type PinOption = { value: string; text: string; thumbnail?: string };
 
 export type DisplayImage = {
   id: number;

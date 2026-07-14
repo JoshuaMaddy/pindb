@@ -50,7 +50,12 @@
           var iso = el.getAttribute("datetime");
           if (!iso) return;
           try {
-            el.textContent = new Date(iso).toLocaleDateString();
+            var d = new Date(iso);
+            el.textContent = d.toLocaleDateString();
+            el.title = d.toLocaleString(undefined, {
+              dateStyle: "full",
+              timeStyle: "long",
+            });
           } catch {}
         });
     }
