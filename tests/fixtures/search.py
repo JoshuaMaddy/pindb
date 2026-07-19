@@ -38,6 +38,7 @@ def patch_meilisearch(monkeypatch) -> MagicMock:
     mock_index.update_searchable_attributes = AsyncMock(
         return_value=MagicMock(task_uid=4)
     )
+    mock_index.update_ranking_rules = AsyncMock(return_value=MagicMock(task_uid=6))
     mock_index.update_filterable_attributes = AsyncMock(
         return_value=MagicMock(task_uid=5)
     )

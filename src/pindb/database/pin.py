@@ -171,6 +171,9 @@ class Pin(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         result: dict[str, object] = {
             "id": self.id,
             "name": self.name,
+            # Word count for the name_words:asc ranking tiebreak — see
+            # search/update.py.
+            "name_words": len(self.name.split()),
             "front_image_guid": str(self.front_image_guid),
             "is_pending": self.is_pending,
             "is_rejected": self.is_rejected,

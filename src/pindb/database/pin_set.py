@@ -90,6 +90,9 @@ class PinSet(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return {
             "id": self.id,
             "name": self.name,
+            # Word count for the name_words:asc ranking tiebreak — see
+            # search/update.py.
+            "name_words": len(self.name.split()),
             "description": self.description,
             "owner_id": self.owner_id,
             "is_pending": self.is_pending,

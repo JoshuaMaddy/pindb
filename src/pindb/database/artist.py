@@ -94,6 +94,9 @@ class Artist(PendingMixin, AuditMixin, MappedAsDataclass, Base):
         return {
             "id": self.id,
             "name": self.name,
+            # Word count for the name_words:asc ranking tiebreak — see
+            # search/update.py.
+            "name_words": len(self.name.split()),
             "aliases": [a.alias for a in self.aliases],
             "description": self.description,
             "active": self.active,

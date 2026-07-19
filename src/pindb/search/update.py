@@ -70,12 +70,34 @@ class _Indexable(Protocol):
 # ---------------------------------------------------------------------------
 
 
+# Meili's default ranking rules plus a final ``name_words:asc`` tiebreak. The
+# defaults never prefer a field that *is* the query over one that merely
+# *contains* it: for a single-word query like "Flower", the exact tag "Flower"
+# and longer tags like "Flower Crown" tie on every default rule (same words,
+# no typos, both contain the exact word so exactness matches too), leaving the
+# order to arbitrary internal doc ids. ``name_words`` (word count of the
+# primary name, in each document()) breaks that tie toward the shortest name,
+# surfacing the exact match first. Placed *after* exactness so exactness still
+# wins where it can (exact word beats a prefix match); this only settles the
+# post-exactness ties. Every ranked index stores ``name_words``.
+_RANKING_RULES: list[str] = [
+    "words",
+    "typo",
+    "proximity",
+    "attribute",
+    "sort",
+    "exactness",
+    "name_words:asc",
+]
+
+
 async def _create_index(
     uid: str, searchable: list[str], filterable: Sequence[str] | None = None
 ) -> AsyncIndex:
     client = CONFIGURATION.meili_client
     index = await client.get_or_create_index(uid, primary_key="id")
     await index.update_searchable_attributes(searchable)
+    await index.update_ranking_rules(_RANKING_RULES)
     if filterable:
         filterable_attributes: list[str | FilterableAttributes] = list(filterable)
         await index.update_filterable_attributes(filterable_attributes)

@@ -190,6 +190,9 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             "id": self.id,
             "name": self.name,
             "display_name": self.display_name,
+            # Word count of the surfaced name (display_name when set, else name)
+            # for the name_words:asc ranking tiebreak — see search/update.py.
+            "name_words": len((self.display_name or self.name).split()),
             "description": self.description,
             "category": self.category.value,
             "is_pending": self.is_pending,
