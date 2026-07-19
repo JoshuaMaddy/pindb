@@ -82,6 +82,9 @@
   --color-tag-character: hsl(215, 50%, 24%);
   --color-tag-character-fg: hsl(215, 78%, 78%);
   --color-tag-character-hover: hsl(215, 90%, 90%);
+  --color-tag-person: hsl(285, 48%, 26%);
+  --color-tag-person-fg: hsl(285, 70%, 80%);
+  --color-tag-person-hover: hsl(285, 85%, 90%);
   --color-tag-species: hsl(140, 38%, 20%);
   --color-tag-species-fg: hsl(140, 58%, 68%);
   --color-tag-species-hover: hsl(140, 70%, 82%);
@@ -171,6 +174,9 @@
       --color-tag-character: hsl(215, 48%, 23%);
       --color-tag-character-fg: hsl(215, 76%, 77%);
       --color-tag-character-hover: hsl(215, 88%, 89%);
+      --color-tag-person: hsl(285, 46%, 25%);
+      --color-tag-person-fg: hsl(285, 68%, 79%);
+      --color-tag-person-hover: hsl(285, 83%, 89%);
       --color-tag-species: hsl(140, 36%, 19%);
       --color-tag-species-fg: hsl(140, 56%, 67%);
       --color-tag-species-hover: hsl(140, 68%, 81%);
@@ -214,6 +220,9 @@
       --color-tag-character: hsl(215, 46%, 26%);
       --color-tag-character-fg: hsl(215, 74%, 80%);
       --color-tag-character-hover: hsl(215, 86%, 91%);
+      --color-tag-person: hsl(285, 44%, 28%);
+      --color-tag-person-fg: hsl(285, 66%, 82%);
+      --color-tag-person-hover: hsl(285, 81%, 91%);
       --color-tag-species: hsl(140, 34%, 22%);
       --color-tag-species-fg: hsl(140, 54%, 70%);
       --color-tag-species-hover: hsl(140, 66%, 84%);
@@ -400,6 +409,9 @@
       --color-tag-character: hsl(215deg, 100%, 18%);
       --color-tag-character-fg: hsl(215deg, 100%, 94%);
       --color-tag-character-hover: hsl(51deg, 100%, 50%);
+      --color-tag-person: hsl(285deg, 100%, 18%);
+      --color-tag-person-fg: hsl(285deg, 100%, 94%);
+      --color-tag-person-hover: hsl(51deg, 100%, 50%);
       --color-tag-species: hsl(140deg, 100%, 14%);
       --color-tag-species-fg: hsl(140deg, 80%, 92%);
       --color-tag-species-hover: hsl(51deg, 100%, 50%);
@@ -481,6 +493,9 @@
       --color-tag-character: hsl(215deg, 100%, 94%);
       --color-tag-character-fg: hsl(215deg, 100%, 22%);
       --color-tag-character-hover: hsl(230deg, 100%, 28%);
+      --color-tag-person: hsl(285deg, 100%, 94%);
+      --color-tag-person-fg: hsl(285deg, 100%, 22%);
+      --color-tag-person-hover: hsl(230deg, 100%, 28%);
       --color-tag-species: hsl(140deg, 70%, 90%);
       --color-tag-species-fg: hsl(140deg, 100%, 16%);
       --color-tag-species-hover: hsl(230deg, 100%, 28%);
@@ -567,6 +582,9 @@
     --color-tag-character: hsl(215, 70%, 88%);
     --color-tag-character-fg: hsl(215, 70%, 28%);
     --color-tag-character-hover: hsl(215, 80%, 16%);
+    --color-tag-person: hsl(285, 60%, 88%);
+    --color-tag-person-fg: hsl(285, 70%, 30%);
+    --color-tag-person-hover: hsl(285, 80%, 18%);
     --color-tag-species: hsl(140, 50%, 86%);
     --color-tag-species-fg: hsl(140, 50%, 22%);
     --color-tag-species-hover: hsl(140, 60%, 12%);

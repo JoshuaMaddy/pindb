@@ -23,9 +23,10 @@ Tags are the primary way to classify and filter pins. They are shared across the
 Every tag has a category. Choose the one that most accurately describes what the tag represents.
 
 | Category      | Use for                                                                                  |
-|---------------|------------------------------------------------------------------------------------------|
+| ------------- | ---------------------------------------------------------------------------------------- |
 | **General**   | Anything that doesn't fit a more specific category. Themes, styles, objects, adjectives. |
-| **Character** | A specific named character (fictional or real) — `Pikachu`, `Mario`, `Mickey Mouse`.    |
+| **Character** | A specific named _fictional_ character — `Pikachu`, `Mario`, `Mickey Mouse`.             |
+| **Person**    | A specific _real_ person — `Chapel Roan`, `Taylor Swift`. Not an actor's character.      |
 | **Archetype** | A non-distinct, non-copyrightable character type — `Wizard`, `Knight`, `Princess`.       |
 | **Copyright** | A franchise, series, brand, or IP. Characters typically belong to a copyright.           |
 | **Company**   | An organisation that owns or publishes a copyright — `Nintendo`, `Disney`, `Sega`.       |
@@ -34,9 +35,11 @@ Every tag has a category. Choose the one that most accurately describes what the
 | **Color**     | A dominant color or color scheme of the pin.                                             |
 | **Meta**      | Additional information scoped to specific tags, like Pokemon Generation.                 |
 
-**Character vs. Archetype.** A *Character* is a specific, named, usually copyrighted entity (`Link`). An *Archetype* is the generic role or trope that character fits (`Knight`). Use both where applicable — `Link` (Character) implies `Knight` (Archetype) implies `The Legend of Zelda` (Copyright) implies `Nintendo` (Company).
+**Character vs. Archetype.** A _Character_ is a specific, named, usually copyrighted entity (`Link`). An _Archetype_ is the generic role or trope that character fits (`Knight`). Use both where applicable — `Link` (Character) implies `Knight` (Archetype) implies `The Legend of Zelda` (Copyright) implies `Nintendo` (Company).
 
-**Copyright vs. Company.** *Copyright* is the work itself (`Pokemon (Series)`); *Company* is the organisation behind it (`Nintendo`, `The Pokemon Company`). A copyright typically implies its company.
+**Character vs. Person.** _Character_ is for fictional people only (`Link`, `Elsa`). _Person_ is for real people only (`Chapel Roan`, `Hayao Miyazaki`). A role played by a real actor is still a _Character_ (the fictional part), not a _Person_ — tag the actor separately as a _Person_ only if the pin depicts them as themselves.
+
+**Copyright vs. Company.** _Copyright_ is the work itself (`Pokemon (Series)`); _Company_ is the organisation behind it (`Nintendo`, `The Pokemon Company`). A copyright typically implies its company.
 
 When in doubt, use **General**. Admins can recategorize if needed.
 
@@ -47,6 +50,7 @@ When in doubt, use **General**. Admins can recategorize if needed.
 Aliases are alternate names that the tag can be found by. They follow the same lowercase-underscore format as the tag name itself.
 
 Good uses for aliases:
+
 - Common alternate spellings (`grey` for a `gray` tag)
 - Shortened forms (`Ghibli` for `Studio Ghibli`)
 - Localizations of names (`Clefairy`, in Japanese `ピッピ`)
@@ -60,9 +64,10 @@ Aliases are searchable but not displayed directly. A tag's canonical name is wha
 Implications are a powerful feature: if tag **A** implies tag **B**, then any pin tagged with A is automatically also tagged with B. Implications are transitive — if A implies B and B implies C, a pin with A gets both B and C.
 
 **Use implications to encode is-a relationships.** Examples:
+
 - `Pikachu` implies `Pokemon (Series)` — every Pikachu is in the Pokemon series.
 - `Pokemon (Series)` implies `Nintendo` — Pokemon is owned by Nintendo, hence, `Pikachu -> Pokemon (Series) -> Nintendo`.
-- `Pikachu` **DOES NOT** imply `Yellow` — not *every* depiction of Pikachu has to be yellow, only canonical ones do.
+- `Pikachu` **DOES NOT** imply `Yellow` — not _every_ depiction of Pikachu has to be yellow, only canonical ones do.
 
 **Do not use implications for loose associations.** Implications are structural, not editorial. If a connection depends on context, use a tag on the pin directly instead. If `Pikachu` is yellow in this pin, add `Yellow`.
 

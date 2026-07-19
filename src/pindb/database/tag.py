@@ -55,11 +55,16 @@ async def _tag_scalars(
 
 
 class TagCategory(str, Enum):
-    """Fixed tag kinds (material, color, character, …) including ``material`` for finishes."""
+    """Fixed tag kinds (material, color, character, person, …) including ``material`` for finishes.
+
+    ``person`` is exclusively for real people (e.g. Chapel Roan); ``character``
+    is for fictional people / an actor's character.
+    """
 
     general = "general"
     copyright = "copyright"
     character = "character"
+    person = "person"
     archetype = "archetype"
     species = "species"
     company = "company"
