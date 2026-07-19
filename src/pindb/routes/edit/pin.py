@@ -140,7 +140,7 @@ async def post_edit_pin(
             old_snapshot: dict[str, object] = get_effective_snapshot(pin, chain)
 
             grades_list = parse_grade_dicts(fields.grade_names, fields.grade_prices)
-            grades_list.sort(key=lambda grade: grade["name"])  # type: ignore[arg-type, return-value]
+            grades_list.sort(key=lambda grade: str(grade["name"]))
 
             return await submit_pending_edit(
                 session=session,
