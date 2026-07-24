@@ -17,8 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pindb.achievements import refresh_users_stats
 from pindb.audit_events import get_audit_user
 from pindb.auth import require_admin
+from pindb.blacklist import (
+    BlacklistMatch,
+    blacklist_block_message,
+    find_blacklist_match,
+)
 from pindb.database import (
     Artist,
+    BlacklistEntityType,
     PinSet,
     Shop,
     Tag,
@@ -108,6 +114,12 @@ class BulkPinResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+_BLACKLIST_MODEL_TYPES: dict[type, BlacklistEntityType] = {
+    Shop: BlacklistEntityType.shop,
+    Artist: BlacklistEntityType.artist,
+}
+
+
 async def _get_or_create(
     session: AsyncSession,
     model: type[_NameOnly],
@@ -117,6 +129,17 @@ async def _get_or_create(
     resolved = normalize_tag_name(name) if model is Tag else name
     entity = await session.scalar(select(model).where(model.name == resolved))
     if not entity:
+        # A typed-in shop/artist silently creates a row here — the one create
+        # path besides the create forms — so the blacklist gate applies too.
+        blacklist_entity_type = _BLACKLIST_MODEL_TYPES.get(model)
+        if blacklist_entity_type is not None:
+            match: BlacklistMatch | None = await find_blacklist_match(
+                session=session,
+                entity_type=blacklist_entity_type,
+                candidates=[resolved],
+            )
+            if match is not None and match.exact:
+                raise ValueError(blacklist_block_message(match=match))
         entity = model(name=resolved)
         session.add(entity)
         await session.flush()

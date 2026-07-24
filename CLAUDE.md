@@ -105,10 +105,13 @@ with session_maker() as db:
 **2. Render outside session (required when write precedes read)** — write block must close first; use `selectinload` for every relationship template touches:
 ```python
 with session_maker.begin() as db:
-    db.execute(...)   # write
+    db.execute(...)  # write
 with session_maker() as db:
-    pin = db.scalar(select(Pin).where(Pin.id == pin_id)
-                    .options(selectinload(Pin.shops), selectinload(Pin.artists)))
+    pin = db.scalar(
+        select(Pin)
+        .where(Pin.id == pin_id)
+        .options(selectinload(Pin.shops), selectinload(Pin.artists))
+    )
 return HTMLResponse(content=str(template(pin=pin)))
 ```
 
@@ -212,6 +215,14 @@ Photos of a user's *real-life* pin display, at the shareable public page `GET /u
 **The pointer has no foreign key.** Nothing cascades, and no FK check will ever remind you. So: every path that deletes a reportable row must close the reports naming it (erasure deletes them; the admin "Remove content" action marks *every* open report on that target `actioned`), and the queue must render when a target has already vanished. Reports a user *filed* survive their account erasure, anonymised — `reporter_id` is nullable precisely for that.
 
 `ContentReport` carries no `AuditMixin` (so it is excluded from audit like `ChangeLog`) and its `created_at` has a `server_default` — it is written by a Core `ON CONFLICT` insert, which bypasses the ORM's `default_factory` entirely. Same reason `MessageReceipt` has one.
+
+## Name Blacklist (do-not-index)
+
+Shops/artists that asked not to be cataloged. `BlacklistedName` (`database/blacklist.py`, one row per blocked spelling/alias, `entity_type` shop|artist) + matching in `src/pindb/blacklist.py` (rapidfuzz). Admin CRUD at `/admin/blacklist` (rows hard-delete; no `AuditMixin`, like `ContentReport`).
+
+- **Exact normalized match hard-blocks server-side; fuzzy (`WRatio ≥ 87`) only warns inline.** Fuzzy can false-positive, so it must never block — the check-name endpoint (`/create/check-name`) returns an amber "similar to X … do not submit unless certain" fragment, red for exact. Enforcement (`blacklisted_exact_match_response`) sits in `routes/create/{shop,artist}.py`, `routes/edit/{shop,artist}.py`, **and `routes/bulk/pin.py::_get_or_create`** — the silent auto-create path. Aliases are checked, not just `name`.
+- **Edit routes only check *newly introduced* names/aliases** (normalized-set difference against the entity's current values) — an entity predating its blacklist entry stays editable without being locked behind its own name.
+- Exact matching collapses whitespace runs (`blacklist.py::_exact_key`) — stricter than the entities' `normalized_name` canon on purpose, so a double space can't slip past a block.
 
 ## User Pin Lists
 

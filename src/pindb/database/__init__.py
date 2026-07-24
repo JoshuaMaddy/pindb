@@ -16,6 +16,7 @@ from pindb.config import CONFIGURATION
 from pindb.database.artist import Artist, ArtistAlias
 from pindb.database.audit_mixin import AuditMixin
 from pindb.database.base import Base
+from pindb.database.blacklist import BlacklistedName, BlacklistEntityType
 from pindb.database.change_log import ChangeLog
 from pindb.database.content_report import (
     ContentReport,
@@ -63,6 +64,8 @@ __all__: list[str] = [
     "AuditMixin",
     "PendingMixin",
     "Base",
+    "BlacklistEntityType",
+    "BlacklistedName",
     "ChangeLog",
     "ContentReport",
     "Currency",

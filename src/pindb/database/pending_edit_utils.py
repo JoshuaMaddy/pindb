@@ -72,10 +72,10 @@ def snapshot_pin(pin: Pin) -> dict[str, Any]:
             copy.id for copy in pin.unauthorized_copies
         ),
         "links": sorted(link.path for link in pin.links),
-        "grades": sorted(
-            [{"name": grade.name, "price": grade.price} for grade in pin.grades],
-            key=lambda grade: grade["name"],
-        ),
+        "grades": [
+            {"name": grade.name, "price": grade.price}
+            for grade in sorted(pin.grades, key=lambda grade: grade.name)
+        ],
     }
 
 

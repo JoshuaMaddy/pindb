@@ -29,6 +29,8 @@ def admin_panel_page(
                 hr,
                 _users_section(request),
                 hr,
+                _blacklist_section(request),
+                hr,
                 _tags_bulk_section(request),
                 hr,
                 _search_section(),
@@ -120,6 +122,31 @@ def _users_section(request: Request) -> Element:
                 aria_hidden="true",
             ),
             "Manage Users",
+        ],
+    ]
+
+
+def _blacklist_section(request: Request) -> Element:
+    return div(class_="flex flex-col gap-2")[
+        page_heading(
+            icon="ban",
+            text="Name Blacklist",
+            level=2,
+        ),
+        p(class_="text-sm")[
+            "Shops/artists that asked not to be cataloged. Exact name matches "
+            "are refused at submission; similar names warn the editor."
+        ],
+        a(
+            href=str(request.url_for("get_admin_blacklist")),
+            class_="btn btn-primary w-fit",
+        )[
+            i(
+                data_lucide="ban",
+                class_="inline-block w-4 h-4 mr-1",
+                aria_hidden="true",
+            ),
+            "Manage Blacklist",
         ],
     ]
 

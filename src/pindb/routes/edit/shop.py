@@ -13,7 +13,8 @@ from sqlalchemy.orm import selectinload
 
 from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
-from pindb.database import Shop, async_session_maker
+from pindb.blacklist import blacklisted_exact_match_response
+from pindb.database import BlacklistEntityType, Shop, async_session_maker
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
     apply_snapshot_in_memory,
@@ -21,6 +22,7 @@ from pindb.database.pending_edit_utils import (
     get_effective_snapshot,
 )
 from pindb.database.shop import replace_shop_aliases
+from pindb.database.tag import normalize_tag_name
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
@@ -107,6 +109,25 @@ async def post_edit_shop(
             raise HTTPException(status_code=404, detail="Shop not found")
 
         assert_editor_can_edit(shop, current_user)
+
+        # Only *newly introduced* names/aliases are checked — an entity that
+        # predates its blacklist entry stays editable (description tweaks etc.)
+        # without being locked behind its own name.
+        existing_keys: set[str] = {normalize_tag_name(name=shop.name)} | {
+            normalize_tag_name(name=alias.alias) for alias in shop.aliases
+        }
+        new_candidates: list[str] = [
+            candidate
+            for candidate in [name, *aliases]
+            if normalize_tag_name(name=candidate) not in existing_keys
+        ]
+        blocked: HTMLResponse | None = await blacklisted_exact_match_response(
+            request=request,
+            entity_type=BlacklistEntityType.shop,
+            candidates=new_candidates,
+        )
+        if blocked is not None:
+            return blocked
 
         if needs_pending_edit(shop, current_user):
             LOGGER.info("Submitting pending edit for shop id=%d name=%r", id, name)

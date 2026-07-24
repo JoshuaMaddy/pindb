@@ -13,7 +13,8 @@ from sqlalchemy.exc import IntegrityError
 
 from pindb.achievements import refresh_users_stats
 from pindb.audit_events import get_audit_user
-from pindb.database import Shop, ShopAlias, async_session_maker
+from pindb.blacklist import blacklisted_exact_match_response
+from pindb.database import BlacklistEntityType, Shop, ShopAlias, async_session_maker
 from pindb.database.link import Link
 from pindb.htmx_toast import (
     hx_redirect_with_toast_headers,
@@ -58,6 +59,13 @@ async def post_create_shop(
     aliases: list[str] = Form(default_factory=list),
 ) -> HTMLResponse:
     LOGGER.info("Creating shop name=%r aliases=%s", name, aliases)
+    blocked: HTMLResponse | None = await blacklisted_exact_match_response(
+        request=request,
+        entity_type=BlacklistEntityType.shop,
+        candidates=[name, *aliases],
+    )
+    if blocked is not None:
+        return blocked
     try:
         async with async_session_maker.begin() as session:
             new_links: set[Link] = (

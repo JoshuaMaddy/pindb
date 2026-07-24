@@ -7,6 +7,7 @@ from htpy import p
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pindb.blacklist import BlacklistMatch, blacklist_block_message
 from pindb.database import Artist, Pin, PinSet, Shop, Tag
 from pindb.database.tag import normalize_tag_name
 
@@ -41,6 +42,33 @@ def duplicate_name_response(name: str) -> HTMLResponse:
 def empty_name_check_response() -> HTMLResponse:
     """Return an empty fragment so HTMX clears prior feedback."""
     return HTMLResponse(content="")
+
+
+def blacklist_match_response(match: BlacklistMatch) -> HTMLResponse:
+    """Return the inline warning fragment for a blacklist match.
+
+    Exact matches render in error red — the server will refuse the submission.
+    Fuzzy matches render in pending amber: the editor may still submit, but is
+    told not to unless certain the name is unrelated.
+    """
+    if match.exact:
+        return HTMLResponse(
+            content=str(
+                p(class_="text-sm text-error-main")[
+                    f"{blacklist_block_message(match=match)} "
+                    "This entry cannot be submitted."
+                ]
+            )
+        )
+    return HTMLResponse(
+        content=str(
+            p(class_="text-sm text-pending-main")[
+                f'This name is similar to "{match.entry_name}", which is not '
+                "indexable at their request. Please do not submit unless certain "
+                "this is a different entity."
+            ]
+        )
+    )
 
 
 async def normalized_name_exists(

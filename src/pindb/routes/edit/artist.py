@@ -14,7 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from pindb.achievements import refresh_user_stats
 from pindb.auth import EditorUser
-from pindb.database import Artist, async_session_maker
+from pindb.blacklist import blacklisted_exact_match_response
+from pindb.database import Artist, BlacklistEntityType, async_session_maker
 from pindb.database.artist import replace_artist_aliases
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_edit_utils import (
@@ -22,6 +23,7 @@ from pindb.database.pending_edit_utils import (
     get_edit_chain,
     get_effective_snapshot,
 )
+from pindb.database.tag import normalize_tag_name
 from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.log import user_logger
 from pindb.model_utils import empty_str_list_to_none, empty_str_to_none
@@ -106,6 +108,25 @@ async def post_edit_artist(
             raise HTTPException(status_code=404, detail="Artist not found")
 
         assert_editor_can_edit(artist, current_user)
+
+        # Only *newly introduced* names/aliases are checked — an entity that
+        # predates its blacklist entry stays editable (description tweaks etc.)
+        # without being locked behind its own name.
+        existing_keys: set[str] = {normalize_tag_name(name=artist.name)} | {
+            normalize_tag_name(name=alias.alias) for alias in artist.aliases
+        }
+        new_candidates: list[str] = [
+            candidate
+            for candidate in [name, *aliases]
+            if normalize_tag_name(name=candidate) not in existing_keys
+        ]
+        blocked: HTMLResponse | None = await blacklisted_exact_match_response(
+            request=request,
+            entity_type=BlacklistEntityType.artist,
+            candidates=new_candidates,
+        )
+        if blocked is not None:
+            return blocked
 
         if needs_pending_edit(artist, current_user):
             LOGGER.info("Submitting pending edit for artist id=%d name=%r", id, name)
