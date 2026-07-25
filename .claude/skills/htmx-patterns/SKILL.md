@@ -13,7 +13,7 @@ Membership toggle endpoints are called from the pin detail page, the pin set edi
 if request.headers.get("HX-Request"):
     hx_target = request.headers.get("HX-Target", "")
     if hx_target.startswith("pin-row-"):
-        return HTMLResponse("")          # remove the card (outerHTML → nothing)
+        return HTMLResponse("")  # remove the card (outerHTML → nothing)
     elif hx_target.startswith("search-row-"):
         return HTMLResponse(str(search_result_row(...)))
     else:
@@ -39,8 +39,12 @@ Fragment functions should live close to their page — the fragment for toggling
 Search containers use `innerHTML`; individual rows inside use `outerHTML`:
 
 ```python
-input(hx_get=search_url, hx_trigger="input changed delay:300ms, search",
-      hx_target="#pin-search-results", hx_swap="innerHTML")
+input(
+    hx_get=search_url,
+    hx_trigger="input changed delay:300ms, search",
+    hx_target="#pin-search-results",
+    hx_swap="innerHTML",
+)
 div(id="pin-search-results")  # container — always present
 ```
 
@@ -53,8 +57,10 @@ Never OOB-replace a container that has JS bound to it — replacing the DOM node
 Instead, use targeted OOB operations that leave the container intact:
 
 ```python
-div(hx_swap_oob="beforeend:#pin-list")[card(new_pin)]   # append without touching container
-p(id="pin-list-empty", hx_swap_oob="delete")             # remove placeholder
+div(hx_swap_oob="beforeend:#pin-list")[
+    card(new_pin)
+]  # append without touching container
+p(id="pin-list-empty", hx_swap_oob="delete")  # remove placeholder
 h2(id="pin-list-count", hx_swap_oob="true")[f"Pins ({count})"]
 ```
 

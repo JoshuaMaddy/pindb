@@ -98,7 +98,7 @@ def artist_form(
 ) -> Element:
     artist_links: None | list[Link] = None
     if artist:
-        artist_links: list[Link] = list(artist.links) # Note type reassignment
+        artist_links: list[Link] = list(artist.links)  # Note type reassignment
 ```
 
 Example of 'unreasonable' typing is an external library enforcing loose typing - in which case narrow as best as possible with asserts/isinstance/if/else.
@@ -145,6 +145,7 @@ Never hardcode paths, always use `pathlib.Path` for filesystem operations.
 
 ```py
 from pathlib import Path
+
 # Read relative positioned file
 file = (Path(__file__).parent / "some_file.txt").resolve()
 file.read_text()

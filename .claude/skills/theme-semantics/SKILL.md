@@ -73,7 +73,7 @@ _LINK: str = "no-underline text-base-text hover:text-accent"
 ...
 return nav(class_="px-2 py-1 bg-main relative z-[10]")[...]
 ...
-class_="sm:hidden inline-flex ... border border-lightest ... text-base-text hover:bg-lighter-hover ..."
+class_ = "sm:hidden inline-flex ... border border-lightest ... text-base-text hover:bg-lighter-hover ..."
 ```
 
 Source: `src/pindb/templates/components/shell/navbar.py`
@@ -83,7 +83,7 @@ Source: `src/pindb/templates/components/shell/navbar.py`
 ```python
 button(
     type="submit",
-    class_="... bg-main hover:bg-main-hover border border-lightest ... text-base-text ..."
+    class_="... bg-main hover:bg-main-hover border border-lightest ... text-base-text ...",
 )["Create Set"]
 ```
 
