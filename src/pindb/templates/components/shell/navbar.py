@@ -22,28 +22,26 @@ def _staff_nav_link_items(user: User) -> list[Element]:
     return items
 
 
-def _auth_block(
-    request: Request | None, user: User | None, *, ml_auto: bool
-) -> Element:
+def _auth_block(request: Request | None, user: User, *, ml_auto: bool) -> Element:
+    """Profile link, message widget and logout for a signed-in member.
+
+    Only ever rendered for a real user: ``navbar`` returns early when logged
+    out, so there is no anonymous "Login" variant to fall back to.
+    """
     cls: str = "flex items-center gap-3" + (" ml-auto" if ml_auto else "")
-    if user:
-        return div(class_=cls)[
-            request is not None and messages_nav_widget(request),
-            a(
-                class_="no-underline text-base-text hover:text-accent",
-                href=f"/user/{user.username}",
-            )[user.username],
-            form(method="post", action="/auth/logout")[
-                button(
-                    type="submit",
-                    class_="no-underline text-base-text bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
-                )["Logout"]
-            ],
-        ]
-    return a(
-        class_=cls + " no-underline text-base-text",
-        href="/auth/login",
-    )["Login"]
+    return div(class_=cls)[
+        request is not None and messages_nav_widget(request),
+        a(
+            class_="no-underline text-base-text hover:text-accent",
+            href=f"/user/{user.username}",
+        )[user.username],
+        form(method="post", action="/auth/logout")[
+            button(
+                type="submit",
+                class_="no-underline text-base-text bg-transparent border-0 cursor-pointer p-0 font-inherit hover:text-accent",
+            )["Logout"]
+        ],
+    ]
 
 
 def navbar(
@@ -51,6 +49,14 @@ def navbar(
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
     is_staff: bool = bool(user and (user.is_admin or user.is_editor))
+
+    if user is None:
+        # Logged out means the login page and nothing else, so the nav carries
+        # the wordmark alone: every other destination would 401, and a "Login"
+        # link would point at the page already being viewed.
+        return nav(
+            class_="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 bg-main relative z-10"
+        )[a(class_="no-underline text-accent font-bold shrink-0", href="/")["PinDB"]]
 
     if not is_staff:
         return nav(

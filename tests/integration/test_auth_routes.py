@@ -32,6 +32,20 @@ class TestGetLoginPage:
         for provider in ("google", "discord", "meta"):
             assert f"/auth/{provider}" not in body
 
+    def test_navbar_carries_only_the_wordmark(self, client):
+        """Every other nav destination 401s for a guest, so none are offered."""
+        body = client.get("/auth/login").text
+        assert ">PinDB<" in body
+        for href in ('href="/list"', 'href="/search/pin"', 'href="/create"'):
+            assert href not in body
+        assert 'href="/auth/login"' not in body
+
+    def test_signed_in_member_still_gets_the_nav_links(self, auth_client):
+        """The logged-out stripping must not reach a plain member's navbar."""
+        body = auth_client.get("/").text
+        assert 'href="/list"' in body
+        assert 'href="/search/pin"' in body
+
 
 @pytest.mark.integration
 class TestRemovedAuthRoutes:
