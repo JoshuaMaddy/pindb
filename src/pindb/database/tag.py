@@ -193,6 +193,9 @@ class Tag(PendingMixin, AuditMixin, MappedAsDataclass, Base):
             # Word count of the surfaced name (display_name when set, else name)
             # for the name_words:asc ranking tiebreak — see search/update.py.
             "name_words": len((self.display_name or self.name).split()),
+            # 0 for color tags, 1 otherwise — see search/update.py category_rank
+            # ranking rule: surfaces color tags above other categories on ties.
+            "category_rank": 0 if self.category == TagCategory.color else 1,
             "description": self.description,
             "category": self.category.value,
             "is_pending": self.is_pending,

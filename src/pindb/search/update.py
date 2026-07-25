@@ -90,14 +90,35 @@ _RANKING_RULES: list[str] = [
     "name_words:asc",
 ]
 
+# Tags only: same as _RANKING_RULES but with a ``category_rank:asc`` tiebreak
+# ahead of ``name_words:asc`` so color tags surface above other categories
+# when the rest of the ranking ties (e.g. searching "red" against a color tag
+# and a same-relevance non-color tag).
+_TAG_RANKING_RULES: list[str] = [
+    "words",
+    "typo",
+    "proximity",
+    "attribute",
+    "sort",
+    "exactness",
+    "category_rank:asc",
+    "name_words:asc",
+]
+
 
 async def _create_index(
-    uid: str, searchable: list[str], filterable: Sequence[str] | None = None
+    uid: str,
+    searchable: list[str],
+    filterable: Sequence[str] | None = None,
+    ranking_rules: list[str] | None = None,
+    sortable: Sequence[str] | None = None,
 ) -> AsyncIndex:
     client = CONFIGURATION.meili_client
     index = await client.get_or_create_index(uid, primary_key="id")
     await index.update_searchable_attributes(searchable)
-    await index.update_ranking_rules(_RANKING_RULES)
+    if sortable:
+        await index.update_sortable_attributes(list(sortable))
+    await index.update_ranking_rules(ranking_rules or _RANKING_RULES)
     if filterable:
         filterable_attributes: list[str | FilterableAttributes] = list(filterable)
         await index.update_filterable_attributes(filterable_attributes)
@@ -129,6 +150,8 @@ async def setup_index() -> None:
         uid=f"{_INDEX_BASE}_tags",
         searchable=["display_name", "name", "aliases", "category"],
         filterable=["category", "id"],
+        ranking_rules=_TAG_RANKING_RULES,
+        sortable=["category_rank"],
     )
     await _create_index(
         uid=f"{_INDEX_BASE}_artists",
