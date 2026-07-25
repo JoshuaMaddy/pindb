@@ -21,7 +21,7 @@ The pin's name as the creator has given it. Use the name from the shop listing, 
 How the pin was sold:
 
 | Type          | Use when                                                             |
-|---------------|----------------------------------------------------------------------|
+| ------------- | -------------------------------------------------------------------- |
 | **Single**    | Sold individually, buyer knows exactly what they are getting.        |
 | **Blind box** | Sold in packaging where the specific design is unknown until opened. |
 | **Set**       | Sold as part of a multi-pin package where all contents are known.    |
@@ -61,7 +61,7 @@ The date the pin went on sale (or pre-order!), and the date sales ended (for lim
 ### Funding type
 
 | Type            | Use when                                      |
-|-----------------|-----------------------------------------------|
+| --------------- | --------------------------------------------- |
 | **Self**        | Funded directly by the artist or shop.        |
 | **Crowdfunded** | Funded via Kickstarter, Makeship, or similar. |
 | **Sponsored**   | Funded or commissioned by a third party.      |
@@ -84,7 +84,7 @@ Select all applicable tags. You only need to select explicit tags — implied ta
 
 ### Grades
 
-The condition grades available or applicable for this pin. If a shop sells pins at "grades", document them to the best of your ability. This includes the *original* price per grade, as well as primary currency. If there is no grade, leave the default `Normal` grade and populate price and currency if known.
+The condition grades available or applicable for this pin. If a shop sells pins at "grades", document them to the best of your ability. This includes the _original_ price per grade, as well as primary currency. If there is no grade, leave the default `Normal` grade and populate price and currency if known.
 
 ### Links
 

@@ -239,6 +239,10 @@ async def erase_user_account(session: AsyncSession, user_id: int) -> list[UUID]:
             user_favorite_pin_sets.c.user_id == user_id
         )
     )
+    # OAuth sign-in is gone, but the table still holds rows from when it
+    # existed, and this delete stays until a later release drops the table.
+    # Dropping it in the same release that stopped writing it would break the
+    # old containers still serving traffic during a blue/green swap.
     await session.execute(
         delete(UserAuthProvider).where(UserAuthProvider.user_id == user_id)
     )

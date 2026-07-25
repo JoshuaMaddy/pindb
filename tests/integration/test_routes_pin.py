@@ -31,19 +31,19 @@ from tests.integration.helpers.pin_payloads import pin_form_data
 
 @pytest.mark.integration
 class TestGetPin:
-    def test_nonexistent_pin_redirects(self, client):
-        response = client.get("/get/pin/999999", follow_redirects=False)
+    def test_nonexistent_pin_redirects(self, auth_client):
+        response = auth_client.get("/get/pin/999999", follow_redirects=False)
         assert response.status_code in (302, 307)
 
-    def test_existing_pin_returns_200(self, client, db_session):
+    def test_existing_pin_returns_200(self, auth_client, db_session):
         pin = PinFactory(name="Special Pikachu Pin")
-        response = client.get(f"/get/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
+        response = auth_client.get(f"/get/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
         assert response.status_code == 200
         assert "Special Pikachu Pin" in response.text
 
-    def test_id_only_url_redirects_to_slugged_form(self, client, db_session):
+    def test_id_only_url_redirects_to_slugged_form(self, auth_client, db_session):
         pin = PinFactory(name="Special Pikachu Pin")
-        response = client.get(
+        response = auth_client.get(
             f"/get/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
             follow_redirects=False,
         )
@@ -52,9 +52,9 @@ class TestGetPin:
             f"/get/pin/special_pikachu_pin/{pin.id}"  # ty:ignore[unresolved-attribute]
         )
 
-    def test_wrong_slug_redirects_to_canonical(self, client, db_session):
+    def test_wrong_slug_redirects_to_canonical(self, auth_client, db_session):
         pin = PinFactory(name="Special Pikachu Pin")
-        response = client.get(
+        response = auth_client.get(
             f"/get/pin/wrong_slug/{pin.id}",  # ty:ignore[unresolved-attribute]
             follow_redirects=False,
         )
@@ -63,10 +63,10 @@ class TestGetPin:
             f"/get/pin/special_pikachu_pin/{pin.id}"  # ty:ignore[unresolved-attribute]
         )
 
-    def test_existing_pin_shows_shops(self, client, db_session):
+    def test_existing_pin_shows_shops(self, auth_client, db_session):
         shop = ShopFactory(name="Pokemon Store")
         pin = PinFactory(shops={shop})
-        response = client.get(f"/get/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
+        response = auth_client.get(f"/get/pin/{pin.id}")  # ty:ignore[unresolved-attribute]
         assert response.status_code == 200
         assert "Pokemon Store" in response.text
 
@@ -75,8 +75,8 @@ class TestGetPin:
 class TestCreatePinAuthEnforcement:
     """`/create/pin` requires the `editor` role. Regular users get 403."""
 
-    def test_unauthenticated_get_returns_401(self, client):
-        response = client.get("/create/pin")
+    def test_unauthenticated_get_returns_401(self, anon_client):
+        response = anon_client.get("/create/pin")
         assert response.status_code == 401
 
     def test_regular_user_get_returns_403(self, auth_client):
@@ -92,8 +92,8 @@ class TestCreatePinAuthEnforcement:
         response = admin_client.get("/create/pin")
         assert response.status_code == 200
 
-    def test_unauthenticated_post_returns_401(self, client):
-        response = client.post("/create/pin", data={})
+    def test_unauthenticated_post_returns_401(self, anon_client):
+        response = anon_client.post("/create/pin", data={})
         assert response.status_code == 401
 
     def test_regular_user_post_returns_403(self, auth_client):
@@ -192,9 +192,9 @@ class TestDuplicatePin:
 class TestDeletePinAuthEnforcement:
     """`POST /delete/pin/{id}` is admin-only and returns a 303 redirect on success."""
 
-    def test_unauthenticated_delete_returns_401(self, client, db_session):
+    def test_unauthenticated_delete_returns_401(self, anon_client, db_session):
         pin = PinFactory()
-        response = client.post(
+        response = anon_client.post(
             f"/delete/pin/{pin.id}",  # ty:ignore[unresolved-attribute]
             follow_redirects=False,
         )

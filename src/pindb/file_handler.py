@@ -2,8 +2,10 @@
 
 Images are stored as opaque UUID keys (no extension). Uploads are capped at
 ``MAX_IMAGE_BYTES``, stripped of embedded metadata, and written with WebP
-sidecars ``{uuid}.thumb.{w}`` for each width in ``THUMBNAIL_SIZES``. The active
-backend comes from ``CONFIGURATION`` (local directory or Cloudflare R2).
+sidecars ``{uuid}.thumb.{w}`` for each width in ``THUMBNAIL_SIZES``. Storage is the
+local ``CONFIGURATION.image_directory``; there is deliberately no object-store
+backend, because a publicly readable bucket URL would serve pin art to anyone
+holding the link and bypass the app's auth gate entirely.
 
 Legacy data may still have a single ``{uuid}.thumbnail`` (256px WebP).
 """
@@ -14,8 +16,6 @@ import uuid
 from math import floor
 from pathlib import Path
 
-import boto3
-from botocore.exceptions import ClientError
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
 from starlette.datastructures import UploadFile
@@ -162,137 +162,32 @@ class FilesystemBackend:
         ]
 
 
-class R2Backend:
-    """S3-compatible access to a Cloudflare R2 bucket from app configuration."""
-
-    def __init__(self) -> None:
-        """Build a boto3 S3 client and bucket handle from ``CONFIGURATION``."""
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=f"https://{CONFIGURATION.r2_account_id}.r2.cloudflarestorage.com",
-            aws_access_key_id=CONFIGURATION.r2_access_key_id,
-            aws_secret_access_key=CONFIGURATION.r2_secret_access_key,
-            region_name="auto",
-        )
-        self._bucket = CONFIGURATION.r2_bucket
-
-    def save(self, key: str, data: bytes) -> None:
-        """Upload *data* to R2 at *key*.
-
-        Args:
-            key (str): Object key in the bucket.
-            data (bytes): Object body.
-        """
-        self._client.put_object(Bucket=self._bucket, Key=key, Body=data)
-
-    def load(self, key: str) -> bytes | None:
-        """Download *key* from R2, swallowing missing-object errors.
-
-        Args:
-            key (str): Object key in the bucket.
-
-        Returns:
-            bytes | None: Object bytes, or ``None`` if the object is absent
-                or the request fails with ``ClientError``.
-        """
-        try:
-            response = self._client.get_object(Bucket=self._bucket, Key=key)
-            return response["Body"].read()
-        except ClientError:
-            return None
-
-    def delete(self, key: str) -> None:
-        """Remove *key* from the bucket. Missing objects are not an error.
-
-        Args:
-            key (str): Object key in the bucket.
-        """
-        try:
-            self._client.delete_object(Bucket=self._bucket, Key=key)
-        except ClientError:
-            pass
-
-    def public_url(self, key: str) -> str | None:
-        """Return a public HTTPS URL for *key* when ``r2_public_url`` is set.
-
-        Args:
-            key (str): Object key appended to the configured public base URL.
-
-        Returns:
-            str | None: Full URL, or ``None`` if public base URL is not
-                configured (caller should proxy bytes instead).
-        """
-        if CONFIGURATION.r2_public_url:
-            return f"{CONFIGURATION.r2_public_url.rstrip('/')}/{key}"
-        return None
-
-    def list_keys(self) -> list[str]:
-        """List original image keys in the bucket (bare UUID object keys only).
-
-        Returns:
-            list[str]: Keys from paginated ``list_objects_v2`` that match
-                the original UUID pattern.
-        """
-        paginator = self._client.get_paginator("list_objects_v2")
-        keys: list[str] = []
-        for page in paginator.paginate(Bucket=self._bucket):
-            for bucket_object in page.get("Contents", []):
-                object_key: str = bucket_object["Key"]
-                if is_original_image_key(object_key):
-                    keys.append(object_key)
-        return keys
+_backend: FilesystemBackend | None = None
 
 
-_backend: FilesystemBackend | R2Backend | None = None
-
-
-def get_backend() -> FilesystemBackend | R2Backend:
+def get_backend() -> FilesystemBackend:
     """Return the process-wide image storage backend singleton.
 
     Returns:
-        FilesystemBackend | R2Backend: Backend selected by
-            ``CONFIGURATION.image_backend`` and related settings.
+        FilesystemBackend: Backend rooted at ``CONFIGURATION.image_directory``.
     """
     global _backend
     if _backend is None:
-        if CONFIGURATION.image_backend == "r2":
-            _backend = R2Backend()
-        else:
-            assert CONFIGURATION.image_directory is not None
-            _backend = FilesystemBackend(CONFIGURATION.image_directory)
+        assert CONFIGURATION.image_directory is not None
+        _backend = FilesystemBackend(CONFIGURATION.image_directory)
     return _backend
 
 
 def image_file_path(key: str) -> Path | None:
-    """Return a filesystem path for *key* when using the directory backend.
+    """Return the filesystem path for *key*.
 
     Args:
         key (str): Stored object key (UUID string).
 
     Returns:
-        Path | None: Path on disk for the filesystem backend; ``None`` for R2
-            or when the object file is missing.
+        Path | None: Path on disk, or ``None`` when the file is missing.
     """
-    backend = get_backend()
-    if isinstance(backend, FilesystemBackend):
-        return backend.file_path(key)
-    return None
-
-
-def image_public_url(key: str) -> str | None:
-    """Return a direct public URL for *key* when using R2 with a public base.
-
-    Args:
-        key (str): Stored object key (UUID string).
-
-    Returns:
-        str | None: Public URL from ``R2Backend.public_url``, or ``None`` when
-            not applicable.
-    """
-    backend = get_backend()
-    if isinstance(backend, R2Backend):
-        return backend.public_url(key)
-    return None
+    return get_backend().file_path(key)
 
 
 def load_image(key: str) -> bytes | None:

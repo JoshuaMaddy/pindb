@@ -88,6 +88,35 @@ def rate_limit(limit_str: str):
     return dependency
 
 
+def enforce_limit(key: str, limit_str: str) -> None:
+    """Enforce *limit_str* against an arbitrary *key* from inside a handler.
+
+    The per-IP dependency cannot see form fields, so it cannot stop one
+    attacker spraying many passwords at one account from many addresses. Login
+    calls this with the submitted username as the key to close that gap. With
+    the site private and login the only public POST, that is the whole
+    credential-guessing surface.
+
+    Args:
+        key (str): Pre-namespaced bucket key.
+        limit_str (str): Limit specification for the ``limits`` library.
+
+    Raises:
+        HTTPException: 429 with ``Retry-After`` when the window is exceeded.
+    """
+    if not CONFIGURATION.rate_limit_enabled:
+        return
+    limit = _parse(limit_str)
+    if not _limiter.hit(limit, key):
+        stats = _limiter.get_window_stats(limit, key)
+        retry_after = max(1, int(stats.reset_time - time.time()))
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests — slow down and try again shortly.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 def reset_rate_limits() -> None:
     """Clear all in-memory rate-limit counters.
 

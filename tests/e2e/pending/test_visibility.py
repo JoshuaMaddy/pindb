@@ -77,9 +77,8 @@ def admin_user_id(db_handle):
 
 @pytest.mark.slow
 class TestApprovedVisibility:
-    def test_approved_shop_visible_to_everyone(
+    def test_approved_shop_visible_to_every_member(
         self,
-        anon_browser_context,
         regular_user_browser_context,
         editor_browser_context,
         admin_browser_context,
@@ -89,7 +88,6 @@ class TestApprovedVisibility:
         make_shop("PublicShop", approved=True)
 
         for ctx in (
-            anon_browser_context,
             regular_user_browser_context,
             editor_browser_context,
             admin_browser_context,

@@ -390,7 +390,7 @@ class TestErasure:
 @pytest.mark.integration
 class TestProfileBadges:
     def test_profile_shows_only_highest_tier_per_family(
-        self, client, db_session, test_user
+        self, auth_client, db_session, test_user
     ):
         db_session.add(
             UserAchievement(
@@ -415,7 +415,7 @@ class TestProfileBadges:
         )
         db_session.flush()
 
-        response = client.get(f"/user/{test_user.username}")
+        response = auth_client.get(f"/user/{test_user.username}")
         assert response.status_code == 200
         html = response.text
         assert "Silver Hoarder (II)" in html
@@ -423,8 +423,8 @@ class TestProfileBadges:
         assert "Pin Lover" in html
 
     def test_profile_without_achievements_has_no_badge_row(
-        self, client, db_session, test_user
+        self, auth_client, db_session, test_user
     ):
-        response = client.get(f"/user/{test_user.username}")
+        response = auth_client.get(f"/user/{test_user.username}")
         assert response.status_code == 200
         assert "achievement-badge" not in response.text

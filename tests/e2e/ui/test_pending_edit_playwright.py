@@ -41,8 +41,12 @@ class TestPendingEditBanner:
             admin_page.get_by_role("link", name=re.compile("View pending"))
         ).to_be_visible()
 
-    def test_anonymous_user_does_not_see_pending_edit_banner(
-        self, browser, admin_browser_context, editor_browser_context, live_server
+    def test_regular_member_does_not_see_pending_edit_banner(
+        self,
+        regular_user_browser_context,
+        admin_browser_context,
+        editor_browser_context,
+        live_server,
     ):
         admin_page = admin_browser_context.new_page()
         admin_page.goto(f"{live_server}/create/shop")
@@ -60,14 +64,13 @@ class TestPendingEditBanner:
         submit_content_form(editor_page)
         editor_page.wait_for_load_state("load")
 
-        with browser.new_context(base_url=live_server) as anon:
-            anon_page = anon.new_page()
-            anon_page.goto(f"{live_server}/list/shops")
-            anon_page.get_by_text("AnonShopBanner").first.click()
-            anon_page.wait_for_load_state("load")
-            expect(anon_page.locator("body")).not_to_contain_text(
-                "This entry has a pending edit awaiting approval."
-            )
+        member_page = regular_user_browser_context.new_page()
+        member_page.goto(f"{live_server}/list/shops")
+        member_page.get_by_text("AnonShopBanner").first.click()
+        member_page.wait_for_load_state("load")
+        expect(member_page.locator("body")).not_to_contain_text(
+            "This entry has a pending edit awaiting approval."
+        )
 
 
 @pytest.mark.slow

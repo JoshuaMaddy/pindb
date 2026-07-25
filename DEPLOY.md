@@ -60,19 +60,45 @@ Required variables (bootstrap will refuse to run without them):
 - `POSTGRES_PASSWORD`
 - `MEILISEARCH_KEY`
 
-Other variables (OAuth client IDs/secrets, contact email, R2 credentials, etc.)
-are optional and feature-gated. See [`src/pindb/config.py`](./src/pindb/config.py)
-for the full list.
+Other variables (contact email, rate-limit and cookie flags, etc.) are optional
+and feature-gated. See [`src/pindb/config.py`](./src/pindb/config.py) for the
+full list.
 
-### 1.4 (Optional) Bootstrap admin users
+`FORWARDED_ALLOW_IPS` is worth setting: it decides whose `X-Forwarded-For`
+uvicorn believes, and the login rate limiter keys on the resulting client IP.
+The default `*` lets any client spoof the header and mint itself a fresh
+attempt budget per request. Pin it to the proxy's address on the compose
+network.
 
-Set in `.env`:
+### 1.4 Bootstrap the first admin
+
+There is no signup, so a fresh deployment needs one account seeded from the
+environment or nobody can get in. Set in `.env`:
 
 ```
 BOOTSTRAP_ADMIN_USERNAMES=alice,bob
+BOOTSTRAP_ADMIN_PASSWORD=<a strong password>
 ```
 
-These users are promoted to admin on app startup (after they sign up).
+On startup, each listed username that already exists is promoted to admin;
+one that does not exist is **created** with `BOOTSTRAP_ADMIN_PASSWORD`. An
+existing account's password is never overwritten from the environment, so it is
+safe to leave both set. Log in and change the password, then create the rest of
+the members from `/admin/users`.
+
+### 1.4.1 Accounts, passwords, and lockouts
+
+- Every account is created by an admin at `/admin/users`. There is no signup.
+- **There is no password reset** — PinDB sends no email. A member who is locked
+  out needs an admin to set a new password for them from the same page.
+- Rows with `hashed_password IS NULL` are leftovers from the removed OAuth
+  sign-in and can no longer log in. Find them before cutting over:
+
+  ```bash
+  docker compose exec postgres psql -U pindb -c     "SELECT username, email FROM users WHERE hashed_password IS NULL;"
+  ```
+
+  For each, either set a password from `/admin/users` or erase the account.
 
 ### 1.5 Log in to ghcr.io (only if the package is private)
 

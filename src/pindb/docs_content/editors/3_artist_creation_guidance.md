@@ -33,6 +33,7 @@ Mark an artist as **inactive** if they have permanently stopped creating pins. D
 ## Aliases
 
 Alternate names or handles the artist can be found by:
+
 - A legal name if they are also publicly known by it
 - A former handle or name used before a rebrand
 

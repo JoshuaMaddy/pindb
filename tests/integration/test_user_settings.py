@@ -107,7 +107,8 @@ class TestDeleteOwnAccount:
             follow_redirects=False,
         )
         assert response.status_code == 303
-        assert response.headers.get("location") == "/"
+        # The account and its session are gone, so the only page left is login.
+        assert response.headers.get("location") == "/auth/login"
         set_cookie = response.headers.get("set-cookie", "").lower()
         assert "session" in set_cookie and (
             "max-age=0" in set_cookie or "expires=" in set_cookie

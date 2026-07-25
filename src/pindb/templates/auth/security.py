@@ -22,89 +22,22 @@ from htpy import (
 )
 
 from pindb.database.user import User
-from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import describe_policy
 from pindb.templates.base import html_base
-from pindb.templates.components.dialogs.confirm_modal import confirm_modal
 from pindb.templates.components.forms.error_message import error_message
 from pindb.templates.components.layout.centered import centered_div
-from pindb.utils import pretty_titlecase
-
-_PROVIDER_LABELS = {
-    OAuthProvider.google: "Google",
-    OAuthProvider.discord: "Discord",
-    OAuthProvider.meta: "Meta",
-}
-
-
-def _provider_section(
-    *,
-    enabled_providers: list[OAuthProvider],
-    linked_providers: list[UserAuthProvider],
-    can_unlink: bool,
-) -> Element:
-    linked_by_provider = {link.provider: link for link in linked_providers}
-    rows: list[Element] = []
-    for provider in enabled_providers:
-        label_text = _PROVIDER_LABELS.get(provider, pretty_titlecase(provider.value))
-        link = linked_by_provider.get(provider)
-        if link is not None:
-            detail_parts: list[str] = []
-            if link.provider_email:
-                detail_parts.append(link.provider_email)
-            if link.email_verified:
-                detail_parts.append("verified")
-            detail = f" ({', '.join(detail_parts)})" if detail_parts else ""
-            if can_unlink:
-                unlink_control: Element = confirm_modal(
-                    trigger=button(type="button", class_="text-sm")["Unlink"],
-                    message=(
-                        f"Unlink {label_text}? You will no longer be able to sign "
-                        "in with it. You can re-link it later."
-                    ),
-                    form_action=f"/user/me/unlink/{provider.value}",
-                    confirm_label="Unlink",
-                )
-            else:
-                # Only sign-in method left — unlinking would lock the user out.
-                unlink_control = button(
-                    type="button",
-                    disabled=True,
-                    class_="text-sm",
-                    title="Set a password or link another provider first.",
-                )["Unlink"]
-            rows.append(
-                li(class_="flex items-center justify-between gap-2")[
-                    div[f"{label_text}{detail}"],
-                    unlink_control,
-                ]
-            )
-        else:
-            rows.append(
-                li(class_="flex items-center justify-between gap-2")[
-                    div[label_text],
-                    a(
-                        href=f"/auth/{provider.value}?link=1",
-                        class_="text-sm",
-                    )["Link account"],
-                ]
-            )
-    return ul(class_="flex flex-col gap-2")[rows]
 
 
 def security_page(
     request: Request,
     *,
     current_user: User,
-    linked_providers: list[UserAuthProvider],
-    enabled_providers: list[OAuthProvider],
     error: str | None = None,
     success: str | None = None,
     password_errors: list[str] | None = None,
 ) -> Element:
     policy = describe_policy()
     has_password = current_user.hashed_password is not None
-    can_unlink = has_password or len(linked_providers) > 1
 
     return html_base(
         title="Security",
@@ -171,17 +104,6 @@ def security_page(
                     button(type="submit")[
                         "Set password" if not has_password else "Change password"
                     ],
-                ],
-                hr,
-                h2["Sign-in providers"],
-                _provider_section(
-                    enabled_providers=enabled_providers,
-                    linked_providers=linked_providers,
-                    can_unlink=can_unlink,
-                )
-                if enabled_providers
-                else p(class_="text-subtle")[
-                    "No OAuth providers are configured on this server."
                 ],
                 div(class_="mt-4")[
                     a(href=f"/user/{current_user.username}")["Back to profile"],

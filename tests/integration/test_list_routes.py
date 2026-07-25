@@ -9,45 +9,45 @@ from tests.factories.shop import ShopFactory
 
 @pytest.mark.integration
 class TestListShops:
-    def test_empty_list_returns_200(self, client):
-        response = client.get("/list/shops")
+    def test_empty_list_returns_200(self, auth_client):
+        response = auth_client.get("/list/shops")
         assert response.status_code == 200
 
-    def test_shows_shop_name(self, client, db_session):
+    def test_shows_shop_name(self, auth_client, db_session):
         ShopFactory(name="Acme Pins")
-        response = client.get("/list/shops")
+        response = auth_client.get("/list/shops")
         assert response.status_code == 200
         assert "Acme Pins" in response.text
 
-    def test_shows_multiple_shops(self, client, db_session):
+    def test_shows_multiple_shops(self, auth_client, db_session):
         ShopFactory(name="Shop Alpha")
         ShopFactory(name="Shop Beta")
-        response = client.get("/list/shops")
+        response = auth_client.get("/list/shops")
         assert "Shop Alpha" in response.text
         assert "Shop Beta" in response.text
 
 
 @pytest.mark.integration
 class TestListArtists:
-    def test_empty_list_returns_200(self, client):
-        response = client.get("/list/artists")
+    def test_empty_list_returns_200(self, auth_client):
+        response = auth_client.get("/list/artists")
         assert response.status_code == 200
 
-    def test_shows_artist_name(self, client, db_session):
+    def test_shows_artist_name(self, auth_client, db_session):
         ArtistFactory(name="Famous Artist")
-        response = client.get("/list/artists")
+        response = auth_client.get("/list/artists")
         assert "Famous Artist" in response.text
 
 
 @pytest.mark.integration
 class TestListPinSets:
-    def test_empty_list_returns_200(self, client):
-        response = client.get("/list/pin_sets")
+    def test_empty_list_returns_200(self, auth_client):
+        response = auth_client.get("/list/pin_sets")
         assert response.status_code == 200
 
-    def test_shows_pin_set_name(self, client, db_session):
+    def test_shows_pin_set_name(self, auth_client, db_session):
         PinSetFactory(name="My Awesome Set")
-        response = client.get("/list/pin_sets")
+        response = auth_client.get("/list/pin_sets")
         assert "My Awesome Set" in response.text
 
 
@@ -55,20 +55,20 @@ class TestListPinSets:
 class TestListDetailedView:
     """The shared entity_list_items factory must render both grid and detailed."""
 
-    def test_shops_detailed(self, client, db_session):
+    def test_shops_detailed(self, auth_client, db_session):
         ShopFactory(name="Detailed Shop")
-        response = client.get("/list/shops?view=detailed")
+        response = auth_client.get("/list/shops?view=detailed")
         assert response.status_code == 200
         assert "Detailed Shop" in response.text
 
-    def test_artists_detailed(self, client, db_session):
+    def test_artists_detailed(self, auth_client, db_session):
         ArtistFactory(name="Detailed Artist")
-        response = client.get("/list/artists?view=detailed")
+        response = auth_client.get("/list/artists?view=detailed")
         assert response.status_code == 200
         assert "Detailed Artist" in response.text
 
-    def test_pin_sets_detailed(self, client, db_session):
+    def test_pin_sets_detailed(self, auth_client, db_session):
         PinSetFactory(name="Detailed Set")
-        response = client.get("/list/pin_sets?view=detailed")
+        response = auth_client.get("/list/pin_sets?view=detailed")
         assert response.status_code == 200
         assert "Detailed Set" in response.text

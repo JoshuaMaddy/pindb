@@ -33,6 +33,7 @@ from pindb.database.user_pin_queries import (
     get_wanted_entries,
 )
 from pindb.file_handler import delete_image
+from pindb.require_login import LOGIN_PATH
 from pindb.routes.user.displays import router as displays_router
 from pindb.routes.user.lists import router as lists_router
 from pindb.routes.user.sets import router as sets_router
@@ -104,7 +105,9 @@ async def delete_own_account(
     # that no longer exist.
     for guid in orphaned_guids:
         delete_image(guid)
-    response = RedirectResponse(url="/", status_code=303)
+    # Straight to login, not "/": the account and its session are gone, so the
+    # auth gate would bounce them there anyway.
+    response = RedirectResponse(url=LOGIN_PATH, status_code=303)
     clear_session_cookie(response)
     return response
 

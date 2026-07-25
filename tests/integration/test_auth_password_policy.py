@@ -1,4 +1,4 @@
-"""Integration tests for password policy on signup + password change."""
+"""Integration tests for password policy on admin-create + password change."""
 
 from __future__ import annotations
 
@@ -14,10 +14,12 @@ ALSO_STRONG = "Velvet-Orbit-Maple-91!"
 
 
 @pytest.mark.integration
-class TestSignupPolicy:
-    def test_weak_password_rejected_with_rules(self, client):
-        response = client.post(
-            "/auth/signup",
+class TestAdminCreatePolicy:
+    """The policy now guards admin-created accounts; signup is gone."""
+
+    def test_weak_password_rejected_with_rules(self, admin_client):
+        response = admin_client.post(
+            "/admin/users/create",
             data={
                 "username": "weakie",
                 "email": "w@example.com",
@@ -27,9 +29,9 @@ class TestSignupPolicy:
         assert response.status_code == 400
         assert "password" in response.text.lower()
 
-    def test_strong_password_accepted(self, client):
-        response = client.post(
-            "/auth/signup",
+    def test_strong_password_accepted(self, admin_client):
+        response = admin_client.post(
+            "/admin/users/create",
             data={
                 "username": "stronger",
                 "email": "strong@example.com",
@@ -104,12 +106,16 @@ class TestChangePassword:
 
 
 @pytest.mark.integration
-class TestOAuthOnlyUserCanSetPassword:
-    def test_oauth_only_user_can_add_password_without_current(
+class TestPasswordlessUserCanSetPassword:
+    def test_passwordless_user_can_add_password_without_current(
         self, client, db_session, seed_currencies
     ):
-        """An OAuth-only user has no ``hashed_password``; they should be
-        able to set one without a ``current_password``."""
+        """A row with no ``hashed_password`` (an OAuth-era leftover) can set
+        one without supplying a ``current_password``.
+
+        Such a user can no longer log in, so in practice an admin sets the
+        password for them — but a still-valid session must be able to do it.
+        """
         import secrets
         from datetime import datetime, timedelta, timezone
 

@@ -1,4 +1,8 @@
-"""Smoke tests for public list and entity detail pages."""
+"""Smoke tests for list and entity detail pages.
+
+These pages were public before PinDB went private. They now require a
+session, so each case both renders for a member and 401s for a guest.
+"""
 
 from __future__ import annotations
 
@@ -25,7 +29,7 @@ class SmokeEntity(Protocol):
 
 
 @pytest.mark.integration
-class TestPublicPageSmoke:
+class TestPageSmoke:
     @pytest.mark.parametrize(
         "path",
         [
@@ -36,22 +40,31 @@ class TestPublicPageSmoke:
             "/list/pin_sets",
         ],
     )
-    def test_list_pages_return_200(self, anon_client, admin_user, path: str):
+    def test_list_pages_return_200(
+        self, anon_client, auth_client, admin_user, path: str
+    ):
         ShopFactory(name="Smoke Shop", approved=True, created_by=admin_user)
         ArtistFactory(name="Smoke Artist", approved=True, created_by=admin_user)
         TagFactory(name="smoke_tag", approved=True, created_by=admin_user)
         PinSetFactory(name="Smoke Set", approved=True, created_by=admin_user)
 
-        response = anon_client.get(path)
-
-        assert response.status_code == 200
+        assert auth_client.get(path).status_code == 200
+        assert anon_client.get(path, follow_redirects=False).status_code == 401
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_user_profile_page_returns_200(self, anon_client, subject_user):
-        response = anon_client.get(f"/user/{subject_user.username}")
+    def test_user_profile_page_returns_200(
+        self, anon_client, auth_client, subject_user
+    ):
+        response = auth_client.get(f"/user/{subject_user.username}")
 
         assert response.status_code == 200
         assert subject_user.username in response.text
+        assert (
+            anon_client.get(
+                f"/user/{subject_user.username}", follow_redirects=False
+            ).status_code
+            == 401
+        )
 
     @pytest.mark.parametrize(
         ("entity_key", "path_for_entity", "expected_text"),
@@ -66,6 +79,7 @@ class TestPublicPageSmoke:
     def test_get_pages_return_200(
         self,
         anon_client,
+        auth_client,
         admin_user,
         entity_key: str,
         path_for_entity: Callable[[SmokeEntity], str],
@@ -115,7 +129,9 @@ class TestPublicPageSmoke:
         }
         entity = entities[entity_key]
 
-        response = anon_client.get(path_for_entity(entity))
+        path = path_for_entity(entity)
+        response = auth_client.get(path)
 
         assert response.status_code == 200
         assert expected_text in response.text
+        assert anon_client.get(path, follow_redirects=False).status_code == 401

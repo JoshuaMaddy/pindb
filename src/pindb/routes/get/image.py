@@ -5,7 +5,7 @@ FastAPI routes: `routes/get/image.py`.
 from uuid import UUID
 
 from fastapi import HTTPException, Query, Response
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 
 from pindb.file_handler import (
@@ -15,7 +15,6 @@ from pindb.file_handler import (
     ensure_legacy_thumbnail_on_disk,
     ensure_sized_thumbnail_on_disk,
     image_file_path,
-    image_public_url,
     load_image,
     sniff_image_mime,
     thumbnail_storage_key,
@@ -42,7 +41,7 @@ async def get_image(
     guid: UUID,
     thumbnail: bool = False,
     w: int | None = Query(None),
-) -> FileResponse | RedirectResponse | Response:
+) -> FileResponse | Response:
     guid_str = str(guid)
 
     if w is not None:
@@ -71,14 +70,9 @@ async def get_image(
         key = guid_str
         is_webp = False
 
-    pub_url = image_public_url(key)
-    if pub_url:
-        return RedirectResponse(
-            url=pub_url,
-            status_code=302,
-            headers={"Cache-Control": IMAGE_CACHE_CONTROL},
-        )
-
+    # Bytes are always served from this route, never redirected to storage: a
+    # redirect target would be fetched without the session cookie and would
+    # hand out pin art to anyone holding the URL.
     path = image_file_path(key)
     if path is not None:
         media_type = "image/webp" if is_webp else _original_mime_from_path(path)

@@ -182,9 +182,7 @@ class TestDisplayEditing:
         assert db_session.get(UserDisplayImage, victim_first["id"]).position == 0
         assert db_session.get(UserDisplayImage, victim_second["id"]).position == 1
 
-    def test_delete_hides_image_from_the_page(
-        self, auth_client, client, test_user, png_upload
-    ):
+    def test_delete_hides_image_from_the_page(self, auth_client, test_user, png_upload):
         image = _upload(auth_client, png_upload)
         assert (
             auth_client.post(
@@ -193,7 +191,7 @@ class TestDisplayEditing:
             == 204
         )
 
-        page = client.get(f"/user/{test_user.username}/display")
+        page = auth_client.get(f"/user/{test_user.username}/display")
         assert page.status_code == 200
         assert image["guid"] not in page.text
 
@@ -236,27 +234,42 @@ class TestPinOptions:
 
 
 @pytest.mark.integration
-class TestPublicDisplayPage:
-    def test_guest_sees_the_page_and_its_share_card(
-        self, auth_client, client, test_user, png_upload
+class TestMemberVisibleDisplayPage:
+    """The display page is members-only now — no unfurl card, no guests."""
+
+    def test_member_sees_another_users_display(
+        self, auth_client, admin_client, test_user, png_upload
     ):
         _upload(auth_client, png_upload)
         auth_client.post("/user/me/display", data={"blurb": "My whole wall."})
 
-        page = client.get(f"/user/{test_user.username}/display")
+        page = admin_client.get(f"/user/{test_user.username}/display")
         assert page.status_code == 200
-        assert 'property="og:image"' in page.text
-        assert f"/get/og-image/user_display/{test_user.id}" in page.text
         assert "My whole wall." in page.text
 
-    def test_user_with_no_display_is_an_empty_page_not_a_404(self, client, test_user):
-        # A shared link must never break, so this is deliberately not a 404.
-        response = client.get(f"/user/{test_user.username}/display")
+    def test_guest_is_denied(self, auth_client, anon_client, test_user, png_upload):
+        _upload(auth_client, png_upload)
+        response = anon_client.get(
+            f"/user/{test_user.username}/display", follow_redirects=False
+        )
+        assert response.status_code == 401
+
+    def test_page_carries_no_share_card(self, auth_client, test_user, png_upload):
+        _upload(auth_client, png_upload)
+        page = auth_client.get(f"/user/{test_user.username}/display")
+        assert 'property="og:' not in page.text
+        assert "/get/og-image/" not in page.text
+
+    def test_user_with_no_display_is_an_empty_page_not_a_404(
+        self, auth_client, test_user
+    ):
+        # Still not a 404: a link passed between members must not break.
+        response = auth_client.get(f"/user/{test_user.username}/display")
         assert response.status_code == 200
         assert "No display photos yet" in response.text
 
-    def test_unknown_user_is_a_404(self, client):
-        assert client.get("/user/nobody-here/display").status_code == 404
+    def test_unknown_user_is_a_404(self, auth_client):
+        assert auth_client.get("/user/nobody-here/display").status_code == 404
 
     def test_me_does_not_collide_with_the_username_route(self, auth_client):
         """``/user/me/display/edit`` must not be read as username="me"."""
@@ -264,28 +277,13 @@ class TestPublicDisplayPage:
         assert response.status_code == 200
         assert "Edit Display" in response.text
 
-    def test_og_card_renders_with_and_without_a_cover(
-        self, auth_client, client, test_user, png_upload
-    ):
-        empty = client.get(f"/get/og-image/user_display/{test_user.id}")
-        assert empty.status_code == 200
-        assert empty.headers["content-type"] == "image/webp"
-
-        _upload(auth_client, png_upload)
-        with_cover = client.get(f"/get/og-image/user_display/{test_user.id}")
-        assert with_cover.status_code == 200
-        assert with_cover.headers["content-type"] == "image/webp"
-
-    def test_og_card_404s_for_unknown_user(self, client):
-        assert client.get("/get/og-image/user_display/999999").status_code == 404
-
 
 @pytest.mark.integration
 class TestProfileSection:
     def test_display_strip_links_to_the_display_page(
-        self, auth_client, client, test_user, png_upload
+        self, auth_client, test_user, png_upload
     ):
         _upload(auth_client, png_upload)
-        profile = client.get(f"/user/{test_user.username}")
+        profile = auth_client.get(f"/user/{test_user.username}")
         assert profile.status_code == 200
         assert f"/user/{test_user.username}/display" in profile.text

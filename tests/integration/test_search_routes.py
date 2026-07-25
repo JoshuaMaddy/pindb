@@ -7,15 +7,17 @@ from tests.factories.pin import PinFactory
 
 @pytest.mark.integration
 class TestSearchPin:
-    def test_get_search_page_returns_200(self, client):
-        response = client.get("/search/pin")
+    def test_get_search_page_returns_200(self, auth_client):
+        response = auth_client.get("/search/pin")
         assert response.status_code == 200
 
-    def test_empty_search_returns_200(self, client):
-        response = client.get("/search/pin", params={"q": ""})
+    def test_empty_search_returns_200(self, auth_client):
+        response = auth_client.get("/search/pin", params={"q": ""})
         assert response.status_code == 200
 
-    def test_search_with_no_hits_shows_empty_state(self, client, patch_meilisearch):
+    def test_search_with_no_hits_shows_empty_state(
+        self, auth_client, patch_meilisearch
+    ):
         patch_meilisearch.search.return_value = {
             "hits": [],
             "offset": 0,
@@ -24,12 +26,12 @@ class TestSearchPin:
             "processingTimeMs": 1,
             "query": "nonexistent",
         }
-        response = client.get("/search/pin", params={"q": "nonexistent"})
+        response = auth_client.get("/search/pin", params={"q": "nonexistent"})
         assert response.status_code == 200
         assert "No pins found" in response.text
 
     def test_search_with_hits_shows_pin_names(
-        self, client, db_session, patch_meilisearch
+        self, auth_client, db_session, patch_meilisearch
     ):
         pin = PinFactory(name="Rare Holographic Pin")
         patch_meilisearch.search.return_value = {
@@ -50,12 +52,12 @@ class TestSearchPin:
             "query": "holographic",
         }
         # Bookmarkable GET URL renders the hits inline (no HTMX round-trip needed).
-        response = client.get("/search/pin", params={"q": "holographic"})
+        response = auth_client.get("/search/pin", params={"q": "holographic"})
         assert response.status_code == 200
         assert "Rare Holographic Pin" in response.text
 
     def test_htmx_request_returns_results_fragment(
-        self, client, db_session, patch_meilisearch
+        self, auth_client, db_session, patch_meilisearch
     ):
         pin = PinFactory(name="Fragment Pin")
         patch_meilisearch.search.return_value = {
@@ -75,7 +77,7 @@ class TestSearchPin:
             "processingTimeMs": 2,
             "query": "fragment",
         }
-        response = client.get(
+        response = auth_client.get(
             "/search/pin", params={"q": "fragment"}, headers={"HX-Request": "true"}
         )
         assert response.status_code == 200

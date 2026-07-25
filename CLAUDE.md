@@ -3,7 +3,7 @@
 > **Maintainability note:** Keep file current. Changes to architecture, tech stack, auth, deployment, structure → update section in same commit. Only non-obvious things.
 
 ## Project Overview
-PinDB: FastAPI app cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password + OAuth (Google, Discord, Meta).
+PinDB: FastAPI app cataloging collectible pins. Server-rendered HTML via **htpy** + **HTMX** (no SPA/REST), SQLAlchemy ORM over PostgreSQL, Meilisearch full-text search. Session auth: password only. **Private members-only site** — see "Private Access Gate".
 
 ## After Every Code Change
 Run before task done:
@@ -17,7 +17,7 @@ npm run islands:check   # when frontend/ touched
 
 ## Tech Stack
 - **Backend:** Python 3.13+, FastAPI, SQLAlchemy 2.0+, Pydantic Settings, APScheduler
-- **Auth:** Argon2, DB-backed session tokens, Google OIDC, Discord OAuth, Meta OAuth
+- **Auth:** Argon2, DB-backed session tokens. No OAuth, no signup — admins create accounts at `/admin/users`.
 - **Frontend:** htpy, HTMX, Tailwind CSS 4, Svelte 5 islands (TypeScript), Lucide icons. Alpine.js and Tom Select fully removed — complex widgets are islands; pure show/hide disclosures use the delegated `data-disclosure` pattern in `templates/js/shell/pindb_shell.js`.
 - **Select widgets:** all enhanced selects are the native `frontend/lib/MultiSelect.svelte` component (chips, dropdown, remote load via `/get/options/*` or `/bulk/options/*`, create-on-type, tag category branding from `window.TagCategoryData`). Bulk grids use it as a plain component; page forms render a server `<select>` followed by the `multi-select` enhancer island (`island("multi-select", props={"selectId": ...})`), which adopts the select — moves it inside the widget, keeps it synced, dispatches real bubbling `change` events (HTMX `hx-trigger="change"`, form gates and form-persist saves all keep working). Gate check is `pindbSelectHasItems` (reads the underlying select). E2E drives selects only through `tests/e2e/select_helpers.py`, never widget internals. Meilisearch note: index uids all derive from `MEILISEARCH_INDEX` (base name) — `<base>`, `<base>_tags`, `<base>_artists`, `<base>_shops`, `<base>_pin_sets` — so parallel test workers on one Meili server stay isolated; renaming means indexes rebuild on next sync after deploy.
 - **Database:** PostgreSQL 17, Meilisearch
@@ -134,17 +134,15 @@ return HTMLResponse(content=str(template(pin=pin)))
 ### HTMX
 - Routes check `request.headers.get("HX-Request")` to return fragments vs full pages.
 - `RedirectResponse(..., status_code=303)` for form-to-redirect.
-- Authlib stores OAuth state in Starlette `SessionMiddleware` using cookie `pindb_starlette_session` (not `session`, which is login token).
 
 ### Images
 - Pin has `front_image_guid` (required), `back_image_guid` (optional) — UUIDs.
 - Thumbnails: objects `{uuid}.thumb.{w}` for `w ∈ {50, 100, 200, 400, 600}` (WebP, long-edge fit), generated eagerly at ingest. Legacy data may still have `{uuid}.thumbnail` (256px WebP); `GET /get/image/{guid}?thumbnail=true` prefers `.thumb.200` then falls back to `.thumbnail`.
 - `GET /get/image/{guid}?w=N` serves a sized thumb when `N` is in that set. Templates use `pin_thumbnail_img()`: `src` is the smallest stored width (fallback), `srcset` lists all widths with `w` descriptors, `sizes` is a comma-separated media-query list (first match wins) per layout.
 - `file_handler.delete_image(guid)` irreversibly removes the original **and all five thumbs**. Only account erasure calls it — see "User Displays". Ordinary deletes soft-delete the row and leave the bytes.
-- Two backends (mutually exclusive): `filesystem` or `r2` (Cloudflare R2).
-- R2 with `r2_public_url` set → redirects; else proxies bytes. Filesystem → `FileResponse`.
+- **Filesystem storage only, and the route never redirects.** An object-store backend was removed on purpose: a publicly readable bucket URL is fetched without the session cookie, so it hands out pin art to anyone holding the link and defeats the auth gate entirely. Bytes always come from `image_directory` via `FileResponse`. Don't reintroduce a redirect branch.
+- `Cache-Control` is `private, max-age=31536000, immutable` — immutable because keys are UUIDs, `private` because a shared/CDN cache must never serve members-only art to a request with no cookie.
 - 20 MB upload limit; EXIF/ICC/XMP stripped on ingest (`_strip_metadata`) prevents GPS/device leaks.
-- Migration: `uv run python scripts/migrate_images.py --direction fs-to-r2|r2-to-fs`
 
 ### Search (Meilisearch)
 - `Pin.document()` returns indexed dict.
@@ -162,6 +160,25 @@ return HTMLResponse(content=str(template(pin=pin)))
 - `PinSet.owner_id = NULL` → global/curator set (admin-editable).
 - `PinSet.owner_id = {user_id}` → personal set (user-editable).
 - Admin can promote personal → global.
+
+## Private Access Gate (load-bearing)
+
+PinDB is a **private community**: the login page is the only thing an anonymous visitor can reach. This exists to protect the catalog's IP, so treat anything that widens the public surface as a bug.
+
+`require_login.py::require_login_middleware` is the enforcement point — **middleware, not per-route `AuthenticatedUser` dependencies**, for three reasons that are easy to forget:
+1. A route added later is private by default. With dependencies, one forgotten annotation silently republishes the catalog.
+2. **Dependencies never run for `app.mount()`ed apps.** `/static` and `/templates-js` bypass routing entirely, so no dependency could ever guard them. This is also why the editor docs markdown lives in `pindb/docs_content/`, *not* `static/docs/` — anything under the mount is served raw. Don't move it back.
+3. It runs before routing, so 404/405/validation responses stop being an existence oracle.
+
+Ordering in `__init__.py`: added *before* `attach_user_middleware` so it runs *after* it (Starlette nests in reverse add-order) and reads the already-resolved `request.state.user` with no second DB hit; inside CSRF and security-headers so rejections still carry baseline headers and a cross-origin POST still reads as CSRF.
+
+The allowlist is `PUBLIC_EXACT` (`/healthz`, `/auth/login`, `/auth/logout`, `/robots.txt`, `/favicon.ico`) plus `PUBLIC_PREFIXES` (`/static/`, `/templates-js/`). `/`, `/legal`, and `/docs` are deliberately **not** public. `tests/integration/test_private_access_gate.py` walks `app.routes` and fails if any route answers anonymously without being allowlisted — that test is the regression net for the whole lockdown.
+
+Three rejection shapes, and the third is why the integration suite still compiles: HTMX requests get `401` + `HX-Redirect` (htmx handles that header before status-based response handling, so no error toast); browser navigations (`Accept: text/html` on GET) get `303` to `/auth/login?next=…`; **everything else gets a plain `401`**, which is what `TestClient` (`Accept: */*`) and `helpers/authz.py` expect. `next` is validated by `safe_next_target` — relative only, and `//`/`/\` rejected, or the login form becomes an open redirect.
+
+**No signup and no OAuth.** Accounts are created by an admin at `POST /admin/users/create`. There is no password reset (no outbound email anywhere in the app), so a locked-out member needs an admin to set a new password. A fresh deployment bootstraps via `BOOTSTRAP_ADMIN_USERNAMES` + `BOOTSTRAP_ADMIN_PASSWORD` (`lifespan._ensure_admins` creates the row when missing; it never overwrites an existing account's password). Rows with `hashed_password IS NULL` are OAuth-era leftovers and cannot log in at all.
+
+**No unfurl or SEO surface**: no OpenGraph/Twitter tags, no canonical links, no `/get/og-image/*`. `security_headers.py` sets `X-Robots-Tag: noindex, …` on *every* response (headers, not `<meta>`, so images and error responses are covered too) and `/robots.txt` is deny-all. CSP `img-src` is `'self' data:` — the last remote images were the OAuth provider icons.
 
 ## Editor Role & Pending Approval
 
@@ -192,10 +209,10 @@ Wire value note: `MessageCategory.changes_requested` deliberately persists as `"
 
 ## User Displays
 
-Photos of a user's *real-life* pin display, at the shareable public page `GET /user/{username}/display`. The point is organic promotion: the link unfurls in Discord with the user's cover photo plus PinDB branding, and the "Pins in this display" section carries the click back into the catalog. Everything lives in `routes/user/displays.py` + `templates/user/display_{page,edit,layouts}.py` + the `display-editor` island.
+Photos of a user's *real-life* pin display at `GET /user/{username}/display`, visible to fellow members. This was a public, Discord-unfurlable page; the site going private removed the share card and the anonymous viewer, but the page itself and the "Pins in this display" section are unchanged. Everything lives in `routes/user/displays.py` + `templates/user/display_{page,edit,layouts}.py` + the `display-editor` island.
 
 - **`UserDisplay` is 1:1 with a user, created lazily** (`_get_or_create_display`, `pg_insert ... ON CONFLICT DO NOTHING` on the unique `user_id`) — not at signup, or every account that never uses the feature leaves a dead row. **The cover photo is simply the image at the lowest `position`**; there is no `cover_image_id` (it would be a circular FK needing a fixup on every cover delete).
-- **A user with no display is a 200 empty state, never a 404** — a shared link must not break.
+- **A user with no display is a 200 empty state, never a 404** — a link passed between members must not break.
 - **Display photos render at full original resolution, never a thumbnail** — `_photo_figure` (`display_layouts.py`) points `src` straight at `full_image_url()`, not `pin_thumbnail_img()`/`srcset`. A photo of someone's shelf is the point of the page, unlike catalog pin art, which is fine downsized. Only the editor's own drag-reorder tiles (`DisplayImageTile.svelte`) use a small `?w=200` thumb — that list is a management UI, not the public page.
 - **Route ordering trap:** `/user/me/display/edit` and `/user/{username}/display` are the same shape, so `me` matches `{username}`. The `/me/...` routes are declared first *within* `displays.py`, and the router is included before `router.py`'s `/{username}` catch-all. Get it wrong and every owner route 404s with "User not found" — a routing bug that reads like a template bug.
 - **The pin picker has its own options endpoint** (`GET /user/me/display/pin-options`). `/get/options/{entity_type}` is `require_editor`-gated on purpose (it reads Meili with no ORM re-hydration and would leak pending entities), so a regular user tagging pins in their own photo would get a 403 from it. This one goes through `search_pin`, which re-hydrates via the ORM so `_filter_deleted` applies.
@@ -235,7 +252,7 @@ Four list types, each with paginated full page (`GET /user/{username}/{list}`) a
 | Want List | `wants` | `UserWantedPin` (per-grade) |
 | Trades | `trades` | `UserOwnedPin` filtered by `tradeable_quantity > 0` |
 
-Full pages paginated 24/page, distinct pins, grid/table toggle via `?view=grid|table`, public.
+Full pages paginated 24/page, distinct pins, grid/table toggle via `?view=grid|table`, members-only like everything else.
 
 Add/remove/update routes: `routes/user/collection.py` (prefix `/user/pins`).
 
@@ -252,7 +269,7 @@ Entry: `database/erasure.py::erase_user_account(session, user_id)`.
 - All user-FK columns already nullable with ON DELETE behavior — no schema migration needed.
 
 ## Legal Pages & Footer
-- `routes/legal.py` serves `/about`, `/privacy`, `/terms` (public). Templates in `templates/legal/`, shared "not legal advice" banner in `_shared.py`.
+- `routes/legal.py` serves `/about`, `/privacy`, `/terms` (members-only — they are *not* on the public allowlist). Templates in `templates/legal/`, shared "not legal advice" banner in `_shared.py`.
 - `templates/components/shell/footer.py` rendered by `html_base()` on every full page (not HTMX fragments). Shows version from `pindb.__version__` via `importlib.metadata` and `CONFIGURATION.contact_email`.
 - Sticky-footer layout: `body.min-h-screen.flex.flex-col` + `main.min-h-screen.relative.z-5` (`templates/base.py`).
 - Copyright: project name only ("PinDB"), no person named.

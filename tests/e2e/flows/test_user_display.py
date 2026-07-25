@@ -1,13 +1,12 @@
-"""Build a display in the editor, then share it.
+"""Build a display in the editor, then view it as another member.
 
 Drives the ``display-editor`` island the way a user does — a real multi-file
 pick, a real caption, a real pin tag through the select helpers — and then loads
-the public page a logged-out visitor would land on from a shared link.
+the page a fellow member lands on from a link. There is no logged-out viewer
+and no unfurl card any more: the site is members-only.
 """
 
 from __future__ import annotations
-
-import re
 
 import pytest
 from playwright.sync_api import expect
@@ -92,25 +91,19 @@ def test_build_a_display_and_share_it(
     ).to_have_value("The top shelf")
     assert_screenshot(page, "display-editor-two-photos")
 
-    # What a visitor arriving from a shared link actually sees.
-    anon = admin_browser_context.browser.new_context()
-    try:
-        public = anon.new_page()
-        public.goto(f"{live_server}/user/{_DISPLAY_OWNER}/display")
-        public.wait_for_load_state("load")
+    # What another member following the link actually sees.
+    viewer = admin_browser_context.new_page()
+    viewer.goto(f"{live_server}/user/{_DISPLAY_OWNER}/display")
+    viewer.wait_for_load_state("load")
 
-        expect(public.locator("h1")).to_contain_text("My Shadow Box")
-        expect(public.locator("body")).to_contain_text("The top shelf")
-        expect(public.locator("body")).to_contain_text("DisplayTaggedPin")
-        expect(public.locator("figure img")).to_have_count(2)
+    expect(viewer.locator("h1")).to_contain_text("My Shadow Box")
+    expect(viewer.locator("body")).to_contain_text("The top shelf")
+    expect(viewer.locator("body")).to_contain_text("DisplayTaggedPin")
+    expect(viewer.locator("figure img")).to_have_count(2)
 
-        # The share card is the whole point of the feature.
-        expect(public.locator("meta[property='og:image']")).to_have_attribute(
-            "content", re.compile(r"/get/og-image/user_display/\d+$")
-        )
-        assert_screenshot(public, "display-page-default")
-    finally:
-        anon.close()
+    # No unfurl card: the share surface was removed with the rest of the SEO.
+    expect(viewer.locator("meta[property='og:image']")).to_have_count(0)
+    assert_screenshot(viewer, "display-page-default")
 
 
 @pytest.mark.slow

@@ -24,7 +24,6 @@ from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.pins.paginated_pin_grid import paginated_pin_grid
-from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.utils import pretty_titlecase, review_label
 
 
@@ -54,14 +53,6 @@ def pin_set_page(
     return html_base(
         title=pin_set.name,
         request=request,
-        head_content=opengraph_head(
-            title=f"Pin Set: {pin_set.name}",
-            description=share_description,
-            canonical_url=canonical_url,
-            image_url=str(
-                request.url_for("get_og_image", entity_type="pin_set", id=pin_set.id)
-            ),
-        ),
         body_content=centered_div(
             content=[
                 bread_crumb(

@@ -29,7 +29,6 @@ from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.pins.pin_lightbox import pin_lightbox
 from pindb.templates.components.pins.pin_preview_card import pin_preview_card
-from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.types import Content
 from pindb.templates.user.display_layouts import display_photos
 
@@ -154,18 +153,6 @@ def user_display_page(
         )
         if is_carousel
         else None,
-        opengraph_head(
-            title=heading,
-            description=_share_description(display, username),
-            canonical_url=canonical_url,
-            image_url=str(
-                request.url_for(
-                    "get_og_image",
-                    entity_type="user_display",
-                    id=profile_user.id,
-                )
-            ),
-        ),
     ]
     js_extra: tuple[str, ...] = (
         ("displays/display_swiper.js", "pins/pin_lightbox.js")

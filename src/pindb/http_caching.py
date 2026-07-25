@@ -11,8 +11,11 @@ from starlette.types import Scope
 # Vendored JS/CSS and `main.css` are loaded with `?v=<start_time>` so deploy changes the URL.
 VENDORED_STATIC_CACHE_CONTROL = "public, max-age=31536000, immutable"
 
-# Pin images use the same policy: UUID-keyed bytes; new uploads get new URLs (never in-place).
-IMAGE_CACHE_CONTROL = VENDORED_STATIC_CACHE_CONTROL
+# Pin images are immutable for the same reason (UUID-keyed bytes; new uploads
+# get new URLs, never rewritten in place) but `private`, not `public`: they are
+# members-only, so a shared or CDN cache must never hold a copy it could hand
+# to a request that carries no session cookie.
+IMAGE_CACHE_CONTROL = "private, max-age=31536000, immutable"
 
 
 def is_vendored_or_built_css_path(full_path: str | os.PathLike[str]) -> bool:

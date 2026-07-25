@@ -44,18 +44,18 @@ class TestImageRoute:
             assert r.headers["content-type"].startswith("image/webp")
             assert r.headers["cache-control"] == IMAGE_CACHE_CONTROL
 
-    def test_invalid_w_returns_422(self, client):
+    def test_invalid_w_returns_422(self, auth_client):
         missing = uuid4()
-        r = client.get(
+        r = auth_client.get(
             f"/get/image/{missing}", params={"w": 123}, follow_redirects=False
         )
         assert r.status_code == 422
 
-    def test_missing_guid_returns_404(self, client):
+    def test_missing_guid_returns_404(self, auth_client):
         missing = uuid4()
-        response = client.get(f"/get/image/{missing}", follow_redirects=False)
+        response = auth_client.get(f"/get/image/{missing}", follow_redirects=False)
         assert response.status_code == 404
 
-    def test_invalid_guid_returns_422(self, client):
-        response = client.get("/get/image/not-a-uuid", follow_redirects=False)
+    def test_invalid_guid_returns_422(self, auth_client):
+        response = auth_client.get("/get/image/not-a-uuid", follow_redirects=False)
         assert response.status_code == 422

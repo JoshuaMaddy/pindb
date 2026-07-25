@@ -73,7 +73,7 @@
   const deleteConfirmMessage = (username: string): string =>
     `Permanently erase account '${username}'?\n\n` +
     "This anonymises all audit-log references, drops sessions, " +
-    "OAuth links, favorites, owned and wanted pins, and deletes " +
+    "favorites, owned and wanted pins, and deletes " +
     "their personal pin sets. Cannot be undone.";
 
   const SORTABLE: { label: string; key: "username" | "email" | "is_admin" }[] =

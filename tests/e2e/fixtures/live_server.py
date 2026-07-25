@@ -115,7 +115,6 @@ def live_server(
         "IMAGE_BACKEND": "filesystem",
         "BASE_URL": base_url,
         "SEARCH_SYNC_INTERVAL_MINUTES": "60",
-        "ALLOW_TEST_OAUTH_PROVIDER": "true",
         "SESSION_COOKIE_SECURE": "false",
         "CSRF_ENFORCE_ORIGIN": "false",
         "CONTACT_EMAIL": "e2e@example.test",

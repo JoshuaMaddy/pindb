@@ -258,6 +258,18 @@ def editor_http_client(live_server) -> Generator[httpx.Client, None, None]:
         yield client
 
 
+@pytest.fixture(scope="session")
+def regular_http_client(live_server) -> Generator[httpx.Client, None, None]:
+    """A signed-in member with no roles.
+
+    Since the site went private this is the baseline viewer for anything that
+    used to be checked anonymously: guests see only the login page, so "what a
+    plain visitor sees" is now "what a plain member sees".
+    """
+    with _authed_client(live_server, e2e_users.REGULAR) as client:
+        yield client
+
+
 def _create_entity_http(
     admin_client: httpx.Client,
     editor_client: httpx.Client,
@@ -436,41 +448,6 @@ def anon_browser_context(browser, live_server) -> Iterator:
         yield context
     finally:
         context.close()
-
-
-@pytest.fixture
-def register_test_oauth_identity(live_server) -> Callable[..., str]:
-    """Register a canned OAuth identity with the in-app test provider.
-
-    Returns a function ``(identity_id, provider, **fields) -> identity_id``
-    that POSTs to ``/auth/_test-oauth/register`` so subsequent
-    ``/auth/_test-oauth/start`` calls return the requested identity.
-    """
-
-    def _register(
-        identity_id: str,
-        *,
-        provider: str = "google",
-        provider_user_id: str | None = None,
-        email: str | None = None,
-        email_verified: bool = True,
-        username_hint: str = "e2e_oauth",
-        provider_username: str | None = None,
-    ) -> str:
-        payload: dict[str, Any] = {
-            "identity_id": identity_id,
-            "provider": provider,
-            "provider_user_id": provider_user_id or identity_id,
-            "email": email,
-            "email_verified": email_verified,
-            "username_hint": username_hint,
-            "provider_username": provider_username,
-        }
-        resp = httpx.post(f"{live_server}/auth/_test-oauth/register", json=payload)
-        resp.raise_for_status()
-        return identity_id
-
-    return _register
 
 
 # ---------------------------------------------------------------------------

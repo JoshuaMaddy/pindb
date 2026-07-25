@@ -158,8 +158,8 @@ class TestNeedsChangesVisibility:
         # The banner carries the reviewer's reason to the person who has to act on it.
         assert REASON in response.text
 
-    def test_still_hidden_from_anonymous_visitors(
-        self, admin_client, anon_client, db_session, editor_user
+    def test_still_hidden_from_regular_member_visitors(
+        self, admin_client, auth_client, db_session, editor_user
     ):
         shop = ShopFactory(approved=False, created_by=editor_user)
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
@@ -170,7 +170,7 @@ class TestNeedsChangesVisibility:
             follow_redirects=False,
         )
 
-        response = anon_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
+        response = auth_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
         assert response.status_code in (302, 307, 404)
 
 

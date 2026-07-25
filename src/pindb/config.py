@@ -7,7 +7,6 @@ misconfiguration fails fast at startup.
 
 import sys
 from pathlib import Path
-from typing import Literal
 
 from meilisearch_python_sdk import AsyncClient
 from pydantic import Field, ValidationError, model_validator
@@ -25,13 +24,10 @@ class Configuration(BaseSettings):
     )
 
     # Images
-    image_backend: Literal["filesystem", "r2"] = Field(default="filesystem")
+    # Local disk only. An object-store backend is deliberately not supported:
+    # a publicly readable bucket URL serves pin art without a session and
+    # defeats the app's auth gate.
     image_directory: Path | None = Field(default=None)
-    r2_account_id: str | None = Field(default=None)
-    r2_bucket: str | None = Field(default=None)
-    r2_access_key_id: str | None = Field(default=None)
-    r2_secret_access_key: str | None = Field(default=None)
-    r2_public_url: str | None = Field(default=None)
 
     @model_validator(mode="after")
     def _database_sync_default(self) -> "Configuration":
@@ -51,21 +47,8 @@ class Configuration(BaseSettings):
 
     @model_validator(mode="after")
     def _check_backend_config(self) -> "Configuration":
-        if self.image_backend == "filesystem" and self.image_directory is None:
-            raise ValueError("image_directory required when image_backend=filesystem")
-        if self.image_backend == "r2":
-            missing = [
-                f
-                for f in (
-                    "r2_account_id",
-                    "r2_bucket",
-                    "r2_access_key_id",
-                    "r2_secret_access_key",
-                )
-                if getattr(self, f) is None
-            ]
-            if missing:
-                raise ValueError(f"R2 backend missing config: {', '.join(missing)}")
+        if self.image_directory is None:
+            raise ValueError("image_directory is required")
         return self
 
     # Postgres: async app uses postgresql+asyncpg; sync URL for Alembic/CLI
@@ -119,35 +102,23 @@ class Configuration(BaseSettings):
     # Legal / contact — shown in footer, privacy policy, ToS, DMCA notice
     contact_email: str
 
-    # Google OAuth (optional)
-    google_client_id: str | None = Field(default=None)
-    google_client_secret: str | None = Field(default=None)
-
-    # Discord OAuth (optional)
-    discord_client_id: str | None = Field(default=None)
-    discord_client_secret: str | None = Field(default=None)
-
-    # Meta (Facebook Login) OAuth (optional)
-    meta_client_id: str | None = Field(default=None)
-    meta_client_secret: str | None = Field(default=None)
-
     # Password policy
     password_min_length: int = Field(default=12)
     password_min_zxcvbn_score: int = Field(default=3)
 
-    # Test-only OAuth provider — enables /auth/_test-oauth endpoints
-    # used by the e2e suite. MUST stay False in production.
-    allow_test_oauth_provider: bool = Field(default=False)
-
     # Toggle the per-IP rate limiter on sensitive auth endpoints. Disable only
     # for the e2e suite, where all traffic shares 127.0.0.1 and hits the
-    # signup/login windows almost immediately. MUST stay True in production.
+    # login window almost immediately. MUST stay True in production.
     rate_limit_enabled: bool = Field(default=True)
 
     # Comma-separated usernames to auto-promote to admin on startup.
     # Empty by default — promote your first admin via SQL or a seeded
     # migration. Kept as a string so ``.env`` stays ergonomic.
     bootstrap_admin_usernames: str = Field(default="")
+    # Password used only when a bootstrap admin username has no user row yet.
+    # Signup no longer exists, so without this a fresh deployment has no way in.
+    # Never overwrites an existing account's password.
+    bootstrap_admin_password: str | None = Field(default=None)
 
     @property
     def bootstrap_admin_username_list(self) -> list[str]:

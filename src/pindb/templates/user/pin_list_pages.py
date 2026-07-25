@@ -41,7 +41,6 @@ from pindb.templates.components.nav.bread_crumb import bread_crumb
 from pindb.templates.components.nav.pill_link import pill_link
 from pindb.templates.components.pins.pin_grid import pin_grid
 from pindb.templates.components.pins.pin_thumbnail import pin_thumbnail_img
-from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 from pindb.templates.pin_image_alt import pin_front_image_alt
 from pindb.templates.types import Content
@@ -397,16 +396,6 @@ def collection_list_page(
         view=view,
         current_url=current_url,
         content=content,
-        head_content=opengraph_head(
-            title=f"{profile_user.username}'s Collection",
-            description=f"View {profile_user.username}'s pin collection on PinDB.",
-            canonical_url=current_url,
-            image_url=str(
-                request.url_for(
-                    "get_og_image", entity_type="user_collection", id=profile_user.id
-                )
-            ),
-        ),
     )
 
 
@@ -466,16 +455,6 @@ def wants_list_page(
         view=view,
         current_url=current_url,
         content=content,
-        head_content=opengraph_head(
-            title=f"{profile_user.username}'s Want List",
-            description=f"See what pins {profile_user.username} is looking for on PinDB.",
-            canonical_url=current_url,
-            image_url=str(
-                request.url_for(
-                    "get_og_image", entity_type="user_wants", id=profile_user.id
-                )
-            ),
-        ),
     )
 
 
@@ -530,16 +509,6 @@ def trades_list_page(
         view=view,
         current_url=current_url,
         content=content,
-        head_content=opengraph_head(
-            title=f"{profile_user.username}'s Trades",
-            description=f"See what pins {profile_user.username} has available for trade on PinDB.",
-            canonical_url=current_url,
-            image_url=str(
-                request.url_for(
-                    "get_og_image", entity_type="user_trades", id=profile_user.id
-                )
-            ),
-        ),
     )
 
 

@@ -37,6 +37,7 @@ Mark a shop as **inactive** if they have permanently closed or have stopped prod
 ## Shop Aliases
 
 Alternate names the shop can be found by. Use aliases for:
+
 - Common abbreviations
 - Former names after a rebrand
 - Names with different punctuation or spacing (`Pin & Co` / `Pin and Co`)

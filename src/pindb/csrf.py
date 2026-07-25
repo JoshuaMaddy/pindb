@@ -10,10 +10,9 @@ When ``Origin`` is absent we fall back to ``Referer`` — same-site check.
 If neither header is present on an unsafe method, the request is
 rejected with 403. GET/HEAD/OPTIONS are untouched.
 
-The test-only OAuth provider (``allow_test_oauth_provider``) and the
-``/auth/*/callback`` paths are exempt: OAuth redirects arrive without an
-Origin that matches us, and the test endpoints are driven by the
-integration suite.
+There are no exemptions. The OAuth callbacks used to need one — a provider
+redirect carries the provider's Origin, not ours — but with OAuth gone every
+unsafe request originates from a form or fetch on this site.
 """
 
 from __future__ import annotations
@@ -27,12 +26,6 @@ from fastapi.responses import PlainTextResponse, Response
 from pindb.config import CONFIGURATION
 
 _SAFE_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "OPTIONS"})
-_EXEMPT_PREFIXES: tuple[str, ...] = (
-    "/auth/google/callback",
-    "/auth/discord/callback",
-    "/auth/meta/callback",
-    "/auth/_test-oauth/",
-)
 
 
 def _origin_host(value: str | None) -> tuple[str, str, int | None] | None:
@@ -103,10 +96,6 @@ async def csrf_origin_middleware(
 
     method = request.method.upper()
     if method in _SAFE_METHODS:
-        return await call_next(request)
-
-    path = request.url.path
-    if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
         return await call_next(request)
 
     origin = _origin_host(request.headers.get("origin"))

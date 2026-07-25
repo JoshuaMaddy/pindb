@@ -2,8 +2,11 @@
 
 FastAPI app for cataloging collectible pins. Server-rendered HTML via
 [htpy](https://htpy.dev) + [HTMX](https://htmx.org), SQLAlchemy over
-PostgreSQL, Meilisearch full-text search. Session auth with password login +
-OAuth (Google, Discord, Meta).
+PostgreSQL, Meilisearch full-text search. Session auth with password login.
+
+PinDB is a **private, members-only** community site: there is no public page
+except login, no self-service signup, and no shareable/unfurlable content.
+Accounts are created by an administrator at `/admin/users`.
 
 ## Development setup
 

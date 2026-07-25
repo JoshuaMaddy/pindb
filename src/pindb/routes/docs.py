@@ -15,7 +15,9 @@ from pindb.templates.docs.page import DocEntry, DocSection, docs_page
 
 router = APIRouter(prefix="/docs")
 
-_DOCS_ROOT = Path(__file__).parent.parent / "static" / "docs"
+# Deliberately outside ``static/``: that directory is a mounted StaticFiles app,
+# so anything under it is served raw and bypasses the auth gate entirely.
+_DOCS_ROOT = Path(__file__).parent.parent / "docs_content"
 _MD = MarkdownIt().enable("table")
 
 _SECTIONS: dict[str, DocSection] = {}

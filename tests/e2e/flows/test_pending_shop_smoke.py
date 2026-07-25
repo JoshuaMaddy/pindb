@@ -10,7 +10,10 @@ from tests.e2e._pages import submit_content_form, submit_pending_action
 
 @pytest.mark.slow
 def test_pending_shop_approve_smoke(
-    admin_browser_context, editor_browser_context, live_server
+    admin_browser_context,
+    editor_browser_context,
+    regular_user_browser_context,
+    live_server,
 ):
     editor_page = editor_browser_context.new_page()
     editor_page.goto(f"{live_server}/create/shop")
@@ -26,7 +29,6 @@ def test_pending_shop_approve_smoke(
         admin_page.locator("form[action*='/admin/pending/approve/shop/']").first,
     )
 
-    with admin_browser_context.browser.new_context(base_url=live_server) as anon:
-        anon_page = anon.new_page()
-        anon_page.goto(f"{live_server}/list/shops")
-        expect(anon_page.get_by_text("Cascade Shop")).to_be_visible()
+    member_page = regular_user_browser_context.new_page()
+    member_page.goto(f"{live_server}/list/shops")
+    expect(member_page.get_by_text("Cascade Shop")).to_be_visible()

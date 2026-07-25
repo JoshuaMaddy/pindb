@@ -23,7 +23,6 @@ from htpy.starlette import HtpyResponse  # noqa: E402
 from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.orm import selectinload  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
-from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 
 from pindb.audit_events import register_audit_events  # noqa: E402
 from pindb.auth import attach_user_middleware  # noqa: E402
@@ -37,6 +36,7 @@ from pindb.http_caching import (  # noqa: E402
     CacheBustedTemplateJsFiles,
 )
 from pindb.lifespan import lifespan  # noqa: E402
+from pindb.require_login import require_login_middleware  # noqa: E402
 from pindb.routes import (  # noqa: E402
     admin,
     approve,
@@ -52,10 +52,10 @@ from pindb.routes import (  # noqa: E402
     list,
     messages,
     report,
+    robots,
     search,
     user,
 )
-from pindb.routes.auth import _test_oauth  # noqa: E402
 from pindb.routes.user import collection, security  # noqa: E402
 from pindb.security_headers import security_headers_middleware  # noqa: E402
 from pindb.templates.homepage import homepage  # noqa: E402
@@ -69,22 +69,16 @@ app = FastAPI(
     openapi_url=None,
 )
 
-# SessionMiddleware is required by authlib for OAuth state handling.
-# Must not use the default cookie name "session" — that collides with
-# pindb.auth.SESSION_COOKIE; after OAuth clears Starlette's session, the
-# middleware would emit Set-Cookie to expire "session" and wipe the login token.
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=CONFIGURATION.secret_key,
-    session_cookie="pindb_starlette_session",
-    https_only=CONFIGURATION.session_cookie_secure,
-)
+# Default-deny auth gate. Added BEFORE attach_user so it runs AFTER it
+# (Starlette nests middleware in reverse add-order) and can read the
+# already-resolved request.state.user without a second DB round-trip.
+app.add_middleware(BaseHTTPMiddleware, dispatch=require_login_middleware)
 
 # Attach current user to request.state on every request
 app.add_middleware(BaseHTTPMiddleware, dispatch=attach_user_middleware)
 
-# CSRF via Origin/Referer check on unsafe methods. Exempts OAuth
-# callbacks where the Origin legitimately comes from the provider.
+# CSRF via Origin/Referer check on unsafe methods. No exemptions — the OAuth
+# callbacks that needed one are gone.
 app.add_middleware(BaseHTTPMiddleware, dispatch=csrf_origin_middleware)
 
 # Baseline security response headers (HSTS, CSP report-only, XFO, etc).
@@ -180,8 +174,6 @@ app.include_router(health.router)
 app.include_router(admin.router)
 app.include_router(approve.router)
 app.include_router(auth.router)
-if CONFIGURATION.allow_test_oauth_provider:
-    app.include_router(_test_oauth.router)
 app.include_router(security.router)
 app.include_router(user.router)
 app.include_router(collection.router)
@@ -196,3 +188,4 @@ app.include_router(legal.router)
 app.include_router(docs.router)
 app.include_router(messages.router)
 app.include_router(report.router)
+app.include_router(robots.router)

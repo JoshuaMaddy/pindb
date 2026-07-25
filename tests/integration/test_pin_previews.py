@@ -43,7 +43,7 @@ def _count_badge(html: str, tag: Tag) -> str:
 class TestPinPreviewCounts:
     def test_soft_deleted_pins_are_not_counted(
         self,
-        anon_client,
+        auth_client,
         db_session,
         admin_user,
     ):
@@ -61,15 +61,15 @@ class TestPinPreviewCounts:
         gone.deleted_by_id = admin_user.id
         _attach(db_session, tag, live, gone)
 
-        response = anon_client.get("/list/tags?view=detailed")
+        response = auth_client.get("/list/tags?view=detailed")
 
         assert response.status_code == 200
         assert _count_badge(response.text, tag) == "(1)"
         assert "Gone Pin" not in response.text
 
-    def test_pending_pins_are_hidden_from_guests(
+    def test_pending_pins_are_hidden_from_regular_members(
         self,
-        anon_client,
+        auth_client,
         db_session,
         admin_user,
         editor_user,
@@ -86,7 +86,7 @@ class TestPinPreviewCounts:
         )
         _attach(db_session, tag, approved, pending)
 
-        response = anon_client.get("/list/tags?view=detailed")
+        response = auth_client.get("/list/tags?view=detailed")
 
         assert response.status_code == 200
         assert _count_badge(response.text, tag) == "(1)"
@@ -119,7 +119,7 @@ class TestPinPreviewCounts:
 
     def test_count_is_total_while_thumbnails_are_capped_at_four(
         self,
-        anon_client,
+        auth_client,
         db_session,
         admin_user,
     ):
@@ -137,7 +137,7 @@ class TestPinPreviewCounts:
         ]
         _attach(db_session, tag, *pins)
 
-        response = anon_client.get("/list/tags")
+        response = auth_client.get("/list/tags")
 
         assert response.status_code == 200
         assert _count_badge(response.text, tag) == "(7)"
@@ -146,12 +146,12 @@ class TestPinPreviewCounts:
         )
         assert drawn == 4
 
-    def test_tag_with_no_pins_renders_zero(self, anon_client, admin_user):
+    def test_tag_with_no_pins_renders_zero(self, auth_client, admin_user):
         tag = cast(
             Tag, TagFactory(name="lonely_tag", approved=True, created_by=admin_user)
         )
 
-        response = anon_client.get("/list/tags?view=detailed")
+        response = auth_client.get("/list/tags?view=detailed")
 
         assert response.status_code == 200
         assert _count_badge(response.text, tag) == "(0)"

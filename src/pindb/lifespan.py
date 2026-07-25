@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 
 from pindb.achievements import refresh_all_user_stats
+from pindb.auth import hash_password
 from pindb.config import CONFIGURATION
 from pindb.database import async_engine, async_session_maker, seed_currencies
 from pindb.database.user import User
@@ -19,15 +20,39 @@ LOGGER = logging.getLogger("pindb.lifespan")
 
 
 async def _ensure_admins() -> None:
-    """Promote configured usernames to admin on startup when not already admin."""
+    """Promote configured usernames to admin, creating the first one if absent.
+
+    With self-service signup gone, every account is created by an admin at
+    ``/admin/users`` — which leaves a fresh deployment with no way in. So when
+    ``BOOTSTRAP_ADMIN_PASSWORD`` is set, a missing bootstrap username is
+    *created* rather than skipped. It is only ever used for accounts that do
+    not exist: an existing admin's password is never overwritten from env.
+    """
     usernames = CONFIGURATION.bootstrap_admin_username_list
     if not usernames:
         return
+    bootstrap_password = CONFIGURATION.bootstrap_admin_password
     async with async_session_maker.begin() as db:
         for username in usernames:
             res = await db.execute(select(User).where(User.username == username))
             user: User | None = res.scalars().first()
-            if user is not None and not user.is_admin:
+            if user is None:
+                if not bootstrap_password:
+                    LOGGER.warning(
+                        "Bootstrap admin '%s' does not exist and "
+                        "BOOTSTRAP_ADMIN_PASSWORD is unset; cannot create it.",
+                        username,
+                    )
+                    continue
+                db.add(
+                    User(
+                        username=username,
+                        hashed_password=hash_password(bootstrap_password),
+                        is_admin=True,
+                    )
+                )
+                LOGGER.info("Created bootstrap admin '%s'.", username)
+            elif not user.is_admin:
                 user.is_admin = True
                 LOGGER.info("Granted admin to user '%s'.", username)
 

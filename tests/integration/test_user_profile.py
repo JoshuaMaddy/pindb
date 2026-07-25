@@ -11,17 +11,17 @@ from tests.fixtures.users import (
 @pytest.mark.integration
 class TestUserProfile:
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_existing_user_profile_returns_200(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}")
+    def test_existing_user_profile_returns_200(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}")
         assert response.status_code == 200
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_profile_shows_username(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}")
+    def test_profile_shows_username(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}")
         assert subject_user.username in response.text
 
-    def test_nonexistent_user_returns_404(self, client):
-        response = client.get("/user/definitely_does_not_exist_xyz")
+    def test_nonexistent_user_returns_404(self, auth_client):
+        response = auth_client.get("/user/definitely_does_not_exist_xyz")
         assert response.status_code == 404
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
@@ -35,13 +35,13 @@ class TestUserProfile:
 @pytest.mark.integration
 class TestUserFavoritesPage:
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_favorites_page_returns_200(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}/favorites")
+    def test_favorites_page_returns_200(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}/favorites")
         assert response.status_code == 200
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_favorites_empty_or_populated(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}/favorites")
+    def test_favorites_empty_or_populated(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}/favorites")
         assert response.status_code == 200
         if subject_user.username == MINIMAL_USER_USERNAME:
             assert "No pins in favorites yet." in response.text
@@ -53,16 +53,16 @@ class TestUserFavoritesPage:
 @pytest.mark.integration
 class TestUserCollectionPage:
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_collection_page_returns_200(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}/collection")
+    def test_collection_page_returns_200(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}/collection")
         assert response.status_code == 200
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_wants_page_returns_200(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}/wants")
+    def test_wants_page_returns_200(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}/wants")
         assert response.status_code == 200
 
     @pytest.mark.parametrize("subject_user", SUBJECT_USER_PARAMS, indirect=True)
-    def test_trades_page_returns_200(self, client, subject_user):
-        response = client.get(f"/user/{subject_user.username}/trades")
+    def test_trades_page_returns_200(self, auth_client, subject_user):
+        response = auth_client.get(f"/user/{subject_user.username}/trades")
         assert response.status_code == 200

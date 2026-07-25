@@ -20,6 +20,7 @@ A pin can belong to both a tag and a set — they are not mutually exclusive.
 ### Global sets
 
 Global sets have no owner and are maintained by editors and administrators. They appear in the database as curated collections. Use global sets for:
+
 - Official product sets (a manufacturer's boxed set)
 - Series or event-based groupings (all pins from a specific convention year)
 - Thematic reference collections that the community would find useful

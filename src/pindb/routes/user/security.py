@@ -1,13 +1,11 @@
-"""User account security: change password, link/unlink OAuth providers.
+"""User account security: change password.
 
 Routes:
-  * ``GET  /user/me/security`` — page with password form + provider list
+  * ``GET  /user/me/security`` — page with the password form
   * ``POST  /user/me/password`` — change password (requires current when set)
-  * ``POST  /user/me/unlink/{provider}`` — detach a provider; refuses if it
-    would leave the user with no way to log in.
 
-The ``link`` action reuses ``/auth/{provider}?link=1`` which sets a
-link-intent cookie consumed by the OAuth callback.
+A password is the only credential PinDB accepts; provider linking went away
+with OAuth.
 """
 
 from __future__ import annotations
@@ -28,31 +26,11 @@ from pindb.auth import (
 from pindb.database import async_session_maker
 from pindb.database.session import UserSession
 from pindb.database.user import User
-from pindb.database.user_auth_provider import OAuthProvider, UserAuthProvider
 from pindb.password_policy import PasswordPolicyError, validate_password
 from pindb.rate_limit import rate_limit
-from pindb.routes.auth._oauth import provider_enabled
 from pindb.templates.auth.security import security_page
 
 router = APIRouter(prefix="/user/me", tags=["user"])
-
-
-def _enabled_providers() -> list[OAuthProvider]:
-    return [p for p in OAuthProvider if provider_enabled(p)]
-
-
-async def _load_user_providers(user_id: int) -> list[UserAuthProvider]:
-    async with async_session_maker() as db:
-        links = list(
-            (
-                await db.scalars(
-                    select(UserAuthProvider).where(UserAuthProvider.user_id == user_id)
-                )
-            ).all()
-        )
-        for link in links:
-            db.expunge(link)
-        return links
 
 
 @router.get("/security", response_model=None)
@@ -62,14 +40,11 @@ async def get_security(
     error: str | None = None,
     success: str | None = None,
 ) -> HTMLResponse:
-    links = await _load_user_providers(current_user.id)
     return HTMLResponse(
         content=str(
             security_page(
                 request=request,
                 current_user=current_user,
-                linked_providers=links,
-                enabled_providers=_enabled_providers(),
                 error=error,
                 success=success,
             )
@@ -143,56 +118,6 @@ async def _fetch_hashed_password(user_id: int) -> str | None:
         return user.hashed_password if user is not None else None
 
 
-@router.post("/unlink/{provider}", response_model=None)
-async def post_unlink_provider(
-    request: Request,
-    current_user: AuthenticatedUser,
-    provider: str,
-) -> Response:
-    try:
-        provider_enum = OAuthProvider(provider)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Unknown provider")
-
-    async with async_session_maker.begin() as db:
-        user = await db.get(User, current_user.id)
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        links = list(
-            (
-                await db.scalars(
-                    select(UserAuthProvider).where(UserAuthProvider.user_id == user.id)
-                )
-            ).all()
-        )
-        target = next((link for link in links if link.provider is provider_enum), None)
-        if target is None:
-            return await _render(
-                request,
-                current_user,
-                error=f"No {provider_enum.value} account is linked.",
-            )
-
-        leaves_no_login = user.hashed_password is None and len(links) <= 1
-        if leaves_no_login:
-            return await _render(
-                request,
-                current_user,
-                error=(
-                    "Can't unlink your only sign-in method. "
-                    "Set a password first, or link another provider."
-                ),
-            )
-
-        await db.delete(target)
-
-    return RedirectResponse(
-        url=f"/user/me/security?success=Unlinked+{provider_enum.value}",
-        status_code=303,
-    )
-
-
 async def _render(
     request: Request,
     current_user: User,
@@ -200,14 +125,11 @@ async def _render(
     error: str | None = None,
     password_errors: list[str] | None = None,
 ) -> HTMLResponse:
-    links = await _load_user_providers(current_user.id)
     return HTMLResponse(
         content=str(
             security_page(
                 request=request,
                 current_user=current_user,
-                linked_providers=links,
-                enabled_providers=_enabled_providers(),
                 error=error,
                 password_errors=password_errors,
             )

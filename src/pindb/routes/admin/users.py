@@ -2,25 +2,34 @@
 FastAPI routes: `routes/admin/users.py`.
 """
 
-from typing import Sequence
+from typing import Annotated, Sequence
+from urllib.parse import quote
 
-from fastapi import HTTPException, Request
+from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from sqlalchemy import select
 
-from pindb.auth import AdminUser
+from pindb.auth import AdminUser, hash_password
 from pindb.database import async_session_maker
 from pindb.database.erasure import erase_user_account
 from pindb.database.user import User
 from pindb.file_handler import delete_image
+from pindb.password_policy import PasswordPolicyError, validate_password
 from pindb.templates.admin.users import admin_users_page
 
 router = APIRouter()
 
 
-@router.get("/users")
-async def get_admin_users(request: Request, current_user: AdminUser) -> HTMLResponse:
+async def _render_users_page(
+    request: Request,
+    current_user_id: int,
+    *,
+    error: str | None = None,
+    password_errors: list[str] | None = None,
+    success: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
     async with async_session_maker() as session:
         users: Sequence[User] = (
             await session.scalars(select(User).order_by(User.username.asc()))
@@ -30,10 +39,91 @@ async def get_admin_users(request: Request, current_user: AdminUser) -> HTMLResp
                 admin_users_page(
                     request=request,
                     users=users,
-                    current_user_id=current_user.id,
+                    current_user_id=current_user_id,
+                    error=error,
+                    password_errors=password_errors,
+                    success=success,
                 )
+            ),
+            status_code=status_code,
+        )
+
+
+@router.get("/users")
+async def get_admin_users(
+    request: Request,
+    current_user: AdminUser,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    return await _render_users_page(
+        request,
+        current_user.id,
+        error=error,
+        success=success,
+    )
+
+
+@router.post("/users/create", response_model=None)
+async def create_user(
+    request: Request,
+    current_user: AdminUser,
+    username: Annotated[str, Form()],
+    email: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    is_editor: Annotated[bool, Form()] = False,
+    is_admin: Annotated[bool, Form()] = False,
+) -> HTMLResponse | RedirectResponse:
+    """Create a member account.
+
+    This is the only way an account comes into existence: PinDB is a private
+    community with no self-service signup. Clashes are reported plainly rather
+    than with the unified message a public signup form would need — the actor
+    is already an admin, so there is no enumeration to prevent.
+    """
+    username = username.strip()
+    email = email.strip()
+
+    try:
+        validate_password(password, username=username, email=email)
+    except PasswordPolicyError as exc:
+        return await _render_users_page(
+            request,
+            current_user.id,
+            error="Password does not meet the policy.",
+            password_errors=exc.rules,
+            status_code=400,
+        )
+
+    async with async_session_maker.begin() as db:
+        if (await db.scalars(select(User).where(User.username == username))).first():
+            return await _render_users_page(
+                request,
+                current_user.id,
+                error=f"Username {username!r} is already taken.",
+                status_code=400,
+            )
+        if (await db.scalars(select(User).where(User.email == email))).first():
+            return await _render_users_page(
+                request,
+                current_user.id,
+                error=f"Email {email!r} is already registered.",
+                status_code=400,
+            )
+        db.add(
+            User(
+                username=username,
+                email=email,
+                hashed_password=hash_password(password),
+                is_editor=is_editor,
+                is_admin=is_admin,
             )
         )
+
+    return RedirectResponse(
+        url=f"/admin/users?success={quote(f'Created {username}')}",
+        status_code=303,
+    )
 
 
 @router.post("/users/{user_id}/promote")

@@ -9,6 +9,11 @@ Headers set:
   particular were served with a bare ``image`` type before).
 - ``X-Frame-Options: DENY`` — no third-party framing.
 - ``Referrer-Policy: strict-origin-when-cross-origin``.
+- ``X-Robots-Tag`` — full noindex. Set here rather than as a ``<meta>`` tag so
+  it also covers images, static assets and error responses, none of which
+  render a document head. Belt and braces with the deny-all ``/robots.txt``:
+  the auth gate already stops crawlers, but nothing about this site should be
+  indexed even if a URL leaks.
 - ``Content-Security-Policy`` — report-only for now. Executable page JS is
   loaded from same-origin ``/static/`` and ``/templates-js/`` (both allowed
   by ``script-src 'self'``); all frontend libraries are vendored or bundled,
@@ -35,7 +40,10 @@ from pindb.config import CONFIGURATION
 # wasm-unsafe-eval: WebAssembly.compile / instantiateStreaming (libwebp in pindb-webp), not JS eval.
 _CSP = (
     "default-src 'self'; "
-    "img-src 'self' data: https:; "
+    # 'self' only: the last remote images were the OAuth provider icons on the
+    # login page, and OAuth is gone. A private catalog should not be fetching
+    # images from anywhere else.
+    "img-src 'self' data:; "
     "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' "
     "https://static.cloudflareinsights.com; "
     "style-src 'self' 'unsafe-inline'; "
@@ -69,6 +77,10 @@ async def security_headers_middleware(
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "X-Robots-Tag",
+        "noindex, nofollow, noarchive, nosnippet, noimageindex",
+    )
     response.headers.setdefault("Content-Security-Policy-Report-Only", _CSP)
     if CONFIGURATION.session_cookie_secure:
         response.headers.setdefault(

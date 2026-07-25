@@ -28,7 +28,7 @@ from tests.fixtures.users import SUBJECT_USER_PARAMS
 class TestPinGridEagerLoading:
     def test_tag_page_renders_pin_grid_with_shop_and_artist(
         self,
-        anon_client,
+        auth_client,
         db_session,
         admin_user,
     ):
@@ -55,7 +55,7 @@ class TestPinGridEagerLoading:
         db_session.execute(pins_tags.insert().values(pin_id=pin.id, tag_id=tag.id))
         db_session.flush()
 
-        response = anon_client.get(f"/get/tag/{tag.id}")
+        response = auth_client.get(f"/get/tag/{tag.id}")
 
         assert response.status_code == 200
         assert "Grid Pin" in response.text
@@ -64,7 +64,7 @@ class TestPinGridEagerLoading:
 
     def test_artist_page_renders_pin_grid_with_shop(
         self,
-        anon_client,
+        auth_client,
         admin_user,
     ):
         shop = cast(
@@ -90,7 +90,7 @@ class TestPinGridEagerLoading:
             ),
         )
 
-        response = anon_client.get(f"/get/artist/{artist.id}")
+        response = auth_client.get(f"/get/artist/{artist.id}")
 
         assert response.status_code == 200
         assert "Artist Grid Pin" in response.text
@@ -99,7 +99,7 @@ class TestPinGridEagerLoading:
 
     def test_shop_page_renders_pin_grid_with_artist(
         self,
-        anon_client,
+        auth_client,
         admin_user,
     ):
         shop = cast(
@@ -123,7 +123,7 @@ class TestPinGridEagerLoading:
             ),
         )
 
-        response = anon_client.get(f"/get/shop/{shop.id}")
+        response = auth_client.get(f"/get/shop/{shop.id}")
 
         assert response.status_code == 200
         assert "Shop Grid Pin" in response.text
@@ -132,7 +132,7 @@ class TestPinGridEagerLoading:
 
     def test_pin_set_page_renders_pin_grid_with_shop_and_artist(
         self,
-        anon_client,
+        auth_client,
         db_session,
         admin_user,
     ):
@@ -167,7 +167,7 @@ class TestPinGridEagerLoading:
         )
         db_session.flush()
 
-        response = anon_client.get(f"/get/pin_set/{pin_set.id}")
+        response = auth_client.get(f"/get/pin_set/{pin_set.id}")
 
         assert response.status_code == 200
         assert "Set Grid Pin" in response.text

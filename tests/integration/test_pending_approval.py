@@ -64,10 +64,10 @@ class TestApproveEndpoints:
         assert refreshed.approved_at is not None
         assert refreshed.approved_by_id is not None
 
-    def test_approved_shop_visible_to_anonymous(
-        self, admin_client, anon_client, db_session, editor_user
+    def test_approved_shop_visible_to_regular_member(
+        self, admin_client, auth_client, db_session, editor_user
     ):
-        """Visibility changes: before approval, anonymous cannot see the shop."""
+        """Visibility changes: before approval, a regular member cannot see the shop."""
         shop = ShopFactory(
             name="Approved Shop Visibility",
             approved=False,
@@ -75,14 +75,14 @@ class TestApproveEndpoints:
         )
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
 
-        before = anon_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
+        before = auth_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
         assert before.status_code in (302, 307, 404)
 
         admin_client.post(
             f"/admin/pending/approve/shop/{shop_id}", follow_redirects=False
         )
 
-        after = anon_client.get(f"/get/shop/{shop_id}")
+        after = auth_client.get(f"/get/shop/{shop_id}")
         assert after.status_code == 200
         assert "Approved Shop Visibility" in after.text
 
@@ -312,8 +312,8 @@ class TestRejectEndpoint:
         assert refreshed.rejected_at is not None
         assert refreshed.approved_at is None
 
-    def test_rejected_shop_invisible_to_anonymous(
-        self, admin_client, anon_client, db_session, editor_user
+    def test_rejected_shop_invisible_to_regular_member(
+        self, admin_client, auth_client, db_session, editor_user
     ):
         shop = ShopFactory(approved=False, created_by=editor_user)
         shop_id = shop.id  # ty:ignore[unresolved-attribute]
@@ -326,7 +326,7 @@ class TestRejectEndpoint:
             follow_redirects=False,
         )
 
-        response = anon_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
+        response = auth_client.get(f"/get/shop/{shop_id}", follow_redirects=False)
         assert response.status_code in (302, 307, 404)
 
 

@@ -35,7 +35,6 @@ from pindb.templates.components.layout.page_heading import page_heading
 from pindb.templates.components.nav.back_link import back_link
 from pindb.templates.components.pins.pin_image_carousel import pin_image_carousel
 from pindb.templates.components.pins.pin_lightbox import pin_lightbox
-from pindb.templates.components.seo.opengraph import opengraph_head
 from pindb.templates.get.pin_details import pin_details
 
 # Re-exported for backwards compatibility — route handlers import from here.
@@ -94,15 +93,6 @@ def pin_page(
             script(
                 src=f"/static/vendor/swiper.min.js?v={STATIC_CACHE_BUSTER}",
                 defer=True,
-            ),
-            opengraph_head(
-                title=f"Pin: {pin.name}",
-                description=_pin_share_description(pin),
-                canonical_url=canonical_url,
-                image_url=str(
-                    request.url_for("get_og_image", entity_type="pin", id=pin.id)
-                ),
-                og_type="article",
             ),
         ],
         body_content=fragment[

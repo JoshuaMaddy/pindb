@@ -54,8 +54,8 @@ def privacy_page(request: Request) -> Element:
                 _ul(
                     [
                         "Username (required, unique, chosen by you)",
-                        "Email address (optional unless required by your "
-                        "OAuth provider)",
+                        "Email address (recorded when an administrator "
+                        "creates your account)",
                         "Password hash (Argon2, irreversible — we never see "
                         "or store your plaintext password)",
                         "UI theme preference",
@@ -63,13 +63,12 @@ def privacy_page(request: Request) -> Element:
                         "Editor / administrator role flags",
                     ]
                 ),
-                p(class_="font-semibold mt-3")["OAuth identity data"],
+                p(class_="font-semibold mt-3")["Third-party sign-in"],
                 _p(
-                    "If you sign in with Google, Discord, or Meta (Facebook "
-                    "Login), we receive and store the provider name, the "
-                    "provider's stable user ID, the email address on that "
-                    "account, the display name, and whether the provider "
-                    "reports the email as verified."
+                    "None. PinDB does not support signing in with Google, "
+                    "Discord, Meta, or any other external provider, and no "
+                    "data is exchanged with them. A username and password, "
+                    "issued by an administrator, is the only credential."
                 ),
                 p(class_="font-semibold mt-3")["Session data"],
                 _p(
@@ -116,35 +115,13 @@ def privacy_page(request: Request) -> Element:
                             " \u2014 primary authentication token. HttpOnly, "
                             "SameSite=Lax, 30-day expiry.",
                         ],
-                        div[
-                            code["pindb_starlette_session"],
-                            " \u2014 session-scoped cookie used by the OAuth "
-                            "library (Authlib) to carry state between the "
-                            "redirect to a provider and the return callback.",
-                        ],
-                        div[
-                            code["pindb_oauth_onboarding"],
-                            " \u2014 short-lived (10 minute) cookie that holds "
-                            "the OAuth identity between sign-in and new "
-                            "account creation.",
-                        ],
-                        div[
-                            code["pindb_oauth_link"],
-                            " \u2014 short-lived (10 minute) cookie used when "
-                            "linking an additional OAuth provider to your "
-                            "existing account.",
-                        ],
                     ]
                 ),
                 _h2("5. Third parties and data processors"),
                 _ul(
                     [
-                        "Google, Discord, Meta \u2014 only if you choose to "
-                        "sign in with them. See their respective privacy "
-                        "policies.",
-                        "Cloudflare R2 \u2014 object storage for uploaded pin "
-                        "images (optional backend; may be filesystem in "
-                        "self-hosted deployments).",
+                        "Uploaded images \u2014 stored on this server's own "
+                        "disk. No third-party object storage is used.",
                         "Meilisearch \u2014 self-hosted search index. Holds "
                         "catalog data only, no user PII.",
                         "PostgreSQL \u2014 self-hosted primary database.",
@@ -157,8 +134,8 @@ def privacy_page(request: Request) -> Element:
                         "account and letting you use the service.",
                         "Legitimate interest \u2014 keeping an audit log to "
                         "protect catalog integrity and prevent abuse.",
-                        "Consent \u2014 when you link an OAuth provider or "
-                        "optionally provide an email address.",
+                        "Consent \u2014 when you optionally provide profile "
+                        "information such as a display.",
                     ]
                 ),
                 _h2("7. Your rights"),
@@ -189,7 +166,6 @@ def privacy_page(request: Request) -> Element:
                 _ul(
                     [
                         "Session tokens \u2014 30 days from creation.",
-                        "Temporary OAuth cookies \u2014 10 minutes.",
                         "Account data \u2014 until you request deletion.",
                         "Audit log \u2014 retained indefinitely; user ID "
                         "references are anonymised on account deletion.",

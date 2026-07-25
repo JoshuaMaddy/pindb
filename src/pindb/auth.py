@@ -7,6 +7,7 @@ dependencies may delete expired sessions when loading the user for protected rou
 
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 from typing import Annotated
 
 from argon2 import PasswordHasher
@@ -37,6 +38,13 @@ _hasher = PasswordHasher()
 _DUMMY_HASH = _hasher.hash("pindb-timing-oracle-dummy-password")
 
 SESSION_COOKIE = "session"
+
+# Lifetime of both the ``user_sessions`` row and the cookie that points at it.
+# Lives here rather than in the auth router so ``set_session_cookie`` can give
+# the cookie a matching ``Max-Age`` without a circular import — without one it
+# is a browser-session cookie and members are logged out on every restart while
+# the server-side row lives on for 30 days.
+SESSION_TTL = timedelta(days=30)
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +113,7 @@ def set_session_cookie(
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
+        max_age=int(SESSION_TTL.total_seconds()),
         httponly=True,
         samesite="lax",
         secure=CONFIGURATION.session_cookie_secure,

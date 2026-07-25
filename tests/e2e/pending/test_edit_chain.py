@@ -215,10 +215,10 @@ class TestPendingBannerLinksWork:
         # (The pending view uses ?version=pending and renders the snapshot.)
         expect(admin_page.locator("body")).to_contain_text("BannerLink v2")
 
-    def test_anonymous_visiting_canonical_does_not_see_proposed_name(
+    def test_regular_member_visiting_canonical_does_not_see_proposed_name(
         self,
         editor_browser_context,
-        anon_browser_context,
+        regular_user_browser_context,
         live_server,
         make_shop,
     ):
@@ -229,7 +229,7 @@ class TestPendingBannerLinksWork:
             shop_id
         ).submit(name="AnonShop v2")
 
-        anon_page = anon_browser_context.new_page()
-        ShopListPage(anon_page, live_server).goto()
-        expect(anon_page.locator("body")).to_contain_text("AnonShop")
-        expect(anon_page.locator("body")).not_to_contain_text("AnonShop v2")
+        member_page = regular_user_browser_context.new_page()
+        ShopListPage(member_page, live_server).goto()
+        expect(member_page.locator("body")).to_contain_text("AnonShop")
+        expect(member_page.locator("body")).not_to_contain_text("AnonShop v2")

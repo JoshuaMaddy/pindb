@@ -57,15 +57,15 @@ class TestEditorCreatesPendingEntity:
 
 @pytest.mark.integration
 class TestPendingVisibility:
-    def test_anonymous_cannot_see_pending_shop_in_list(
-        self, anon_client, editor_user, db_session
+    def test_regular_member_cannot_see_pending_shop_in_list(
+        self, auth_client, editor_user, db_session
     ):
         ShopFactory(
             name="Invisible Pending Shop",
             approved=False,
             created_by=editor_user,
         )
-        response = anon_client.get("/list/shops")
+        response = auth_client.get("/list/shops")
         assert response.status_code == 200
         assert "Invisible Pending Shop" not in response.text
 
