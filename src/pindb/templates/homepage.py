@@ -86,6 +86,9 @@ def _homepage_center(request: Request, pin_count: int) -> Element:
             div[
                 h2(class_="text-center")["A database for all things pins."],
                 p(class_="text-center")[f"{pin_count:,} pins and counting!"],
+                p(class_="text-center text-sm text-base-text")[
+                    "Private, invite-only community."
+                ],
             ],
             form(
                 id="homepage-search",

@@ -24,11 +24,11 @@ def about_page(request: Request) -> Element:
                     "What is PinDB?"
                 ],
                 p(class_="mb-4")[
-                    "PinDB is a community-run catalog for collectible pins. "
-                    "Users can browse, search, and track pin sets, artists, "
-                    "shops, and tags. Accounts let you mark favorites, "
-                    "record what you own, and list what you want or have "
-                    "available to trade."
+                    "PinDB is a private, invite-only catalog for collectible "
+                    "pins. Members can browse, search, and track pin sets, "
+                    "artists, shops, and tags. Accounts let you mark "
+                    "favorites, record what you own, and list what you want "
+                    "or have available to trade."
                 ],
                 h2(class_="text-lg font-semibold mt-6 mb-2 sm:text-xl")["How it works"],
                 p(class_="mb-4")[

@@ -11,6 +11,7 @@ from htpy import (
     hr,
     input,
     label,
+    p,
 )
 
 from pindb.templates.base import html_base
@@ -39,6 +40,7 @@ def login_page(
             content_width="small",
             content=[
                 h1["Login"],
+                p(class_="text-sm text-base-text")["Private, invite-only community."],
                 hr,
                 error_message(error),
                 form(
