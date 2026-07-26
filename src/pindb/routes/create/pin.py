@@ -190,7 +190,8 @@ async def post_create_pin(
         session.add(instance=new_pin)
         await session.flush()
         await apply_pin_tags(new_pin.id, fields.tag_ids, session)
-        sync_symmetric_pin_links(
+        await sync_symmetric_pin_links(
+            session=session,
             pin=new_pin,
             variants=variant_pins,
             unauthorized_copies=unauthorized_copy_pins,

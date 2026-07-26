@@ -238,7 +238,8 @@ async def post_edit_pin(
         )
 
         await apply_pin_tags(pin.id, fields.tag_ids, session)
-        sync_symmetric_pin_links(
+        await sync_symmetric_pin_links(
+            session=session,
             pin=pin,
             variants=variant_pins,
             unauthorized_copies=unauthorized_copy_pins,

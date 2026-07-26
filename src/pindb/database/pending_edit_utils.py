@@ -802,7 +802,8 @@ async def _approve_pin_snapshot(
         if copy_ids
         else set()
     )
-    sync_symmetric_pin_links(
+    await sync_symmetric_pin_links(
+        session=session,
         pin=pin,
         variants=approved_variants,
         unauthorized_copies=approved_copies,

@@ -345,6 +345,51 @@ class TestPinWriteRoutes:
         assert all(loaded_pin.id != source_pin_id for loaded_pin in refreshed.variants)
         assert any(loaded_pin.id == related_pin.id for loaded_pin in refreshed.variants)
 
+    def test_edit_pin_variant_link_merges_into_transitive_clique(
+        self, admin_client, db_session
+    ):
+        """Linking C to B, where A-B is already linked, must also link A-C.
+
+        The whole connected group becomes mutually linked (a clique), not
+        just the pair touched by the edit that introduced the new edge.
+        """
+        pin_a = cast(Pin, PinFactory(name="Variant A", approved=True))
+        pin_b = cast(Pin, PinFactory(name="Variant B", approved=True))
+        pin_c = cast(Pin, PinFactory(name="Variant C", approved=True))
+        pin_a_id, pin_b_id, pin_c_id = pin_a.id, pin_b.id, pin_c.id
+
+        # A <-> B.
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Variant A", variant_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        # C -> B only; the route never mentions A.
+        response = admin_client.post(
+            f"/edit/pin/{pin_c_id}",
+            data=pin_form_data(name="Variant C", variant_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        db_session.expire_all()
+
+        def variant_ids(pin_id: int) -> set[int]:
+            loaded = db_session.scalar(
+                select(Pin)
+                .where(Pin.id == pin_id)
+                .options(selectinload(Pin.variants))
+                .execution_options(include_pending=True)
+            )
+            assert loaded is not None
+            return {variant.id for variant in loaded.variants}
+
+        assert variant_ids(pin_a_id) == {pin_b_id, pin_c_id}
+        assert variant_ids(pin_b_id) == {pin_a_id, pin_c_id}
+        assert variant_ids(pin_c_id) == {pin_a_id, pin_b_id}
+
 
 @pytest.mark.integration
 class TestGetPinForAuthenticatedUser:
