@@ -20,6 +20,7 @@ from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.database.user import User
 from pindb.templates.admin._pending_shared import (
+    ENTITY_COL_WIDTHS,
     action_buttons,
     action_form_button,
     pending_table,
@@ -43,7 +44,10 @@ def _edit_groups_section(
             "Approving applies the accumulated chain to the canonical entry."
         ],
         pending_table(
-            columns=["Entity", "Edits", "Latest editor", "Latest at", "Actions"],
+            # Same four columns and widths as the per-entity sections above so
+            # the tables line up; the edit count rides in the entity cell.
+            columns=["Entity", "Latest editor", "Latest at", "Actions"],
+            col_widths=ENTITY_COL_WIDTHS,
             rows=[
                 _edit_group_row(
                     table_name=table_name,
@@ -95,10 +99,9 @@ def _edit_group_row(
         td(class_="py-2 pr-6")[
             a(href=pending_view_url)[name],
             span(class_="block text-xs text-lighter-hover")[
-                f"{pretty_titlecase(slug.replace('_', ' '))}"
+                f"{pretty_titlecase(slug.replace('_', ' '))} — {len(chain)} edit(s)"
             ],
         ],
-        td(class_="py-2 pr-6")[str(len(chain))],
         td(class_="py-2 pr-6 text-lighter-hover")[latest_editor],
         td(class_="py-2 pr-6 text-lighter-hover")[local_date_formatter(latest_at)],
         td(class_="py-2")[

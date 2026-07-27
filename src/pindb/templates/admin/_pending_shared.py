@@ -32,6 +32,7 @@ from pindb.templates.components.display.review_actions import (
 from pindb.templates.list.base import TABLE_LIST_SCROLL
 
 __all__ = [
+    "ENTITY_COL_WIDTHS",
     "action_buttons",
     "action_form_button",
     "count_badge",
@@ -39,6 +40,12 @@ __all__ = [
     "request_changes_button",
     "section_header",
 ]
+
+# Shared column widths so every queue section that renders the same four columns
+# (pins, shops, artists, tags, pin sets, and pending edits) lines its columns up
+# vertically. ``None`` = flexible (Name absorbs the remaining width). Actions has
+# to fit Approve + Request changes + Delete on one line.
+ENTITY_COL_WIDTHS: tuple[str | None, ...] = (None, "9rem", "8rem", "21rem")
 
 
 def count_badge(count: int) -> Element:

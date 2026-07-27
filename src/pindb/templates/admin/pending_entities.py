@@ -22,6 +22,7 @@ from pindb.database.pending_edit import PendingEdit
 from pindb.database.pending_mixin import PendingAuditEntity
 from pindb.database.user import User
 from pindb.templates.admin._pending_shared import (
+    ENTITY_COL_WIDTHS,
     action_buttons,
     action_form_button,
     pending_table,
@@ -34,12 +35,6 @@ from pindb.templates.admin.pending_needs_changes import (
     NeedsChangesView,
     needs_changes_section,
 )
-
-# Shared column widths so every per-entity section (pins, shops, artists, tags,
-# pin sets) lines its columns up vertically. ``None`` = flexible (Name absorbs
-# the remaining width). Order matches the columns list in ``_entity_section``.
-# Actions has to fit Approve + Request changes + Delete on one line.
-_ENTITY_COL_WIDTHS: tuple[str | None, ...] = (None, "9rem", "8rem", "21rem")
 
 
 def _sections(
@@ -139,7 +134,7 @@ def _entity_section(
         section_header(icon=icon, title=label, count=len(items)),
         pending_table(
             columns=["Name", "Submitted by", "Submitted at", "Actions"],
-            col_widths=_ENTITY_COL_WIDTHS,
+            col_widths=ENTITY_COL_WIDTHS,
             rows=[
                 _entity_row(
                     entity_type=entity_type,
