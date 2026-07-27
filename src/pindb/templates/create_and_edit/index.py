@@ -12,7 +12,9 @@ from pindb.templates.components.layout.centered import centered_div
 
 def create_index(request: Request) -> Element:
     user = getattr(request.state, "user", None)
-    show_bulk_pin_import = user is not None and user.is_admin
+    # Editors get bulk import too; their batch lands in the approval queue as
+    # one bulk bundle, same as bulk tag creation.
+    show_bulk_pin_import = user is not None and (user.is_editor or user.is_admin)
 
     return html_base(
         title="Create",

@@ -1,12 +1,18 @@
 """
 FastAPI routes: `routes/bulk/pin.py`.
+
+Editor-accessible: the router-level ``require_editor`` dependency in
+``routes/bulk/__init__.py`` is the gate. Editor submissions land pending and
+share one ``bulk_id``, so the approval queue shows them as a single bulk
+bundle; admin submissions auto-approve via the shared ``before_flush`` audit
+hook, exactly like the bulk tag flow.
 """
 
 from datetime import date
 from typing import Sequence, TypeVar
 from uuid import UUID, uuid4
 
-from fastapi import Depends, Form, Query, Request, UploadFile
+from fastapi import Form, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from htpy.starlette import HtpyResponse
@@ -15,8 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pindb.achievements import refresh_users_stats
-from pindb.audit_events import get_audit_user
-from pindb.auth import require_admin
+from pindb.auth import EditorUser
 from pindb.blacklist import (
     BlacklistMatch,
     blacklist_block_message,
@@ -219,8 +224,8 @@ async def get_bulk_options(
     )
 
 
-@router.get(path="/pin", dependencies=[Depends(require_admin)])
-async def get_bulk_pin(request: Request) -> HtpyResponse:
+@router.get(path="/pin")
+async def get_bulk_pin(request: Request, current_user: EditorUser) -> HtpyResponse:
     options_base_url: str = str(
         request.url_for("get_bulk_options", entity_type="placeholder")
     ).removesuffix("/placeholder")
@@ -235,23 +240,25 @@ async def get_bulk_pin(request: Request) -> HtpyResponse:
                 options_base_url=options_base_url,
                 currencies=currencies,
                 request=request,
+                submissions_pending=not current_user.is_admin,
             )
         )
 
 
-@router.post(path="/pin/image", dependencies=[Depends(require_admin)])
+@router.post(path="/pin/image")
 async def post_bulk_image(image: UploadFile = Form()) -> JSONResponse:
     guid: UUID = await save_image(file=image)
     LOGGER.info("Bulk image upload guid=%s", guid)
     return JSONResponse(content={"guid": str(guid)})
 
 
-@router.post(path="/pin", dependencies=[Depends(require_admin)])
-async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
+@router.post(path="/pin")
+async def post_bulk_pins(body: BulkPinInput, current_user: EditorUser) -> JSONResponse:
     results: list[PinRowResult] = []
 
     # One bulk_id for the entire submission. Admin-created entities auto-approve
-    # via audit_events; bulk_id still ties the batch for auditing / grouping.
+    # via audit_events; editor-created ones land pending and the queue groups
+    # them by this id into one bulk bundle.
     bulk_id: UUID = uuid4()
     LOGGER.info("Bulk-creating %d pins bulk_id=%s", len(body.pins), bulk_id)
 
@@ -369,12 +376,13 @@ async def post_bulk_pins(body: BulkPinInput) -> JSONResponse:
     failed = sum(1 for result in results if not result.success)
 
     # Sync each created pin (and its shops/artists/tags) to Meilisearch now so
-    # admin-created bulk pins are searchable immediately instead of waiting for
-    # the scheduled reconcile. Runs after the write transaction has committed.
+    # bulk pins are searchable immediately instead of waiting for the scheduled
+    # reconcile (pending ones carry `is_pending`, like every other submission).
+    # Runs after the write transaction has committed.
     for pin_id in created_pin_ids:
         await sync_pin_with_deps(pin_id)
     if created_pin_ids:
-        await refresh_users_stats([get_audit_user()])
+        await refresh_users_stats([current_user.id])
 
     LOGGER.info(
         "Bulk pin submission complete bulk_id=%s created=%d failed=%d",

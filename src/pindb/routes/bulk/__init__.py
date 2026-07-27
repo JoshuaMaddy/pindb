@@ -8,11 +8,11 @@ from fastapi.routing import APIRouter
 from pindb.auth import require_editor
 from pindb.routes.bulk import edit, pin, tag
 
-# Tag bulk create and bulk pin edit flows are editor-allowed. Bulk pin import
-# (`pin.router`) adds admin-only dependencies on its pin endpoints while
-# `/bulk/options/*` stays editor-accessible for tag and pin forms. Admin-only
-# operations (e.g. bulk-editing search results) check `current_user.is_admin`
-# inside `bulk/edit.py`.
+# Every bulk flow — tag create, pin import, pin edit — is editor-allowed, and
+# `/bulk/options/*` rides the same gate for the tag and pin forms. Editor
+# submissions land pending; admin ones auto-approve. Admin-only operations
+# (e.g. bulk-editing search results) check `current_user.is_admin` inside
+# `bulk/edit.py`.
 _editor = [Depends(require_editor)]
 router = APIRouter()
 

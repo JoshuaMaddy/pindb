@@ -5,7 +5,7 @@ htpy page and fragment builders: `templates/bulk/pin.py`.
 from typing import Sequence
 
 from fastapi import Request
-from htpy import Element, div, p, script
+from htpy import Element, div, i, p, script
 
 from pindb.asset_cache_buster import STATIC_CACHE_BUSTER
 from pindb.database.currency import Currency
@@ -31,12 +31,25 @@ _OPTIONAL_COLS: list[tuple[str, str]] = [
 ]
 
 
+def _pending_notice(submissions_pending: bool) -> Element | str:
+    """Editors submit into the approval queue; admins write straight through."""
+    if not submissions_pending:
+        return ""
+    return div(
+        class_="rounded bg-pending-dark border border-pending-dark text-pending-main px-4 py-2 text-sm"
+    )[
+        i(data_lucide="clock", class_="inline-block w-4 h-4 mr-1"),
+        "Every pin in this batch is submitted for admin approval as one bulk bundle.",
+    ]
+
+
 def bulk_pin_page(
     upload_image_url: str,
     submit_url: str,
     options_base_url: str,
     currencies: Sequence[Currency],
     request: Request | None = None,
+    submissions_pending: bool = False,
 ) -> Element:
     island_props: dict[str, object] = {
         "uploadImageUrl": upload_image_url,
@@ -77,6 +90,7 @@ def bulk_pin_page(
                         "Bulk pin import needs a wider layout. Resize the window or use a tablet or desktop to add rows and submit."
                     ],
                 ],
+                _pending_notice(submissions_pending),
                 # Header bar + grid + success modal all live in the island.
                 island(
                     "bulk-import",

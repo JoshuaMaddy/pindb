@@ -366,6 +366,8 @@ docker compose --profile migrate run --rm --entrypoint /app/.venv/bin/python mig
 ```
 
 ## Bulk Import
-In-app, admin-only: `GET /bulk/pin` (grid editor, `bulk-import` island) → `POST /bulk/pin/image` per image → `POST /bulk/pin` with the rows as JSON (`routes/bulk/pin.py`). Entity cells resolve through `/bulk/options/{entity_type}` and `_get_or_create`, so a typed-in shop/tag/artist is created inline.
+In-app, editor-or-admin: `GET /bulk/pin` (grid editor, `bulk-import` island) → `POST /bulk/pin/image` per image → `POST /bulk/pin` with the rows as JSON (`routes/bulk/pin.py`). Gating is the router-level `require_editor` in `routes/bulk/__init__.py` — the routes carry no dependency of their own. Entity cells resolve through `/bulk/options/{entity_type}` and `_get_or_create`, so a typed-in shop/tag/artist is created inline.
+
+Editor submissions land **pending** (no route code — `before_flush` only auto-approves admins) and every row in one submission shares a `bulk_id`, so the approval queue renders the batch as a single Bulk Bundle that approves/rejects as a unit. The editor sees a pending notice on the page; admins write straight through as before.
 
 The old `scripts/import_csv.py` CSV importer no longer exists; `scripts/README.md` documents its format for reference only (a `scripts/import.csv` and `scripts/Images/` still sit in the tree).

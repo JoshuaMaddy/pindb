@@ -1,6 +1,7 @@
 """`/bulk/pin*` routes: image upload, JSON pin creation, and per-entity-type
-options lookup. Bulk pin import is admin-only; ``/bulk/options/*`` stays
-editor-accessible for tag/pin forms. Admin submissions auto-approve."""
+options lookup. Bulk pin import is editor-accessible; ``/bulk/options/*`` stays
+editor-accessible for tag/pin forms. Admin submissions auto-approve, editor
+submissions land pending under one ``bulk_id``."""
 
 from __future__ import annotations
 
@@ -9,29 +10,39 @@ from sqlalchemy import select
 
 from pindb.database import Pin
 from pindb.models.acquisition_type import AcquisitionType
-from tests.integration.helpers.authz import assert_admin_only_get_loose_anon
+from tests.integration.helpers.authz import assert_editor_or_admin_get_loose_anon
 
 
 @pytest.mark.integration
 class TestBulkPinAuthorization:
-    def test_non_admin_rejected(self, anon_client, auth_client, editor_client) -> None:
-        assert_admin_only_get_loose_anon(
-            "/bulk/pin", anon_client, auth_client, editor_client
-        )
+    def test_non_editor_rejected(self, anon_client, auth_client) -> None:
+        assert_editor_or_admin_get_loose_anon("/bulk/pin", anon_client, auth_client)
 
     def test_admin_allowed(self, admin_client):
         response = admin_client.get("/bulk/pin")
         assert response.status_code == 200
 
+    def test_editor_allowed(self, editor_client):
+        response = editor_client.get("/bulk/pin")
+        assert response.status_code == 200
+
 
 @pytest.mark.integration
 class TestBulkImageUpload:
-    def test_editor_rejected(self, editor_client, png_upload):
-        response = editor_client.post(
+    def test_regular_user_rejected(self, auth_client, png_upload):
+        response = auth_client.post(
             "/bulk/pin/image",
             files={"image": png_upload},
         )
         assert response.status_code == 403
+
+    def test_editor_upload_returns_guid(self, editor_client, png_upload):
+        response = editor_client.post(
+            "/bulk/pin/image",
+            files={"image": png_upload},
+        )
+        assert response.status_code == 200
+        assert len(response.json()["guid"]) == 36
 
     def test_upload_returns_guid(self, admin_client, png_upload):
         response = admin_client.post(
@@ -61,8 +72,8 @@ class TestBulkImageUpload:
 
 @pytest.mark.integration
 class TestBulkPinsCreate:
-    def test_editor_post_rejected(self, editor_client):
-        response = editor_client.post("/bulk/pin", json={"pins": []})
+    def test_regular_user_post_rejected(self, auth_client):
+        response = auth_client.post("/bulk/pin", json={"pins": []})
         assert response.status_code == 403
 
     def test_single_pin_created(self, admin_client, png_upload, db_session):
@@ -196,6 +207,51 @@ class TestBulkCreationBulkId:
         pin = db_session.scalar(select(Pin).where(Pin.name == "Admin Bulk"))
         assert pin is not None
         assert pin.approved_at is not None
+
+    def test_editor_pins_land_pending_under_one_bulk_id(
+        self, editor_client, png_upload, db_session
+    ):
+        image_one = editor_client.post(
+            "/bulk/pin/image", files={"image": png_upload}
+        ).json()["guid"]
+        image_two = editor_client.post(
+            "/bulk/pin/image", files={"image": png_upload}
+        ).json()["guid"]
+
+        response = editor_client.post(
+            "/bulk/pin",
+            json={
+                "pins": [
+                    {
+                        "name": "Editor Bulk Pair 1",
+                        "acquisition_type": AcquisitionType.single.value,
+                        "front_image_guid": image_one,
+                    },
+                    {
+                        "name": "Editor Bulk Pair 2",
+                        "acquisition_type": AcquisitionType.single.value,
+                        "front_image_guid": image_two,
+                    },
+                ]
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["created_count"] == 2
+
+        db_session.expire_all()
+        pins = (
+            db_session.scalars(
+                select(Pin)
+                .where(Pin.name.in_(["Editor Bulk Pair 1", "Editor Bulk Pair 2"]))
+                .execution_options(include_pending=True)
+            )
+            .unique()
+            .all()
+        )
+        assert len(pins) == 2
+        assert all(pin.approved_at is None for pin in pins)
+        assert len({pin.bulk_id for pin in pins}) == 1
+        assert next(iter({pin.bulk_id for pin in pins})) is not None
 
 
 @pytest.mark.integration
