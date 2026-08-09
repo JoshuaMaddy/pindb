@@ -20,6 +20,7 @@ from pindb.database.pending_edit_utils import (
     reopen_rejected_edits,
 )
 from pindb.database.pin import Pin
+from pindb.database.pin_set import PinSet
 from pindb.database.shop import Shop
 from pindb.database.tag import Tag
 from pindb.database.user import User
@@ -27,23 +28,22 @@ from pindb.htmx_toast import hx_redirect_with_toast_headers
 from pindb.routes._urls import slugify_for_url
 
 
-async def submit_pending_edit(
+async def stage_pending_patch(
     *,
     session: AsyncSession,
-    entity: Pin | Artist | Shop | Tag,
+    entity: Pin | Artist | Shop | Tag | PinSet,
     entity_table: str,
     entity_id: int,
     field_updates: dict[str, object],
     current_user: User,
-    request: Request,
-    redirect_route: str,
-) -> HTMLResponse:
-    """Diff ``field_updates`` against the entity's current effective snapshot;
-    if non-empty, persist a new PendingEdit row.
+) -> dict[str, object] | None:
+    """Diff ``field_updates`` against the entity's current effective snapshot
+    and, if non-empty, persist a new stacked ``PendingEdit`` row.
 
-    Always returns the HTMLResponse the caller should hand back to the client:
-    a plain HX-Redirect when there is nothing to save, or one with
-    ``?version=pending`` when a new pending edit was queued.
+    Returns the patch that was written, or ``None`` when there was nothing to
+    save. Lower-level than ``submit_pending_edit`` — for callers (like pin_set
+    membership mutations) that need to stage several small edits one HTMX call
+    at a time rather than build one HTML redirect response per call.
     """
     chain = await get_edit_chain(session, entity_table, entity_id)
     old_snapshot: dict[str, object] = get_effective_snapshot(entity, chain)
@@ -51,21 +51,9 @@ async def submit_pending_edit(
     new_snapshot: dict[str, object] = dict(old_snapshot)
     new_snapshot.update(field_updates)
 
-    canonical_slug: str = slugify_for_url(
-        name=getattr(entity, "name", ""), fallback=entity_table.rstrip("s") or "entity"
-    )
-    redirect_url = str(
-        request.url_for(redirect_route, slug=canonical_slug, id=entity_id)
-    )
-
     patch = compute_patch(old_snapshot, new_snapshot)
     if not patch:
-        return HTMLResponse(
-            headers=hx_redirect_with_toast_headers(
-                redirect_url=redirect_url,
-                message="No changes to save.",
-            )
-        )
+        return None
 
     # Only now that we know the editor actually changed something: reopen the chain
     # they were asked to fix so this edit stacks on it. Autoflush makes the cleared
@@ -82,6 +70,47 @@ async def submit_pending_edit(
             parent_id=head.id if head else None,
         )
     )
+    return patch
+
+
+async def submit_pending_edit(
+    *,
+    session: AsyncSession,
+    entity: Pin | Artist | Shop | Tag | PinSet,
+    entity_table: str,
+    entity_id: int,
+    field_updates: dict[str, object],
+    current_user: User,
+    request: Request,
+    redirect_route: str,
+) -> HTMLResponse:
+    """``stage_pending_patch`` plus the HTML redirect response an edit-form
+    POST hands back to the client: a plain HX-Redirect when there was nothing
+    to save, or one with ``?version=pending`` when a new pending edit was
+    queued.
+    """
+    canonical_slug: str = slugify_for_url(
+        name=getattr(entity, "name", ""), fallback=entity_table.rstrip("s") or "entity"
+    )
+    redirect_url = str(
+        request.url_for(redirect_route, slug=canonical_slug, id=entity_id)
+    )
+
+    patch = await stage_pending_patch(
+        session=session,
+        entity=entity,
+        entity_table=entity_table,
+        entity_id=entity_id,
+        field_updates=field_updates,
+        current_user=current_user,
+    )
+    if patch is None:
+        return HTMLResponse(
+            headers=hx_redirect_with_toast_headers(
+                redirect_url=redirect_url,
+                message="No changes to save.",
+            )
+        )
 
     return HTMLResponse(
         headers=hx_redirect_with_toast_headers(

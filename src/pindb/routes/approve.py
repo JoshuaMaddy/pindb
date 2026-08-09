@@ -32,6 +32,7 @@ from pindb.database.pending_mixin import (
 )
 from pindb.database.user import User
 from pindb.models.message_body import ChangesRequestedBody
+from pindb.routes._pending_sort import sort_pending_entities
 from pindb.routes._pin_shared import PIN_SELECTINLOADS
 from pindb.search.update import delete_one, sync_entity, sync_pin_with_deps
 from pindb.templates.admin.pending import (
@@ -188,7 +189,14 @@ async def _load_pin_for_edit(session: AsyncSession, pin_id: int) -> Pin | None:
 
 async def _load_entity_for_edit(
     session: AsyncSession, entity_type: EntityType, entity_id: int
-) -> Pin | Shop | Artist | Tag | None:
+) -> Pin | Shop | Artist | Tag | PinSet | None:
+    if entity_type == EntityType.pin_set:
+        return await session.scalar(
+            select(PinSet)
+            .where(PinSet.id == entity_id)
+            .options(selectinload(PinSet.pins))
+            .execution_options(include_pending=True)  # type: ignore[call-overload]
+        )
     if entity_type == EntityType.pin:
         return await _load_pin_for_edit(session, entity_id)
     if entity_type == EntityType.shop:
@@ -287,11 +295,24 @@ async def _collect_pending_view(session: AsyncSession) -> dict[str, Any]:
         )
     ).all()
 
-    pending_pins_list: list[Pin] = list(pending_pins)
-    pending_shops_list: list[Shop] = list(pending_shops)
-    pending_artists_list: list[Artist] = list(pending_artists)
-    pending_tags_list: list[Tag] = list(pending_tags)
-    pending_pin_sets_list: list[PinSet] = list(pending_pin_sets)
+    # Day-grouped, then alphabetical within the day — see ``_pending_sort``.
+    pending_pins_list: list[Pin] = cast(
+        list[Pin], sort_pending_entities(cast(list[PendingAuditEntity], pending_pins))
+    )
+    pending_shops_list: list[Shop] = cast(
+        list[Shop], sort_pending_entities(cast(list[PendingAuditEntity], pending_shops))
+    )
+    pending_artists_list: list[Artist] = cast(
+        list[Artist],
+        sort_pending_entities(cast(list[PendingAuditEntity], pending_artists)),
+    )
+    pending_tags_list: list[Tag] = cast(
+        list[Tag], sort_pending_entities(cast(list[PendingAuditEntity], pending_tags))
+    )
+    pending_pin_sets_list: list[PinSet] = cast(
+        list[PinSet],
+        sort_pending_entities(cast(list[PendingAuditEntity], pending_pin_sets)),
+    )
 
     creator_ids: set[int] = {
         e.created_by_id

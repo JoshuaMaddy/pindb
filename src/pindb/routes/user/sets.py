@@ -9,17 +9,29 @@ from htpy.starlette import HtpyResponse
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from pindb.achievements import refresh_user_stats, refresh_users_stats
 from pindb.auth import AdminUser, AuthenticatedUser
 from pindb.database import Pin, PinSet, User, async_session_maker
+from pindb.database.entity_type import EntityType
 from pindb.database.joins import (
     pin_set_memberships,
     user_favorite_pin_sets,
     user_favorite_pins,
 )
+from pindb.database.pending_edit_utils import (
+    apply_snapshot_in_memory,
+    get_edit_chain,
+    get_effective_snapshot,
+)
 from pindb.htmx_toast import redirect_or_htmx_toast
+from pindb.routes._guards import (
+    assert_editor_can_edit,
+    clear_rejection_on_resubmit,
+    needs_pending_edit,
+)
 from pindb.routes._name_check import (
     NameCheckKind,
     duplicate_name_response,
@@ -27,7 +39,9 @@ from pindb.routes._name_check import (
     normalized_name_exists,
     normalized_name_key,
 )
+from pindb.routes.edit._pending_helpers import stage_pending_patch, submit_pending_edit
 from pindb.search.search import search_pin
+from pindb.search.update import sync_entity
 from pindb.templates.create_and_edit.pin_set import (
     pin_card_oob,
     pin_count_oob,
@@ -43,13 +57,55 @@ router = APIRouter(tags=["user"])
 
 
 def _assert_can_edit_set(pin_set: PinSet, user: User) -> None:
+    """Gate for content edits — name/description *and* pin membership/order:
+    owner for personal sets, editor-or-admin for global sets. Editors go
+    through the same pending-edit review flow as any other approved entity
+    (``needs_pending_edit``); admins write straight through.
+    """
+    if pin_set.owner_id is None:
+        if not (user.is_admin or user.is_editor):
+            raise HTTPException(
+                status_code=403, detail="Editor access required to edit global sets"
+            )
+        assert_editor_can_edit(pin_set, user)
+    elif pin_set.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this pin set")
+
+
+def _assert_can_delete_set(pin_set: PinSet, user: User) -> None:
+    """Gate for deleting the whole set. Unlike an edit, a delete isn't a
+    diffable pending-edit field, so it stays admin-only for global sets even
+    though editors can now edit one via the review flow.
+    """
     if pin_set.owner_id is None:
         if not user.is_admin:
             raise HTTPException(
-                status_code=403, detail="Admin access required to edit global sets"
+                status_code=403, detail="Admin access required to delete global sets"
             )
     elif pin_set.owner_id != user.id:
         raise HTTPException(status_code=403, detail="You do not own this pin set")
+
+
+def _is_pending_membership_mode(pin_set: PinSet, user: User) -> bool:
+    """True when this editor's changes to *pin_set* (metadata or membership)
+    must go through the pending-edit review flow rather than writing direct.
+    """
+    return pin_set.owner_id is None and needs_pending_edit(pin_set, user)
+
+
+async def _load_pin_set_with_pins(db: AsyncSession, set_id: int) -> PinSet | None:
+    """Load a PinSet with ``pins`` eager (required for snapshot_pin_set, which
+    reads the relationship — see pending_edit_utils.py)."""
+    return await db.scalar(
+        select(PinSet).where(PinSet.id == set_id).options(selectinload(PinSet.pins))
+    )
+
+
+async def _effective_pin_ids(db: AsyncSession, pin_set: PinSet) -> list[int]:
+    """Ordered pin ids reflecting *pin_set*'s pending-edit chain, if any."""
+    chain = await get_edit_chain(db, "pin_sets", pin_set.id)
+    ids = get_effective_snapshot(pin_set, chain).get("pin_ids") or []
+    return list(ids)
 
 
 # ---------------------------------------------------------------------------
@@ -102,29 +158,27 @@ async def get_edit_set(
     current_user: AuthenticatedUser,
 ) -> HTMLResponse:
     async with async_session_maker() as db:
-        pin_set = await db.get(PinSet, set_id)
+        pin_set = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
 
-        pins: list[Pin] = list(
-            (
-                await db.scalars(
-                    select(Pin)
-                    .join(pin_set_memberships, Pin.id == pin_set_memberships.c.pin_id)
-                    .where(pin_set_memberships.c.set_id == set_id)
-                    .order_by(pin_set_memberships.c.position)
-                )
-            ).all()
-        )
+        pending_mode = _is_pending_membership_mode(pin_set, current_user)
+        if pending_mode:
+            chain = await get_edit_chain(db, "pin_sets", set_id)
+            if chain:
+                effective = get_effective_snapshot(pin_set, chain)
+                with db.no_autoflush:
+                    await apply_snapshot_in_memory(pin_set, effective, db)
 
         return HTMLResponse(
             content=str(
                 pin_set_edit_page(
                     request=request,
                     pin_set=pin_set,
-                    pins=pins,
+                    pins=list(pin_set.pins),
                     current_user=current_user,
+                    pending_review=pending_mode,
                 )
             )
         )
@@ -139,13 +193,33 @@ async def update_set(
     description: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse | RedirectResponse:
     async with async_session_maker.begin() as db:
-        pin_set: PinSet | None = await db.get(PinSet, set_id)
+        pin_set: PinSet | None = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
+        is_global: bool = pin_set.owner_id is None
+
+        if _is_pending_membership_mode(pin_set, current_user):
+            return await submit_pending_edit(
+                session=db,
+                entity=pin_set,
+                entity_table="pin_sets",
+                entity_id=set_id,
+                field_updates={
+                    "name": name.strip(),
+                    "description": description.strip() if description else None,
+                },
+                current_user=current_user,
+                request=request,
+                redirect_route="get_pin_set",
+            )
+
+        clear_rejection_on_resubmit(pin_set, current_user)
         pin_set.name = name.strip()
         pin_set.description = description.strip() if description else None
-        is_global: bool = pin_set.owner_id is None
+        pin_set_id: int = pin_set.id
+
+    await sync_entity(EntityType.pin_set, pin_set_id)
 
     if is_global:
         back_url = str(request.url_for("get_list_pin_sets"))
@@ -168,20 +242,30 @@ async def reorder_set_pins(
     pin_ids: Annotated[list[int], Form()],
 ) -> Response:
     async with async_session_maker.begin() as db:
-        pin_set: PinSet | None = await db.get(PinSet, set_id)
+        pin_set: PinSet | None = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
 
-        for position, pin_id in enumerate(pin_ids):
-            await db.execute(
-                pin_set_memberships.update()
-                .where(
-                    pin_set_memberships.c.set_id == set_id,
-                    pin_set_memberships.c.pin_id == pin_id,
-                )
-                .values(position=position)
+        if _is_pending_membership_mode(pin_set, current_user):
+            await stage_pending_patch(
+                session=db,
+                entity=pin_set,
+                entity_table="pin_sets",
+                entity_id=set_id,
+                field_updates={"pin_ids": pin_ids},
+                current_user=current_user,
             )
+        else:
+            for position, pin_id in enumerate(pin_ids):
+                await db.execute(
+                    pin_set_memberships.update()
+                    .where(
+                        pin_set_memberships.c.set_id == set_id,
+                        pin_set_memberships.c.pin_id == pin_id,
+                    )
+                    .values(position=position)
+                )
 
     return Response(status_code=204)
 
@@ -349,7 +433,7 @@ async def delete_personal_set(
         pin_set: PinSet | None = await db.get(PinSet, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
-        _assert_can_edit_set(pin_set, current_user)
+        _assert_can_delete_set(pin_set, current_user)
         await db.delete(pin_set)
 
     return redirect_or_htmx_toast(
@@ -374,31 +458,48 @@ async def add_pin_to_personal_set(
     current_user: AuthenticatedUser,
 ) -> Response:
     async with async_session_maker.begin() as db:
-        pin_set: PinSet | None = await db.get(PinSet, set_id)
+        pin_set: PinSet | None = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
         if await db.get(Pin, pin_id) is None:
             raise HTTPException(status_code=404, detail="Pin not found")
 
-        already: Row[Any] | None = (
-            await db.execute(
-                select(pin_set_memberships).where(
-                    pin_set_memberships.c.set_id == set_id,
-                    pin_set_memberships.c.pin_id == pin_id,
+        if _is_pending_membership_mode(pin_set, current_user):
+            ids: list[int] = await _effective_pin_ids(db, pin_set)
+            if pin_id not in ids:
+                ids.append(pin_id)
+                await stage_pending_patch(
+                    session=db,
+                    entity=pin_set,
+                    entity_table="pin_sets",
+                    entity_id=set_id,
+                    field_updates={"pin_ids": ids},
+                    current_user=current_user,
                 )
-            )
-        ).first()
-        if already is None:
-            max_pos = await db.scalar(
-                select(
-                    func.coalesce(func.max(pin_set_memberships.c.position), -1)
-                ).where(pin_set_memberships.c.set_id == set_id)
-            )
-            await db.execute(
-                pin_set_memberships.insert().values(
-                    set_id=set_id, pin_id=pin_id, position=(max_pos or 0) + 1
+            count = len(ids)
+        else:
+            already: Row[Any] | None = (
+                await db.execute(
+                    select(pin_set_memberships).where(
+                        pin_set_memberships.c.set_id == set_id,
+                        pin_set_memberships.c.pin_id == pin_id,
+                    )
                 )
+            ).first()
+            if already is None:
+                max_pos = await db.scalar(
+                    select(
+                        func.coalesce(func.max(pin_set_memberships.c.position), -1)
+                    ).where(pin_set_memberships.c.set_id == set_id)
+                )
+                await db.execute(
+                    pin_set_memberships.insert().values(
+                        set_id=set_id, pin_id=pin_id, position=(max_pos or 0) + 1
+                    )
+                )
+            count = await db.scalar(
+                select(func.count()).where(pin_set_memberships.c.set_id == set_id)
             )
 
     if request.headers.get("HX-Request"):
@@ -411,9 +512,6 @@ async def add_pin_to_personal_set(
                     .options(selectinload(Pin.shops), selectinload(Pin.artists))
                 )
                 assert pin is not None
-                count = await db.scalar(
-                    select(func.count()).where(pin_set_memberships.c.set_id == set_id)
-                )
 
             parts: list[str] = [
                 str(
@@ -446,25 +544,38 @@ async def remove_pin_from_personal_set(
     current_user: AuthenticatedUser,
 ) -> Response:
     async with async_session_maker.begin() as db:
-        pin_set: PinSet | None = await db.get(PinSet, set_id)
+        pin_set: PinSet | None = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
-        await db.execute(
-            pin_set_memberships.delete().where(
-                pin_set_memberships.c.set_id == set_id,
-                pin_set_memberships.c.pin_id == pin_id,
+
+        if _is_pending_membership_mode(pin_set, current_user):
+            ids: list[int] = await _effective_pin_ids(db, pin_set)
+            if pin_id in ids:
+                ids.remove(pin_id)
+                await stage_pending_patch(
+                    session=db,
+                    entity=pin_set,
+                    entity_table="pin_sets",
+                    entity_id=set_id,
+                    field_updates={"pin_ids": ids},
+                    current_user=current_user,
+                )
+            count = len(ids)
+        else:
+            await db.execute(
+                pin_set_memberships.delete().where(
+                    pin_set_memberships.c.set_id == set_id,
+                    pin_set_memberships.c.pin_id == pin_id,
+                )
             )
-        )
+            count = await db.scalar(
+                select(func.count()).where(pin_set_memberships.c.set_id == set_id)
+            )
 
     if request.headers.get("HX-Request"):
         hx_target: str = request.headers.get("HX-Target", "")
         if hx_target.startswith("pin-row-"):
-            async with async_session_maker() as db:
-                count = await db.scalar(
-                    select(func.count()).where(pin_set_memberships.c.set_id == set_id)
-                )
-
             return HtpyResponse(pin_count_oob(count or 0))
         elif hx_target.startswith("search-row-"):
             async with async_session_maker() as db:
@@ -510,7 +621,7 @@ async def search_pins_for_set(
     q: str = "",
 ) -> HTMLResponse:
     async with async_session_maker() as db:
-        pin_set: PinSet | None = await db.get(PinSet, set_id)
+        pin_set: PinSet | None = await _load_pin_set_with_pins(db, set_id)
         if pin_set is None:
             raise HTTPException(status_code=404, detail="Pin set not found")
         _assert_can_edit_set(pin_set, current_user)
@@ -518,15 +629,18 @@ async def search_pins_for_set(
         results: list[Pin] = []
         if q.strip():
             results = await search_pin(query=q.strip(), session=db) or []
-        existing_ids: set[int] = set(
-            (
-                await db.scalars(
-                    select(pin_set_memberships.c.pin_id).where(
-                        pin_set_memberships.c.set_id == set_id
+        if _is_pending_membership_mode(pin_set, current_user):
+            existing_ids: set[int] = set(await _effective_pin_ids(db, pin_set))
+        else:
+            existing_ids = set(
+                (
+                    await db.scalars(
+                        select(pin_set_memberships.c.pin_id).where(
+                            pin_set_memberships.c.set_id == set_id
+                        )
                     )
-                )
-            ).all()
-        )
+                ).all()
+            )
 
         return HTMLResponse(
             content=str(

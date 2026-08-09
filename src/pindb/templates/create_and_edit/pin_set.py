@@ -145,6 +145,7 @@ def pin_set_edit_page(
     pin_set: PinSet,
     pins: list[Pin],
     current_user: User,
+    pending_review: bool = False,
 ) -> Element:
     reorder_url = str(request.url_for("reorder_set_pins", set_id=pin_set.id))
     is_global: bool = pin_set.owner_id is None
@@ -201,6 +202,16 @@ def pin_set_edit_page(
                     extras=header_extras,
                 ),
                 hr,
+                pending_review
+                and div(
+                    class_="rounded-lg bg-lighter border border-lightest px-3 py-2 text-sm text-lightest-hover"
+                )[
+                    i(
+                        data_lucide="clock",
+                        class_="inline-block w-4 h-4 align-text-bottom mr-1",
+                    ),
+                    "Your changes to this set (details and pins) are queued for admin review.",
+                ],
                 _metadata_form(request=request, pin_set=pin_set),
                 hr,
                 pin_list_section(

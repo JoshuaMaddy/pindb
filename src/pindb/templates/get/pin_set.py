@@ -8,6 +8,7 @@ from fastapi import Request
 from htpy import Element, fragment
 
 from pindb.database.entity_type import EntityType
+from pindb.database.pending_edit_utils import PendingChange
 from pindb.database.pin import Pin
 from pindb.database.pin_set import PinSet
 from pindb.database.user import User
@@ -18,6 +19,10 @@ from pindb.templates.components.display.changes_requested_banner import (
     changes_requested_banner,
 )
 from pindb.templates.components.display.description_block import description_block
+from pindb.templates.components.display.pending_changes_table import (
+    pending_changes_table,
+)
+from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
 from pindb.templates.components.display.review_actions import review_actions_bar
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
@@ -34,9 +39,16 @@ def pin_set_page(
     total_count: int,
     page: int,
     per_page: int,
+    has_pending_chain: bool = False,
+    viewing_pending: bool = False,
+    pending_changes: Sequence[PendingChange] = (),
+    edit_change_request: str | None = None,
 ) -> Element:
     user: User | None = getattr(getattr(request, "state", None), "user", None)
-    can_edit: bool = user is not None and (pin_set.owner_id == user.id or user.is_admin)
+    is_global: bool = pin_set.owner_id is None
+    can_edit: bool = user is not None and (
+        pin_set.owner_id == user.id or user.is_admin or (is_global and user.is_editor)
+    )
     can_delete: bool = user is not None and (
         pin_set.owner_id == user.id or user.is_admin
     )
@@ -48,6 +60,7 @@ def pin_set_page(
         and (pin_set.is_pending or pin_set.is_rejected)
     )
     canonical_url = str(pin_set_url(request=request, pin_set=pin_set))
+    pending_url = canonical_url + "?version=pending"
     share_description: str = pin_set.description or f"View {pin_set.name} on PinDB."
 
     return html_base(
@@ -73,6 +86,20 @@ def pin_set_page(
                     if can_edit
                     else None,
                 ),
+                edit_change_request
+                and changes_requested_banner(
+                    reason=edit_change_request,
+                    edit_url=str(request.url_for("get_edit_set", set_id=pin_set.id)),
+                    is_edit=True,
+                ),
+                has_pending_chain
+                and not edit_change_request
+                and pending_edit_banner(
+                    viewing_pending=viewing_pending,
+                    canonical_url=canonical_url,
+                    pending_url=pending_url,
+                ),
+                viewing_pending and pending_changes_table(pending_changes),
                 in_review
                 and review_actions_bar(
                     entity_type=EntityType.pin_set,

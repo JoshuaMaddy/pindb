@@ -45,4 +45,7 @@ async def replace_aliases(
     result = session.flush()
     if isawaitable(result):
         await result
-    owner.aliases = [alias_cls(alias=value) for value in cleaned]
+    owner.aliases = [
+        alias_cls(alias=value)  # ty: ignore[unknown-argument]
+        for value in cleaned
+    ]

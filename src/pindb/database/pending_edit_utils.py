@@ -21,6 +21,7 @@ from sqlalchemy.orm import attributes
 from pindb.database.artist import Artist
 from pindb.database.currency import Currency
 from pindb.database.grade import Grade
+from pindb.database.joins import pin_set_memberships
 from pindb.database.link import Link
 from pindb.database.pending_edit import PendingEdit
 from pindb.database.pin import Pin
@@ -110,7 +111,20 @@ def snapshot_tag(tag: Tag) -> dict[str, Any]:
     }
 
 
-def snapshot_entity(entity: Pin | Artist | Shop | Tag) -> dict[str, Any]:
+def snapshot_pin_set(pin_set: PinSet) -> dict[str, Any]:
+    """Snapshot editable ``PinSet`` columns, plus ordered pin membership.
+
+    Requires ``pin_set.pins`` to already be selectinloaded (it's an
+    ``order_by=position`` relationship, so the list order *is* the set order).
+    """
+    return {
+        "name": pin_set.name,
+        "description": pin_set.description,
+        "pin_ids": [pin.id for pin in pin_set.pins],
+    }
+
+
+def snapshot_entity(entity: Pin | Artist | Shop | Tag | PinSet) -> dict[str, Any]:
     """Dispatch to entity-specific snapshot helpers."""
     if isinstance(entity, Pin):
         return snapshot_pin(entity)
@@ -120,6 +134,8 @@ def snapshot_entity(entity: Pin | Artist | Shop | Tag) -> dict[str, Any]:
         return snapshot_shop(entity)
     if isinstance(entity, Tag):
         return snapshot_tag(entity)
+    if isinstance(entity, PinSet):
+        return snapshot_pin_set(entity)
     raise TypeError(f"No snapshot defined for {type(entity).__name__}")
 
 
@@ -233,7 +249,7 @@ async def get_head_edit(
 
 
 def get_effective_snapshot(
-    entity: Pin | Artist | Shop | Tag, chain: Sequence[PendingEdit]
+    entity: Pin | Artist | Shop | Tag | PinSet, chain: Sequence[PendingEdit]
 ) -> dict[str, Any]:
     snapshot = snapshot_entity(entity)
     for edit in chain:
@@ -295,6 +311,7 @@ _CHANGE_FIELD_LABELS: dict[str, str] = {
     "tag_ids": "Tags",
     "artist_ids": "Artists",
     "pin_set_ids": "Sets",
+    "pin_ids": "Pins",
     "variant_pin_ids": "Variants",
     "unauthorized_copy_pin_ids": "Unauthorized copies",
     "implication_ids": "Implications",
@@ -309,6 +326,7 @@ _CHANGE_ID_LIST_FIELDS: dict[str, Any] = {
     "tag_ids": Tag,
     "artist_ids": Artist,
     "pin_set_ids": PinSet,
+    "pin_ids": Pin,
     "variant_pin_ids": Pin,
     "unauthorized_copy_pin_ids": Pin,
     "implication_ids": Tag,
@@ -451,7 +469,7 @@ async def build_pending_changes(
 async def maybe_apply_pending_view(
     *,
     session: AsyncSession,
-    entity: Pin | Artist | Shop | Tag,
+    entity: Pin | Artist | Shop | Tag | PinSet,
     entity_table: str,
     current_user: object,
     version: str | None,
@@ -552,8 +570,36 @@ def _apply_tag_scalar_fields(tag: Tag, snapshot: dict[str, Any]) -> None:
     tag.category = TagCategory(snapshot["category"])
 
 
+def _apply_pin_set_scalar_fields(pin_set: PinSet, snapshot: dict[str, Any]) -> None:
+    pin_set.name = snapshot["name"]
+    pin_set.description = snapshot["description"]
+
+
+async def _ordered_pins_for_ids(pin_ids: list[int], session: AsyncSession) -> list[Pin]:
+    """Load ``Pin`` rows and return them in ``pin_ids`` order (the set's order)."""
+    if not pin_ids:
+        return []
+    rows = (
+        await session.scalars(
+            select(Pin)
+            .where(Pin.id.in_(pin_ids))
+            .execution_options(include_pending=True)
+        )
+    ).all()
+    by_id = {pin.id: pin for pin in rows}
+    return [by_id[pin_id] for pin_id in pin_ids if pin_id in by_id]
+
+
+async def _apply_pin_set_snapshot_in_memory(
+    pin_set: PinSet, snapshot: dict[str, Any], session: AsyncSession
+) -> None:
+    _apply_pin_set_scalar_fields(pin_set, snapshot)
+    ordered_pins = await _ordered_pins_for_ids(snapshot.get("pin_ids") or [], session)
+    attributes.set_committed_value(pin_set, "pins", ordered_pins)
+
+
 async def apply_snapshot_in_memory(
-    entity: Pin | Artist | Shop | Tag,
+    entity: Pin | Artist | Shop | Tag | PinSet,
     snapshot: dict[str, Any],
     session: AsyncSession,
 ) -> None:
@@ -571,6 +617,8 @@ async def apply_snapshot_in_memory(
         _apply_shop_snapshot_in_memory(entity, snapshot)
     elif isinstance(entity, Tag):
         await _apply_tag_snapshot_in_memory(entity, snapshot, session)
+    elif isinstance(entity, PinSet):
+        await _apply_pin_set_snapshot_in_memory(entity, snapshot, session)
     else:
         raise TypeError(f"No in-memory apply for {type(entity).__name__}")
 
@@ -704,7 +752,7 @@ async def _apply_tag_snapshot_in_memory(
 
 
 async def apply_snapshot_to_entity(
-    entity: Pin | Artist | Shop | Tag,
+    entity: Pin | Artist | Shop | Tag | PinSet,
     snapshot: dict[str, Any],
     session: AsyncSession,
 ) -> None:
@@ -721,8 +769,39 @@ async def apply_snapshot_to_entity(
         await _approve_shop_snapshot(entity, snapshot, session)
     elif isinstance(entity, Tag):
         await _approve_tag_snapshot(entity, snapshot, session)
+    elif isinstance(entity, PinSet):
+        await _approve_pin_set_snapshot(entity, snapshot, session)
     else:
         raise TypeError(f"No approval apply for {type(entity).__name__}")
+
+
+async def _approve_pin_set_snapshot(
+    pin_set: PinSet, snapshot: dict[str, Any], session: AsyncSession
+) -> None:
+    """Write name/description plus membership+order.
+
+    Membership isn't a plain relationship assignment: ``pin_set_memberships``
+    carries a ``position`` column the ``pins`` relationship doesn't populate on
+    write, so order is rebuilt explicitly — full replace rather than a diff,
+    since a pending edit's ``pin_ids`` is already the complete target order.
+    """
+    _apply_pin_set_scalar_fields(pin_set, snapshot)
+    pin_ids: list[int] = snapshot.get("pin_ids") or []
+    await session.execute(
+        pin_set_memberships.delete().where(pin_set_memberships.c.set_id == pin_set.id)
+    )
+    if pin_ids:
+        await session.execute(
+            pin_set_memberships.insert(),
+            [
+                {"set_id": pin_set.id, "pin_id": pin_id, "position": position}
+                for position, pin_id in enumerate(pin_ids)
+            ],
+        )
+    await session.flush()
+    attributes.set_committed_value(
+        pin_set, "pins", await _ordered_pins_for_ids(pin_ids, session)
+    )
 
 
 async def _replace_links(
