@@ -7,7 +7,7 @@ carries them on an entry's own detail page. The buttons live here rather than in
 them; `templates/admin/_pending_shared.py` re-exports them for the queue.
 """
 
-from htpy import Element, button, div, form, fragment, i
+from htpy import Element, Fragment, button, div, form, fragment, i
 
 from pindb.database.entity_type import EntityType
 from pindb.database.pending_mixin import MIN_CHANGE_REQUEST_LENGTH
@@ -100,6 +100,89 @@ def action_buttons(*buttons: Element) -> Element:
     return div(class_="flex gap-2")[list(buttons)]
 
 
+def _review_bar(*, headline: str, buttons: list[Element | Fragment]) -> Element:
+    """Shell shared by the new-entry and pending-edit review bars."""
+    return div(class_=_BAR_CLASS)[
+        div(class_="flex items-center gap-2 font-medium")[
+            i(
+                data_lucide="shield-check",
+                class_="inline-block w-4 h-4 shrink-0",
+                aria_hidden="true",
+            ),
+            headline,
+        ],
+        div(class_="flex gap-2")[buttons],
+    ]
+
+
+def edit_review_actions_bar(
+    *,
+    entity_type: EntityType,
+    entity_id: int,
+    entity_name: str,
+    is_rejected: bool,
+) -> Element:
+    """Admin review controls for a pending *edit chain* on the entity's own page.
+
+    The entry itself is already approved and live; what is awaiting review is the
+    proposed change to it. That is the whole reason this is a separate bar from
+    ``review_actions_bar``: the two states are independent (an approved pin can
+    carry a pending edit), the routes are the ``/admin/pending/*-edits/`` family
+    rather than the entity ones, and Delete here discards the submission rather
+    than the entry.
+
+    Posts carry ``?after=reload`` instead of ``?after=back``. Ruling on an edit
+    leaves the page standing — approving writes the new values into the entity the
+    admin is looking at — so the right ending is a re-render in place, not a walk
+    back through history. See ``routes/approve.py::_pending_action_response``.
+
+    Mirrors the queue's needs-changes section: a chain already sent back offers
+    Approve and Delete only.
+
+    Callers gate on ``user.is_admin``; the routes re-check with ``require_admin``.
+    """
+    action_url = (
+        f"/admin/pending/{{}}-edits/{entity_type.value}/{entity_id}?after=reload"
+    )
+    headline = (
+        "Edit sent back for changes — waiting on the submitter."
+        if is_rejected
+        else "Pending edit awaiting review."
+    )
+    return _review_bar(
+        headline=headline,
+        buttons=[
+            action_form_button(
+                action="approve",
+                url=action_url.format("approve"),
+                label="Approve edit",
+                hx_target="this",
+                hx_swap="none",
+            ),
+            fragment[
+                not is_rejected
+                and request_changes_button(
+                    url=action_url.format("reject"),
+                    entity_label=f"the pending edits to {entity_name}",
+                    hx_target="this",
+                    hx_swap="none",
+                )
+            ],
+            confirm_modal(
+                trigger=_action_button(
+                    action="delete", label="Discard edit", type_="button"
+                ),
+                message=(
+                    f'Discard the pending edits to "{entity_name}"? '
+                    "The entry itself keeps its current values."
+                ),
+                form_action=action_url.format("delete"),
+                htmx_post=True,
+            ),
+        ],
+    )
+
+
 def review_actions_bar(
     *,
     entity_type: EntityType,
@@ -128,16 +211,9 @@ def review_actions_bar(
         if is_rejected
         else "Awaiting review."
     )
-    return div(class_=_BAR_CLASS)[
-        div(class_="flex items-center gap-2 font-medium")[
-            i(
-                data_lucide="shield-check",
-                class_="inline-block w-4 h-4 shrink-0",
-                aria_hidden="true",
-            ),
-            headline,
-        ],
-        div(class_="flex gap-2")[
+    return _review_bar(
+        headline=headline,
+        buttons=[
             action_form_button(
                 action="approve",
                 url=action_url.format("approve"),
@@ -163,4 +239,4 @@ def review_actions_bar(
                 htmx_post=True,
             ),
         ],
-    ]
+    )

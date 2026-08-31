@@ -25,7 +25,10 @@ from pindb.templates.components.display.pending_changes_table import (
     pending_changes_table,
 )
 from pindb.templates.components.display.pending_edit_banner import pending_edit_banner
-from pindb.templates.components.display.review_actions import review_actions_bar
+from pindb.templates.components.display.review_actions import (
+    edit_review_actions_bar,
+    review_actions_bar,
+)
 from pindb.templates.components.forms.icon_button import icon_button
 from pindb.templates.components.layout.centered import centered_div
 from pindb.templates.components.layout.page_heading import page_heading
@@ -153,6 +156,9 @@ def tag_page(
     in_review: bool = (
         user is not None and user.is_admin and (tag.is_pending or tag.is_rejected)
     )
+    # An approved entry can still be carrying a pending edit, so this is a
+    # separate state from `in_review` — both bars can legitimately show at once.
+    edit_in_review: bool = user is not None and user.is_admin and has_pending_chain
     pending_url = canonical_url + "?version=pending"
     return html_base(
         title=tag.display_name,
@@ -185,6 +191,13 @@ def tag_page(
                     pending_url=pending_url,
                 ),
                 viewing_pending and pending_changes_table(pending_changes),
+                edit_in_review
+                and edit_review_actions_bar(
+                    entity_type=EntityType.tag,
+                    entity_id=tag.id,
+                    entity_name=tag.name,
+                    is_rejected=edit_change_request is not None,
+                ),
                 in_review
                 and review_actions_bar(
                     entity_type=EntityType.tag,

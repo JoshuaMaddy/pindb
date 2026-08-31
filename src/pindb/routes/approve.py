@@ -500,10 +500,20 @@ async def _pending_action_response(
     swap into, and the entry the admin is looking at is gone from view the moment
     they rule on it, so the response carries no body — just the trigger that walks
     the admin back to wherever they came from. No-JS callers land on the queue.
+
+    ``after=reload`` is the same idea for the *edit* review bar, and differs
+    because ruling on an edit chain leaves the page standing: the entity is still
+    there, it just now shows the approved values (or has lost its pending banner).
+    So the admin stays put and the page re-renders instead of being walked back.
+    ``HX-Refresh`` is htmx's own header — no shell listener involved.
     """
     if after == "back":
         if request.headers.get("HX-Request"):
             return Response(status_code=204, headers={"HX-Trigger": REVIEW_DONE_EVENT})
+        return RedirectResponse(url="/admin/pending", status_code=303)
+    if after == "reload":
+        if request.headers.get("HX-Request"):
+            return Response(status_code=204, headers={"HX-Refresh": "true"})
         return RedirectResponse(url="/admin/pending", status_code=303)
     if request.headers.get("HX-Request"):
         async with async_session_maker() as session:
@@ -619,6 +629,7 @@ async def approve_pending_edits(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    after: str | None = None,
     current_user: User = Depends(require_admin),
 ) -> Response:
     now = utc_now()
@@ -652,7 +663,7 @@ async def approve_pending_edits(
             await sync_entity(entity_type, entity_id)
         await refresh_users_stats(affected_user_ids)
 
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 @router.post("/reject-edits/{entity_type}/{entity_id}")
@@ -661,6 +672,7 @@ async def reject_pending_edits(
     entity_type: EntityType,
     entity_id: int,
     reason: Annotated[str, Form()],
+    after: str | None = None,
     current_user: User = Depends(require_admin),
 ) -> Response:
     """Flag an edit chain as needing changes, and tell everyone who contributed to it."""
@@ -692,7 +704,7 @@ async def reject_pending_edits(
                     is_edit=True,
                 )
 
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 @router.post("/delete-edits/{entity_type}/{entity_id}")
@@ -700,6 +712,7 @@ async def delete_pending_edits(
     request: Request,
     entity_type: EntityType,
     entity_id: int,
+    after: str | None = None,
 ) -> Response:
     table_name = entity_type.table_name
     async with async_session_maker.begin() as session:
@@ -707,7 +720,7 @@ async def delete_pending_edits(
         for edit in chain:
             await session.delete(edit)
 
-    return await _pending_action_response(request)
+    return await _pending_action_response(request, after)
 
 
 # ---------------------------------------------------------------------------
