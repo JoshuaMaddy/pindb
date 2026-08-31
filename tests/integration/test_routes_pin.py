@@ -390,6 +390,188 @@ class TestPinWriteRoutes:
         assert variant_ids(pin_b_id) == {pin_a_id, pin_c_id}
         assert variant_ids(pin_c_id) == {pin_a_id, pin_b_id}
 
+    def test_edit_pin_removes_variant_links_on_both_sides(
+        self, admin_client, db_session
+    ):
+        """Dropping a variant from the form must clear the mirror row too.
+
+        The removed counterpart never goes through ``load_pin_links``, so its
+        own ``variants`` collection is unloaded — reaching for it to drop the
+        mirror row used to raise ``MissingGreenlet`` and 500 the POST.
+        """
+        pin_a = cast(Pin, PinFactory(name="Drop A", approved=True))
+        pin_b = cast(Pin, PinFactory(name="Drop B", approved=True))
+        pin_a_id, pin_b_id = pin_a.id, pin_b.id
+
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Drop A", variant_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Drop A", variant_pin_ids=[]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        db_session.expire_all()
+
+        def variant_ids(pin_id: int) -> set[int]:
+            loaded = db_session.scalar(
+                select(Pin)
+                .where(Pin.id == pin_id)
+                .options(selectinload(Pin.variants))
+                .execution_options(include_pending=True)
+            )
+            assert loaded is not None
+            return {variant.id for variant in loaded.variants}
+
+        assert variant_ids(pin_a_id) == set()
+        assert variant_ids(pin_b_id) == set()
+
+    def test_edit_pin_removing_one_variant_detaches_it_from_the_group(
+        self, admin_client, db_session
+    ):
+        """Dropping B from A must pull B out of A's whole variant group.
+
+        Cutting only the A↔B pair would leave B reachable from A through C,
+        so the next clique propagation anywhere in the group would link
+        A↔B straight back.
+        """
+        pin_a = cast(Pin, PinFactory(name="Group A", approved=True))
+        pin_b = cast(Pin, PinFactory(name="Group B", approved=True))
+        pin_c = cast(Pin, PinFactory(name="Group C", approved=True))
+        pin_a_id, pin_b_id, pin_c_id = pin_a.id, pin_b.id, pin_c.id
+
+        # A, B and C become one clique.
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Group A", variant_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+        response = admin_client.post(
+            f"/edit/pin/{pin_c_id}",
+            data=pin_form_data(name="Group C", variant_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        # Drop only B from A; C stays.
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Group A", variant_pin_ids=[pin_c_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        db_session.expire_all()
+
+        def variant_ids(pin_id: int) -> set[int]:
+            loaded = db_session.scalar(
+                select(Pin)
+                .where(Pin.id == pin_id)
+                .options(selectinload(Pin.variants))
+                .execution_options(include_pending=True)
+            )
+            assert loaded is not None
+            return {variant.id for variant in loaded.variants}
+
+        assert variant_ids(pin_a_id) == {pin_c_id}
+        assert variant_ids(pin_c_id) == {pin_a_id}
+        assert variant_ids(pin_b_id) == set()
+
+    def test_edit_pin_removed_variant_stays_gone_after_later_group_edit(
+        self, admin_client, db_session
+    ):
+        """A detached variant must not be re-linked by a later group merge."""
+        pin_a = cast(Pin, PinFactory(name="Stay A", approved=True))
+        pin_b = cast(Pin, PinFactory(name="Stay B", approved=True))
+        pin_c = cast(Pin, PinFactory(name="Stay C", approved=True))
+        pin_d = cast(Pin, PinFactory(name="Stay D", approved=True))
+        pin_a_id, pin_b_id = pin_a.id, pin_b.id
+        pin_c_id, pin_d_id = pin_c.id, pin_d.id
+
+        for actor_id, name in ((pin_a_id, "Stay A"), (pin_c_id, "Stay C")):
+            response = admin_client.post(
+                f"/edit/pin/{actor_id}",
+                data=pin_form_data(name=name, variant_pin_ids=[pin_b_id]),
+                follow_redirects=False,
+            )
+            assert response.status_code == 200
+
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Stay A", variant_pin_ids=[pin_c_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        # A later merge of D into the surviving group must not resurrect B.
+        response = admin_client.post(
+            f"/edit/pin/{pin_d_id}",
+            data=pin_form_data(name="Stay D", variant_pin_ids=[pin_c_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        db_session.expire_all()
+
+        def variant_ids(pin_id: int) -> set[int]:
+            loaded = db_session.scalar(
+                select(Pin)
+                .where(Pin.id == pin_id)
+                .options(selectinload(Pin.variants))
+                .execution_options(include_pending=True)
+            )
+            assert loaded is not None
+            return {variant.id for variant in loaded.variants}
+
+        assert variant_ids(pin_a_id) == {pin_c_id, pin_d_id}
+        assert variant_ids(pin_c_id) == {pin_a_id, pin_d_id}
+        assert variant_ids(pin_d_id) == {pin_a_id, pin_c_id}
+        assert variant_ids(pin_b_id) == set()
+
+    def test_edit_pin_removes_unauthorized_copy_links_on_both_sides(
+        self, admin_client, db_session
+    ):
+        """Same mirror-row drop for the pairwise unauthorized-copy links."""
+        pin_a = cast(Pin, PinFactory(name="Copy A", approved=True))
+        pin_b = cast(Pin, PinFactory(name="Copy B", approved=True))
+        pin_a_id, pin_b_id = pin_a.id, pin_b.id
+
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Copy A", unauthorized_copy_pin_ids=[pin_b_id]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        response = admin_client.post(
+            f"/edit/pin/{pin_a_id}",
+            data=pin_form_data(name="Copy A", unauthorized_copy_pin_ids=[]),
+            follow_redirects=False,
+        )
+        assert response.status_code == 200
+
+        db_session.expire_all()
+
+        def copy_ids(pin_id: int) -> set[int]:
+            loaded = db_session.scalar(
+                select(Pin)
+                .where(Pin.id == pin_id)
+                .options(selectinload(Pin.unauthorized_copies))
+                .execution_options(include_pending=True)
+            )
+            assert loaded is not None
+            return {copy.id for copy in loaded.unauthorized_copies}
+
+        assert copy_ids(pin_a_id) == set()
+        assert copy_ids(pin_b_id) == set()
+
 
 @pytest.mark.integration
 class TestGetPinForAuthenticatedUser:
